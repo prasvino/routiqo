@@ -1,0 +1,15 @@
+spring:
+  profiles:
+    default: preview
+  application:
+    name: routiqo-core-api
+  threads:
+    virtual:
+      enabled: true
+server:
+  port: 8080
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never

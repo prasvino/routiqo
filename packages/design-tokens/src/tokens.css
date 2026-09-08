@@ -1,0 +1,21 @@
+:root {
+  --canvas: #f8f8f2;
+  --surface: #fff;
+  --ink: #173e38;
+  --muted: #687a74;
+  --accent: #146e60;
+  --soft: #e9eee6;
+  --line: #e1e6dc;
+  --sand: #eee5d2;
+  --danger: #a23930;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --touch: 48px;
+}

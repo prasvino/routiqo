@@ -1,0 +1,378 @@
+openapi: 3.0.3
+info:
+  title: Routiqo core API
+  version: 0.4.0
+  description: Discovery and opt-in browser authentication. Auth requires web-auth, google-auth and persistence profiles; default preview denies these routes. No live traffic or user presence.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status, service]
+                properties:
+                  status: { type: string, enum: [UP] }
+                  service: { type: string, enum: [routiqo-core-api] }
+  /api/v1/destinations:
+    get:
+      operationId: listDestinations
+      responses:
+        '200':
+          description: Curated seed destinations, not live routing information
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items: { $ref: '#/components/schemas/Destination' }
+  /api/v1/journeys:
+    get:
+      operationId: listBrowserJourneys
+      security: [{ browserSession: [] }]
+      description: Owner-scoped keyset history. Cursor fields must be supplied together. No route endpoints or presence are returned.
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { in: query, name: beforeStartedAt, schema: { type: string, format: date-time }, description: Microsecond precision; pair with beforeId. }
+        - { in: query, name: beforeId, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Bounded journey history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [journeys, next]
+                properties:
+                  journeys: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Journey' } }
+                  next: { $ref: '#/components/schemas/JourneyCursor' }
+        '400': { description: Invalid page size or cursor }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+    post:
+      operationId: startBrowserJourney
+      security: [{ browserSession: [] }]
+      description: Retry with the same UUID and kind. Returns the original record even after completion; never restarts a completed journey. Owner comes only from the session.
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, kind]
+              properties:
+                id: { type: string, format: uuid }
+                kind: { type: string, enum: [trip, commute] }
+      responses:
+        '200': { $ref: '#/components/responses/JourneyResult' }
+        '400': { description: Invalid identifier, kind or JSON }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '409': { description: Journey identity/kind conflict or another active journey }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/journeys/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getBrowserJourney
+      security: [{ browserSession: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/JourneyResult' }
+        '400': { description: Invalid identifier }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey absent or inaccessible }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/journeys/{id}/complete:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: completeBrowserJourney
+      security: [{ browserSession: [] }]
+      description: Owner-only idempotent completion using server time; repeats return the original completion.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/JourneyResult' }
+        '400': { description: Invalid identifier }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey absent or inaccessible }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/auth/csrf:
+    get:
+      operationId: getBrowserCsrf
+      description: Same-origin bootstrap. Sets an HttpOnly CSRF cookie; send the returned masked token in X-XSRF-TOKEN for POST requests. Responses are no-store.
+      responses:
+        '200':
+          description: CSRF token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CsrfToken' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/auth/google/challenge:
+    post:
+      operationId: beginGoogleBrowserLogin
+      description: Creates a five-minute challenge and sets its HttpOnly binding cookie. A newer challenge replaces the browser binding; no raw binding is returned.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Pass nonce to Google sign-in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoogleChallenge' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/auth/google/exchange:
+    post:
+      operationId: exchangeGoogleBrowserLogin
+      description: Requires the challenge binding cookie. Sets a 15-minute HttpOnly session cookie and clears binding. Session credentials never appear in the response body. No refresh token yet.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, idToken]
+              properties:
+                challengeId: { type: string, format: uuid }
+                idToken: { type: string, minLength: 1, maxLength: 16384 }
+      responses:
+        '200':
+          description: Browser session established
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserSession' }
+        '400': { description: Invalid JSON or request fields }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/auth/session:
+    get:
+      operationId: getBrowserSession
+      security: [{ browserSession: [] }]
+      responses:
+        '200':
+          description: Enabled account for an unexpired, unrevoked browser session
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [accountId]
+                properties:
+                  accountId: { type: string, format: uuid }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/auth/session/renew:
+    post:
+      operationId: renewBrowserSession
+      security: [{ browserSession: [] }]
+      description: Rotates a valid session in its last five minutes; otherwise returns its existing expiry. HttpOnly cookie only. Original Google authentication limits all replacements to 12 hours. Expired or revoked credentials cannot renew. A lost rotation response may require sign-in again.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Current or renewed browser session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserSession' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/auth/account/delete:
+    post:
+      operationId: deleteBrowserAccount
+      security: [{ browserSession: [] }]
+      description: Deletes this Routiqo account, its server journeys and all sessions. Requires Google authentication within five minutes; renewal does not reset that time. Local plans and the Google account remain unchanged. Reauthentication must be followed by explicit confirmation again.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmation, accountId]
+              properties:
+                confirmation: { type: string, enum: [DELETE] }
+                accountId: { type: string, format: uuid, description: Must match the session account shown when confirmation opened; rejects account switches in other tabs. }
+      responses:
+        '204': { description: Account deleted; session and binding cookies cleared }
+        '400': { description: Explicit confirmation required or invalid JSON }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '428': { description: Sign in with Google again, then explicitly reconfirm deletion }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/auth/logout:
+    post:
+      operationId: logoutBrowserSession
+      description: Idempotently revokes the supplied session and clears session/binding cookies. CSRF is required even if already signed out.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '204': { description: Signed out }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+components:
+  securitySchemes:
+    browserSession:
+      type: apiKey
+      in: cookie
+      name: __Host-routiqo_session
+      description: Secure production cookie. Explicit loopback HTTP development uses routiqo_session.
+  parameters:
+    JourneyAccount:
+      in: header
+      name: X-Routiqo-Account
+      required: true
+      schema: { type: string, format: uuid }
+      description: Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching.
+    AuthOrigin:
+      in: header
+      name: Origin
+      required: true
+      schema: { type: string }
+      description: Must exactly match the configured browser origin.
+    AuthCsrf:
+      in: header
+      name: X-XSRF-TOKEN
+      required: true
+      schema: { type: string }
+      description: Masked token returned by GET csrf; browser must also send its CSRF cookie.
+  responses:
+    JourneyResult:
+      description: Owned journey lifecycle record
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Journey' }
+    AuthRejected:
+      description: Missing, invalid, expired or revoked authentication; no credential details are returned.
+    AuthForbidden:
+      description: Origin, fetch metadata or CSRF check failed.
+    AuthTooLarge:
+      description: Body exceeds 20 KiB.
+    AuthMediaType:
+      description: POST requires application/json.
+    AuthLimited:
+      description: Request rate exceeded.
+      headers:
+        Retry-After:
+          schema: { type: string }
+          description: Retry delay in seconds.
+  schemas:
+    Journey:
+      type: object
+      additionalProperties: false
+      required: [id, kind, status, startedAt, completedAt]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [trip, commute] }
+        status: { type: string, enum: [active, completed] }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+    JourneyCursor:
+      type: object
+      nullable: true
+      required: [startedAt, id]
+      properties:
+        startedAt: { type: string, format: date-time }
+        id: { type: string, format: uuid }
+    CsrfToken:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token: { type: string }
+    GoogleChallenge:
+      type: object
+      additionalProperties: false
+      required: [id, nonce, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        nonce: { type: string, minLength: 43, maxLength: 43 }
+        expiresAt: { type: string, format: date-time }
+    BrowserSession:
+      type: object
+      additionalProperties: false
+      required: [accountId, expiresAt]
+      properties:
+        accountId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+    Destination:
+      type: object
+      additionalProperties: false
+      required: [id, name, region, category, eyebrow, description, detail, highlights, image, imageAlt, travelLabel, accent]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        region: { type: string }
+        category: { type: string, enum: [Coast, Hills, Heritage] }
+        eyebrow: { type: string }
+        description: { type: string }
+        detail: { type: string }
+        highlights: { type: array, items: { type: string }, maxItems: 10 }
+        image: { type: string }
+        imageAlt: { type: string }
+        travelLabel: { type: string }
+        accent: { type: string }

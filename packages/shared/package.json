@@ -1,0 +1,16 @@
+{
+  "name": "@routiqo/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./catalog": "./src/catalog.json"
+  },
+  "dependencies": {
+    "@routiqo/api-client": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

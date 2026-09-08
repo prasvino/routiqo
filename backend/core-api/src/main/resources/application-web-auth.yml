@@ -1,0 +1,3 @@
+server:
+  # Peer-address rate limiting must not trust client-supplied forwarding headers.
+  forward-headers-strategy: none

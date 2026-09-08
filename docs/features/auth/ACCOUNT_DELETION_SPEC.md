@@ -1,0 +1,9 @@
+# Account deletion
+
+An authenticated user may explicitly delete their Routiqo server account. Require exact confirmation DELETE and Google authentication within the previous five minutes. Renewal retains the original authentication timestamp and cannot satisfy this requirement. Older authentication returns 428; the user signs in again and explicitly reconfirms. Never automatically delete after a Google callback.
+
+The transaction locks the valid current session and enabled account, checks recent authentication, then deletes the account. Foreign keys cascade all its sessions and server journey records. Other accounts remain untouched. Adding the journey owner foreign key must fail on orphaned legacy rows; do not silently erase or remap data. This migration has only been exercised in disposable databases until explicitly run against a configured environment.
+
+Browser POST requires exact Origin, CSRF, the session cookie and bounded JSON. Success clears session and challenge binding cookies. A lost response can be ambiguous: check account status and explain that deletion could not be confirmed rather than claiming success. Local device plans/bookmarks remain available and can be cleared separately. Google account and Google consent are separate; Routiqo has no Google access token to revoke. Subsequent Google login creates a new Routiqo account.
+
+Acceptance: synthetic PostgreSQL tests prove owner-only cascade, all-session invalidation, recent-auth boundary, renewal cannot bypass it, disabled/revoked rejection. HTTP tests cover explicit confirmation, CSRF and 428. UI uses a native confirmation dialog, explains scope, supports retry and fresh sign-in, and never submits deletion from login completion.

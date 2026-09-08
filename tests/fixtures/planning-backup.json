@@ -1,0 +1,22 @@
+{
+  "format": "routiqo-planning",
+  "version": 1,
+  "exportedAt": "2026-09-06T00:00:00Z",
+  "data": {
+    "version": 1,
+    "plans": [
+      {
+        "id": "qa-backup-restore",
+        "kind": "trip",
+        "origin": "Chennai",
+        "destination": "Thanjavur",
+        "date": "2026-10-10",
+        "time": "07:30",
+        "days": [],
+        "notes": "Synthetic backup-restore QA plan",
+        "createdAt": "2026-09-06T00:00:00Z"
+      }
+    ],
+    "saved": ["thanjavur"]
+  }
+}

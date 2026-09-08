@@ -1,0 +1,13 @@
+{
+  "name": "@routiqo/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./css": "./src/tokens.css"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

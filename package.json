@@ -1,0 +1,45 @@
+{
+  "name": "routiqo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.34.4",
+  "engines": {
+    "node": ">=22.13.0 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @routiqo/web dev",
+    "dev:web": "pnpm --filter @routiqo/web dev",
+    "dev:admin": "pnpm --filter @routiqo/admin dev",
+    "dev:mobile": "pnpm --filter @routiqo/mobile dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "eslint apps packages tests --max-warnings 0",
+    "test": "vitest run",
+    "check": "pnpm contracts:check && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
+    "contracts:generate": "openapi-typescript contracts/openapi/core.yaml -o packages/api-client/src/schema.d.ts",
+    "contracts:check": "node scripts/check-contracts.mjs",
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down",
+    "backend:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backend.ps1 check",
+    "backend:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backend.ps1 :core-api:bootRun",
+    "format": "prettier --write apps packages tests scripts *.mjs *.mts *.json .github",
+    "format:check": "prettier --check apps packages tests scripts *.mjs *.mts *.json .github",
+    "secrets:check": "node scripts/scan-secrets.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.3",
+    "@types/node": "22.19.15",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.3",
+    "eslint-plugin-react-hooks": "7.0.1",
+    "fake-indexeddb": "6.2.5",
+    "globals": "16.5.0",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.6",
+    "turbo": "2.10.12",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0",
+    "vitest": "4.1.11"
+  }
+}

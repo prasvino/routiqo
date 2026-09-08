@@ -1,0 +1,9 @@
+# Atomic journey result and outbox acknowledgement
+
+Before dispatching lifecycle writes, persist a validated server journey result in the same SQLite transaction that removes the acknowledged head command. A crash or storage failure must leave both old queue and old snapshots unchanged. Network calls remain outside transactions. Only the current lease may acknowledge; stale worker results do not write snapshots, including after account queue deletion. Account partitions are explicit and never inferred from a response body.
+
+Use generated Journey transport shape with runtime validation of UUID, kind/status, canonical UTC dates and up to microsecond precision. Reject impossible dates, completed-before-start, active-with-completion, wrong journey/kind and active response to a completion command. Never cache unknown fields or credentials. A completed snapshot never reverts to active, and immutable kind/start/completion timestamps must agree on repeated observations.
+
+Store a bounded version-one cache of at most100 records per account, ordered by start time/id. When full, prune oldest completed snapshots; never silently discard an active record. This is a recent lifecycle cache, not complete server history. Read corrupt/oversized/mismatched account state as an error; do not replace it with an empty cache. Local planning backups exclude this cache and outbox. Account deletion clears both partitions in one transaction; not yet wired to native authentication.
+
+Tests: response validation and monotonic merge, capacity/pruning, exact microsecond comparison, stale acknowledgement, reopen after commit, snapshot-insert failure rollback preserving queue, wrong-account isolation, and atomic local partition removal. No dispatcher/background network or native account storage is enabled by this slice.

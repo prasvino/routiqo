@@ -1,0 +1,12 @@
+node_modules
+**/.next
+**/dist
+**/.expo
+**/build
+packages/api-client/src/schema.d.ts
+**/next-env.d.ts
+pnpm-lock.yaml
+docs/product
+docs/design/ROUTIQO_UI_UX_SYSTEM.md
+docs/development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md
+docs/reference

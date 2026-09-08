@@ -1,0 +1,18 @@
+import type { NextConfig } from 'next';
+const config: NextConfig = {
+  poweredByHeader: false,
+  transpilePackages: ['@routiqo/design-tokens'],
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
+    ];
+  },
+};
+export default config;

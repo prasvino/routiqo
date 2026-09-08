@@ -1,0 +1,9 @@
+title = "Routiqo source secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Reviewed non-secrets: localStorage namespace and authentication prose"
+regexTarget = "secret"
+regexes = ['''^routiqo\.planning\.v1$''', '''^rotating/revocable$''']
