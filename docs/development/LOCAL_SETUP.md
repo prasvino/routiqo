@@ -66,7 +66,7 @@ Then run `npx.cmd --yes pnpm@10.34.4 backend:dev`. Startup applies migrations to
 
 The internal Google verifier is opt-in. For database-independent verification setup use `SPRING_PROFILES_ACTIVE=preview,google-auth`; for account persistence use `persistence,google-auth` plus the database variables above. Set `ROUTIQO_GOOGLE_CLIENT_ID` to the intended Google OAuth client ID. It is an identifier, not a client secret. No key-fetch URL override is accepted. Missing/invalid client configuration fails startup; provider failures reject verification.
 
-Google OAuth consent-screen/client registration and authorized web origins are still needed for real login. Do not put client secrets in web/mobile bundles or paste them into task messages. Session exchange and client login are not implemented yet; setting the client ID alone will not enable sign-in. Phone OTP is deferred.
+Google OAuth consent-screen/client registration and authorized web origins are still needed for real login. Do not put client secrets in web/mobile bundles or paste them into task messages. Session exchange and web login are implemented; setting the client ID alone does not configure the remaining backend and proxy settings. Phone OTP is deferred.
 
 ## Opt-in browser auth HTTP
 
@@ -76,8 +76,14 @@ Use profiles `persistence,google-auth,web-auth` with the existing database/Googl
 - `ROUTIQO_AUTH_RATE_SECRET`: a random secret of at least 32 characters, shared by all replicas, supplied externally.
 - `ROUTIQO_AUTH_SECURE_COOKIES`: defaults true. Set false only for explicit local HTTP with localhost/127.0.0.1 origin.
 
-Browser requests must use a same-origin API proxy; wildcard CORS is not enabled. The login UI/proxy is pending. HTTP tests exercise the routes directly without a real Google account. Default preview remains unchanged.
+Browser requests use the implemented same-origin API proxy; wildcard CORS is not enabled. Configure the web server with `ROUTIQO_GOOGLE_CLIENT_ID`, `ROUTIQO_AUTH_API_URL` (the backend origin) and the same `ROUTIQO_WEB_ORIGIN`. HTTP tests exercise the routes directly without a real Google account. Default preview remains unchanged.
 
 GET /api/v1/auth/csrf sets its HttpOnly cookie and returns a masked token. Send the cookie plus X-XSRF-TOKEN and the exact Origin on POST challenge/exchange/logout, using application/json. HTTPS session/binding/CSRF cookie names have __Host- prefixes; loopback development names do not. Never expose session credentials to JavaScript.
 
-Rate limits use the socket peer, not forwarded headers. A reverse proxy therefore shares a peer bucket until trusted forwarding is explicitly configured. Cleanup runs in bounded batches; measure backlog/capacity before launch. Sessions expire after 15 minutes; refresh rotation is pending.
+Rate limits use the socket peer, not forwarded headers. A reverse proxy therefore shares a peer bucket until trusted forwarding is explicitly configured. Cleanup runs in bounded batches; measure backlog/capacity before launch. Sessions expire after 15 minutes; bounded refresh rotation supports a maximum 12-hour lineage.
+
+## Opt-in private routing
+
+Add `routing` to `persistence,google-auth,web-auth` and supply `ROUTIQO_MAPBOX_TOKEN` only to the backend process through external secret configuration. Missing token fails startup when this profile is active. Never use a `NEXT_PUBLIC_` variable for this token. The web proxy uses the same backend configuration as authentication.
+
+The endpoint is POST `/api/v1/routes`, with mode `driving`, `walking` or `cycling`, and two longitude/latitude coordinate arrays named `origin` and `destination`. It requires the browser session, CSRF, exact origin and matching account header. It returns private Mapbox estimates without creating journeys or presence. A route-selection UI is still pending. No real Mapbox request has been tested; automated tests use synthetic transport responses.

@@ -10,6 +10,39 @@ export interface RouteOption {
   durationSeconds: number;
   geometry: RouteCoordinate[];
 }
+export interface RouteResult {
+  provider: 'mapbox';
+  calculatedAt: string;
+  routes: RouteOption[];
+}
+/** Validate the normalized application contract; never retain provider extras. */
+export function readRouteResult(input: unknown): RouteResult {
+  if (
+    !record(input) ||
+    input.provider !== 'mapbox' ||
+    typeof input.calculatedAt !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(input.calculatedAt) ||
+    !Number.isFinite(Date.parse(input.calculatedAt)) ||
+    !Array.isArray(input.routes) ||
+    input.routes.length > 3
+  )
+    throw new Error('Routing response is invalid.');
+  const routes =
+    input.routes.length === 0
+      ? []
+      : readMapboxRoutes({
+          code: 'Ok',
+          routes: input.routes.map((route: unknown) => {
+            if (!record(route)) throw new Error('Routing response is invalid.');
+            return {
+              distance: route.distanceMetres,
+              duration: route.durationSeconds,
+              geometry: { type: 'LineString', coordinates: route.geometry },
+            };
+          }),
+        });
+  return { provider: 'mapbox', calculatedAt: input.calculatedAt, routes };
+}
 const record = (input: unknown): input is Record<string, unknown> =>
   typeof input === 'object' && input !== null && !Array.isArray(input);
 function coordinate(input: unknown): RouteCoordinate {

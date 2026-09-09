@@ -215,10 +215,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Opt-in routing profile. Sends selected endpoints to Mapbox; does not start a journey or publish presence. Twenty requests per account per minute. Results are estimates; empty routes means no route found. */
+        post: operations["calculatePrivateRoute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Longitude then latitude. Longitude must be between -180 and180, latitude between -90 and90. Endpoints must differ. */
+        RouteCoordinate: number[];
         Journey: {
             /** Format: uuid */
             id: string;
@@ -785,6 +804,71 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
+        };
+    };
+    calculatePrivateRoute: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    mode: "driving" | "walking" | "cycling";
+                    origin: components["schemas"]["RouteCoordinate"];
+                    destination: components["schemas"]["RouteCoordinate"];
+                };
+            };
+        };
+        responses: {
+            /** @description Private route estimates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        provider: "mapbox";
+                        /** Format: date-time */
+                        calculatedAt: string;
+                        routes: {
+                            distanceMetres: number;
+                            durationSeconds: number;
+                            geometry: components["schemas"]["RouteCoordinate"][];
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid mode or endpoints */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Routing provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
 }

@@ -134,11 +134,25 @@ export async function proxyBrowserJourneys(
     upstreamFetch,
   );
 }
+export async function proxyBrowserRouting(
+  request: Request,
+  config: BrowserAuthConfig | null,
+  upstreamFetch: typeof fetch = fetch,
+): Promise<Response> {
+  if (!config) return failure(503);
+  if (request.method !== 'POST') return failure(405);
+  if (new URL(request.url).search) return failure(400);
+  return forwardBrowserRequest(request, 'routes', config, upstreamFetch, {
+    responseLimit: 1024 * 1024,
+    timeout: 15000,
+  });
+}
 async function forwardBrowserRequest(
   request: Request,
   path: string,
   config: BrowserAuthConfig,
   upstreamFetch: typeof fetch,
+  limits = { responseLimit: 64 * 1024, timeout: 8000 },
 ): Promise<Response> {
   if (
     request.headers.get('sec-fetch-site') === 'cross-site' ||
@@ -178,7 +192,7 @@ async function forwardBrowserRequest(
       ...(body ? { body: Buffer.from(body) } : {}),
       redirect: 'manual',
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(limits.timeout),
     });
     if (result.status >= 300 && result.status < 400) {
       await result.body?.cancel();
@@ -195,7 +209,7 @@ async function forwardBrowserRequest(
     for (const cookie of result.headers.getSetCookie()) {
       if (cookieNames.has(cookie.split('=', 1)[0] ?? '')) output.append('set-cookie', cookie);
     }
-    const bytes = await boundedBody(result.body, 64 * 1024);
+    const bytes = await boundedBody(result.body, limits.responseLimit);
     return new Response(result.status === 204 ? null : Buffer.from(bytes), {
       status: result.status,
       headers: output,

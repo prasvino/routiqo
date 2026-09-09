@@ -28,12 +28,13 @@ public class BrowserAuthConfiguration {
         var csrf = new CookieCsrfTokenRepository();
         csrf.setCookieName(policy.cookieName("routiqo_csrf")); csrf.setCookiePath("/");
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(policy.secureCookies()).sameSite("Strict"));
-        return http.securityMatcher("/api/v1/auth/**", "/api/v1/journeys", "/api/v1/journeys/**")
+        return http.securityMatcher("/api/v1/auth/**", "/api/v1/journeys", "/api/v1/journeys/**", "/api/v1/routes")
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.csrfTokenRepository(csrf))
                 .addFilterBefore(new BrowserAuthGuard(policy, rates), CsrfFilter.class)
                 .authorizeHttpRequests(a -> a
+                    .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/routes").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/auth/csrf", "/api/v1/auth/session").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/journeys", "/api/v1/journeys/*").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/journeys", "/api/v1/journeys/*/complete").permitAll()

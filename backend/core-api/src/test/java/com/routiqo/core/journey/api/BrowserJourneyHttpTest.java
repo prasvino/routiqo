@@ -16,9 +16,10 @@ import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
     "ROUTIQO_GOOGLE_CLIENT_ID=test-client.apps.googleusercontent.com",
-    "ROUTIQO_WEB_ORIGIN=http://localhost:3000", "ROUTIQO_AUTH_SECURE_COOKIES=false"
+    "ROUTIQO_WEB_ORIGIN=http://localhost:3000", "ROUTIQO_AUTH_SECURE_COOKIES=false",
+    "ROUTIQO_MAPBOX_TOKEN=synthetic-routing-token"
 })
-@ActiveProfiles({"persistence", "google-auth", "web-auth"})
+@ActiveProfiles({"persistence", "google-auth", "web-auth", "routing"})
 @Import(BrowserJourneyHttpTest.TestIdentity.class)
 class BrowserJourneyHttpTest {
     static final PostgreSQLContainer DATABASE = new PostgreSQLContainer("postgres:16-alpine");
@@ -30,6 +31,10 @@ class BrowserJourneyHttpTest {
         properties.add("ROUTIQO_AUTH_RATE_SECRET", () -> UUID.randomUUID().toString());
     }
     @TestConfiguration static class TestIdentity {
+        @Bean @Primary com.routiqo.core.routing.application.RouteProvider syntheticRoutes() {
+            return request -> java.util.List.of(new com.routiqo.core.routing.domain.RouteOption(1200, 600,
+                    java.util.List.of(request.origin(), request.destination())));
+        }
         @Bean @Primary GoogleIdentityVerifier syntheticIdentity() {
             return (token, nonce) -> {
                 if (!token.startsWith(nonce + ":")) throw new SecurityException("Synthetic test credential rejected");
@@ -68,6 +73,22 @@ class BrowserJourneyHttpTest {
         return new Browser(client, csrf, JsonPath.read(exchange.body(), "$.accountId"));
     }
     String start(UUID id, String kind) { return "{\"id\":\"" + id + "\",\"kind\":\"" + kind + "\"}"; }
+    @Test void privateRoutingRequiresAccountCsrfOriginAndAccountRateBudget() throws Exception {
+        var owner = login();
+        String body = "{\"mode\":\"driving\",\"origin\":[80,13],\"destination\":[79,12]}";
+        assertThat(send(owner.client(), "routes", body, owner.csrf(), "http://localhost:3000", UUID.randomUUID().toString()).statusCode()).isEqualTo(401);
+        assertThat(send(owner.client(), "routes", body, null, "http://localhost:3000", owner.account()).statusCode()).isEqualTo(403);
+        assertThat(send(owner.client(), "routes", body, owner.csrf(), "https://wrong.example", owner.account()).statusCode()).isEqualTo(403);
+        assertThat(send(owner, "routes", body.replace("driving", "flying")).statusCode()).isEqualTo(400);
+        for (int attempt = 0; attempt < 20; attempt++) {
+            var result = send(owner, "routes", body);
+            assertThat(result.statusCode()).isEqualTo(200);
+            assertThat(result.headers().firstValue("Cache-Control")).contains("no-store");
+            assertThat(JsonPath.<String>read(result.body(), "$.provider")).isEqualTo("mapbox");
+            assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account());
+        }
+        assertThat(send(owner, "routes", body).statusCode()).isEqualTo(429);
+    }
     @Test void lifecycleRetriesNeverRestartOrChangeOwnership() throws Exception {
         var owner = login(); var other = login(); var id = UUID.randomUUID();
         String forged = start(id, "trip").replace("}", ",\"ownerId\":\"" + other.account() + "\"}");

@@ -1,4 +1,4 @@
-# Build status — 2026-09-08
+# Build status — 2026-09-09
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
 
@@ -21,6 +21,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Latest routing pass: **102 TypeScript tests and 61 Java tests passed**, with contract drift, formatting, strict types, lint and Gradle check/bootJar. Secret scanning found no leaks. Authenticated routing, bounded Mapbox transport, same-origin proxy and cancellable browser calculator are implemented; route-selection UI and live provider/OAuth configuration remain pending. Dependency security fixes were verified with zero production audit advisories and a successful Android JavaScript export. These results supersede the historical totals below.
 
 Latest post-crash journey/storage pass: **93 TypeScript tests passed** with contracts, format, strict types and lint. Gradle check/bootJar passed after adding authenticated journey HTTP coverage and account-switch protection. Native Android export passed after snapshot storage; complete web/admin builds and Android export passed. Tests cover owner isolation, request guards, stable retries, bounded pagination, deletion races, atomic SQLite/IndexedDB result acknowledgement, failed writes, stale leases and transport outcomes. Final secret scan passed, including the IndexedDB addition. Real Google/native device testing remains pending.
 
