@@ -9,12 +9,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@routiqo/api-client": "workspace:*",
+    "@routiqo/design-tokens": "workspace:*",
+    "@routiqo/shared": "workspace:*",
+    "lucide-react": "1.41.0",
     "next": "16.3.4",
     "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "lucide-react": "1.41.0",
-    "@routiqo/shared": "workspace:*",
-    "@routiqo/design-tokens": "workspace:*",
-    "@routiqo/api-client": "workspace:*"
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.0",
+    "jsdom": "26.1.0"
   }
 }

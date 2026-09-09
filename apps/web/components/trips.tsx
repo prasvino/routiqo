@@ -17,6 +17,7 @@ import { usePlanning } from './planning-provider';
 import { PlanDialog } from './plan-dialog';
 import { useLocalClock } from './use-local-clock';
 import { Modal } from './modal';
+import { JourneyWorkspace } from './journey-workspace';
 export function Trips() {
   const now = useLocalClock();
   const { state, ready, removePlan } = usePlanning();
@@ -35,6 +36,7 @@ export function Trips() {
           <Plus size={18} /> New plan
         </button>
       </section>
+      <JourneyWorkspace />
       <div className="local-strip">
         <ShieldCheck size={18} />
         <span>

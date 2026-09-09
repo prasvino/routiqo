@@ -5,6 +5,10 @@ import {
   clearBrowserJourneyPartition,
   readBrowserJourneyPartition,
   updateBrowserJourneyOutbox,
+  queueBrowserJourneyAction,
+  reconcileBrowserJourney,
+  mergeBrowserJourneyHistory,
+  retireBrowserJourneyPartition,
 } from '../apps/web/lib/journey-storage';
 import { claimJourneyCommand, enqueueJourneyCommand } from '../packages/shared/src/journey-outbox';
 const account = '00000000-0000-4000-8000-000000000001';
@@ -33,6 +37,73 @@ async function pending(owner = account) {
   );
 }
 describe('browser IndexedDB journey partitions', () => {
+  it('prevents late history and queue writes from resurrecting a deleted account', async () => {
+    await mergeBrowserJourneyHistory(account, [response]);
+    await mergeBrowserJourneyHistory(other, [response]);
+    await retireBrowserJourneyPartition(account);
+    await retireBrowserJourneyPartition(account);
+    await expect(mergeBrowserJourneyHistory(account, [response])).rejects.toThrow('deleted');
+    await expect(
+      queueBrowserJourneyAction(account, { action: 'start', kind: 'trip', journeyId: id }, 0),
+    ).rejects.toThrow('deleted');
+    await expect(readBrowserJourneyPartition(account)).rejects.toThrow('deleted');
+    expect((await readBrowserJourneyPartition(other)).snapshots.journeys).toHaveLength(1);
+  });
+  it('restores server history without clearing pending actions and rolls back invalid batches', async () => {
+    await queueBrowserJourneyAction(account, { action: 'start', kind: 'trip', journeyId: id }, 0);
+    const restored = await mergeBrowserJourneyHistory(account, [response]);
+    expect(restored.outbox.entries).toHaveLength(1);
+    expect(restored.snapshots.journeys).toHaveLength(1);
+    await expect(
+      mergeBrowserJourneyHistory(account, [
+        { ...response, id: other },
+        { ...response, kind: 'commute' },
+      ]),
+    ).rejects.toThrow();
+    expect(await readBrowserJourneyPartition(account)).toEqual(restored);
+  });
+  it('atomically reconciles only confirmed blocked work and preserves following commands', async () => {
+    const command = { action: 'start' as const, kind: 'trip' as const, journeyId: id };
+    await queueBrowserJourneyAction(account, command, 0);
+    await queueBrowserJourneyAction(account, { action: 'complete', journeyId: id }, 1);
+    await updateBrowserJourneyOutbox(account, (queue) => ({
+      ...queue,
+      entries: queue.entries.map((entry, index) =>
+        index === 0 ? { ...entry, blocked: 'conflict' } : entry,
+      ),
+    }));
+    await expect(
+      reconcileBrowserJourney(account, command, { ...response, kind: 'commute' }),
+    ).rejects.toThrow();
+    expect((await readBrowserJourneyPartition(account)).outbox.entries).toHaveLength(2);
+    expect(await reconcileBrowserJourney(account, command, response)).toBe(true);
+    const saved = await readBrowserJourneyPartition(account);
+    expect(saved.snapshots.journeys[0]?.id).toBe(id);
+    expect(saved.outbox.entries[0]?.command.action).toBe('complete');
+    expect(await reconcileBrowserJourney(account, command, response)).toBe(false);
+  });
+  it('allows only one competing explicit start across tabs', async () => {
+    const results = await Promise.allSettled(
+      [id, other].map((journeyId) =>
+        queueBrowserJourneyAction(account, { action: 'start', kind: 'trip', journeyId }, 0),
+      ),
+    );
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect((await readBrowserJourneyPartition(account)).outbox.entries).toHaveLength(1);
+  });
+  it('queues offline completion behind its start and rejects unknown completion', async () => {
+    await expect(
+      queueBrowserJourneyAction(account, { action: 'complete', journeyId: id }, 0),
+    ).rejects.toThrow();
+    await queueBrowserJourneyAction(account, { action: 'start', kind: 'trip', journeyId: id }, 0);
+    await queueBrowserJourneyAction(account, { action: 'complete', journeyId: id }, 1);
+    await queueBrowserJourneyAction(account, { action: 'complete', journeyId: id }, 2);
+    expect(
+      (await readBrowserJourneyPartition(account)).outbox.entries.map(
+        (item) => item.command.action,
+      ),
+    ).toEqual(['start', 'complete']);
+  });
   it('serializes concurrent writers without losing queued commands', async () => {
     await Promise.all(
       [id, other].map((journeyId) =>

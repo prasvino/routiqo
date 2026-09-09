@@ -1859,3 +1859,53 @@ textarea::placeholder {
 .privacy-section p + p {
   margin-top: 12px;
 }
+.journey-workspace {
+  margin: 24px 0;
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.journey-workspace h2 {
+  margin: 8px 0 12px;
+}
+.journey-workspace p {
+  max-width: 64ch;
+  line-height: 1.6;
+}
+.journey-workspace .detail-actions {
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.journey-note {
+  margin-top: 16px;
+  font-size: 13px;
+}
+.journey-kind {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0;
+}
+.journey-kind select {
+  padding: 12px;
+  font: inherit;
+  border-radius: 8px;
+}
+.journey-history {
+  margin-top: 24px;
+}
+.journey-history ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.journey-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.journey-history li span {
+  color: var(--muted);
+}

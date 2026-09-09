@@ -5,3 +5,5 @@ export * from './backup';
 export * from './journey-outbox';
 export * from './journey-snapshots';
 export * from './journey-dispatch';
+export * from './journey-batch';
+export * from './routing';

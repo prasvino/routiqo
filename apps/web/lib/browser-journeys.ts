@@ -2,7 +2,7 @@ import type { paths } from '@routiqo/api-client';
 import { readServerJourney, type JourneyCommand, type JourneyDelivery } from '@routiqo/shared';
 import { browserCsrf, BrowserAuthError } from './browser-auth';
 
-/** Used only by a future durable dispatcher, never by local planning draft operations. */
+/** Used by durable dispatch, never by local planning draft operations. */
 export async function sendBrowserJourney(
   accountId: string,
   command: JourneyCommand,
@@ -58,4 +58,52 @@ export async function sendBrowserJourney(
       return { outcome: 'authentication' };
     return { outcome: 'transient' };
   }
+}
+
+/** Owner-bound lookup for reconciliation; missing is not proof that queued work should be removed. */
+export async function readBrowserJourney(accountId: string, journeyId: string) {
+  const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+  if (!uuid.test(accountId) || !uuid.test(journeyId)) throw new Error('Invalid journey identity.');
+  const response = await fetch(`/api/v1/journeys/${journeyId}`, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    redirect: 'error',
+    headers: { 'X-Routiqo-Account': accountId },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new BrowserAuthError(response.status);
+  const raw = await response.text();
+  if (raw.length > 4096) throw new Error('Journey response exceeds its limit.');
+  const journey = readServerJourney(JSON.parse(raw));
+  if (journey.id !== journeyId) throw new Error('Journey response does not match the request.');
+  return journey;
+}
+
+export async function readRecentBrowserJourneys(accountId: string) {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(accountId))
+    throw new Error('Invalid account identity.');
+  const response = await fetch('/api/v1/journeys?limit=20', {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    redirect: 'error',
+    headers: { 'X-Routiqo-Account': accountId },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!response.ok) throw new BrowserAuthError(response.status);
+  const raw = await response.text();
+  if (raw.length > 32768) throw new Error('Journey history exceeds its limit.');
+  const value: unknown = JSON.parse(raw);
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('journeys' in value) ||
+    !Array.isArray(value.journeys) ||
+    value.journeys.length > 20
+  )
+    throw new Error('Invalid journey history.');
+  const journeys = value.journeys.map(readServerJourney);
+  if (new Set(journeys.map((journey) => journey.id)).size !== journeys.length)
+    throw new Error('Duplicate journey history.');
+  return journeys;
 }

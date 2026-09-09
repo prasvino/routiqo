@@ -12,8 +12,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
-| Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; no mounted client sync loop |
-| Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration and web transport; no mounted sync loop/live journey UI |
+| Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
+| Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
 | Login sessions | Five-minute one-use challenge, atomic account/session exchange, hashed 15-minute opaque credentials, bounded rotation up to 12 hours, lineage revocation and disabled-account enforcement |
 | Browser auth API | Opt-in challenge/exchange/session/logout and CSRF bootstrap; HttpOnly cookies, exact origin/CSRF checks, PostgreSQL rate limits, body limits and bounded expiry cleanup. Default preview still denies auth; web Google button UI and allowlisted same-origin proxy implemented; real OAuth configuration pending |
@@ -22,7 +22,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 ## Verification
 
-Latest post-crash journey/storage pass: **66 TypeScript tests passed** with contracts, format, strict types and lint. Gradle check/bootJar passed after adding authenticated journey HTTP coverage and account-switch protection. Native Android export passed after snapshot storage; complete web/admin builds and Android export passed. Tests cover owner isolation, request guards, stable retries, bounded pagination, deletion races, atomic SQLite/IndexedDB result acknowledgement, failed writes, stale leases and transport outcomes. Final secret scan passed, including the IndexedDB addition. Real Google/native device testing remains pending.
+Latest post-crash journey/storage pass: **93 TypeScript tests passed** with contracts, format, strict types and lint. Gradle check/bootJar passed after adding authenticated journey HTTP coverage and account-switch protection. Native Android export passed after snapshot storage; complete web/admin builds and Android export passed. Tests cover owner isolation, request guards, stable retries, bounded pagination, deletion races, atomic SQLite/IndexedDB result acknowledgement, failed writes, stale leases and transport outcomes. Final secret scan passed, including the IndexedDB addition. Real Google/native device testing remains pending.
 
 
 Latest web account pass: **51 Java tests and 40 TypeScript tests passed**, zero failures/errors; Gradle check/bootJar, contract drift, formatting, types, lint and web production build passed. Secret scan clean. Renewal/revocation, recent-auth deletion, owner cascade and concurrent deletion/renewal have disposable PostgreSQL coverage. HTTP deletion checks cover CSRF, explicit account confirmation and fresh sign-in. Phone deletion dialog and unavailable-service recovery were checked in a temporary synthetic component preview, removed before the production build. Screenshots: delete-account-mobile.png and delete-account-error-mobile.png. Profile preview remains intact. No live Google sign-in has been tested.
@@ -40,12 +40,12 @@ Earlier backend pass: Gradle `check bootJar` passed with **21 Java tests, zero f
 
 Previous passes verified consumer/admin production builds and Expo Android export, rendered web interactions at desktop and phone width, draft persistence after reload, commute ordering, dialog keyboard/Escape/focus behavior, search/bookmarks, and backup validation/restore/merge. Browser download delivery was not confirmed in the in-app browser; the visible backup-text fallback was verified. This is not evidence of real-device native behavior.
 
-Local PostGIS, Redis and MinIO were healthy during this audit. No production services or personal data were used. Synthetic QA plans/bookmarks remain in the preview browser. Remote CI results have not been verified. The Git remote is configured as https://github.com/prasvino/routiqo.git; no deployment has been performed.
+Local PostGIS, Redis and MinIO were healthy during this audit. No production services or personal data were used. Synthetic QA plans/bookmarks remain in the preview browser. GitHub Verify passed for initial commit60d16a7 (run34253287130); later local changes have not run remotely. The Git remote is configured as https://github.com/prasvino/routiqo.git; no deployment has been performed.
 
 ## Pending, in dependency order
 
 1. Actual Google OAuth configuration and end-to-end testing; native credential transport. Web login/proxy, bounded renewal and recent-auth account deletion are implemented. Browser HTTP security, contracts and bounded expiry cleanup are implemented; proxy trust and rate/cleanup capacity still need deployment validation.
-2. Wire durable dispatch/session/reconnect hooks and reconciliation UI; native secure transport remains pending. Authenticated journey contracts/controllers, atomic native snapshots and web IndexedDB are implemented. Local plans remain separate from server journey records.
+2. Complete cross-device restoration and unresolved-conflict UX; verify live OAuth and authenticated browser visuals. Web foreground dispatch, bounded recent restoration and confirmed-result reconciliation are implemented; native secure transport remains pending. Authenticated journey contracts/controllers, atomic native snapshots and web IndexedDB are implemented. Local plans remain separate from server journey records.
 3. Mapbox/native route integration, routing and location permissions, offline route behavior; provider configuration and native development build required.
 4. Privacy-reviewed presence, expiring rooms, blocking/moderation/reporting and realtime delivery. Existing pure policy tests do not implement these services.
 5. Reminders/push, trip journals/commute summaries, media and AI adapters, useful admin workflows.
@@ -56,5 +56,5 @@ Local PostGIS, Redis and MinIO were healthy during this audit. No production ser
 
 Read `docs/features/journey/SERVER_PERSISTENCE_SPEC.md` and ADR 0005 before extending persistence. Default preview needs no database; only the explicit persistence profile runs migrations. No migration was applied to the user's existing Compose volume in this pass.
 
-For offline sync, read `docs/features/journey/OUTBOX_SPEC.md` and ADR 0006. Shared commands and native storage are implemented; authenticated dispatch, atomic local server snapshots, web queue storage and reconciliation UI are still pending. Google is the first login method; phone OTP is deferred. Read `docs/features/auth/GOOGLE_SIGN_IN_SPEC.md` and ADR 0007 before continuing authentication.
+For offline sync, read `docs/features/journey/OUTBOX_SPEC.md` and ADR 0006. Shared commands, native storage, web dispatch, atomic local snapshots and web queue storage are implemented. Broader reconciliation and native secure transport remain pending. Google is the first login method; phone OTP is deferred. Read `docs/features/auth/GOOGLE_SIGN_IN_SPEC.md` and ADR 0007 before continuing authentication.
 

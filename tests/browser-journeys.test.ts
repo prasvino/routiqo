@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { sendBrowserJourney } from '../apps/web/lib/browser-journeys';
+import {
+  sendBrowserJourney,
+  readBrowserJourney,
+  readRecentBrowserJourneys,
+} from '../apps/web/lib/browser-journeys';
 const account = '00000000-0000-4000-8000-000000000001';
 const id = '00000000-0000-4000-8000-000000000002';
 const command = { journeyId: id, action: 'start' as const, kind: 'trip' as const };
@@ -13,6 +17,78 @@ function respond(response: Response) {
   return fetcher;
 }
 describe('browser journey delivery', () => {
+  it('bounds recent history and rejects duplicate or malformed records', async () => {
+    const journey = {
+      id,
+      kind: 'trip',
+      status: 'active',
+      startedAt: '2026-09-08T12:00:00Z',
+      completedAt: null,
+    };
+    const fetcher = vi.fn(async () => Response.json({ journeys: [journey], next: null }));
+    vi.stubGlobal('fetch', fetcher);
+    expect(await readRecentBrowserJourneys(account)).toHaveLength(1);
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/journeys?limit=20',
+      expect.objectContaining({ headers: { 'X-Routiqo-Account': account } }),
+    );
+    for (const journeys of [[journey, journey], Array(21).fill(journey), [{}]]) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => Response.json({ journeys })),
+      );
+      await expect(readRecentBrowserJourneys(account)).rejects.toThrow();
+    }
+  });
+  it('reads authoritative state with the account guard and strips unrelated fields', async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json({
+        id,
+        kind: 'trip',
+        status: 'active',
+        startedAt: '2026-09-08T12:00:00Z',
+        completedAt: null,
+        owner: 'private',
+      }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    const result = await readBrowserJourney(account, id);
+    expect(result?.id).toBe(id);
+    expect(result).not.toHaveProperty('owner');
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/v1/journeys/${id}`,
+      expect.objectContaining({
+        headers: { 'X-Routiqo-Account': account },
+        cache: 'no-store',
+        redirect: 'error',
+      }),
+    );
+  });
+  it('distinguishes missing records from unavailable or unrelated results', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 404 })),
+    );
+    expect(await readBrowserJourney(account, id)).toBeNull();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 401 })),
+    );
+    await expect(readBrowserJourney(account, id)).rejects.toThrow();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          id: account,
+          kind: 'trip',
+          status: 'active',
+          startedAt: '2026-09-08T12:00:00Z',
+          completedAt: null,
+        }),
+      ),
+    );
+    await expect(readBrowserJourney(account, id)).rejects.toThrow('does not match');
+  });
   it('binds the account partition and sends a stable retry identity', async () => {
     const fetcher = respond(
       Response.json({
