@@ -1,4 +1,5 @@
 node_modules/
+.patch-work/
 .pnpm-store/
 .next/
 .expo/
