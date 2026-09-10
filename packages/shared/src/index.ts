@@ -7,3 +7,4 @@ export * from './journey-snapshots';
 export * from './journey-dispatch';
 export * from './journey-batch';
 export * from './routing';
+export * from './place-search';

@@ -31,6 +31,11 @@ class BrowserJourneyHttpTest {
         properties.add("ROUTIQO_AUTH_RATE_SECRET", () -> UUID.randomUUID().toString());
     }
     @TestConfiguration static class TestIdentity {
+        @Bean @Primary com.routiqo.core.routing.application.PlaceProvider syntheticPlaces() {
+            return query -> new com.routiqo.core.routing.domain.PlaceResults(java.util.List.of(
+                    new com.routiqo.core.routing.domain.PlaceMatch("synthetic-place", "Synthetic town",
+                    new com.routiqo.core.routing.domain.RouteRequest.Coordinate(80, 13))), "Synthetic attribution");
+        }
         @Bean @Primary com.routiqo.core.routing.application.RouteProvider syntheticRoutes() {
             return request -> java.util.List.of(new com.routiqo.core.routing.domain.RouteOption(1200, 600,
                     java.util.List.of(request.origin(), request.destination())));
@@ -88,6 +93,22 @@ class BrowserJourneyHttpTest {
             assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account());
         }
         assertThat(send(owner, "routes", body).statusCode()).isEqualTo(429);
+    }
+    @Test void placeSearchRequiresAccountCsrfAndEnforcesItsOwnQuota() throws Exception {
+        var owner = login();
+        String body = "{\"query\":\"Chennai\"}";
+        assertThat(send(owner.client(), "routes/places", body, owner.csrf(), "http://localhost:3000", UUID.randomUUID().toString()).statusCode()).isEqualTo(401);
+        assertThat(send(owner.client(), "routes/places", body, null, "http://localhost:3000", owner.account()).statusCode()).isEqualTo(403);
+        assertThat(send(owner.client(), "routes/places", body, owner.csrf(), "https://wrong.example", owner.account()).statusCode()).isEqualTo(403);
+        assertThat(send(owner, "routes/places", "{\"query\":\"bad;query\"}").statusCode()).isEqualTo(400);
+        for (int attempt = 0; attempt < 20; attempt++) {
+            var result = send(owner, "routes/places", body);
+            assertThat(result.statusCode()).isEqualTo(200);
+            assertThat(result.headers().firstValue("Cache-Control")).contains("no-store");
+            assertThat(JsonPath.<String>read(result.body(), "$.places[0].label")).isEqualTo("Synthetic town");
+            assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account(), "Chennai");
+        }
+        assertThat(send(owner, "routes/places", body).statusCode()).isEqualTo(429);
     }
     @Test void lifecycleRetriesNeverRestartOrChangeOwnership() throws Exception {
         var owner = login(); var other = login(); var id = UUID.randomUUID();

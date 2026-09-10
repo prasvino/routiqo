@@ -14,6 +14,7 @@ import {
   type BrowserJourneyPartition,
 } from '../lib/journey-storage';
 import { Modal } from './modal';
+import { RoutePlanner } from './route-planner';
 import { readBrowserJourney } from '../lib/browser-journeys';
 import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 
@@ -328,6 +329,7 @@ export function JourneyWorkspace() {
           </button>
         </>
       )}
+      {availability === 'ready' && account && <RoutePlanner account={account} />}
       {start && (
         <Modal
           title="Start a journey"

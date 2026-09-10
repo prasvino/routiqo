@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.5.0
+  version: 0.6.0
   description: Discovery and opt-in browser authentication. Auth requires web-auth, google-auth and persistence profiles; default preview denies these routes. No live traffic or user presence.
 servers:
   - url: http://localhost:8080
@@ -274,6 +274,52 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/routes/places:
+    post:
+      operationId: searchPrivateRoutePlaces
+      security: [{ browserSession: [] }]
+      description: Explicit temporary Mapbox place lookup. No persistence or presence. Twenty requests per account per minute.
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string, minLength: 3, maxLength: 256, description: Trimmed text; no semicolon or control characters; at most20 letter/number groups. }
+      responses:
+        '200':
+          description: Temporary places and provider attribution; empty places means no matches
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [provider, places, attribution]
+                properties:
+                  provider: { type: string, enum: [mapbox] }
+                  attribution: { type: string, minLength: 1, maxLength: 2048 }
+                  places:
+                    type: array
+                    maxItems: 5
+                    items:
+                      type: object
+                      required: [id, label, coordinate]
+                      properties:
+                        id: { type: string, minLength: 1, maxLength: 512 }
+                        label: { type: string, minLength: 1, maxLength: 512 }
+                        coordinate: { $ref: '#/components/schemas/RouteCoordinate' }
+        '400': { description: Invalid search text }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Place provider unavailable }
   /api/v1/routes:
     post:
       operationId: calculatePrivateRoute

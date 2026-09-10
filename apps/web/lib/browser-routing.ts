@@ -1,5 +1,10 @@
 import type { paths } from '@routiqo/api-client';
-import { readRouteRequest, readRouteResult } from '@routiqo/shared';
+import {
+  readRouteRequest,
+  readRouteResult,
+  readPlaceQuery,
+  readPlaceResults,
+} from '@routiqo/shared';
 import { browserCsrf, BrowserAuthError } from './browser-auth';
 
 export class BrowserRoutingError extends Error {
@@ -20,10 +25,27 @@ export async function calculateBrowserRoute(
   input: unknown,
   signal?: AbortSignal,
 ) {
-  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(accountId))
-    throw new Error('Invalid account identity.');
   const body: paths['/api/v1/routes']['post']['requestBody']['content']['application/json'] =
     readRouteRequest(input);
+  return privateRequest(accountId, '/api/v1/routes', body, readRouteResult, 1048576, signal);
+}
+export async function searchBrowserPlaces(accountId: string, input: unknown, signal?: AbortSignal) {
+  const body: paths['/api/v1/routes/places']['post']['requestBody']['content']['application/json'] =
+    {
+      query: readPlaceQuery(input),
+    };
+  return privateRequest(accountId, '/api/v1/routes/places', body, readPlaceResults, 262144, signal);
+}
+async function privateRequest<T>(
+  accountId: string,
+  path: '/api/v1/routes' | '/api/v1/routes/places',
+  body: unknown,
+  validate: (value: unknown) => T,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(accountId))
+    throw new Error('Invalid account identity.');
   const cancellation = signal
     ? AbortSignal.any([signal, AbortSignal.timeout(18000)])
     : AbortSignal.timeout(18000);
@@ -31,7 +53,7 @@ export async function calculateBrowserRoute(
     cancellation.throwIfAborted();
     const csrf = await browserCsrf();
     cancellation.throwIfAborted();
-    const response = await fetch('/api/v1/routes', {
+    const response = await fetch(path, {
       method: 'POST',
       credentials: 'same-origin',
       cache: 'no-store',
@@ -56,12 +78,12 @@ export async function calculateBrowserRoute(
         const chunk = await reader.read();
         if (chunk.done) break;
         bytes += chunk.value.byteLength;
-        if (bytes > 1048576) throw new BrowserRoutingError(503);
+        if (bytes > limit) throw new BrowserRoutingError(503);
         raw += decoder.decode(chunk.value, { stream: true });
       }
       raw += decoder.decode();
       cancellation.throwIfAborted();
-      return readRouteResult(JSON.parse(raw));
+      return validate(JSON.parse(raw));
     } finally {
       await reader.cancel().catch(() => undefined);
       reader.releaseLock();

@@ -1,4 +1,4 @@
-# Build status — 2026-09-09
+# Build status — 2026-09-10
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
 
@@ -12,6 +12,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
+| Route planning | Authenticated temporary place search, explicit endpoint selection and private Mapbox estimates; optional one-time browser location with cancellation/accuracy checks. No map rendering/navigation or live provider verification yet |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -21,6 +22,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Latest place-search/location pass: **120 TypeScript/component tests and 65 Java tests passed**, with contracts, formatting, types, lint and Gradle check/bootJar. Secret scan clean. The final web production build passed, including one-time location and both routing endpoints. Synthetic tests cover fixed provider hosts, temporary lookup, query/result limits, account/CSRF/origin/rate guards, explicit selection, stale responses, account changes and location denial/accuracy/timeout/cancellation. Visual capture failed twice with `SetIsBorderRequired failed: No such interface supported (0x80004002)`; rendered UI/mobile layout verification remains pending. The temporary review page was removed. Old active journeys outside the recent20 page now get an owner-bound detail check before atomic restoration; missing/unavailable detail leaves saved work unchanged.
 
 Latest routing pass: **102 TypeScript tests and 61 Java tests passed**, with contract drift, formatting, strict types, lint and Gradle check/bootJar. Secret scanning found no leaks. Authenticated routing, bounded Mapbox transport, same-origin proxy and cancellable browser calculator are implemented; route-selection UI and live provider/OAuth configuration remain pending. Dependency security fixes were verified with zero production audit advisories and a successful Android JavaScript export. These results supersede the historical totals below.
 
@@ -59,4 +62,5 @@ Local PostGIS, Redis and MinIO were healthy during this audit. No production ser
 Read `docs/features/journey/SERVER_PERSISTENCE_SPEC.md` and ADR 0005 before extending persistence. Default preview needs no database; only the explicit persistence profile runs migrations. No migration was applied to the user's existing Compose volume in this pass.
 
 For offline sync, read `docs/features/journey/OUTBOX_SPEC.md` and ADR 0006. Shared commands, native storage, web dispatch, atomic local snapshots and web queue storage are implemented. Broader reconciliation and native secure transport remain pending. Google is the first login method; phone OTP is deferred. Read `docs/features/auth/GOOGLE_SIGN_IN_SPEC.md` and ADR 0007 before continuing authentication.
+
 

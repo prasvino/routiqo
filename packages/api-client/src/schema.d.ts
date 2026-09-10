@@ -215,6 +215,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/routes/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Explicit temporary Mapbox place lookup. No persistence or presence. Twenty requests per account per minute. */
+        post: operations["searchPrivateRoutePlaces"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/routes": {
         parameters: {
             query?: never;
@@ -804,6 +821,68 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
+        };
+    };
+    searchPrivateRoutePlaces: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Trimmed text; no semicolon or control characters; at most20 letter/number groups. */
+                    query: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Temporary places and provider attribution; empty places means no matches */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        provider: "mapbox";
+                        attribution: string;
+                        places: {
+                            id: string;
+                            label: string;
+                            coordinate: components["schemas"]["RouteCoordinate"];
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid search text */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Place provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     calculatePrivateRoute: {

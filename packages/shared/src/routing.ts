@@ -47,7 +47,7 @@ export function readRouteResult(input: unknown): RouteResult {
 }
 const record = (input: unknown): input is Record<string, unknown> =>
   typeof input === 'object' && input !== null && !Array.isArray(input);
-function coordinate(input: unknown): RouteCoordinate {
+export function readRouteCoordinate(input: unknown): RouteCoordinate {
   if (
     !Array.isArray(input) ||
     input.length !== 2 ||
@@ -64,8 +64,8 @@ function coordinate(input: unknown): RouteCoordinate {
 export function readRouteRequest(input: unknown): RouteRequest {
   if (!record(input) || !['driving', 'walking', 'cycling'].includes(input.mode as string))
     throw new Error('Choose a supported travel mode.');
-  const origin = coordinate(input.origin),
-    destination = coordinate(input.destination);
+  const origin = readRouteCoordinate(input.origin),
+    destination = readRouteCoordinate(input.destination);
   if (origin[0] === destination[0] && origin[1] === destination[1])
     throw new Error('Choose two different places.');
   return { mode: input.mode as RouteMode, origin, destination };
@@ -99,7 +99,7 @@ export function readMapboxRoutes(input: unknown): RouteOption[] {
     return {
       distanceMetres: route.distance,
       durationSeconds: route.duration,
-      geometry: route.geometry.coordinates.map(coordinate),
+      geometry: route.geometry.coordinates.map(readRouteCoordinate),
     };
   });
 }

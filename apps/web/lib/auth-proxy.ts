@@ -134,6 +134,19 @@ export async function proxyBrowserJourneys(
     upstreamFetch,
   );
 }
+export async function proxyBrowserPlaceSearch(
+  request: Request,
+  config: BrowserAuthConfig | null,
+  upstreamFetch: typeof fetch = fetch,
+): Promise<Response> {
+  if (!config) return failure(503);
+  if (request.method !== 'POST') return failure(405);
+  if (new URL(request.url).search) return failure(400);
+  return forwardBrowserRequest(request, 'routes/places', config, upstreamFetch, {
+    responseLimit: 262144,
+    timeout: 15000,
+  });
+}
 export async function proxyBrowserRouting(
   request: Request,
   config: BrowserAuthConfig | null,
