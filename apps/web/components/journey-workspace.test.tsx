@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { JourneyWorkspace } from './journey-workspace';
+import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 import { authAvailability, browserAccount } from '../lib/browser-auth';
 import { readBrowserJourneyPartition, queueBrowserJourneyAction } from '../lib/journey-storage';
 import {
@@ -11,6 +12,7 @@ import {
 vi.mock('../lib/browser-auth');
 vi.mock('../lib/journey-storage');
 vi.mock('../lib/journey-dispatch');
+vi.mock('../lib/journey-restoration');
 const accountId = '00000000-0000-4000-8000-000000000001';
 const empty = () => ({
   outbox: { version: 1 as const, accountId, entries: [] },
@@ -165,4 +167,18 @@ it('closes an old start dialog when the verified account changes', async () => {
   fireEvent.focus(window);
   await screen.findByRole('link', { name: 'Sign in from Profile' });
   expect(screen.queryByRole('dialog')).toBeNull();
+});
+it('restores confirmed history through the account-bound service and keeps failures visible', async () => {
+  vi.mocked(restoreRecentBrowserJourneyHistory).mockResolvedValue({
+    partition: empty(),
+    recentCount: 20,
+  });
+  render(<JourneyWorkspace />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Restore recent journeys' }));
+  await screen.findByText('Checked 20 recent server journeys. Pending actions are preserved.');
+  expect(restoreRecentBrowserJourneyHistory).toHaveBeenCalledWith(accountId);
+  vi.mocked(restoreRecentBrowserJourneyHistory).mockRejectedValue(new Error('Service unavailable'));
+  fireEvent.click(screen.getByRole('button', { name: 'Restore recent journeys' }));
+  await screen.findByText('Recent journeys could not be restored. Saved work is unchanged.');
+  expect(dispatchBrowserJourneyBatch).not.toHaveBeenCalled();
 });

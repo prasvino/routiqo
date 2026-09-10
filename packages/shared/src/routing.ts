@@ -22,7 +22,9 @@ export function readRouteResult(input: unknown): RouteResult {
     input.provider !== 'mapbox' ||
     typeof input.calculatedAt !== 'string' ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(input.calculatedAt) ||
+    input.calculatedAt.startsWith('0000') ||
     !Number.isFinite(Date.parse(input.calculatedAt)) ||
+    new Date(input.calculatedAt).toISOString().slice(0, 19) !== input.calculatedAt.slice(0, 19) ||
     !Array.isArray(input.routes) ||
     input.routes.length > 3
   )

@@ -10,12 +10,12 @@ import {
 import {
   queueBrowserJourneyAction,
   reconcileBrowserJourney,
-  mergeBrowserJourneyHistory,
   readBrowserJourneyPartition,
   type BrowserJourneyPartition,
 } from '../lib/journey-storage';
 import { Modal } from './modal';
-import { readBrowserJourney, readRecentBrowserJourneys } from '../lib/browser-journeys';
+import { readBrowserJourney } from '../lib/browser-journeys';
+import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 
 export function JourneyWorkspace() {
   const [availability, setAvailability] = useState<
@@ -123,12 +123,11 @@ export function JourneyWorkspace() {
     setError('');
     const current = ++revision.current;
     try {
-      const journeys = await readRecentBrowserJourneys(account);
-      const saved = await mergeBrowserJourneyHistory(account, journeys);
+      const restored = await restoreRecentBrowserJourneyHistory(account);
       if (current === revision.current) {
-        setPartition(saved);
+        setPartition(restored.partition);
         setReview(
-          `Checked ${journeys.length} recent server journeys. Pending actions are preserved.`,
+          `Checked ${restored.recentCount} recent server journeys. Pending actions are preserved.`,
         );
       }
     } catch {

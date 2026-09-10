@@ -200,7 +200,8 @@ export function mergeBrowserJourneyHistory(
   account: string,
   responses: unknown[],
 ): Promise<BrowserJourneyPartition> {
-  if (responses.length > 20) throw new Error('Too many journeys to restore at once.');
+  // One bounded page plus an older cached active journey resolved by owner-bound detail.
+  if (responses.length > 21) throw new Error('Too many journeys to restore at once.');
   return transaction(account, (value) => {
     const partition = read(value, account);
     let snapshots = partition.snapshots;

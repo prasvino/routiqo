@@ -1,5 +1,15 @@
 import { expect, it } from 'vitest';
-import { readMapboxRoutes, readRouteRequest } from './routing';
+import { readMapboxRoutes, readRouteRequest, readRouteResult } from './routing';
+it('rejects impossible estimate timestamps while retaining Java nanosecond precision', () => {
+  const input = { provider: 'mapbox', calculatedAt: '2026-09-09T12:00:00.123456789Z', routes: [] };
+  expect(readRouteResult(input)).toEqual(input);
+  for (const calculatedAt of [
+    '2026-02-30T12:00:00Z',
+    '0000-01-01T00:00:00Z',
+    '2026-09-09T24:00:00Z',
+  ])
+    expect(() => readRouteResult({ ...input, calculatedAt })).toThrow();
+});
 it('validates coordinates and rejects identical endpoints without inventing routes', () => {
   const input = { mode: 'driving', origin: [80, 13], destination: [79, 12] };
   expect(readRouteRequest(input)).toEqual(input);
