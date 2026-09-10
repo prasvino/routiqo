@@ -1,6 +1,6 @@
 # Data retention and deletion
-Current foundation: catalog content plus local plans/saved destination IDs. No accounts, live GPS, messages or personal cloud data. Users can delete a plan or clear all local planning data.
+Current implementation: catalog content plus local plans/saved destination IDs; opt-in Google account identifiers, bounded opaque sessions, server journey lifecycle records and account-bound local outbox/snapshot caches. Users can remove planning data separately from account deletion. Browser account deletion retires its local journey partition to prevent late workers recreating it; sign-out preserves queued work. Other devices retain local caches until their own storage is cleared; do not claim remote erasure of offline device data. No messages, media or public presence are stored yet.
+Temporary Mapbox place results and calculated routes are not persisted or backed up. Optional one-time browser location stays in the route form and is sent to Mapbox only when calculating. Do not enable permanent provider result storage without a separate reviewed decision.
 Browser and native local planning storage must validate shape/version and expose storage failures. No silent cloud upload.
 Before public launch define category-specific retention for raw GPS, presence, messages, reports, media, journals, AI outputs, sessions, backups and providers. No default indefinite precise movement retention.
 Account deletion must revoke sessions promptly and be tested end to end; do not reuse the contradictory Wayfind reactivation specification.
-

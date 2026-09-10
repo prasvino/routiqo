@@ -22,10 +22,18 @@ export default function Page() {
       <div className="privacy-section">
         <MapPinOff size={24} />
         <div>
-          <h2>No location collection in this preview.</h2>
+          <h2>Location only when you choose.</h2>
           <p>
-            Chennai is the starting context for our curated collection. We do not request GPS
-            access, publish your position, or show live traveller presence.
+            Chennai is the starting context for our curated collection, not a detected location.
+            Route planning can request one browser location reading when you choose “Use my current
+            location.” Routiqo does not watch your location in the background, publish your
+            position, or show live traveller presence.
+          </p>
+          <p>
+            When route planning is enabled, submitting a place search sends that text to Mapbox.
+            Calculating a route sends your selected endpoints, including a location reading if you
+            chose one. Place results and route estimates stay in the current view; they are not
+            saved to plans, planning backups or Routiqo’s database.
           </p>
         </div>
       </div>
@@ -34,7 +42,7 @@ export default function Page() {
         <div>
           <h2>Your plans stay on this device.</h2>
           <p>
-            Journey details and saved destination IDs are stored in your browser. They are not
+            Planning drafts and saved destination IDs are stored in your browser. They are not
             synced to an account or shared with other travellers. Avoid entering private addresses
             or sensitive information in plan notes.
           </p>
@@ -54,8 +62,8 @@ export default function Page() {
         </div>
       </div>
       <p className="fine-print">
-        Routiqo serves local image assets; no analytics integration is enabled. Live journeys and
-        traveller presence are not available in this preview.
+        Routiqo serves local image assets; no analytics integration is enabled. Traveller presence
+        and public location sharing are not available.
       </p>
       <div className="privacy-section">
         <ShieldCheck size={24} />
@@ -71,6 +79,13 @@ export default function Page() {
             renewal, or at most 12 hours after signing in. Sign out revokes that sign-in session and
             its replacements. Session records are removed by periodic cleanup after that maximum
             lifetime.
+          </p>
+          <p>
+            Starting or finishing an account journey saves its type, status and timestamps on
+            Routiqo’s server. Pending actions and recent confirmations are also kept in an
+            account-specific cache on this device so they can survive a lost connection. Signing out
+            preserves that saved work; deleting the account removes its local journey cache on the
+            device where you delete it. Planning drafts remain separate.
           </p>
           <p>
             Delete your Routiqo account from Profile to remove its server records and sign out all
