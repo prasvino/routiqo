@@ -5,6 +5,11 @@
 Extend the authenticated web route planner with Mapbox maps, explicit alternative
 selection and a provider-supplied directions list with manual Previous/Next review.
 This is route review, not GPS-triggered turn announcements or native navigation.
+All directions offers direct selection of a provider step, marks the selected item
+with `aria-current="step"`, and moves focus to the current instruction. Previous/Next
+continue from that selection. Re-selecting the current route alternative preserves
+the review position; choosing another alternative starts at its first step. These
+controls use loaded data only, including offline, with no location or route requests.
 Keep the existing account, origin, CSRF, rate and bounded-body controls.
 
 Directions requests use `steps=true&language=en`. Normalize one leg's bounded steps

@@ -2141,3 +2141,13 @@ textarea::placeholder {
     flex: 1;
   }
 }
+.route-step-choice {
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.route-step-choice[aria-current='step'] {
+  border-color: #2f6b5f;
+  box-shadow: inset 3px 0 0 #2f6b5f;
+}

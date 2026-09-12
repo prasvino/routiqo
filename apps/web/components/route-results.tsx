@@ -1,11 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { RouteResult } from '@routiqo/shared';
 import { RouteMap } from './route-map';
 
 export function RouteResults({ result }: { result: RouteResult }) {
   const [choice, setChoice] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
+  const currentStep = useRef<HTMLDivElement>(null);
   const route = result.routes[choice];
   if (!route) return null;
   const steps = route.steps ?? [];
@@ -21,6 +22,7 @@ export function RouteResults({ result }: { result: RouteResult }) {
             aria-pressed={choice === index}
             key={index}
             onClick={() => {
+              if (choice === index) return;
               setChoice(index);
               setStepIndex(0);
             }}
@@ -47,7 +49,13 @@ export function RouteResults({ result }: { result: RouteResult }) {
               Review steps before travelling. This view does not announce turns or follow your
               position.
             </p>
-            <div role="status" aria-live="polite" className="route-current-step">
+            <div
+              ref={currentStep}
+              tabIndex={-1}
+              role="status"
+              aria-live="polite"
+              className="route-current-step"
+            >
               <span>
                 Step {stepIndex + 1} of {steps.length}
               </span>
@@ -77,7 +85,18 @@ export function RouteResults({ result }: { result: RouteResult }) {
               <ol>
                 {steps.map((item, index) => (
                   <li key={index}>
-                    {item.instruction} · {Math.round(item.distanceMetres).toLocaleString('en-IN')} m
+                    <button
+                      type="button"
+                      className="button secondary route-step-choice"
+                      aria-current={stepIndex === index ? 'step' : undefined}
+                      onClick={() => {
+                        setStepIndex(index);
+                        currentStep.current?.focus();
+                      }}
+                    >
+                      Step {index + 1}: {item.instruction} ·{' '}
+                      {Math.round(item.distanceMetres).toLocaleString('en-IN')} m
+                    </button>
                   </li>
                 ))}
               </ol>

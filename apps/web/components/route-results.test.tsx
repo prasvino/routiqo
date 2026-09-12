@@ -81,6 +81,26 @@ it('bounds manual step review and resets it when selecting an alternative', () =
   expect(lifecycle.mount).toHaveBeenCalledOnce();
   expect(lifecycle.unmount).not.toHaveBeenCalled();
 });
+it('jumps directly to loaded directions offline and focuses the selected instruction', () => {
+  const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+  render(<RouteResults result={result} />);
+  fireEvent.click(screen.getByText('All directions'));
+  screen.getByText('All directions').closest('details')!.open = true;
+  const arrival = screen.getByRole('button', { name: /Step 2: Arrive at destination/ });
+  fireEvent.click(arrival);
+  expect(arrival.getAttribute('aria-current')).toBe('step');
+  expect(screen.getByRole('status').textContent).toContain('Step 2 of 2');
+  expect(document.activeElement).toBe(screen.getByRole('status'));
+  fireEvent.click(screen.getByRole('button', { name: /Route 1/ }));
+  expect(screen.getByRole('status').textContent).toContain('Step 2 of 2');
+  fireEvent.click(screen.getByRole('button', { name: 'Previous step' }));
+  expect(arrival.hasAttribute('aria-current')).toBe(false);
+  expect(
+    screen.getByRole('button', { name: /Step 1: Head north/ }).getAttribute('aria-current'),
+  ).toBe('step');
+  online.mockRestore();
+});
+
 it('does not invent directions for legacy route responses', () => {
   const first = result.routes[0]!;
   const legacy = {
