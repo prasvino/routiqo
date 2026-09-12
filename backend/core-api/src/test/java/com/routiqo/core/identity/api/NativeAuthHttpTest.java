@@ -161,8 +161,61 @@ class NativeAuthHttpTest {
         for (String header : List.of("Cookie", "Origin", "Sec-Fetch-Site")) {
             assertThat(request("GET", "session", "", "Bearer " + login.credential(),
                     List.<String[]>of(new String[] {header, "blocked"})).statusCode()).isEqualTo(403);
+            assertThat(request("GET", "session", "", "Bearer " + login.credential(),
+                    List.<String[]>of(new String[] {header, ""})).statusCode()).isEqualTo(403);
+        }
+        // HttpClient removes an empty query delimiter; send the exact request target.
+        try (var socket = new java.net.Socket("localhost", port)) {
+            socket.setSoTimeout(5000);
+            socket.getOutputStream().write(("GET /api/v1/native/auth/session? HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Authorization: Bearer " + login.credential() + "\r\nConnection: close\r\n\r\n")
+                    .getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            var response = new String(socket.getInputStream().readNBytes(8192), java.nio.charset.StandardCharsets.US_ASCII);
+            assertThat(response.substring(0, response.indexOf("\r\n"))).isEqualTo("HTTP/1.1 403 ");
         }
         assertThat(get("session?credential=" + login.credential(), login.credential()).statusCode()).isEqualTo(403);
+    }
+
+    @Test void disabledAndExpiredCredentialsCannotReadRenewOrDelete() throws Exception {
+        Login login = login();
+        UUID accountId = UUID.fromString(login.accountId());
+        String deletion = "{\"confirmation\":\"DELETE\",\"accountId\":\"" + accountId + "\"}";
+        jdbc.update("UPDATE routiqo_account SET enabled = FALSE WHERE id = ?", accountId);
+        assertThat(get("session", login.credential()).statusCode()).isEqualTo(401);
+        assertThat(post("session/renew", "{}", login.credential()).statusCode()).isEqualTo(401);
+        assertThat(post("account/delete", deletion, login.credential()).statusCode()).isEqualTo(401);
+        jdbc.update("UPDATE routiqo_account SET enabled = TRUE WHERE id = ?", accountId);
+        jdbc.update("UPDATE auth_session SET authenticated_at = CURRENT_TIMESTAMP - INTERVAL '20 minutes', "
+                + "created_at = CURRENT_TIMESTAMP - INTERVAL '20 minutes', "
+                + "expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second' WHERE account_id = ?", accountId);
+        assertThat(get("session", login.credential()).statusCode()).isEqualTo(401);
+        assertThat(post("session/renew", "{}", login.credential()).statusCode()).isEqualTo(401);
+        assertThat(post("account/delete", deletion, login.credential()).statusCode()).isEqualTo(401);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM routiqo_account WHERE id = ?", Integer.class, accountId)).isEqualTo(1);
+    }
+
+    @Test void nativeBearerDoesNotAuthorizeBrowserJourneyResources() throws Exception {
+        Login login = login();
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/journeys"))
+                .header("Authorization", "Bearer " + login.credential()).GET().build();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(401);
+        assertThat(response.body()).doesNotContain(login.credential(), login.accountId());
+        assertThat(response.headers().allValues("Set-Cookie")).isEmpty();
+    }
+
+    @Test void chunkedBodyCannotBypassRequestSizeLimit() throws Exception {
+        byte[] oversized = "x".repeat(20 * 1024 + 1).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var body = HttpRequest.BodyPublishers.ofInputStream(() -> new java.io.ByteArrayInputStream(oversized));
+        assertThat(body.contentLength()).isEqualTo(-1);
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/native/auth/google/challenge"))
+                .version(HttpClient.Version.HTTP_1_1).header("Content-Type", "application/json").POST(body).build();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(413);
+        assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(response.headers().allValues("Set-Cookie")).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM login_challenge", Integer.class)).isZero();
+        assertThat(VERIFICATIONS).hasValue(0);
     }
 
     @Test void postBodiesRequireBoundedStrictJsonWithExactFields() throws Exception {

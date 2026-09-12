@@ -101,3 +101,15 @@ For offline sync, read `docs/features/journey/OUTBOX_SPEC.md` and ADR 0006. Shar
 Account-history pass (2026-09-12): **178 TypeScript/component tests passed**, with contracts, formatting, types and lint. Web production build and secret scanning passed. The verified-account workspace now offers explicit, bounded 20-row account-history browsing and opens journals for older completed trips. Transport rejects malformed, duplicate, unordered and non-progressing pages; component tests cover exact-cursor retries, authentication clearing, account changes and React Strict Mode effect replay. Reads do not mutate offline snapshots or queues. Backend and native code were unchanged. Authenticated rendered history, small-screen and live Google sign-in QA remain pending; automated component coverage is not live authentication evidence.
 
 Native authentication HTTP pass (2026-09-12): opt-in native-auth now supports challenge/exchange, session read/renew, lineage logout and recent-auth deletion independently of web-auth. Strict bearer/header/query/body rules, database peer/account/challenge limits and redacted DTOs are implemented; browser CSRF and cookie-only resources remain intact. Lost-renewal logout with a retained predecessor revokes its successor and remains retryable. OpenAPI/types, ADR0020, setup/security/threat documentation and unmounted mobile response validators are updated. Full check passed **230 TypeScript/component tests across 38 files**, contracts, formatting, types and lint; core-api check/bootJar passed **95 Java tests across 21 suites, zero failures/errors/skips** using disposable PostgreSQL and synthetic identity verification. Secret scan and independent security review passed; the medium logout/rotation finding was fixed and regression-tested. No new device/UI/live-provider validation or deployment. Redirect-safe native networking, Google UI/challenge coordination, vault integration and native resource authorization remain pending. Android setup is being handled by the user.
+
+Native HTTP adversarial verification pass (2026-09-12): actual HTTP coverage now
+includes empty forbidden browser headers, a raw empty-query request target,
+chunked oversized bodies, disabled/expired credentials across read/renew/delete,
+and denial of native bearer credentials on browser journey resources. Full
+core-api check/bootJar passed **98 Java tests, zero failures/errors/skips**; secret
+scan passed. No production source changed. Initial fixture issues (HttpClient
+normalizing empty query and invalid expiry chronology) were corrected; the final
+requests exercise the intended cases. Added read-only Android prerequisite doctor;
+normal and RequireReady modes ran under Windows PowerShell. SDK installation is in
+progress: SDK folder, Build Tools and Platform Tools detected; API36, command-line
+tools and selected JDK17 are not yet ready. This is file inspection, not device QA.

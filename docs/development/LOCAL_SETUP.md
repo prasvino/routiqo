@@ -109,3 +109,19 @@ vault coordination and authenticated journey transport before device sign-in QA.
 Use TLS at the deployed API boundary. Automated API verification uses loopback
 HTTP, disposable PostgreSQL and synthetic Google identity; it does not prove live
 Google or production proxy behavior. See `NATIVE_AUTH_HTTP_SPEC.md` and ADR 0020.
+
+## Android prerequisite inspection
+
+Run `powershell -NoProfile -File scripts/android-doctor.ps1` from the repository.
+The read-only script checks SDK API 36, Build Tools 36.0.0, Platform Tools,
+Command-line Tools and the selected JDK 17. It does not install packages, modify
+PATH/JAVA_HOME, launch adb/emulators or contact devices. Default SDK selection is
+ANDROID_HOME, then ANDROID_SDK_ROOT, then the standard LocalAppData Android/Sdk
+folder. Pass `-SdkPath` for a custom installation and `-AndroidJavaHome` for the
+Android JDK directory; otherwise the JDK check uses JAVA_HOME. A missing JDK result
+means that selected directory is not a verified JDK 17, not that every installation
+on the machine has been searched. Keep Java 25 available for backend builds.
+
+Use `-RequireReady` to return a nonzero exit code if any checked prerequisite is
+missing. A Ready result verifies files only: accept SDK licenses, configure an
+emulator or USB-debugging device, then build and exercise the native app separately.
