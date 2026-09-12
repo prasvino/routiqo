@@ -33,3 +33,35 @@ Unknown/cross-purpose identities fail closed. Retain existing Mapbox identity wh
 its adapter is active. Adding identifiers does not enable new services or imply a
 Valhalla/Photon request occurred. Route estimate labels follow response identity;
 map renderer/provider disclosure remains separate until rendering is migrated.
+
+## Valhalla adapter acceptance
+
+The initial Valhalla slice is unmounted. No browser/provider configuration changes
+or real requests are enabled until regional coverage and paired service rollout
+are reviewed. Constructor accepts a fixed operator-owned HTTP(S) origin only:
+host required, bounded length, no credentials/query/fragment/non-root path, valid
+port. POST `/route` with bounded JSON; never place traveller coordinates in a URL.
+The application owns costing (auto/pedestrian/bicycle), two break locations,
+kilometer units, English instructions and at most two alternatives. No dynamic
+request URL, public demo, credential forwarding or automatic retry/fallback.
+
+Native Valhalla JSON uses encoded polyline6; decode with bounded varints/positions,
+validate latitude/longitude and reject truncated/overflow/invalid encodings. Do not
+assume GeoJSON shape support in the native JSON format. Require one leg per route,
+up to three routes,2–10000 geometry positions, at most500 valid maneuvers and
+bounded well-formed instructions. Validate begin/end shape indices and derive
+maneuver positions from checked geometry; convert km to metres and preserve
+seconds. Enforce expected units/status and strict duplicate/trailing/UTF-8 parsing.
+Malformed alternatives fail the whole result. Never manufacture route geometry,
+travel duration or guidance. Only the verified no-path code442 under HTTP400 is
+an empty result; unexpected provider statuses/errors remain unavailable and are
+redacted. Missing regional graph/out-of-coverage classification is a separate
+required integration gate, not inferred from arbitrary provider errors.
+
+The shared POST transport preserves HTTP400 for adapter classification but refuses
+redirects/other statuses. It caps request UTF-8 at20KiB, response at1MiB and applies
+the whole-operation10-second deadline with cancellation on timeout/interruption.
+No response wrapper may print its private body. Synthetic tests cover mode mapping,
+units, alternatives, decoder/maneuver bounds, failure redaction and actual loopback
+POST transport. Reference: [Valhalla route API](https://valhalla.github.io/valhalla/api/route/api-reference/).
+The next independent prerequisite is documented in ROUTING_COVERAGE_SPEC.md: an unmounted provider decorator enforces a conservative configured region both before requests and on normalized route geometry/maneuvers. Runtime activation and an explicit browser coverage outcome remain separate.

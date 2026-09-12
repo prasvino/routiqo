@@ -260,3 +260,28 @@ terms appear in the internal provider query URL; infrastructure must avoid reque
 URL logging. No public demo fallback, browser configuration switch, persistence,
 proximity tracking or dataset download is introduced by this adapter-only slice.
 Review found and corrected a shared transport slow-body gap: request-header timeout alone did not bound body completion. A whole-operation10s deadline now cancels the HTTP future on timeout/interruption; loopback stalled-body regression exercises this boundary.
+
+## Valhalla adapter and routing POST boundary
+
+The unmounted Valhalla adapter sends two precise endpoints in a bounded JSON body
+to a fixed operator-owned `/route` destination. No coordinates, account IDs or
+browser credentials enter the provider URL. POST retains only200/400 responses
+for strict adapter interpretation; redirects and unexpected statuses fail. Whole
+body deadlines, interruption cancellation, request/response byte caps and strict
+UTF-8 apply to both HTTP methods. Response wrappers redact their bodies in toString.
+
+Treat route shapes, maneuver indices, distances, units, instructions and error
+codes as untrusted. Polyline6 parsing must bound varints, accumulation and point
+counts; reject invalid coordinates/index spans and malformed alternatives rather
+than returning partial fabricated guidance. Explicit no-path classification must
+not disguise service errors or missing regional data. Before mounting, add
+reviewed coverage/configuration and verify service egress, dataset attribution,
+logging suppression and route quality. No live provider/region setup is implied.
+
+The independent regional guard in ROUTING_COVERAGE_SPEC.md rejects out-of-region
+endpoints before any provider call and rejects out-of-region returned geometry or
+maneuvers as a whole response. Bounds are a conservative operator-controlled
+non-antimeridian rectangle, not proof that all roads inside it exist in the graph.
+No coordinates enter coverage error messages or region string representations.
+The guard is unmounted until explicit authenticated HTTP/client handling and
+reviewed dataset configuration exist; no route clipping or invented rerouting.

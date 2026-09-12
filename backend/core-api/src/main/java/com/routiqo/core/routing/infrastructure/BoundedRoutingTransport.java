@@ -7,6 +7,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -18,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /** Bounded streaming body; only called with URLs built by the fixed-host provider adapter. */
-public final class BoundedRoutingTransport implements RoutingTransport {
+public final class BoundedRoutingTransport implements RoutingTransport, RoutingPostTransport {
     private final int maximumBytes;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
             .followRedirects(HttpClient.Redirect.NEVER).build();
@@ -30,6 +31,27 @@ public final class BoundedRoutingTransport implements RoutingTransport {
     @Override public String get(URI uri) throws Exception {
         var request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10))
                 .header("Accept", "application/json").GET().build();
+        var response = execute(request);
+        if (response.status() != 200) throw new IOException("Routing provider unavailable");
+        return response.body();
+    }
+    @Override public RoutingPostTransport.Response post(URI uri, String json) throws Exception {
+        if (json == null || json.isBlank() || json.length() > 20 * 1024)
+            throw new IllegalArgumentException("Invalid routing request body");
+        var encoded = StandardCharsets.UTF_8.newEncoder().encode(CharBuffer.wrap(json));
+        if (encoded.remaining() > 20 * 1024)
+            throw new IllegalArgumentException("Invalid routing request body");
+        byte[] body = new byte[encoded.remaining()];
+        encoded.get(body);
+        var request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10))
+                .header("Accept", "application/json").header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
+        var response = execute(request);
+        if (response.status() != 200 && response.status() != 400)
+            throw new IOException("Routing provider unavailable");
+        return response;
+    }
+    private RoutingPostTransport.Response execute(HttpRequest request) throws Exception {
         var operation = client.sendAsync(request, info -> new LimitedBody(maximumBytes));
         HttpResponse<byte[]> response;
         try {
@@ -44,8 +66,8 @@ public final class BoundedRoutingTransport implements RoutingTransport {
         } catch (ExecutionException failure) {
             throw new IOException("Routing provider unavailable");
         }
-        if (response.statusCode() != 200) throw new IOException("Routing provider unavailable");
-        return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(response.body())).toString();
+        return new RoutingPostTransport.Response(response.statusCode(),
+                StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(response.body())).toString());
     }
     private static final class LimitedBody implements HttpResponse.BodySubscriber<byte[]> {
         private final int maximum;

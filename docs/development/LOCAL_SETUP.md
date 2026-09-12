@@ -145,3 +145,8 @@ no Photon profile/environment switch yet. The current `routing` profile still
 constructs Mapbox adapters. Do not infer that a Photon service is running or route
 real search traffic to a public demo. A controlled regional service and coordinated
 configuration/disclosure changes are the next integration step.
+
+Valhalla adapter work follows the same staged rollout: tested route normalization
+and bounded POST come before a runtime configuration switch. Regional graph import,
+coverage enforcement and service URLs are not yet enabled. A Docker routing engine
+also does not provide phone-offline routing without an on-device engine and graph.

@@ -204,3 +204,38 @@ Pending: configure a controlled Photon regional service, implement Valhalla,
 coordinate backend selection with truthful browser disclosures, and verify live
 regional quality/logging/egress. No external query, dataset download, deployment,
 provider switch or native navigation change occurred in this phase.
+
+## Open-source migration phases 4–5 — Valhalla and regional routing guard
+
+ValhallaRouteProvider now normalizes native JSON routing responses through the
+existing domain interface. Fixed-origin POST keeps endpoints out of the URL;
+explicit mode/units/instruction/alternative choices preserve the app contract.
+The polyline6 decoder bounds varints and positions, validates accumulated ranges,
+and checks maneuver shape indices. Strict bounded UTF-8/JSON rejects malformed
+alternatives, instructions and totals. Only HTTP400/error442 becomes no-path;
+other provider failures remain redacted unavailable errors. Actual native wire
+shape and no-path status were verified against official Valhalla source.
+
+Added bounded JSON POST transport (20KiB request, configured response cap up to1MiB,
+whole-operation10s deadline, no redirects/credential forwarding) alongside GET.
+Added independent RoutingRegion/RegionLimitedRouteProvider guard: reject endpoints
+before provider access and reject out-of-region geometry/maneuvers across the
+whole returned result. Conservative inclusive rectangles require finite ordered
+bounds with longitude span under180 degrees. No automatic geographic inference,
+route clipping, persistence or fabricated reroutes.
+
+Both phases remain unmounted: production routing configuration is unchanged.
+Coverage HTTP/client outcomes, runtime provider selection/disclosures, deployed
+regional graphs/Photon/tiles and quality/egress/logging checks remain gates.
+Android doctor remains unchanged: API36 and command-line tools are missing; a
+JDK17 must be selected for Android separately from the backend's JDK25. No device
+or real provider was used.
+
+Verification: final core-api check and bootJar passed **129 Java tests across25
+suites**, zero failures/errors/skips, including10 Valhalla and9 regional guard
+tests. Loopback POST tests cover the actual provider path, no-path classification,
+redirect refusal, exact request-byte limit and bounded error bodies. Guard tests
+cover an outside intermediate geometry point despite inside endpoints. Independent
+security review has no unresolved findings; secret scan and diff checks clean.
+No TS/UI changes; prior247 TypeScript tests and production web build remain latest.
+No push, deployment, reset-credit use or timer change occurred.
