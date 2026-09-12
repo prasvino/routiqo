@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.7.0
+  version: 0.8.0
   description: Discovery and opt-in browser authentication. Auth requires web-auth, google-auth and persistence profiles; default preview denies these routes. No live traffic or user presence.
 servers:
   - url: http://localhost:8080
@@ -408,6 +408,11 @@ paths:
                           minItems: 2
                           maxItems: 10000
                           items: { $ref: '#/components/schemas/RouteCoordinate' }
+                        steps:
+                          type: array
+                          maxItems: 500
+                          description: Normalized English turn instructions. Optional only for compatibility with route responses produced before instructions were added.
+                          items: { $ref: '#/components/schemas/RouteStep' }
         '400': { description: Invalid mode or endpoints }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
@@ -494,6 +499,19 @@ components:
       minItems: 2
       maxItems: 2
       items: { type: number, minimum: -180, maximum: 180 }
+    RouteStep:
+      type: object
+      additionalProperties: false
+      required: [instruction, distanceMetres, durationSeconds, location]
+      properties:
+        instruction:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Trimmed plain text without control characters.
+        distanceMetres: { type: number, minimum: 0 }
+        durationSeconds: { type: number, minimum: 0 }
+        location: { $ref: '#/components/schemas/RouteCoordinate' }
     Journey:
       type: object
       additionalProperties: false

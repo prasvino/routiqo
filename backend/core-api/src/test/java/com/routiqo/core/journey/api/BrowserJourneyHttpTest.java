@@ -38,7 +38,9 @@ class BrowserJourneyHttpTest {
         }
         @Bean @Primary com.routiqo.core.routing.application.RouteProvider syntheticRoutes() {
             return request -> java.util.List.of(new com.routiqo.core.routing.domain.RouteOption(1200, 600,
-                    java.util.List.of(request.origin(), request.destination())));
+                    java.util.List.of(request.origin(), request.destination()), java.util.List.of(
+                    new com.routiqo.core.routing.domain.RouteStep("Continue to the destination", 1200, 600,
+                            request.destination()))));
         }
         @Bean @Primary GoogleIdentityVerifier syntheticIdentity() {
             return (token, nonce) -> {
@@ -90,6 +92,8 @@ class BrowserJourneyHttpTest {
             assertThat(result.statusCode()).isEqualTo(200);
             assertThat(result.headers().firstValue("Cache-Control")).contains("no-store");
             assertThat(JsonPath.<String>read(result.body(), "$.provider")).isEqualTo("mapbox");
+            assertThat(JsonPath.<String>read(result.body(), "$.routes[0].steps[0].instruction"))
+                    .isEqualTo("Continue to the destination");
             assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account());
         }
         assertThat(send(owner, "routes", body).statusCode()).isEqualTo(429);

@@ -9,6 +9,13 @@ export interface RouteOption {
   distanceMetres: number;
   durationSeconds: number;
   geometry: RouteCoordinate[];
+  steps?: RouteStep[];
+}
+export interface RouteStep {
+  instruction: string;
+  distanceMetres: number;
+  durationSeconds: number;
+  location: RouteCoordinate;
 }
 export interface RouteResult {
   provider: 'mapbox';
@@ -29,20 +36,16 @@ export function readRouteResult(input: unknown): RouteResult {
     input.routes.length > 3
   )
     throw new Error('Routing response is invalid.');
-  const routes =
-    input.routes.length === 0
-      ? []
-      : readMapboxRoutes({
-          code: 'Ok',
-          routes: input.routes.map((route: unknown) => {
-            if (!record(route)) throw new Error('Routing response is invalid.');
-            return {
-              distance: route.distanceMetres,
-              duration: route.durationSeconds,
-              geometry: { type: 'LineString', coordinates: route.geometry },
-            };
-          }),
-        });
+  const routes = input.routes.map((route: unknown) => {
+    if (!record(route)) throw new Error('Routing response is invalid.');
+    return readRouteOption(
+      route.distanceMetres,
+      route.durationSeconds,
+      route.geometry,
+      route.steps,
+      false,
+    );
+  });
   return { provider: 'mapbox', calculatedAt: input.calculatedAt, routes };
 }
 const record = (input: unknown): input is Record<string, unknown> =>
@@ -83,23 +86,98 @@ export function readMapboxRoutes(input: unknown): RouteOption[] {
   return input.routes.map((route: unknown) => {
     if (
       !record(route) ||
-      typeof route.distance !== 'number' ||
-      !Number.isFinite(route.distance) ||
-      route.distance < 0 ||
-      typeof route.duration !== 'number' ||
-      !Number.isFinite(route.duration) ||
-      route.duration < 0 ||
       !record(route.geometry) ||
       route.geometry.type !== 'LineString' ||
-      !Array.isArray(route.geometry.coordinates) ||
-      route.geometry.coordinates.length < 2 ||
-      route.geometry.coordinates.length > 10000
+      !Array.isArray(route.legs) ||
+      route.legs.length !== 1 ||
+      !record(route.legs[0])
     )
       throw new Error('Routing response is invalid.');
-    return {
-      distanceMetres: route.distance,
-      durationSeconds: route.duration,
-      geometry: route.geometry.coordinates.map(readRouteCoordinate),
-    };
+    return readRouteOption(
+      route.distance,
+      route.duration,
+      route.geometry.coordinates,
+      route.legs[0].steps,
+      true,
+    );
   });
+}
+
+function readRouteOption(
+  distanceMetres: unknown,
+  durationSeconds: unknown,
+  geometry: unknown,
+  steps: unknown,
+  requireSteps: boolean,
+): RouteOption {
+  const routeSteps = steps === undefined ? [] : steps;
+  if (
+    typeof distanceMetres !== 'number' ||
+    !Number.isFinite(distanceMetres) ||
+    distanceMetres < 0 ||
+    typeof durationSeconds !== 'number' ||
+    !Number.isFinite(durationSeconds) ||
+    durationSeconds < 0 ||
+    !Array.isArray(geometry) ||
+    geometry.length < 2 ||
+    geometry.length > 10000 ||
+    !Array.isArray(routeSteps) ||
+    routeSteps.length > 500 ||
+    (requireSteps && routeSteps.length === 0)
+  )
+    throw new Error('Routing response is invalid.');
+  return {
+    distanceMetres,
+    durationSeconds,
+    geometry: geometry.map(readRouteCoordinate),
+    steps: routeSteps.map((step) => readRouteStep(step, requireSteps)),
+  };
+}
+
+function readRouteStep(input: unknown, providerShape: boolean): RouteStep {
+  const maneuver = record(input) && record(input.maneuver) ? input.maneuver : undefined;
+  const instruction = record(input)
+    ? providerShape
+      ? maneuver?.instruction
+      : input.instruction
+    : undefined;
+  const distanceMetres = record(input)
+    ? providerShape
+      ? input.distance
+      : input.distanceMetres
+    : undefined;
+  const durationSeconds = record(input)
+    ? providerShape
+      ? input.duration
+      : input.durationSeconds
+    : undefined;
+  const location = record(input)
+    ? providerShape
+      ? maneuver?.location
+      : input.location
+    : undefined;
+  if (
+    !record(input) ||
+    typeof instruction !== 'string' ||
+    instruction.length < 1 ||
+    instruction.length > 500 ||
+    instruction.trim() !== instruction ||
+    [...instruction].some((character) => {
+      const point = character.codePointAt(0)!;
+      return point <= 0x1f || (point >= 0x7f && point <= 0x9f);
+    }) ||
+    typeof distanceMetres !== 'number' ||
+    !Number.isFinite(distanceMetres) ||
+    distanceMetres < 0 ||
+    typeof durationSeconds !== 'number' ||
+    !Number.isFinite(durationSeconds) ||
+    durationSeconds < 0
+  )
+    throw new Error('Routing response is invalid.');
+  return {
+    instruction,
+    distanceMetres,
+    durationSeconds,
+    location: readRouteCoordinate(location),
+  };
 }

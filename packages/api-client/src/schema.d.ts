@@ -299,6 +299,13 @@ export interface components {
         };
         /** @description Longitude then latitude. Longitude must be between -180 and180, latitude between -90 and90. Endpoints must differ. */
         RouteCoordinate: number[];
+        RouteStep: {
+            /** @description Trimmed plain text without control characters. */
+            instruction: string;
+            distanceMetres: number;
+            durationSeconds: number;
+            location: components["schemas"]["RouteCoordinate"];
+        };
         Journey: {
             /** Format: uuid */
             id: string;
@@ -1068,6 +1075,8 @@ export interface operations {
                             distanceMetres: number;
                             durationSeconds: number;
                             geometry: components["schemas"]["RouteCoordinate"][];
+                            /** @description Normalized English turn instructions. Optional only for compatibility with route responses produced before instructions were added. */
+                            steps?: components["schemas"]["RouteStep"][];
                         }[];
                     };
                 };

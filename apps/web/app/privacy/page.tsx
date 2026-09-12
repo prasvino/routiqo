@@ -35,6 +35,12 @@ export default function Page() {
             chose one. Place results and route estimates stay in the current view; they are not
             saved to plans, planning backups or Routiqo’s database.
           </p>
+          <p>
+            Choosing “Show map” loads Mapbox and sends requests for the area you view. Mapbox may
+            store map tiles and usage metadata in this browser. These provider caches can remain
+            after sign-out or account deletion; clear site data in your browser to remove them.
+            Routiqo does not save your calculated route or download an offline map package.
+          </p>
         </div>
       </div>
       <div className="privacy-section">
@@ -62,8 +68,9 @@ export default function Page() {
         </div>
       </div>
       <p className="fine-print">
-        Routiqo serves local image assets; no analytics integration is enabled. Traveller presence
-        and public location sharing are not available.
+        Routiqo serves local image assets and has no separate analytics integration. Optional map
+        display uses Mapbox’s SDK and usage services. Traveller presence and public location sharing
+        are not available.
       </p>
       <div className="privacy-section">
         <ShieldCheck size={24} />

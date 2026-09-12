@@ -27,7 +27,10 @@ function respond(response: Response) {
 }
 it('posts an account-bound private calculation and strips unrelated response fields', async () => {
   const fetcher = respond(Response.json({ ...result, private: 'discard' }));
-  expect(await calculateBrowserRoute(account, request)).toEqual(result);
+  expect(await calculateBrowserRoute(account, request)).toEqual({
+    ...result,
+    routes: result.routes.map((route) => ({ ...route, steps: [] })),
+  });
   expect(fetcher).toHaveBeenLastCalledWith(
     '/api/v1/routes',
     expect.objectContaining({

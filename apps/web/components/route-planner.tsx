@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlaceMatch, PlaceResults, RouteMode, RouteResult } from '@routiqo/shared';
 import { readBrowserLocation, BrowserLocationError } from '../lib/browser-location';
+import { RouteResults } from './route-results';
 import {
   calculateBrowserRoute,
   searchBrowserPlaces,
@@ -22,7 +23,19 @@ function Planner({ account }: { account: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [offline, setOffline] = useState(false);
+  const [resultRevision, setResultRevision] = useState(0);
   const pending = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const changed = () => setOffline(!navigator.onLine);
+    changed();
+    window.addEventListener('online', changed);
+    window.addEventListener('offline', changed);
+    return () => {
+      window.removeEventListener('online', changed);
+      window.removeEventListener('offline', changed);
+    };
+  }, []);
   useEffect(() => () => pending.current?.abort(), []);
   function clearRequest() {
     pending.current?.abort();
@@ -35,9 +48,10 @@ function Planner({ account }: { account: string }) {
   async function run(
     work: (signal: AbortSignal) => Promise<void>,
     status = 'Looking up your route…',
+    localOnly = false,
   ) {
     if (pending.current) return;
-    if (!navigator.onLine) {
+    if (!localOnly && !navigator.onLine) {
       setError('You’re offline. Connect to search places or calculate a route.');
       return;
     }
@@ -50,6 +64,16 @@ function Planner({ account }: { account: string }) {
       await work(controller.signal);
     } catch (failure) {
       if (!controller.signal.aborted) {
+        if (
+          failure instanceof BrowserRoutingError &&
+          (failure.status === 401 || failure.status === 403)
+        ) {
+          setResult(null);
+          setSelected({});
+          setMatches({});
+          setQuery({ origin: '', destination: '' });
+          setAttribution({ origin: '', destination: '' });
+        }
         setMessage('');
         setError(
           failure instanceof BrowserLocationError
@@ -91,11 +115,11 @@ function Planner({ account }: { account: string }) {
       origin: selected.origin.coordinate,
       destination: selected.destination.coordinate,
     };
-    setResult(null);
     void run(async (signal) => {
       const found = await calculateBrowserRoute(account, input, signal);
       if (signal.aborted) return;
       setResult(found);
+      setResultRevision((value) => value + 1);
       setMessage(
         found.routes.length
           ? 'Route estimates ready.'
@@ -108,26 +132,36 @@ function Planner({ account }: { account: string }) {
     setSelected((current) => ({ ...current, origin: undefined }));
     setMatches((current) => ({ ...current, origin: undefined }));
     setAttribution((current) => ({ ...current, origin: '' }));
-    void run(async (signal) => {
-      const location = await readBrowserLocation(signal);
-      if (signal.aborted) return;
-      setSelected((current) => ({
-        ...current,
-        origin: {
-          id: 'device-location',
-          label: 'My current location',
-          coordinate: location.coordinate,
-        },
-      }));
-      setQuery((current) => ({ ...current, origin: 'My current location' }));
-      setMessage(
-        `Starting location selected, accurate to about ${Math.ceil(location.accuracyMetres)} metres.`,
-      );
-    }, 'Getting your location…');
+    void run(
+      async (signal) => {
+        const location = await readBrowserLocation(signal);
+        if (signal.aborted) return;
+        setSelected((current) => ({
+          ...current,
+          origin: {
+            id: 'device-location',
+            label: 'My current location',
+            coordinate: location.coordinate,
+          },
+        }));
+        setQuery((current) => ({ ...current, origin: 'My current location' }));
+        setMessage(
+          `Starting location selected, accurate to about ${Math.ceil(location.accuracyMetres)} metres.`,
+        );
+      },
+      'Getting your location…',
+      true,
+    );
   }
   return (
     <details className="route-planner">
       <summary>Plan a route</summary>
+      {offline && (
+        <p role="status">
+          You’re offline. Loaded directions remain available in this view. Connect for place search,
+          new map tiles or recalculation.
+        </p>
+      )}
       <p>
         Search text and selected endpoints are sent to Mapbox. Results stay in this view and aren’t
         saved to your plans.
@@ -159,7 +193,7 @@ function Planner({ account }: { account: string }) {
                   }}
                 />
               </label>
-              <button className="button secondary" disabled={busy} type="submit">
+              <button className="button secondary" disabled={busy || offline} type="submit">
                 {endpoint === 'origin' ? 'Find starting place' : 'Find destination'}
               </button>
             </form>
@@ -227,7 +261,7 @@ function Planner({ account }: { account: string }) {
       <button
         type="button"
         className="button primary"
-        disabled={busy || !selected.origin || !selected.destination}
+        disabled={busy || offline || !selected.origin || !selected.destination}
         onClick={calculate}
       >
         Calculate route
@@ -241,30 +275,14 @@ function Planner({ account }: { account: string }) {
         </p>
       )}
       {result && result.routes.length > 0 && (
-        <div className="route-estimates">
-          <h3>Route estimates</h3>
-          <ol>
-            {result.routes.map((route, index) => (
-              <li key={index}>
-                <strong>
-                  {(route.distanceMetres / 1000).toLocaleString('en-IN', {
-                    maximumFractionDigits: 1,
-                  })}{' '}
-                  km
-                </strong>
-                <span>About {Math.max(1, Math.round(route.durationSeconds / 60))} min</span>
-              </li>
-            ))}
-          </ol>
-          <p>
-            Mapbox estimate ·{' '}
-            {new Date(result.calculatedAt).toLocaleTimeString('en-IN', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-            . Check road conditions before travelling.
-          </p>
-        </div>
+        <>
+          {error && (
+            <p className="fine-print">
+              Showing the last successful route. It has not been recalculated.
+            </p>
+          )}
+          <RouteResults key={resultRevision} result={result} />
+        </>
       )}
     </details>
   );

@@ -32,7 +32,10 @@ public final class BrowserRoutingController {
         this.provider = provider; this.places = places; this.sessions = sessions; this.policy = policy; this.rates = rates; this.clock = clock;
     }
     public record Input(String mode, List<Double> origin, List<Double> destination) {}
-    public record Option(double distanceMetres, double durationSeconds, List<List<Double>> geometry) {}
+    public record Step(String instruction, double distanceMetres, double durationSeconds, List<Double> location) {
+        @Override public String toString() { return "Step[private]"; }
+    }
+    public record Option(double distanceMetres, double durationSeconds, List<List<Double>> geometry, List<Step> steps) {}
     public record Result(String provider, Instant calculatedAt, List<Option> routes) {}
     private UUID actor(HttpServletRequest request) {
         var actor = sessions.authenticate(BrowserCookies.read(request, policy, "routiqo_session"));
@@ -67,7 +70,9 @@ public final class BrowserRoutingController {
         if (!rates.allow(actor.toString(), "routing-account", 20))
             return ResponseEntity.status(429).header("Retry-After", "60").build();
         var routes = provider.routes(routeRequest).stream().map(route -> new Option(route.distanceMetres(),
-                route.durationSeconds(), route.geometry().stream().map(point -> List.of(point.longitude(), point.latitude())).toList())).toList();
+                route.durationSeconds(), route.geometry().stream().map(point -> List.of(point.longitude(), point.latitude())).toList(),
+                route.steps().stream().map(step -> new Step(step.instruction(), step.distanceMetres(), step.durationSeconds(),
+                        List.of(step.location().longitude(), step.location().latitude()))).toList())).toList();
         return ResponseEntity.ok(new Result("mapbox", clock.instant(), routes));
     }
     private static RouteRequest.Coordinate coordinate(List<Double> values) {

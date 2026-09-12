@@ -24,6 +24,11 @@ it('validates coordinates and rejects identical endpoints without inventing rout
 it('distinguishes no route from provider failure and validates every geometry point', () => {
   expect(readMapboxRoutes({ code: 'NoRoute' })).toEqual([]);
   expect(() => readMapboxRoutes({ code: 'InvalidInput' })).toThrow();
+  const step = {
+    distance: 1200,
+    duration: 600,
+    maneuver: { instruction: 'Continue south', location: [80, 13] },
+  };
   const route = {
     distance: 1200,
     duration: 600,
@@ -34,11 +39,25 @@ it('distinguishes no route from provider failure and validates every geometry po
         [79, 12],
       ],
     },
+    legs: [{ steps: [step] }],
     privateMetadata: 'discard',
   };
-  expect(readMapboxRoutes({ code: 'Ok', routes: [route] })[0]).not.toHaveProperty(
-    'privateMetadata',
-  );
+  expect(readMapboxRoutes({ code: 'Ok', routes: [route] })[0]).toEqual({
+    distanceMetres: 1200,
+    durationSeconds: 600,
+    geometry: [
+      [80, 13],
+      [79, 12],
+    ],
+    steps: [
+      {
+        instruction: 'Continue south',
+        distanceMetres: 1200,
+        durationSeconds: 600,
+        location: [80, 13],
+      },
+    ],
+  });
   expect(() => readMapboxRoutes({ code: 'Ok', routes: [{ ...route, duration: -1 }] })).toThrow();
   expect(() =>
     readMapboxRoutes({
@@ -57,4 +76,93 @@ it('distinguishes no route from provider failure and validates every geometry po
       ],
     }),
   ).toThrow();
+});
+
+it('normalizes compatible route results with missing or explicit steps', () => {
+  const route = {
+    distanceMetres: 10,
+    durationSeconds: 5,
+    geometry: [
+      [80, 13],
+      [79, 12],
+    ],
+  };
+  const input = { provider: 'mapbox', calculatedAt: '2026-09-09T12:00:00Z', routes: [route] };
+  expect(readRouteResult(input).routes[0]?.steps).toEqual([]);
+  expect(readRouteResult({ ...input, routes: [{ ...route, steps: [] }] }).routes[0]?.steps).toEqual(
+    [],
+  );
+  expect(
+    readRouteResult({
+      ...input,
+      routes: [
+        {
+          ...route,
+          steps: [
+            {
+              instruction: 'Turn right',
+              distanceMetres: 10,
+              durationSeconds: 5,
+              location: [79, 12],
+              providerExtra: 'discard',
+            },
+          ],
+        },
+      ],
+    }).routes[0]?.steps,
+  ).toEqual([
+    {
+      instruction: 'Turn right',
+      distanceMetres: 10,
+      durationSeconds: 5,
+      location: [79, 12],
+    },
+  ]);
+});
+
+it('rejects malformed normalized and provider steps', () => {
+  const geometry = [
+    [80, 13],
+    [79, 12],
+  ];
+  const normalized = {
+    provider: 'mapbox',
+    calculatedAt: '2026-09-09T12:00:00Z',
+    routes: [{ distanceMetres: 10, durationSeconds: 5, geometry }],
+  };
+  for (const steps of [
+    null,
+    [{ instruction: ' Turn right', distanceMetres: 10, durationSeconds: 5, location: [79, 12] }],
+    [{ instruction: 'Turn\nright', distanceMetres: 10, durationSeconds: 5, location: [79, 12] }],
+    [{ instruction: 'Turn right', distanceMetres: -1, durationSeconds: 5, location: [79, 12] }],
+    Array.from({ length: 501 }, () => ({
+      instruction: 'Continue',
+      distanceMetres: 1,
+      durationSeconds: 1,
+      location: [79, 12],
+    })),
+  ])
+    expect(() =>
+      readRouteResult({ ...normalized, routes: [{ ...normalized.routes[0], steps }] }),
+    ).toThrow();
+
+  const route = {
+    distance: 10,
+    duration: 5,
+    geometry: { type: 'LineString', coordinates: geometry },
+  };
+  const providerStep = {
+    distance: 10,
+    duration: 5,
+    maneuver: { instruction: 'Turn right', location: [79, 12] },
+  };
+  for (const legs of [
+    undefined,
+    [],
+    [{ steps: [] }],
+    [{ steps: [providerStep] }, { steps: [providerStep] }],
+    [{ steps: Array.from({ length: 501 }, () => providerStep) }],
+    [{ steps: [{ ...providerStep, maneuver: { location: [79, 12] } }] }],
+  ])
+    expect(() => readMapboxRoutes({ code: 'Ok', routes: [{ ...route, legs }] })).toThrow();
 });

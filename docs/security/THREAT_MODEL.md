@@ -183,6 +183,17 @@ Security-sensitive details must remain in approved private systems.
 
 ## 11. Release gate
 
+Web maps boundary (2026-09-12): explicit Show map loads Mapbox GL with a separate
+public token; backend routing credentials remain server-only. Route geometry and
+validated instructions remain in application memory, with no temporary geocoding
+cache or automatic location watcher. Mapbox SDK tiles and event metadata can
+persist in browser storage across sign-out/account deletion. ADR 0019 records the
+Medium residual-risk disposition and pre-load/privacy disclosure; the root
+implementation owner must verify provider-cache lifecycle before release. No
+claim of complete browser cache erasure or downloaded offline navigation is made.
+See `docs/features/journey/MAPS_NAVIGATION_SPEC.md` and
+`docs/privacy/DATA_RETENTION_AND_DELETION.md` for boundaries and removal guidance.
+
 A change must not ship when it introduces an unmitigated Critical or High threat, silently weakens a security/privacy/safety invariant, lacks required authorization or abuse tests, or leaves sensitive behavior ambiguous.
 
 Risk acceptance must be explicit, authorized, time-bounded where appropriate, and accompanied by an owner and follow-up plan.
