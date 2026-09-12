@@ -63,6 +63,11 @@ preserves existing selections and loaded route estimates; a location reading has
 already cleared its previous origin when started. Cancelling a browser location
 reading cannot dismiss the browser/OS permission prompt. No automatic retry occurs.
 No automatic upload, service worker, tile scraper, GPS watch or route persistence.
+Clear route planning aborts pending work, empties temporary endpoint text/selections,
+matches/attribution and estimates, restores driving mode, and unmounts the map.
+Late request responses cannot repopulate the view. This explicit action works
+offline and does not erase saved journeys or Mapbox-managed browser caches; its
+status message states the cache limitation.
 
 Mapbox GL itself uses browser CacheStorage for map tiles and localStorage for SDK
 event metadata. These are provider-managed caches, not Routiqo route downloads;

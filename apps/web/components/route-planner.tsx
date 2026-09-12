@@ -178,6 +178,21 @@ function Planner({ account }: { account: string }) {
         Search text and selected endpoints are sent to Mapbox. Results stay in this view and aren’t
         saved to your plans.
       </p>
+      <button
+        type="button"
+        className="button secondary"
+        onClick={() => {
+          clearRequest();
+          setQuery({ origin: '', destination: '' });
+          setSelected({});
+          setMatches({});
+          setAttribution({ origin: '', destination: '' });
+          setMode('driving');
+          setMessage('Route planning cleared from this view. Mapbox browser caches may remain.');
+        }}
+      >
+        Clear route planning
+      </button>
       <div className="route-endpoints">
         {(['origin', 'destination'] as const).map((endpoint) => (
           <div key={endpoint}>

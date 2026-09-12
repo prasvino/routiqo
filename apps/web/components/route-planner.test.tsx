@@ -101,6 +101,38 @@ it('cancels a location request and ignores its late result while a new request r
   expect(screen.getByText('Selected: Chosen town')).toBeTruthy();
 });
 
+it('clears temporary planning offline and ignores a late location response', async () => {
+  const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  vi.mocked(searchBrowserPlaces).mockResolvedValueOnce(place('Private destination', 79));
+  let finish!: (value: Awaited<ReturnType<typeof readBrowserLocation>>) => void;
+  vi.mocked(readBrowserLocation).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  open();
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'Private query' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find destination' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Private destination' }));
+  fireEvent.change(screen.getByLabelText('Travel mode'), { target: { value: 'walking' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Use my current location' }));
+  const signal = vi.mocked(readBrowserLocation).mock.calls[0]![0]!;
+  online.mockReturnValue(false);
+  act(() => window.dispatchEvent(new Event('offline')));
+  fireEvent.click(screen.getByRole('button', { name: 'Clear route planning' }));
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish({ coordinate: [80, 13], accuracyMetres: 20 }));
+  expect((screen.getByLabelText('From') as HTMLInputElement).value).toBe('');
+  expect((screen.getByLabelText('To') as HTMLInputElement).value).toBe('');
+  expect((screen.getByLabelText('Travel mode') as HTMLSelectElement).value).toBe('driving');
+  expect(screen.queryByText('Selected: Private destination')).toBeNull();
+  expect(screen.queryByText('Synthetic attribution')).toBeNull();
+  expect(screen.queryByText('Selected: My current location')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Cancel request' })).toBeNull();
+  expect(screen.getByText(/Mapbox browser caches may remain/)).toBeTruthy();
+});
+
 it('keeps an explicit pending location reading alive when connectivity changes', async () => {
   const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
   let finish!: (value: Awaited<ReturnType<typeof readBrowserLocation>>) => void;
