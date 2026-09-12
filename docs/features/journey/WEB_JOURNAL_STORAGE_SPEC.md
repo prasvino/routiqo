@@ -2,6 +2,8 @@
 
 ## Explicit conflict recovery
 
+Navigation recovery must not treat an intermediate history event as restoration. While dirty, intercept same-document history traversal until the editor's own marker is reached; disable the discard decision during restoration. Count traversed entries so confirmed discard preserves a multi-entry destination, while ordinary Back skips the extra editor marker. Preserve router state, create at most one marker per editor lifetime, and stop handling events on unmount/account change. Synthetic regression tests do not replace real browser navigation QA.
+
 After a conflict, a user may review the latest confirmed account journal and choose to discard the device draft. Require an in-dialog confirmation explaining that the device draft and current unsaved edits will be removed; do not send a server write. Atomically compare the expected local mutation ID and the exact reviewed confirmed journal against current storage before deleting the draft. Reject changed/missing drafts, changed confirmed versions/content, retired accounts and transaction failures without modifying data. On success return the confirmed journal and replace the editor fields with it. On failure retain editor text and the draft. No automatic merge, rebase or overwrite. Ordinary Save to account remains an explicit subsequent action.
 
 Applicable threats: T02 account isolation, T10 plain-text rendering, T12 private cache/UI leakage, T13 reordered/concurrent actions, T19 deletion resurrection and T20 authoritative server version conflicts. Review local CAS with two tabs and deletion races. Root owns residual risk; authenticated browser/device navigation QA remains a release prerequisite.

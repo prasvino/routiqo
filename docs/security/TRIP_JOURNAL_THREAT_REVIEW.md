@@ -23,4 +23,6 @@ Likelihood is greatest for ordinary concurrency and interrupted connections; imp
 
 Root implementation/review owns follow-up. Source review found no backend authorization/CAS blocker. Prior frontend account-switch leakage and stranded-draft findings have regression tests. Ordinary Back navigation has component coverage, but arbitrary multi-entry history jumps and rendered authenticated browser behavior remain unverified. This is an open Medium release issue: keep the feature in local preview and complete real browser navigation/accessibility QA before release. Tests alone do not establish navigation safety.
 
+Follow-up navigation tests now cover multi-entry traversal: intermediate events are intercepted until the exact editor marker returns, decision buttons remain disabled during restoration, and explicit discard preserves the traversal offset. Repeated saves retain one marker. This closes the identified source-level early-restoration defect; actual browser/router history behavior still requires release QA.
+
 Live Google configuration, production encryption/backup deletion controls and native device behavior are outside this local verification. Reassess this review before sharing/export, media, AI, native persistence, automatic sync, retention changes, new providers or new account recovery flows. No production deployment is approved by this document.

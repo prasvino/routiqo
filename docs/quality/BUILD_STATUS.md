@@ -8,6 +8,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 |---|---|
 | Web | Home, Explore, Trips, Profile; curated destination search/filter/details, bookmarks, editable trip and recurring commute drafts |
 | Scheduling | Shared next-departure calculation, weekday recurrence, upcoming ordering, foreground refresh, DST-gap handling; no automatic journey completion or reminders |
+| Commute summaries | Monthly counts and exact recorded elapsed minutes from the verified account's confirmed completed commutes saved on this device; time-zone-aware start-month grouping and explicit incomplete-history disclosure. Read-only, no invented distance or new persistence |
 | Local storage | Validated web localStorage with write-error handling and cross-tab refresh; native SQLite adapter; native restart behavior still needs device testing |
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
@@ -24,6 +25,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Commute/navigation pass: **166 TypeScript/component tests passed**, with contracts, formatting, types and lint. Tests cover multi-entry journal history restoration, account-bound commute aggregation, DST, microsecond totals and browser ICU formatting differences. A temporary synthetic commute component page was inspected in the actual browser; it exposed a month-format mismatch that was fixed and rechecked successfully. The temporary page and diagnostic were removed. This verifies the summary component, not live authentication or native device behavior. Web production build, Android JavaScript export (2.9MB Hermes bundle) and secret scanning passed. Backend code was unchanged in this pass; Android export is not device QA.
 
 Journal recovery pass: **154 TypeScript/component tests passed**, including contracts, formatting, types and lint. Web production build and secret scan passed. The prior full journal core API suite passed **85 Java tests**; the subsequent scoped JSON validation fix passed all 6 journal HTTP tests. Numeric strings, fractional values and duplicate known fields now return400 without writes. Source review and tests cover account-switch clearing, retained draft access, exact mutation retries, conflict review/discard, transaction failure and deletion retirement. Browser tools recovered: the signed-out Trips desktop layout was visually inspected after restarting the local server. This is not authenticated journal visual QA. Arbitrary multi-entry browser history jumps remain an open Medium release issue; see `docs/security/TRIP_JOURNAL_THREAT_REVIEW.md`.
 

@@ -49,11 +49,13 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmUseAccount, setConfirmUseAccount] = useState(false);
   const [accountFresh, setAccountFresh] = useState(false);
+  const [historyRestored, setHistoryRestored] = useState(true);
   const mounted = useRef(true);
   const operation = useRef<AbortController | null>(null);
   const pendingHistoryExit = useRef(false);
   const historyGuard = useRef<JournalHistoryGuard | null>(null);
   const historyRestoring = useRef(false);
+  const historyRestorationSteps = useRef(0);
   const dirtyRef = useRef(false);
   const closeRef = useRef(onClose);
 
@@ -155,12 +157,22 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
       const guard = historyGuard.current;
       if (!guard) return;
       if (historyRestoring.current) {
-        historyRestoring.current = false;
         event.stopImmediatePropagation();
+        const current = event.state as Record<string, unknown> | null;
+        if (current?.[historyGuardKey] === guard.marker) {
+          historyRestoring.current = false;
+          setHistoryRestored(true);
+        } else {
+          historyRestorationSteps.current += 1;
+          window.history.forward();
+        }
         return;
       }
       const current = event.state as Record<string, unknown> | null;
-      if (current?.[historyGuardKey] === guard.marker) return;
+      if (current?.[historyGuardKey] === guard.marker) {
+        event.stopImmediatePropagation();
+        return;
+      }
       if (!dirtyRef.current) {
         historyGuard.current = null;
         closeRef.current();
@@ -170,6 +182,8 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
       pendingHistoryExit.current = true;
       setConfirmDiscard(true);
       historyRestoring.current = true;
+      historyRestorationSteps.current = 1;
+      setHistoryRestored(false);
       window.history.forward();
     };
     window.addEventListener('popstate', guardHistory, { capture: true });
@@ -197,12 +211,18 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
 
   const closeWithHistory = (continueHistory: boolean) => {
     const guard = historyGuard.current;
+    const restorationSteps = Math.max(2, historyRestorationSteps.current);
     historyGuard.current = null;
+    historyRestoring.current = false;
+    historyRestorationSteps.current = 0;
     onClose();
     if (!guard) return;
     const current = window.history.state as Record<string, unknown> | null;
     if (current?.[historyGuardKey] !== guard.marker) return;
-    window.setTimeout(() => (continueHistory ? window.history.go(-2) : window.history.back()), 0);
+    window.setTimeout(
+      () => (continueHistory ? window.history.go(-restorationSteps) : window.history.back()),
+      0,
+    );
   };
 
   const requestClose = () => {
@@ -404,8 +424,10 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
             <button
               className="button secondary"
               type="button"
+              disabled={!historyRestored}
               onClick={() => {
                 pendingHistoryExit.current = false;
+                historyRestorationSteps.current = 0;
                 setConfirmDiscard(false);
               }}
             >
@@ -414,6 +436,7 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
             <button
               className="button danger"
               type="button"
+              disabled={!historyRestored}
               onClick={() => {
                 const leaveHistory = pendingHistoryExit.current;
                 pendingHistoryExit.current = false;

@@ -307,7 +307,7 @@ it('resets private fields on account change and ignores a late save callback', a
   expect(screen.queryByText('Draft saved on this device.')).toBeNull();
 });
 
-it('guards browser history while text is dirty and requires an explicit discard', async () => {
+it('restores through every history entry before allowing a multi-step discard', async () => {
   const onClose = vi.fn();
   const historyGo = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
   const historyForward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
@@ -323,17 +323,83 @@ it('guards browser history while text is dirty and requires an explicit discard'
   expect(onClose).not.toHaveBeenCalled();
   expect(historyForward).toHaveBeenCalledOnce();
   expect(laterPopstate).not.toHaveBeenCalled();
+  expect(
+    (screen.getByRole('button', { name: 'Continue writing' }) as HTMLButtonElement).disabled,
+  ).toBe(true);
+  expect(
+    (screen.getByRole('button', { name: 'Discard changes' }) as HTMLButtonElement).disabled,
+  ).toBe(true);
+
   window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('button', { name: 'Continue writing' }) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
+  expect(
+    (screen.getByRole('button', { name: 'Discard changes' }) as HTMLButtonElement).disabled,
+  ).toBe(false);
+  expect(laterPopstate).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole('button', { name: 'Continue writing' }));
   expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Synthetic route edit');
 
   window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
   await screen.findByRole('heading', { name: 'Discard changes?' });
+  expect(
+    (screen.getByRole('button', { name: 'Discard changes' }) as HTMLButtonElement).disabled,
+  ).toBe(true);
+  window.dispatchEvent(new PopStateEvent('popstate', { state: { syntheticStep: 1 } }));
+  window.dispatchEvent(new PopStateEvent('popstate', { state: { syntheticStep: 2 } }));
+  expect(historyForward).toHaveBeenCalledTimes(4);
+  expect(laterPopstate).not.toHaveBeenCalled();
+  window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('button', { name: 'Discard changes' }) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
   expect(onClose).toHaveBeenCalledOnce();
-  await waitFor(() => expect(historyGo).toHaveBeenCalledWith(-2));
+  await waitFor(() => expect(historyGo).toHaveBeenCalledWith(-3));
   window.removeEventListener('popstate', laterPopstate);
+});
+
+it('skips the synthetic duplicate after an ordinary Back discard', async () => {
+  const historyGo = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
+  vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
+  render(<JournalEditor account={accountA} journeyId={journeyId} onClose={vi.fn()} />);
+  await screen.findByLabelText('Title');
+  fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Synthetic back edit' } });
+  await waitFor(() => expect(window.history.state?.__routiqoJournalGuard).toBeTruthy());
+
+  window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+  await screen.findByRole('heading', { name: 'Discard changes?' });
+  window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('button', { name: 'Discard changes' }) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+
+  await waitFor(() => expect(historyGo).toHaveBeenCalledWith(-2));
+});
+
+it('installs only one history sentinel across repeated draft saves', async () => {
+  const pushState = vi.spyOn(window.history, 'pushState');
+  render(<JournalEditor account={accountA} journeyId={journeyId} onClose={vi.fn()} />);
+  await screen.findByLabelText('Title');
+
+  fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Synthetic first edit' } });
+  await waitFor(() => expect(pushState).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+  await screen.findByText('Draft saved on this device.');
+
+  fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Synthetic second edit' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+  await waitFor(() => expect(saveBrowserJournalDraft).toHaveBeenCalledTimes(2));
+  expect(pushState).toHaveBeenCalledOnce();
 });
 
 it('preserves router state and removes its clean guard when the editor closes', async () => {

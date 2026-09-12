@@ -2054,3 +2054,25 @@ textarea::placeholder {
     width: 100%;
   }
 }
+
+.commute-summaries {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.commute-summaries summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.commute-summaries .fine-print {
+  max-width: 68ch;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.commute-summaries ul {
+  list-style: none;
+  padding: 0;
+}
+.commute-summaries li + li {
+  margin-top: 1rem;
+}
