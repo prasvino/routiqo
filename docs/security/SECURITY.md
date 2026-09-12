@@ -79,7 +79,7 @@ Foundation environments must have no consumer-authentication bypass: protected p
 - Never commit secrets or copy them into documentation, examples, CI output, images, or client bundles.
 - Pin and verify dependencies and build inputs according to repository policy.
 - Review new providers, SDKs, permissions, network access, data flows, and dependencies in an ADR when architecture or trust boundaries change.
-- CI must run secret scanning, dependency/vulnerability scanning, provenance/integrity checks where configured, and relevant security tests.
+- CI must run credential scanning, dependency vulnerability checks, provenance/integrity checks where configured, and relevant security tests.
 - A scanner finding is triaged for reachability, exploitability, exposure, and compensating controls; it is not dismissed solely because no public exploit is known.
 
 ---
