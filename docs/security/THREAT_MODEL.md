@@ -4,6 +4,8 @@ This document defines Routiqo's baseline attacker model, protected assets, trust
 
 This is a living engineering artifact, not a compliance checklist. Feature specifications should link to the applicable threats and add feature-specific abuse cases.
 
+Native session storage addition (2026-09-12): the mobile runtime now has an Expo SecureStore boundary for opaque credentials, separate from journey SQLite storage. T01/T02/T12/T13/T19 controls include fixed-key bounded records, device-only unlocked accessibility, Android backup exclusion, instance-bound one-use write tickets, serialized clear/write operations, expiry rechecks and redacted fail-closed storage errors. See `docs/features/auth/NATIVE_SESSION_STORAGE_SPEC.md` and ADR0018. This primitive is not yet mounted in a sign-in flow; server verification, native HTTP transport, logout revocation, challenge binding and physical-device/Keychain lifecycle validation remain gates. Storage tests do not establish authenticated access or physical erasure.
+
 ---
 
 ## 1. Security and safety objectives
@@ -184,4 +186,3 @@ Security-sensitive details must remain in approved private systems.
 A change must not ship when it introduces an unmitigated Critical or High threat, silently weakens a security/privacy/safety invariant, lacks required authorization or abuse tests, or leaves sensitive behavior ambiguous.
 
 Risk acceptance must be explicit, authorized, time-bounded where appropriate, and accompanied by an owner and follow-up plan.
-
