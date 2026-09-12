@@ -1,6 +1,7 @@
 package com.routiqo.core.identity.application;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface SessionStore {
@@ -12,5 +13,6 @@ public interface SessionStore {
     record Renewal(UUID accountId, Instant expiresAt, boolean rotated) {}
     Renewal renew(String tokenHash, String replacementHash, Instant now);
     void deleteAccount(String tokenHash, Instant now);
+    Optional<UUID> revocationAccount(String tokenHash);
     void revoke(String tokenHash, Instant now);
 }

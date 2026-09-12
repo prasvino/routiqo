@@ -93,3 +93,19 @@ Live verification sequence: configure Google/web-auth and routing as above; sign
 Downloaded offline maps/native navigation remain separate gates: Android Studio/SDK, a native Mapbox Maps/Navigation integration and valid tokens, bounded region downloads, storage eviction/deletion, offline rerouting, and real-device tests. The web app does not download tiles or persist temporary geocoding results. In-memory directions do not survive reload.
 
 The endpoint is POST `/api/v1/routes`, with mode `driving`, `walking` or `cycling`, and two longitude/latitude coordinate arrays named `origin` and `destination`. It requires the browser session, CSRF, exact origin and matching account header. It returns private Mapbox estimates without creating journeys or presence. POST `/api/v1/routes/places` accepts a `query` for temporary city/street/address lookup using the same token and guards. Trips includes authenticated place selection, route alternatives, optional web map display and manual provider directions, with an optional one-time current-location origin. Live provider verification, GPS-following navigation and downloaded offline maps remain pending. No real Mapbox request has been tested; automated tests use synthetic transport responses.
+## Native authentication API
+
+The `native-auth` profile is intended to run with `persistence,google-auth` and the
+same database, Google audience and `ROUTIQO_AUTH_RATE_SECRET` settings described
+above. It can coexist with `web-auth`. Native routes use the separate
+`/api/v1/native/auth` namespace; browser cookies are not accepted there. Session
+credentials and challenge bindings are sensitive response data: do not paste them
+into messages, log them, or place them in browser/public environment variables.
+
+The mobile UI/credential transport is not connected by this API slice. Response
+validators and the existing SecureStore vault are prerequisites, not working native
+sign-in. Complete the redirect-safe native HTTP adapter, Google UI/nonce binding,
+vault coordination and authenticated journey transport before device sign-in QA.
+Use TLS at the deployed API boundary. Automated API verification uses loopback
+HTTP, disposable PostgreSQL and synthetic Google identity; it does not prove live
+Google or production proxy behavior. See `NATIVE_AUTH_HTTP_SPEC.md` and ADR 0020.

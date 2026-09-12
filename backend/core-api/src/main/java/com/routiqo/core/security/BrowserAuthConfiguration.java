@@ -1,13 +1,9 @@
 package com.routiqo.core.security;
 
 import com.routiqo.core.identity.application.AuthRateGate;
-import com.routiqo.core.identity.infrastructure.*;
-import java.time.Clock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.core.annotation.Order;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -15,15 +11,9 @@ import org.springframework.security.web.csrf.*;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("web-auth")
-@EnableScheduling
 public class BrowserAuthConfiguration {
     @Bean BrowserAuthPolicy browserAuthPolicy(@Value("${ROUTIQO_WEB_ORIGIN}") String origin,
             @Value("${ROUTIQO_AUTH_SECURE_COOKIES:true}") boolean secure) { return new BrowserAuthPolicy(origin, secure); }
-    @Bean Clock authRateClock() { return Clock.systemUTC(); }
-    @Bean AuthRateGate authRateGate(JdbcTemplate jdbc, @Value("${ROUTIQO_AUTH_RATE_SECRET}") String secret, Clock clock) {
-        return new JdbcAuthRateGate(jdbc, secret, clock);
-    }
-    @Bean AuthMaintenance authMaintenance(JdbcTemplate jdbc) { return new AuthMaintenance(jdbc); }
     @Bean @Order(1) SecurityFilterChain browserAuthSecurity(HttpSecurity http, BrowserAuthPolicy policy, AuthRateGate rates) throws Exception {
         var csrf = new CookieCsrfTokenRepository();
         csrf.setCookieName(policy.cookieName("routiqo_csrf")); csrf.setCookiePath("/");

@@ -215,6 +215,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/native/auth/google/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Creates a five-minute one-use challenge. Authorization, cookies, browser-origin headers and query strings are rejected. The binding remains only in native sign-in coordination memory. */
+        post: operations["beginNativeGoogleLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/auth/google/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Verifies the one-use bound Google challenge and returns a 15-minute opaque native credential. Authorization, cookies, browser-origin headers and query strings are rejected. */
+        post: operations["exchangeNativeGoogleLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns the enabled account for exactly one unexpired, unrevoked native bearer credential. Cookies, browser-origin headers and query strings are rejected. */
+        get: operations["getNativeSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/auth/session/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Returns the current session or atomically rotates it in its last five minutes. The Google-authenticated lineage remains bounded to 12 hours. */
+        post: operations["renewNativeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Idempotently revokes the credential lineage. A retained rotated predecessor also revokes its active replacement; an unknown syntactically valid credential has no effect. */
+        post: operations["logoutNativeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/auth/account/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Deletes the matching Routiqo account and all sessions. Requires Google authentication within five minutes; renewal does not reset that time. */
+        post: operations["deleteNativeAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/journeys/{id}/journal": {
         parameters: {
             query?: never;
@@ -276,6 +378,41 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        NativeEmptyRequest: Record<string, never>;
+        NativeGoogleChallenge: {
+            /** Format: uuid */
+            id: string;
+            nonce: string;
+            binding: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        NativeExchangeRequest: {
+            /** Format: uuid */
+            challengeId: string;
+            binding: string;
+            idToken: string;
+        };
+        NativeSession: {
+            /** Format: uuid */
+            accountId: string;
+            credential: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        NativeAccount: {
+            /** Format: uuid */
+            accountId: string;
+        };
+        NativeDeleteAccountRequest: {
+            /** @enum {string} */
+            confirmation: "DELETE";
+            /**
+             * Format: uuid
+             * @description Must exactly match the authenticated native session account.
+             */
+            accountId: string;
+        };
         TripJournal: {
             journey: components["schemas"]["Journey"];
             annotation: components["schemas"]["TripJournalAnnotation"];
@@ -399,6 +536,20 @@ export interface components {
             headers: {
                 /** @description Retry delay in seconds. */
                 "Retry-After"?: string;
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
+        /** @description Missing, malformed, invalid, expired or revoked native bearer authentication, or prohibited Authorization on challenge/exchange. No credential details are returned. */
+        NativeAuthRejected: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
+        /** @description Cookie, Origin, Sec-Fetch-Site, query string, unknown native route or unsupported method was rejected. */
+        NativeTransportRejected: {
+            headers: {
                 [name: string]: unknown;
             };
             content?: never;
@@ -871,6 +1022,212 @@ export interface operations {
             403: components["responses"]["AuthForbidden"];
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    beginNativeGoogleLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeEmptyRequest"];
+            };
+        };
+        responses: {
+            /** @description Native Google challenge */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeGoogleChallenge"];
+                };
+            };
+            /** @description Body is not the exact empty JSON object */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    exchangeNativeGoogleLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeExchangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Native session established */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSession"];
+                };
+            };
+            /** @description Invalid JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    getNativeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current native account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeAccount"];
+                };
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    renewNativeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeEmptyRequest"];
+            };
+        };
+        responses: {
+            /** @description Current or renewed native session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSession"];
+                };
+            };
+            /** @description Body is not the exact empty JSON object */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    logoutNativeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeEmptyRequest"];
+            };
+        };
+        responses: {
+            /** @description Credential lineage revoked or already absent */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Body is not the exact empty JSON object */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    deleteNativeAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeDeleteAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Account deleted and all session lineages revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Explicit confirmation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            /** @description Sign in with Google again */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             429: components["responses"]["AuthLimited"];
         };
     };

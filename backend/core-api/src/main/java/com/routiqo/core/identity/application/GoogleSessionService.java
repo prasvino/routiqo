@@ -10,9 +10,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
-/** Internal orchestration only; transport must enforce origin/CSRF and bind secrets to the initiating device. */
+/** Internal orchestration only; each transport must enforce its own isolation and bind challenges to the initiating client. */
 public final class GoogleSessionService {
     private final SessionStore store;
     private final GoogleIdentityVerifier verifier;
@@ -50,6 +51,7 @@ public final class GoogleSessionService {
         var result = store.renew(digest(credential), digest(replacement), now());
         return new Session(result.accountId(), result.rotated() ? replacement : credential, result.expiresAt());
     }
+    public Optional<UUID> revocationAccount(String credential) { return store.revocationAccount(digest(credential)); }
     public void revoke(String credential) { store.revoke(digest(credential), now()); }
     public void deleteAccount(String credential) { store.deleteAccount(digest(credential), now()); }
     private Instant now() { return clock.instant().truncatedTo(ChronoUnit.MICROS); }

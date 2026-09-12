@@ -4,6 +4,7 @@ import com.routiqo.core.identity.application.*;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -59,6 +60,11 @@ public final class JdbcSessionStore implements SessionStore {
                     (SELECT account_id, authenticated_at FROM auth_session WHERE token_hash = ?)
                 """, Timestamp.from(now), tokenHash);
         });
+    }
+    @Override public Optional<UUID> revocationAccount(String tokenHash) {
+        var rows = jdbc.query("SELECT account_id FROM auth_session WHERE token_hash = ?",
+                (row, index) -> row.getObject("account_id", UUID.class), tokenHash);
+        return rows.stream().findFirst();
     }
     @Override public Renewal renew(String tokenHash, String replacementHash, Instant now) {
         return Objects.requireNonNull(transaction.execute(status -> {

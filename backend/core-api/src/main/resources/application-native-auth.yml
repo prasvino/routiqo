@@ -1,0 +1,3 @@
+server:
+  # Native rate limiting uses only the direct peer address.
+  forward-headers-strategy: none

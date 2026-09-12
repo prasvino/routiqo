@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.8.0
-  description: Discovery and opt-in browser authentication. Auth requires web-auth, google-auth and persistence profiles; default preview denies these routes. No live traffic or user presence.
+  version: 0.9.0
+  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. No live traffic or user presence.
 servers:
   - url: http://localhost:8080
 paths:
@@ -274,6 +274,123 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/auth/google/challenge:
+    post:
+      operationId: beginNativeGoogleLogin
+      security: []
+      description: Creates a five-minute one-use challenge. Authorization, cookies, browser-origin headers and query strings are rejected. The binding remains only in native sign-in coordination memory.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeEmptyRequest' }
+      responses:
+        '200':
+          description: Native Google challenge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeGoogleChallenge' }
+        '400': { description: Body is not the exact empty JSON object }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/auth/google/exchange:
+    post:
+      operationId: exchangeNativeGoogleLogin
+      security: []
+      description: Verifies the one-use bound Google challenge and returns a 15-minute opaque native credential. Authorization, cookies, browser-origin headers and query strings are rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeExchangeRequest' }
+      responses:
+        '200':
+          description: Native session established
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeSession' }
+        '400': { description: Invalid JSON, non-canonical identifier or request fields }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/auth/session:
+    get:
+      operationId: getNativeSession
+      security: [{ nativeBearer: [] }]
+      description: Returns the enabled account for exactly one unexpired, unrevoked native bearer credential. Cookies, browser-origin headers and query strings are rejected.
+      responses:
+        '200':
+          description: Current native account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeAccount' }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/auth/session/renew:
+    post:
+      operationId: renewNativeSession
+      security: [{ nativeBearer: [] }]
+      description: Returns the current session or atomically rotates it in its last five minutes. The Google-authenticated lineage remains bounded to 12 hours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeEmptyRequest' }
+      responses:
+        '200':
+          description: Current or renewed native session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeSession' }
+        '400': { description: Body is not the exact empty JSON object }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/auth/logout:
+    post:
+      operationId: logoutNativeSession
+      security: [{ nativeBearer: [] }]
+      description: Idempotently revokes the credential lineage. A retained rotated predecessor also revokes its active replacement; an unknown syntactically valid credential has no effect.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeEmptyRequest' }
+      responses:
+        '204': { description: Credential lineage revoked or already absent }
+        '400': { description: Body is not the exact empty JSON object }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/auth/account/delete:
+    post:
+      operationId: deleteNativeAccount
+      security: [{ nativeBearer: [] }]
+      description: Deletes the matching Routiqo account and all sessions. Requires Google authentication within five minutes; renewal does not reset that time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeDeleteAccountRequest' }
+      responses:
+        '204': { description: Account deleted and all session lineages revoked }
+        '400': { description: Explicit confirmation, canonical account identifier and exact fields are required }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '428': { description: Sign in with Google again, then explicitly reconfirm deletion }
+        '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/journeys/{id}/journal:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -427,6 +544,10 @@ components:
       in: cookie
       name: __Host-routiqo_session
       description: Secure production cookie. Explicit loopback HTTP development uses routiqo_session.
+    nativeBearer:
+      type: http
+      scheme: bearer
+      description: Exactly one Authorization header containing Bearer, one space, and a 43-character URL-safe opaque credential.
   parameters:
     JourneyAccount:
       in: header
@@ -466,7 +587,53 @@ components:
         Retry-After:
           schema: { type: string }
           description: Retry delay in seconds.
+    NativeAuthRejected:
+      description: Missing, malformed, invalid, expired or revoked native bearer authentication, or prohibited Authorization on challenge/exchange. No credential details are returned.
+    NativeTransportRejected:
+      description: Cookie, Origin, Sec-Fetch-Site, query string, unknown native route or unsupported method was rejected.
   schemas:
+    NativeEmptyRequest:
+      type: object
+      additionalProperties: false
+      maxProperties: 0
+    NativeGoogleChallenge:
+      type: object
+      additionalProperties: false
+      required: [id, nonce, binding, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        nonce: { type: string, minLength: 43, maxLength: 43, pattern: '^[A-Za-z0-9_-]{43}$' }
+        binding: { type: string, minLength: 43, maxLength: 43, pattern: '^[A-Za-z0-9_-]{43}$' }
+        expiresAt: { type: string, format: date-time }
+    NativeExchangeRequest:
+      type: object
+      additionalProperties: false
+      required: [challengeId, binding, idToken]
+      properties:
+        challengeId: { type: string, format: uuid }
+        binding: { type: string, minLength: 43, maxLength: 43, pattern: '^[A-Za-z0-9_-]{43}$' }
+        idToken: { type: string, minLength: 1, maxLength: 16384 }
+    NativeSession:
+      type: object
+      additionalProperties: false
+      required: [accountId, credential, expiresAt]
+      properties:
+        accountId: { type: string, format: uuid }
+        credential: { type: string, minLength: 43, maxLength: 43, pattern: '^[A-Za-z0-9_-]{43}$' }
+        expiresAt: { type: string, format: date-time }
+    NativeAccount:
+      type: object
+      additionalProperties: false
+      required: [accountId]
+      properties:
+        accountId: { type: string, format: uuid }
+    NativeDeleteAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmation, accountId]
+      properties:
+        confirmation: { type: string, enum: [DELETE] }
+        accountId: { type: string, format: uuid, description: Must exactly match the authenticated native session account. }
     TripJournal:
       type: object
       required: [journey, annotation]

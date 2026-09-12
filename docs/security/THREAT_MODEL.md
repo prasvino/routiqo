@@ -52,6 +52,19 @@ Do not assume authenticated users are trustworthy.
 
 ## 4. Trust boundaries
 
+Native authentication HTTP addition (ADR 0020): an isolated opt-in namespace
+returns opaque session credentials and challenge bindings to the device. Unlike
+browser auth, this transport uses explicit bearer credentials and rejects ambient
+cookies/browser-origin headers. Header rejection is not proof of native-app origin.
+T01/T02 controls reuse server-side challenge binding, one-time exchange, enabled
+account checks, lineage rotation/revocation and recent-auth deletion. T12 requires
+redacted errors/DTO strings, no-store responses, TLS deployment, secure vault storage
+and no URL credentials. T14 retains bounded strict JSON parsing, exact route/method
+allowlists, database-backed rates and expiry cleanup. T13/T19 require late-response
+invalidation and vault/deletion coordination before the mobile flow is mounted.
+Native resource APIs and redirect-safe device transport remain separate gates;
+browser journey/route endpoints do not gain bearer fallback through this change.
+
 Review data whenever it crosses:
 
 - device/browser ↔ public edge/API;
