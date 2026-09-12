@@ -298,6 +298,28 @@ function Planner({ account }: { account: string }) {
       <p role="status" aria-live="polite">
         {message}
       </p>
+      {busy && (
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => {
+            const local = pendingLocalOnly.current;
+            pending.current?.abort();
+            pending.current = null;
+            setBusy(false);
+            setError('');
+            setMessage(
+              local
+                ? 'Location request cancelled. Any browser permission prompt may still need to be closed.'
+                : result?.routes.length
+                  ? 'Request cancelled. The last successful route is still shown.'
+                  : 'Request cancelled. Your selected places are unchanged.',
+            );
+          }}
+        >
+          Cancel request
+        </button>
+      )}
       {error && (
         <p className="form-error" role="alert">
           {error}

@@ -77,6 +77,30 @@ it('cancels an in-flight search offline and isolates a retry from its late respo
   expect(find.disabled).toBe(false);
 });
 
+it('cancels a location request and ignores its late result while a new request runs', async () => {
+  let finish!: (value: Awaited<ReturnType<typeof readBrowserLocation>>) => void;
+  vi.mocked(readBrowserLocation).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  vi.mocked(searchBrowserPlaces).mockResolvedValueOnce(place('Chosen town', 79));
+  open();
+  fireEvent.click(screen.getByRole('button', { name: 'Use my current location' }));
+  const signal = vi.mocked(readBrowserLocation).mock.calls[0]![0]!;
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel request' }));
+  expect(signal.aborted).toBe(true);
+  expect(screen.getByText(/Location request cancelled/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Cancel request' })).toBeNull();
+  fireEvent.change(screen.getByLabelText('From'), { target: { value: 'Chosen' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find starting place' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Chosen town' }));
+  await act(async () => finish({ coordinate: [80, 13], accuracyMetres: 20 }));
+  expect(screen.queryByText('Selected: My current location')).toBeNull();
+  expect(screen.getByText('Selected: Chosen town')).toBeTruthy();
+});
+
 it('keeps an explicit pending location reading alive when connectivity changes', async () => {
   const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
   let finish!: (value: Awaited<ReturnType<typeof readBrowserLocation>>) => void;
@@ -299,6 +323,23 @@ it('retains loaded directions through connection loss and failed recalculation b
   fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
   await screen.findByText('1.2 km');
   let finishRecalculation!: (value: Awaited<ReturnType<typeof calculateBrowserRoute>>) => void;
+  let rejectCancelled!: (error: Error) => void;
+  vi.mocked(calculateBrowserRoute).mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        rejectCancelled = reject;
+      }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
+  const cancelledSignal = vi.mocked(calculateBrowserRoute).mock.calls[1]![2]!;
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel request' }));
+  expect(cancelledSignal.aborted).toBe(true);
+  expect(
+    screen.getByText('Request cancelled. The last successful route is still shown.'),
+  ).toBeTruthy();
+  await act(async () => rejectCancelled(new BrowserRoutingError(401)));
+  expect(screen.getByText('1.2 km')).toBeTruthy();
+  expect(screen.queryByText('Sign in again from Profile to continue.')).toBeNull();
   vi.mocked(calculateBrowserRoute).mockImplementationOnce(
     () =>
       new Promise((resolve) => {
@@ -306,7 +347,7 @@ it('retains loaded directions through connection loss and failed recalculation b
       }),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
-  const interruptedSignal = vi.mocked(calculateBrowserRoute).mock.calls[1]![2]!;
+  const interruptedSignal = vi.mocked(calculateBrowserRoute).mock.calls[2]![2]!;
   online.mockReturnValue(false);
   act(() => window.dispatchEvent(new Event('offline')));
   expect(screen.getByText(/You’re offline. Loaded directions/)).toBeTruthy();
@@ -324,10 +365,10 @@ it('retains loaded directions through connection loss and failed recalculation b
   );
   expect(screen.getByText('1.2 km')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
-  expect(calculateBrowserRoute).toHaveBeenCalledTimes(2);
+  expect(calculateBrowserRoute).toHaveBeenCalledTimes(3);
   online.mockReturnValue(true);
   act(() => window.dispatchEvent(new Event('online')));
-  expect(calculateBrowserRoute).toHaveBeenCalledTimes(2);
+  expect(calculateBrowserRoute).toHaveBeenCalledTimes(3);
   vi.mocked(calculateBrowserRoute).mockRejectedValueOnce(new BrowserRoutingError(503));
   fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
   await screen.findByText('Route planning is unavailable. Try again later.');

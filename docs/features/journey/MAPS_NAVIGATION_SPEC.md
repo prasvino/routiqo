@@ -57,6 +57,11 @@ Connection loss aborts pending network work and releases its busy state immediat
 late responses cannot replace retained directions or interfere with an explicit retry.
 Reconnection never retries automatically. A pending explicit local location reading
 is independent of network connectivity and is not cancelled by an offline event.
+During search, calculation or a one-time location reading, Cancel request aborts
+the current work, releases busy state and ignores late callbacks. Cancellation
+preserves existing selections and loaded route estimates; a location reading has
+already cleared its previous origin when started. Cancelling a browser location
+reading cannot dismiss the browser/OS permission prompt. No automatic retry occurs.
 No automatic upload, service worker, tile scraper, GPS watch or route persistence.
 
 Mapbox GL itself uses browser CacheStorage for map tiles and localStorage for SDK
