@@ -298,6 +298,14 @@ with the backend; previous Mapbox deployments must not serve the new disclosure.
 
 ## Routiqo Live: first-list threats (planned)
 
+Admission implementation boundary (ADR 0023): immutable context/admission objects
+are internal snapshots, not proof of identity or public capabilities. A malicious
+client can invent every field; HTTP must never deserialize these as authority.
+Snapshot consistency checks must be coupled to writes using current authoritative
+revisions across replicas. Coarse anchor sets are sensitive route intent even
+without raw geometry. Record constructors, short expiry and matching generations
+do not establish physical presence, prevent Sybils or approve public aggregation.
+
 Scope and lifecycle: `docs/features/live/ROUTIQO_LIVE_SPEC.md`; ADR 0022.
 No Live capability is enabled by this planning change. Treat authenticated actors
 as potentially malicious, including colluding accounts and commercial spammers.

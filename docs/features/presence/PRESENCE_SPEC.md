@@ -12,6 +12,12 @@ of physical location. Reading never silently enables publication. Ghost withdraw
 invalidates accepted evidence for future projection as well as new heartbeats.
 The cohort ADR must resolve block-safe aggregation before any public projection.
 
+ADR 0023 defines internal signal admission against owned active journeys, current
+consent and a versioned server-owned route context. Its pure application check is
+not an authority store or token issuer. Admission is invalid after route revision,
+consent generation or journey lifecycle changes. Future ingestion must bind the
+check atomically to accepted writes; evidence withdrawal remains a separate policy.
+
 Internal `PresenceConsent` now defines opt-in defaults, monotonic generation changes, terminal journey completion and owner/journey-bound leases of at most90seconds. Its tests cover stale heartbeats after Ghost Mode/re-enable, expiry boundaries and generation overflow. This is a pure transition policy: callers still need authoritative membership checks, atomic durable compare-and-set, rate limits and revocation propagation. Never use it as process-local consent storage or as proof that public presence is safe.
 
 Presence must be opt-in for an owned active journey. A client-supplied route or segment identifier is not proof of membership. Before ingestion, implement server-issued route membership based on verified routing context; arbitrary coordinate or segment queries remain denied. No precise stranger points, participant lists, exact endpoints, stable public actor IDs or movement history may appear in any output.

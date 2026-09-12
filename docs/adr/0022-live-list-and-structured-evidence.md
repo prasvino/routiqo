@@ -30,7 +30,9 @@ AI and full native navigation. HTTP refresh adds bounded delay; the UI must show
 freshness honestly. Core/Redis failures suppress output instead of trusting stale
 authorization. No live feature is implemented by accepting this ADR.
 
-Before aggregate endpoints, a cohort/admission ADR must settle fixed spatial/time
+ADR 0023 defines the internal route-context/admission model; its production
+registration, storage and issuance are not yet implemented. Before aggregate
+endpoints, the cohort publication ADR must settle fixed spatial/time
 partitions, thresholds, independent-evidence criteria, query budgets, Ghost/read
 semantics and block-safe suppression under repeated/colluding queries. Before
 migrations, settle cleanup, moderation holds, deletion and retry tombstones.

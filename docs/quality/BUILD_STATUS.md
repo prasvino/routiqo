@@ -30,6 +30,22 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 ## Verification
 
+Live L0.2a admission pass: added immutable bounded LiveRouteContext and
+SignalAdmission models and an application-layer consistency policy using an
+independently authenticated actor plus current journey/consent/context snapshots.
+It rejects wrong ownership, changed route/consent revisions, missing anchors,
+disallowed categories, future/expired admissions and ended journeys. Ghost Mode
+then re-enable cannot revive an old admission. Sets are copied and diagnostics
+redacted. ADR 0023 documents authority, registration and storage gates.
+
+Full core check/bootJar passed **150 Java tests across 28 suites**, zero failures,
+errors or skips; nine admission tests cover ownership, invalidation, time
+boundaries, immutable sets and redaction. Root and independent source review
+found no remaining issues; secret/diff checks passed. This is an internal policy,
+not an operational admission issuer, persisted route binding, atomic write check
+or public projection. No TS/UI changes; prior 257 TS tests/web build remain latest.
+Next: cohort publication and block-safe suppression, then receipt/storage/withdrawal.
+
 Live L0.1 domain pass: internal QuickSignal and QuickSignalValue implement 17
 closed values across five categories, immutable non-nil identity/context fields,
 nonnegative consent generation, bounded receipt/expiry windows and half-open
