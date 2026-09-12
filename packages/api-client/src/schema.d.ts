@@ -292,6 +292,7 @@ export interface components {
         TripJournalWrite: {
             title: string;
             notes: string;
+            /** @description Exact integer JSON number; no string coercion or fraction truncation. Numeric token at most 64 characters and absolute exponent at most 100. */
             expectedVersion: number;
             /** Format: uuid */
             mutationId: string;

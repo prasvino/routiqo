@@ -482,7 +482,11 @@ components:
       properties:
         title: { type: string, maxLength: 120 }
         notes: { type: string, maxLength: 4000 }
-        expectedVersion: { type: integer, minimum: 0, maximum: 9007199254740990 }
+        expectedVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740990
+          description: Exact integer JSON number; no string coercion or fraction truncation. Numeric token at most 64 characters and absolute exponent at most 100.
         mutationId: { type: string, format: uuid }
     RouteCoordinate:
       type: array

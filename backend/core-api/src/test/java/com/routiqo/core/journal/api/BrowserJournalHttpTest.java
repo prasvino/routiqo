@@ -145,6 +145,42 @@ class BrowserJournalHttpTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_journal_annotation WHERE journey_id = ?", Long.class, trip)).isZero();
     }
 
+    @Test void jsonTypesAndNonIntegralVersionsAreNeverCoerced() throws Exception {
+        Browser owner = login(); UUID trip = journey(owner, "TRIP", "COMPLETED");
+        String path = "journeys/" + trip + "/journal"; String mutation = UUID.randomUUID().toString();
+        for (String body : java.util.List.of(
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":\"0\",\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":true,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":0.5,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":-0.5,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":1e-1,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":0.999999999999999999999999999999,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":0e999999999,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":9007199254740991,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":9223372036854775808,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":17,\"notes\":\"\",\"expectedVersion\":0,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":true,\"notes\":\"\",\"expectedVersion\":0,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":{},\"notes\":\"\",\"expectedVersion\":0,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":17,\"expectedVersion\":0,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":false,\"expectedVersion\":0,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":[],\"expectedVersion\":0,\"mutationId\":\"" + mutation + "\"}",
+                "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":0,\"mutationId\":17}",
+                "{\"title\":\"first\",\"title\":\"second\",\"notes\":\"\",\"expectedVersion\":0,\"mutationId\":\"" + mutation + "\"}")) {
+            assertThat(send(owner, path, body).statusCode()).as(body).isEqualTo(400);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_journal_annotation WHERE journey_id = ?",
+                    Long.class, trip)).isZero();
+        }
+
+        UUID decimalTrip = journey(owner, "TRIP", "COMPLETED");
+        String decimal = "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":0.0,\"mutationId\":\""
+                + UUID.randomUUID() + "\"}";
+        assertThat(send(owner, "journeys/" + decimalTrip + "/journal", decimal).statusCode()).isEqualTo(200);
+        UUID exponentTrip = journey(owner, "TRIP", "COMPLETED");
+        String exponent = "{\"title\":\"\",\"notes\":\"\",\"expectedVersion\":0e5,\"mutationId\":\""
+                + UUID.randomUUID() + "\"}";
+        assertThat(send(owner, "journeys/" + exponentTrip + "/journal", exponent).statusCode()).isEqualTo(200);
+    }
+
     @Test void invalidContentVersionsAndIdentifiersReturnBadRequestWithoutLeakingContent() throws Exception {
         Browser owner = login(); UUID trip = journey(owner, "TRIP", "COMPLETED");
         String path = "journeys/" + trip + "/journal"; UUID mutation = UUID.randomUUID();
