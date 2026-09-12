@@ -2,6 +2,8 @@
 
 Status: design for the next phase; no presence ingestion, storage or public output enabled.
 
+Internal `PresenceConsent` now defines opt-in defaults, monotonic generation changes, terminal journey completion and owner/journey-bound leases of at most90seconds. Its tests cover stale heartbeats after Ghost Mode/re-enable, expiry boundaries and generation overflow. This is a pure transition policy: callers still need authoritative membership checks, atomic durable compare-and-set, rate limits and revocation propagation. Never use it as process-local consent storage or as proof that public presence is safe.
+
 Presence must be opt-in for an owned active journey. A client-supplied route or segment identifier is not proof of membership. Before ingestion, implement server-issued route membership based on verified routing context; arbitrary coordinate or segment queries remain denied. No precise stranger points, participant lists, exact endpoints, stable public actor IDs or movement history may appear in any output.
 
 Redis owns short-lived presence leases, initially capped at90seconds with heartbeats no more often than30seconds. The server supplies timestamps and expiry. Each actor has a monotonic consent generation bound to the active journey. Ghost Mode and completion invalidate that generation and remove discoverable state; older/reordered heartbeats must not recreate it. Consent/revocation state needs a durable source and reliable propagation to every replica. A missing generation, unavailable authority or Redis failure suppresses output. Pub/Sub alone cannot guarantee revocation.
