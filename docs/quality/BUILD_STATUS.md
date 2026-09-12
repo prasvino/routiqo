@@ -126,3 +126,11 @@ The first full test run hit a pre-existing Xcode dependency import timeout; targ
 rerun passed without changes and the final complete run passed **238 tests across
 39 files**. No native transport/UI mounting or device/provider verification occurred.
 Latest backend validation remains98 Java tests; backend source was unchanged.
+
+Map provider direction changed by user (2026-09-12): ADR0021 selects MapLibre,
+self-hosted Valhalla/Photon and regional OSM-derived tiles under Routiqo control.
+Mapbox migration has not started; existing behavior and test results above still
+refer to Mapbox. Prioritize provider contract generalization, web renderer/adapters,
+regional hosting and Android offline feasibility in that order. No Mapbox account
+setup is required for the new target. Public free tiles are optional prototype-only;
+true phone-offline rerouting remains a distinct native engineering gate.

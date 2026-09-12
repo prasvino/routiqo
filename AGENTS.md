@@ -29,7 +29,7 @@ The user's current instructions govern task scope. Documents describe requiremen
 - PostgreSQL/PostGIS owns durable data; Redis owns ephemeral presence/cache with explicit TTLs.
 - OpenAPI and event schemas belong in `contracts`; generate TypeScript transport models/clients.
 - Use versioned migrations, bounded/indexed queries, and explicit transaction boundaries. Never hold DB transactions open for external API/AI calls.
-- Signed direct S3 uploads; Mapbox preferred; AWS target. Kafka, OpenSearch, ClickHouse, Kubernetes are not V1 defaults.
+- Signed direct S3 uploads; open-source maps direction in ADR 0021 (MapLibre/Valhalla/Photon), with migration pending; AWS target. Kafka, OpenSearch, ClickHouse, Kubernetes are not V1 defaults.
 - Record significant architecture choices and external dependencies in ADRs.
 
 ## Security, privacy, and reliability
