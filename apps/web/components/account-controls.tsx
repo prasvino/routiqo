@@ -11,6 +11,7 @@ import {
 import { GoogleLogin } from './google-login';
 import { DeleteAccount } from './delete-account';
 import { retireBrowserJourneyPartition } from '../lib/journey-storage';
+import { retireBrowserJournalPartition } from '../lib/journal-storage';
 
 export function AccountControls() {
   const [config, setConfig] = useState<AuthAvailability | null>(null);
@@ -159,10 +160,14 @@ export function AccountControls() {
               'Your Routiqo account was deleted. Plans and saved places on this device are still here.',
             );
             window.google?.accounts.id.disableAutoSelect();
-            void retireBrowserJourneyPartition(deletingAccount).catch(() => {
-              setNotice(
-                'Your account was deleted, but its local journey cache could not be cleared. Clear this site’s browser data to remove it. Download any local plans you want to keep first.',
-              );
+            void Promise.allSettled([
+              retireBrowserJourneyPartition(deletingAccount),
+              retireBrowserJournalPartition(deletingAccount),
+            ]).then((results) => {
+              if (results.some((result) => result.status === 'rejected'))
+                setNotice(
+                  'Your account was deleted, but some local journey or journal data could not be cleared. Clear this site’s browser data to remove it. Download any local plans you want to keep first.',
+                );
             });
           }}
         />

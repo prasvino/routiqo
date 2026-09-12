@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.6.0
+  version: 0.7.0
   description: Discovery and opt-in browser authentication. Auth requires web-auth, google-auth and persistence profiles; default preview denies these routes. No live traffic or user presence.
 servers:
   - url: http://localhost:8080
@@ -274,6 +274,49 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/journeys/{id}/journal:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    get:
+      operationId: getPrivateTripJournal
+      security: [{ browserSession: [] }]
+      description: Private journal for an owned completed trip; an unsaved annotation has version0. Commutes and active journeys are ineligible.
+      responses:
+        '200':
+          description: Completed trip and private annotation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TripJournal' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: Journey is not a completed trip }
+    post:
+      operationId: savePrivateTripJournal
+      security: [{ browserSession: [] }]
+      description: Save plain-text annotations with optimistic concurrency and latest-mutation replay protection. Twenty writes per account per minute. Empty title and notes clear the annotation content.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TripJournalWrite' }
+      responses:
+        '200':
+          description: Saved completed-trip journal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TripJournal' }
+        '400': { description: Invalid annotation, mutation identifier or version }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: Ineligible journey, stale version or conflicting mutation reuse }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/routes/places:
     post:
       operationId: searchPrivateRoutePlaces
@@ -419,6 +462,28 @@ components:
           schema: { type: string }
           description: Retry delay in seconds.
   schemas:
+    TripJournal:
+      type: object
+      required: [journey, annotation]
+      properties:
+        journey: { $ref: '#/components/schemas/Journey' }
+        annotation: { $ref: '#/components/schemas/TripJournalAnnotation' }
+    TripJournalAnnotation:
+      type: object
+      required: [title, notes, version, updatedAt]
+      properties:
+        title: { type: string, maxLength: 120, description: Plain text; UTF-16 code-unit limit enforced by server }
+        notes: { type: string, maxLength: 4000, description: Plain text; UTF-16 code-unit limit enforced by server }
+        version: { type: integer, minimum: 0, maximum: 9007199254740991 }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    TripJournalWrite:
+      type: object
+      required: [title, notes, expectedVersion, mutationId]
+      properties:
+        title: { type: string, maxLength: 120 }
+        notes: { type: string, maxLength: 4000 }
+        expectedVersion: { type: integer, minimum: 0, maximum: 9007199254740990 }
+        mutationId: { type: string, format: uuid }
     RouteCoordinate:
       type: array
       description: Longitude then latitude. Longitude must be between -180 and180, latitude between -90 and90. Endpoints must differ.

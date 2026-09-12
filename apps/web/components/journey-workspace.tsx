@@ -15,6 +15,8 @@ import {
 } from '../lib/journey-storage';
 import { Modal } from './modal';
 import { RoutePlanner } from './route-planner';
+import { JournalEditor } from './journal-editor';
+import { listBrowserJournals } from '../lib/journal-storage';
 import { readBrowserJourney } from '../lib/browser-journeys';
 import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 
@@ -28,6 +30,27 @@ export function JourneyWorkspace() {
   const [review, setReview] = useState('');
   const [busy, setBusy] = useState(false);
   const [start, setStart] = useState(false);
+  const [journal, setJournal] = useState<string | null>(null);
+  const [journalLibrary, setJournalLibrary] = useState<
+    Awaited<ReturnType<typeof listBrowserJournals>>
+  >([]);
+  const [journalLibraryError, setJournalLibraryError] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setJournalLibrary([]);
+    setJournalLibraryError(false);
+    if (account && !journal)
+      void listBrowserJournals(account)
+        .then((items) => {
+          if (active) setJournalLibrary(items);
+        })
+        .catch(() => {
+          if (active) setJournalLibraryError(true);
+        });
+    return () => {
+      active = false;
+    };
+  }, [account, journal]);
   const [kind, setKind] = useState<'trip' | 'commute'>('trip');
   const revision = useRef(0);
   const locked = useRef(false);
@@ -43,9 +66,21 @@ export function JourneyWorkspace() {
     try {
       const config = await authAvailability();
       const identity = config.enabled ? await browserAccount() : null;
+      if (revision.current !== current) return;
+      if (visibleAccount.current !== (identity?.accountId ?? null)) {
+        setAccount(null);
+        setPartition(null);
+        setJournal(null);
+        setJournalLibrary([]);
+        setStart(false);
+        setReview('');
+        setAvailability('checking');
+        visibleAccount.current = identity?.accountId ?? null;
+      }
       const saved = identity ? await readBrowserJourneyPartition(identity.accountId) : null;
       if (revision.current !== current) return;
       if (visibleAccount.current !== (identity?.accountId ?? null)) setStart(false);
+      if (visibleAccount.current !== (identity?.accountId ?? null)) setJournal(null);
       if (visibleAccount.current !== (identity?.accountId ?? null)) setReview('');
       visibleAccount.current = identity?.accountId ?? null;
       setAccount(identity?.accountId ?? null);
@@ -203,8 +238,7 @@ export function JourneyWorkspace() {
   }, [head, availability, perform]);
   const active = partition?.snapshots.journeys.find((journey) => journey.status === 'active');
   const completed =
-    partition?.snapshots.journeys.filter((journey) => journey.status === 'completed').slice(0, 3) ??
-    [];
+    partition?.snapshots.journeys.filter((journey) => journey.status === 'completed') ?? [];
   const pendingStart = partition?.outbox.entries.find((entry) => entry.command.action === 'start');
   const currentId = active?.id ?? pendingStart?.command.journeyId;
   const completing = partition?.outbox.entries.some(
@@ -292,8 +326,8 @@ export function JourneyWorkspace() {
           </div>
           {review && <p role="status">{review}</p>}
           <p className="journey-note">
-            Only journey type and start/finish records are sent. Your planning notes and places stay
-            on this device.
+            Journey controls send type and start/finish records. Planning notes and places stay on
+            this device; trip journal notes are saved separately when you choose.
           </p>
           {completed.length > 0 && (
             <div className="journey-history">
@@ -312,6 +346,11 @@ export function JourneyWorkspace() {
                         timeStyle: 'short',
                       }).format(new Date(journey.completedAt!))}
                     </span>
+                    {journey.kind === 'trip' && (
+                      <button className="button secondary" onClick={() => setJournal(journey.id)}>
+                        Open trip journal
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -330,6 +369,38 @@ export function JourneyWorkspace() {
         </>
       )}
       {availability === 'ready' && account && <RoutePlanner account={account} />}
+      {availability === 'ready' &&
+        account &&
+        (journalLibrary.length > 0 || journalLibraryError) && (
+          <details>
+            <summary>Journals saved on this device</summary>
+            {journalLibraryError && (
+              <p role="alert">
+                Saved journals could not be read. Your stored work has not been cleared.
+              </p>
+            )}
+            <ul>
+              {journalLibrary.map((item) => (
+                <li key={item.journal.journey.id}>
+                  <button className="text-link" onClick={() => setJournal(item.journal.journey.id)}>
+                    {item.draft?.title ||
+                      item.journal.annotation.title ||
+                      `Trip on ${new Date(item.journal.journey.startedAt).toLocaleDateString('en-IN')}`}
+                    {item.draft ? ' · Unsent draft' : ''}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      {availability === 'ready' && account && journal && (
+        <JournalEditor
+          key={`${account}:${journal}`}
+          account={account}
+          journeyId={journal}
+          onClose={() => setJournal(null)}
+        />
+      )}
       {start && (
         <Modal
           title="Start a journey"

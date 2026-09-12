@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { JourneyWorkspace } from './journey-workspace';
 import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 import { authAvailability, browserAccount } from '../lib/browser-auth';
+import { listBrowserJournals } from '../lib/journal-storage';
 import { readBrowserJourneyPartition, queueBrowserJourneyAction } from '../lib/journey-storage';
 import {
   restoreBrowserJourneyAuthentication,
@@ -13,6 +14,14 @@ vi.mock('../lib/browser-auth');
 vi.mock('../lib/journey-storage');
 vi.mock('../lib/journey-dispatch');
 vi.mock('../lib/journey-restoration');
+vi.mock('../lib/journal-storage', () => ({ listBrowserJournals: vi.fn(async () => []) }));
+vi.mock('./journal-editor', () => ({
+  JournalEditor: ({ account, journeyId }: { account: string; journeyId: string }) => (
+    <div data-testid="trip-journal">
+      {account}:{journeyId}
+    </div>
+  ),
+}));
 const accountId = '00000000-0000-4000-8000-000000000001';
 const empty = () => ({
   outbox: { version: 1 as const, accountId, entries: [] },
@@ -40,8 +49,65 @@ it('shows a confirmed completion and allows a new journey', async () => {
   expect(screen.getByRole('heading', { name: 'Recently completed' })).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Start a journey' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Finish journey' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Open trip journal' })).toBeNull();
+});
+it('keeps a retained journal draft accessible without a recent journey snapshot', async () => {
+  const journeyId = '00000000-0000-4000-8000-000000000004';
+  vi.mocked(listBrowserJournals).mockResolvedValue([
+    {
+      journal: {
+        journey: {
+          id: journeyId,
+          kind: 'trip',
+          status: 'completed',
+          startedAt: '2026-08-01T12:00:00Z',
+          completedAt: '2026-08-01T13:00:00Z',
+        },
+        annotation: { title: '', notes: '', version: 0, updatedAt: null },
+      },
+      draft: {
+        journeyId,
+        title: 'Retained writing',
+        notes: 'Unsent',
+        expectedVersion: 0,
+        mutationId: accountId,
+      },
+    },
+  ]);
+  render(<JourneyWorkspace />);
+  fireEvent.click(await screen.findByText('Journals saved on this device'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Retained writing · Unsent draft' }));
+  expect(screen.getByTestId('trip-journal').textContent).toBe(`${accountId}:${journeyId}`);
+});
+it('opens a completed trip journal with the verified account and journey identity', async () => {
+  const journeyId = '00000000-0000-4000-8000-000000000002';
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue({
+    ...empty(),
+    snapshots: {
+      version: 1,
+      accountId,
+      journeys: [
+        {
+          id: journeyId,
+          kind: 'trip',
+          status: 'completed',
+          startedAt: '2026-09-08T12:00:00.000000Z',
+          completedAt: '2026-09-08T13:00:00.000000Z',
+        },
+      ],
+    },
+  });
+  render(<JourneyWorkspace />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Open trip journal' }));
+  expect(screen.getByTestId('trip-journal').textContent).toBe(`${accountId}:${journeyId}`);
+  vi.mocked(browserAccount).mockResolvedValue({ accountId: journeyId });
+  vi.mocked(readBrowserJourneyPartition).mockRejectedValue(new Error('Unreadable partition'));
+  fireEvent.focus(window);
+  await waitFor(() => expect(screen.queryByTestId('trip-journal')).toBeNull());
+  await screen.findByText('Journey status is unavailable. Saved actions stay on this device.');
 });
 beforeEach(() => {
+  vi.mocked(listBrowserJournals).mockResolvedValue([]);
   vi.mocked(authAvailability).mockResolvedValue({
     enabled: true,
     clientId: 'test.apps.googleusercontent.com',

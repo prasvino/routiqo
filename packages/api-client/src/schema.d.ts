@@ -215,6 +215,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/journal": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Private journal for an owned completed trip; an unsaved annotation has version0. Commutes and active journeys are ineligible. */
+        get: operations["getPrivateTripJournal"];
+        put?: never;
+        /** @description Save plain-text annotations with optimistic concurrency and latest-mutation replay protection. Twenty writes per account per minute. Empty title and notes clear the annotation content. */
+        post: operations["savePrivateTripJournal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/routes/places": {
         parameters: {
             query?: never;
@@ -253,6 +276,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        TripJournal: {
+            journey: components["schemas"]["Journey"];
+            annotation: components["schemas"]["TripJournalAnnotation"];
+        };
+        TripJournalAnnotation: {
+            /** @description Plain text; UTF-16 code-unit limit enforced by server */
+            title: string;
+            /** @description Plain text; UTF-16 code-unit limit enforced by server */
+            notes: string;
+            version: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        TripJournalWrite: {
+            title: string;
+            notes: string;
+            expectedVersion: number;
+            /** Format: uuid */
+            mutationId: string;
+        };
         /** @description Longitude then latitude. Longitude must be between -180 and180, latitude between -90 and90. Endpoints must differ. */
         RouteCoordinate: number[];
         Journey: {
@@ -818,6 +861,105 @@ export interface operations {
                 content?: never;
             };
             403: components["responses"]["AuthForbidden"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    getPrivateTripJournal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Completed trip and private annotation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TripJournal"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Journey is not a completed trip */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    savePrivateTripJournal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TripJournalWrite"];
+            };
+        };
+        responses: {
+            /** @description Saved completed-trip journal */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TripJournal"];
+                };
+            };
+            /** @description Invalid annotation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ineligible journey */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];

@@ -9,7 +9,7 @@ export interface JourneySnapshots {
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
-function instant(value: unknown): string {
+export function readJourneyInstant(value: unknown): string {
   if (typeof value !== 'string') throw new Error('Invalid journey timestamp.');
   const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$/.exec(value);
   if (!match || value.startsWith('0000')) throw new Error('Invalid journey timestamp.');
@@ -27,8 +27,8 @@ export function readServerJourney(value: unknown): ServerJourney {
     (value.status !== 'active' && value.status !== 'completed')
   )
     throw new Error('Invalid server journey.');
-  const startedAt = instant(value.startedAt);
-  const completedAt = value.completedAt === null ? null : instant(value.completedAt);
+  const startedAt = readJourneyInstant(value.startedAt);
+  const completedAt = value.completedAt === null ? null : readJourneyInstant(value.completedAt);
   if (
     (value.status === 'active' && completedAt !== null) ||
     (value.status === 'completed' && (completedAt === null || completedAt < startedAt))

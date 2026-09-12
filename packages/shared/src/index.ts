@@ -8,3 +8,4 @@ export * from './journey-dispatch';
 export * from './journey-batch';
 export * from './routing';
 export * from './place-search';
+export * from './trip-journal';

@@ -88,10 +88,22 @@ export default function Page() {
             device where you delete it. Planning drafts remain separate.
           </p>
           <p>
+            Completed trip journals can keep a title and notes in an account-specific browser draft.
+            Choosing “Save to account” sends that content to Routiqo’s server. Journals are private;
+            they are not shared with other travellers or included in planning backups. Signing out
+            keeps local drafts so you can return to them.
+          </p>
+          <p>
             Delete your Routiqo account from Profile to remove its server records and sign out all
             devices. You’ll need a recent Google sign-in and explicit confirmation. Local plans,
             downloaded backups and your Google account remain separate; deleting Routiqo does not
             remove those copies or your Google account.
+          </p>
+          <p>
+            Account deletion also clears its journey and journal data from this browser. Copies in
+            other browsers or on offline devices may remain until you clear their site data.
+            Clearing site data removes unsent journal drafts, so save any work you want to keep
+            first.
           </p>
         </div>
       </div>

@@ -101,9 +101,10 @@ export async function proxyBrowserJourneys(
   const listing = path.length === 0;
   const detail = path.length === 1 && journeyId.test(path[0] ?? '');
   const complete = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'complete';
-  if (!listing && !detail && !complete) return failure(404);
+  const journal = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'journal';
+  if (!listing && !detail && !complete && !journal) return failure(404);
   if (
-    !(listing
+    !(listing || journal
       ? ['GET', 'POST'].includes(request.method)
       : request.method === (detail ? 'GET' : 'POST'))
   )

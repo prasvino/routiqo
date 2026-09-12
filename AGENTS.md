@@ -45,6 +45,14 @@ The user's current instructions govern task scope. Documents describe requiremen
 - Preserve active journeys through network loss. Durable queues, idempotency, reconciliation, and reconnect behavior must be designed alongside writes; later offline hardening does not postpone these foundations.
 - AI providers belong behind adapters. Minimize external context, preserve uncertainty/provenance, and keep core journeys usable during provider failures.
 
+## Codex orchestration
+
+For substantial implementation tasks, follow
+`docs/development/CODEX_ORCHESTRATION.md`.
+
+Use delegation selectively. The root agent retains responsibility for architecture,
+security/privacy invariants, integration, and final verification.
+
 ## Implementation and verification
 
 - Inspect existing code; define acceptance criteria and a focused feature specification before substantial work.

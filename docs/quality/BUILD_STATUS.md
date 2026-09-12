@@ -1,4 +1,4 @@
-# Build status — 2026-09-10
+# Build status — 2026-09-12
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
 
@@ -13,6 +13,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
 | Route planning | Authenticated temporary place search, explicit endpoint selection and private Mapbox estimates; optional one-time browser location with cancellation/accuracy checks. No map rendering/navigation or live provider verification yet |
+| Trip journals (integration in progress) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts and editor connected to Trips. Targeted storage/transport tests pass; final integrated checks and independent concurrency review are underway. No media, sharing or commute summaries |
+| Presence policy | Internal consent generation and bounded lease rules tested; Ghost Mode invalidates older generations. No discoverable presence, durable consent service or realtime publication enabled |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
