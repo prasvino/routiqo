@@ -12,11 +12,16 @@ interface MapDouble {
   addControl: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
   addSource: ReturnType<typeof vi.fn>;
+  getSource: ReturnType<typeof vi.fn>;
   addLayer: ReturnType<typeof vi.fn>;
   fitBounds: ReturnType<typeof vi.fn>;
   resize: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
   emit(name: string, value?: unknown): void;
+}
+
+interface GeoJsonSourceDouble {
+  setData: ReturnType<typeof vi.fn>;
 }
 
 interface MarkerDouble {
@@ -33,13 +38,16 @@ const sdk = vi.hoisted(() => {
   const markers: MarkerDouble[] = [];
   const controls: object[] = [];
   const bounds: Array<{ extend: ReturnType<typeof vi.fn> }> = [];
+  const sources: GeoJsonSourceDouble[] = [];
   const MapConstructor = vi.fn(function (options: Record<string, unknown>) {
+    let routeSource: GeoJsonSourceDouble | undefined;
     const instance: MapDouble = {
       options,
       handlers: new globalThis.Map(),
       addControl: vi.fn(),
       on: vi.fn(),
       addSource: vi.fn(),
+      getSource: vi.fn(),
       addLayer: vi.fn(),
       fitBounds: vi.fn(),
       resize: vi.fn(),
@@ -49,6 +57,12 @@ const sdk = vi.hoisted(() => {
       },
     };
     instance.addControl.mockImplementation(() => instance);
+    instance.addSource.mockImplementation(() => {
+      routeSource = { setData: vi.fn() };
+      sources.push(routeSource);
+      return instance;
+    });
+    instance.getSource.mockImplementation(() => routeSource);
     instance.on.mockImplementation((name: string, handler: MapHandler) => {
       instance.handlers.set(name, [...(instance.handlers.get(name) ?? []), handler]);
       return instance;
@@ -102,6 +116,7 @@ const sdk = vi.hoisted(() => {
     markers,
     controls,
     bounds,
+    sources,
     moduleLoads: 0,
     importGate: null as Promise<void> | null,
   };
@@ -118,6 +133,10 @@ const geometry: RouteCoordinate[] = [
   [80.2, 13.1],
   [80.25, 13.08],
   [80.3, 13.04],
+];
+const alternateGeometry: RouteCoordinate[] = [
+  [79.9, 12.9],
+  [80.05, 13],
 ];
 
 class ResizeObserverDouble {
@@ -145,6 +164,7 @@ function resetSdkDoubles() {
   sdk.markers.splice(0);
   sdk.controls.splice(0);
   sdk.bounds.splice(0);
+  sdk.sources.splice(0);
   sdk.importGate = null;
   ResizeObserverDouble.instances.splice(0);
 }
@@ -187,16 +207,27 @@ describe('RouteMap', () => {
     expect(sdk.moduleLoads).toBe(0);
   });
 
-  it('ignores a dynamic import that resolves after unmount', async () => {
+  it('uses the latest geometry while the SDK import and map load are pending', async () => {
     const gate = deferred<void>();
     sdk.importGate = gate.promise;
     const view = render(<RouteMap geometry={geometry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
     await waitFor(() => expect(sdk.moduleLoads).toBe(1));
 
-    view.unmount();
+    view.rerender(<RouteMap geometry={alternateGeometry} />);
     await act(async () => gate.resolve());
-    expect(sdk.MapConstructor).not.toHaveBeenCalled();
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
+    const latestBeforeLoad: RouteCoordinate[] = [
+      [81, 14],
+      [81.2, 14.1],
+    ];
+    view.rerender(<RouteMap geometry={latestBeforeLoad} />);
+    act(() => sdk.instances[0]!.emit('load'));
+
+    expect(sdk.instances[0]!.addSource.mock.calls[0]?.[1]).toMatchObject({
+      data: { geometry: { coordinates: latestBeforeLoad } },
+    });
+    expect(sdk.MapConstructor).toHaveBeenCalledOnce();
   });
 
   it('rechecks connectivity after the lazy import before creating a map', async () => {
@@ -299,9 +330,25 @@ describe('RouteMap', () => {
     expect(screen.getByRole('button', { name: 'Retry map' })).toBeTruthy();
   });
 
-  it('keeps a ready map while offline and does not recreate it on reconnect', async () => {
-    setOnline(false);
+  it('keeps online provider errors fatal after the map is ready', async () => {
     render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
+    const map = sdk.instances[0]!;
+    act(() => map.emit('load'));
+
+    act(() => map.emit('error', new Error('private online provider error')));
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Route map is unavailable. Try again later.',
+    );
+    expect(map.remove).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Retry map' })).toBeTruthy();
+  });
+
+  it('updates a ready map offline, retains it after tile errors, and does not retry on reconnect', async () => {
+    setOnline(false);
+    const view = render(<RouteMap geometry={geometry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
     expect((await screen.findByRole('alert')).textContent).toContain('offline');
     expect(sdk.MapConstructor).not.toHaveBeenCalled();
@@ -316,6 +363,28 @@ describe('RouteMap', () => {
     setOnline(false);
     fireEvent(window, new Event('offline'));
     expect(screen.getByText('You’re offline. The current map may not update.')).toBeTruthy();
+    view.rerender(<RouteMap geometry={alternateGeometry} />);
+    expect(sdk.sources[0]!.setData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        geometry: { type: 'LineString', coordinates: alternateGeometry },
+      }),
+    );
+    expect(sdk.markers.map((marker) => marker.coordinate)).toEqual([
+      alternateGeometry[0],
+      alternateGeometry[alternateGeometry.length - 1],
+    ]);
+    expect(map.fitBounds).toHaveBeenCalledTimes(2);
+    act(() =>
+      map.emit('error', {
+        error: new Error('private offline tile URL https://provider.invalid/tile'),
+      }),
+    );
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe(
+      'Some map details may be unavailable. The displayed route is still available.',
+    );
+    expect(alert.textContent).not.toContain('provider.invalid');
+    expect(screen.getByText('Route map ready.')).toBeTruthy();
     expect(map.remove).not.toHaveBeenCalled();
     setOnline(true);
     fireEvent(window, new Event('online'));
@@ -326,32 +395,106 @@ describe('RouteMap', () => {
     expect(map.remove).not.toHaveBeenCalled();
   });
 
-  it('cleans up markers and maps on geometry changes and ignores late events', async () => {
-    const nextGeometry: RouteCoordinate[] = [
-      [79.9, 12.9],
-      [80.05, 13],
-    ];
+  it('updates the source, endpoint markers, and bounds without recreating a ready map', async () => {
     const view = render(<RouteMap geometry={geometry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
     await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
-    const first = sdk.instances[0]!;
-    act(() => first.emit('load'));
+    const map = sdk.instances[0]!;
+    act(() => map.emit('load'));
     expect(sdk.markers).toHaveLength(2);
 
-    view.rerender(<RouteMap geometry={nextGeometry} />);
-    expect(first.remove).toHaveBeenCalledOnce();
+    view.rerender(<RouteMap geometry={alternateGeometry} />);
+
+    expect(sdk.MapConstructor).toHaveBeenCalledOnce();
+    expect(map.addSource).toHaveBeenCalledOnce();
+    expect(map.addLayer).toHaveBeenCalledOnce();
+    expect(sdk.sources[0]!.setData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        geometry: { type: 'LineString', coordinates: alternateGeometry },
+      }),
+    );
+    expect(sdk.Marker).toHaveBeenCalledTimes(2);
+    expect(sdk.markers.map((marker) => marker.coordinate)).toEqual([
+      alternateGeometry[0],
+      alternateGeometry[alternateGeometry.length - 1],
+    ]);
+    expect(map.fitBounds).toHaveBeenLastCalledWith(sdk.bounds[1], {
+      padding: 48,
+      duration: 0,
+      maxZoom: 15,
+    });
+    expect(map.remove).not.toHaveBeenCalled();
+  });
+
+  it('removes a loading map for invalid geometry and ignores its late events', async () => {
+    const view = render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
+    const map = sdk.instances[0]!;
+
+    view.rerender(<RouteMap geometry={[]} />);
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Route map is unavailable for this route.',
+    );
+    expect(map.remove).toHaveBeenCalledOnce();
+    expect(ResizeObserverDouble.instances[0]!.disconnect).toHaveBeenCalledOnce();
+    act(() => {
+      map.emit('load');
+      map.emit('error', new Error('late provider error'));
+    });
+    expect(map.addSource).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toBe('Route map is unavailable for this route.');
+
+    view.rerender(<RouteMap geometry={alternateGeometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry map' }));
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledTimes(2));
+    act(() => sdk.instances[1]!.emit('load'));
+    expect(await screen.findByText('Route map ready.')).toBeTruthy();
+    expect(sdk.instances[1]!.addSource.mock.calls[0]?.[1]).toMatchObject({
+      data: { geometry: { coordinates: alternateGeometry } },
+    });
+  });
+
+  it('removes a ready map for invalid geometry so late errors cannot restore the old route', async () => {
+    const view = render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
+    const map = sdk.instances[0]!;
+    act(() => map.emit('load'));
+
+    view.rerender(
+      <RouteMap
+        geometry={[
+          [181, 13],
+          [80, 13],
+        ]}
+      />,
+    );
+    expect(map.remove).toHaveBeenCalledOnce();
+    expect(sdk.markers[0]!.remove).toHaveBeenCalledOnce();
+    expect(sdk.markers[1]!.remove).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect((view.container.querySelector('.route-map-canvas') as HTMLDivElement).hidden).toBe(
+        true,
+      ),
+    );
+    act(() => map.emit('error', new Error('late')));
+    expect(screen.queryByText('Route map ready.')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toBe('Route map is unavailable for this route.');
+  });
+
+  it('cleans up the ready map, observer, and markers on unmount', async () => {
+    const view = render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
+    const map = sdk.instances[0]!;
+    act(() => map.emit('load'));
+
+    view.unmount();
+    expect(map.remove).toHaveBeenCalledOnce();
     expect(ResizeObserverDouble.instances[0]!.disconnect).toHaveBeenCalledOnce();
     expect(sdk.markers[0]!.remove).toHaveBeenCalledOnce();
     expect(sdk.markers[1]!.remove).toHaveBeenCalledOnce();
-    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledTimes(2));
-    const second = sdk.instances[1]!;
-    const sourceCalls = first.addSource.mock.calls.length;
-    act(() => first.emit('load'));
-    expect(first.addSource).toHaveBeenCalledTimes(sourceCalls);
-
-    view.unmount();
-    expect(second.remove).toHaveBeenCalledOnce();
-    expect(ResizeObserverDouble.instances[1]!.disconnect).toHaveBeenCalledOnce();
   });
 });
 

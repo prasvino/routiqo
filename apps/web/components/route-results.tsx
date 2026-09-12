@@ -38,7 +38,7 @@ export function RouteResults({ result }: { result: RouteResult }) {
         Last calculated {new Date(result.calculatedAt).toLocaleString('en-IN')}. Mapbox estimates;
         check road signs and current conditions. No live traffic updates.
       </p>
-      <RouteMap key={choice} geometry={route.geometry} />
+      <RouteMap geometry={route.geometry} />
       <div className="route-directions">
         <h3>Directions</h3>
         {step ? (

@@ -1,6 +1,6 @@
 # Durable journey outbox
 
-## Scope
+## Original foundation scope
 Shared lifecycle command state machine and native SQLite persistence, ready for later authenticated sync. No dispatcher, HTTP write, account UI or upload is enabled. Existing local plans/backups are separate and unchanged. This is not full offline journey support.
 
 ## Acceptance
@@ -20,4 +20,12 @@ SQLite exclusive transactions perform read/validate/transform/write with paramet
 
 ## Limits
 100 commands per account, 256 KiB serialized input, canonical lowercase UUIDs, integer millisecond scheduling. Backoff starts at 1 second and caps at 5 minutes with 50–100% jitter. Lease identifiers must be fresh UUIDs per claim. Persisted blocked reasons are fixed codes, never server text. Web durable outbox, authenticated transport, connectivity/background scheduling, logout/deletion hooks and reconciliation UI remain subsequent work.
-`nImplemented extensions: LOCAL_JOURNEY_SNAPSHOTS_SPEC.md, DISPATCH_SPEC.md and WEB_JOURNEY_STORAGE_SPEC.md supersede the earlier snapshot/web-storage/orchestration-pending statements. No loop or sync UI is mounted yet.
+## Implemented extensions
+
+`LOCAL_JOURNEY_SNAPSHOTS_SPEC.md`, `DISPATCH_SPEC.md`,
+`WEB_JOURNEY_STORAGE_SPEC.md` and `WEB_JOURNEY_CONTROLS_SPEC.md` supersede the
+historical pending statements above. The authenticated web Trips workspace mounts
+foreground/reconnect dispatch and confirmed-result reconciliation. Snapshot writes
+and command acknowledgement are atomic. Native storage is implemented, but native
+authenticated transport and device verification remain pending. Route estimates
+and map resources are separate from these queues; see `MAPS_NAVIGATION_SPEC.md`.

@@ -1,11 +1,28 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { RouteCoordinate } from '@routiqo/shared';
 
 const style = 'mapbox://styles/mapbox/streets-v12';
 const sourceId = 'routiqo-route';
 const layerId = 'routiqo-route-line';
+const unavailableMessage = 'Route map is unavailable. Try again later.';
+const degradedMessage =
+  'Some map details may be unavailable. The displayed route is still available.';
+
+type Mapbox = typeof import('mapbox-gl').default;
+type RouteData = Parameters<import('mapbox-gl').GeoJSONSource['setData']>[0];
+
+interface MapSession {
+  revision: number;
+  mapbox: Mapbox;
+  map: import('mapbox-gl').Map;
+  source: import('mapbox-gl').GeoJSONSource | null;
+  markers: import('mapbox-gl').Marker[];
+  observer: ResizeObserver | null;
+  loaded: boolean;
+  removed: boolean;
+}
 
 function publicToken(): string | null {
   const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
@@ -47,15 +64,100 @@ function unwrapGeometry(geometry: RouteCoordinate[]): RouteCoordinate[] {
   return unwrapped;
 }
 
+function routeData(geometry: RouteCoordinate[]): RouteData {
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'LineString', coordinates: geometry },
+  };
+}
+
+function removeMarkers(session: MapSession) {
+  session.markers.forEach((marker) => {
+    try {
+      marker.remove();
+    } catch {
+      // Cleanup is best effort; provider details must not escape this boundary.
+    }
+  });
+  session.markers = [];
+}
+
+function removeSession(session: MapSession) {
+  if (session.removed) return;
+  session.removed = true;
+  session.observer?.disconnect();
+  session.observer = null;
+  removeMarkers(session);
+  try {
+    session.map.remove();
+  } catch {
+    // Cleanup is best effort; provider details must not escape this boundary.
+  }
+}
+
+function renderRoute(session: MapSession, geometry: RouteCoordinate[]) {
+  const data = routeData(geometry);
+  if (session.source === null) {
+    session.map.addSource(sourceId, { type: 'geojson', data });
+    session.map.addLayer({
+      id: layerId,
+      type: 'line',
+      source: sourceId,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#2f6b5f', 'line-opacity': 0.9, 'line-width': 5 },
+    });
+    const source = session.map.getSource(sourceId);
+    if (source === undefined || !('setData' in source)) throw new Error('Route source unavailable');
+    session.source = source as import('mapbox-gl').GeoJSONSource;
+  } else {
+    session.source.setData(data);
+  }
+
+  const endpoints = [geometry[0]!, geometry[geometry.length - 1]!] as const;
+  if (session.markers.length === 2) {
+    session.markers[0]!.setLngLat(endpoints[0]);
+    session.markers[1]!.setLngLat(endpoints[1]);
+  } else {
+    removeMarkers(session);
+    const start = new session.mapbox.Marker({ color: '#2f6b5f' })
+      .setLngLat(endpoints[0])
+      .addTo(session.map);
+    start.getElement().setAttribute('aria-label', 'Route start');
+    const end = new session.mapbox.Marker({ color: '#a34f35' })
+      .setLngLat(endpoints[1])
+      .addTo(session.map);
+    end.getElement().setAttribute('aria-label', 'Route end');
+    session.markers = [start, end];
+  }
+
+  const bounds = new session.mapbox.LngLatBounds();
+  geometry.forEach((coordinate) => bounds.extend(coordinate));
+  session.map.fitBounds(bounds, { padding: 48, duration: 0, maxZoom: 15 });
+}
+
 export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
   const container = useRef<HTMLDivElement | null>(null);
   const revision = useRef(0);
+  const phase = useRef<'idle' | 'importing' | 'loading' | 'ready' | 'failed'>('idle');
+  const session = useRef<MapSession | null>(null);
+  const latestGeometry = useRef<RouteCoordinate[] | null>(null);
+  const invalidatedByGeometry = useRef(false);
   const [attempt, setAttempt] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [retryable, setRetryable] = useState(false);
   const [offline, setOffline] = useState(false);
+
+  const preparedGeometry = useMemo(
+    () => (validGeometry(geometry) ? unwrapGeometry(geometry) : null),
+    [geometry],
+  );
+
+  useLayoutEffect(() => {
+    latestGeometry.current = preparedGeometry;
+  }, [preparedGeometry]);
 
   useEffect(() => {
     const updateConnection = () => setOffline(!navigator.onLine);
@@ -68,10 +170,64 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
     };
   }, []);
 
+  useLayoutEffect(() => {
+    if (attempt === null) return;
+    const renderGeometry = preparedGeometry;
+    const currentSession = session.current;
+
+    if (renderGeometry === null) {
+      invalidatedByGeometry.current = true;
+      setLoading(false);
+      setReady(false);
+      setRetryable(false);
+      setError('Route map is unavailable for this route.');
+      if (
+        currentSession !== null ||
+        phase.current === 'importing' ||
+        phase.current === 'loading' ||
+        phase.current === 'ready'
+      ) {
+        revision.current += 1;
+        session.current = null;
+        if (currentSession !== null) removeSession(currentSession);
+      }
+      phase.current = 'failed';
+      return;
+    }
+
+    if (invalidatedByGeometry.current && currentSession === null) {
+      setLoading(false);
+      setReady(false);
+      setRetryable(true);
+      setError(unavailableMessage);
+      return;
+    }
+
+    if (currentSession?.loaded && phase.current === 'ready') {
+      try {
+        renderRoute(currentSession, renderGeometry);
+        setLoading(false);
+        setReady(true);
+        setRetryable(false);
+        setError('');
+      } catch {
+        session.current = null;
+        revision.current += 1;
+        phase.current = 'failed';
+        removeSession(currentSession);
+        setLoading(false);
+        setReady(false);
+        setRetryable(true);
+        setError(unavailableMessage);
+      }
+    }
+  }, [attempt, preparedGeometry]);
+
   useEffect(() => {
     if (attempt === null) return;
     const token = publicToken();
     if (token === null) {
+      phase.current = 'failed';
       setLoading(false);
       setReady(false);
       setRetryable(false);
@@ -79,15 +235,16 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
       return;
     }
     const accessToken = token;
-    if (!validGeometry(geometry)) {
+    if (latestGeometry.current === null) {
+      phase.current = 'failed';
       setLoading(false);
       setReady(false);
       setRetryable(false);
       setError('Route map is unavailable for this route.');
       return;
     }
-    const renderGeometry = unwrapGeometry(geometry);
     if (!navigator.onLine) {
+      phase.current = 'failed';
       setOffline(true);
       setLoading(false);
       setReady(false);
@@ -98,54 +255,21 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
 
     const currentRevision = ++revision.current;
     let disposed = false;
-    let map: import('mapbox-gl').Map | null = null;
-    let markers: import('mapbox-gl').Marker[] = [];
-    let observer: ResizeObserver | null = null;
-    let removed = false;
+    let ownedSession: MapSession | null = null;
+    invalidatedByGeometry.current = false;
+    phase.current = 'importing';
     setLoading(true);
     setReady(false);
     setError('');
     setRetryable(false);
 
-    function current(): boolean {
-      return !disposed && currentRevision === revision.current;
-    }
-
-    function removeMap() {
-      if (removed) return;
-      removed = true;
-      observer?.disconnect();
-      observer = null;
-      markers.forEach((marker) => {
-        try {
-          marker.remove();
-        } catch {
-          // Cleanup is best effort; provider details must not escape this boundary.
-        }
-      });
-      markers = [];
-      try {
-        map?.remove();
-      } catch {
-        // Cleanup is best effort; provider details must not escape this boundary.
-      }
-      map = null;
-    }
-
-    function fail() {
-      if (!current()) return;
-      setLoading(false);
-      setReady(false);
-      setRetryable(true);
-      setError('Route map is unavailable. Try again later.');
-      removeMap();
-    }
-
     async function initialize() {
       try {
         const mapbox = (await import('mapbox-gl')).default;
-        if (!current() || container.current === null) return;
+        if (disposed || currentRevision !== revision.current || container.current === null) return;
+        if (latestGeometry.current === null) return;
         if (!navigator.onLine) {
+          phase.current = 'failed';
           setOffline(true);
           setLoading(false);
           setReady(false);
@@ -153,7 +277,8 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
           setError('You’re offline. Connect to show the route map.');
           return;
         }
-        map = new mapbox.Map({
+
+        const map = new mapbox.Map({
           container: container.current,
           style,
           accessToken,
@@ -161,60 +286,100 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
           collectResourceTiming: false,
           performanceMetricsCollection: false,
         });
+        const currentSession: MapSession = {
+          revision: currentRevision,
+          mapbox,
+          map,
+          source: null,
+          markers: [],
+          observer: null,
+          loaded: false,
+          removed: false,
+        };
+        ownedSession = currentSession;
+        if (disposed || currentRevision !== revision.current) {
+          removeSession(currentSession);
+          return;
+        }
+        session.current = currentSession;
+        phase.current = 'loading';
+
+        function current(): boolean {
+          return (
+            !disposed &&
+            currentRevision === revision.current &&
+            session.current === currentSession &&
+            !currentSession.removed
+          );
+        }
+
+        function fail() {
+          if (!current()) return;
+          session.current = null;
+          revision.current += 1;
+          phase.current = 'failed';
+          setLoading(false);
+          setReady(false);
+          setRetryable(true);
+          setError(unavailableMessage);
+          removeSession(currentSession);
+        }
+
         map.addControl(new mapbox.NavigationControl(), 'top-right');
         if (typeof ResizeObserver !== 'undefined') {
-          observer = new ResizeObserver(() => {
+          currentSession.observer = new ResizeObserver(() => {
             if (!current()) return;
             try {
-              map?.resize();
+              map.resize();
             } catch {
               fail();
             }
           });
-          observer.observe(container.current);
+          currentSession.observer.observe(container.current);
         }
-        map.on('error', fail);
+        map.on('error', () => {
+          if (!current()) return;
+          if (!currentSession.loaded || navigator.onLine) {
+            fail();
+            return;
+          }
+          setOffline(true);
+          setLoading(false);
+          setReady(true);
+          setRetryable(false);
+          setError(degradedMessage);
+        });
         map.on('load', () => {
-          if (!current() || map === null) return;
+          if (!current()) return;
+          const renderGeometry = latestGeometry.current;
+          if (renderGeometry === null) {
+            fail();
+            return;
+          }
           try {
-            map.addSource(sourceId, {
-              type: 'geojson',
-              data: {
-                type: 'Feature',
-                properties: {},
-                geometry: { type: 'LineString', coordinates: renderGeometry },
-              },
-            });
-            map.addLayer({
-              id: layerId,
-              type: 'line',
-              source: sourceId,
-              layout: { 'line-cap': 'round', 'line-join': 'round' },
-              paint: { 'line-color': '#2f6b5f', 'line-opacity': 0.9, 'line-width': 5 },
-            });
-
-            const start = new mapbox.Marker({ color: '#2f6b5f' })
-              .setLngLat(renderGeometry[0]!)
-              .addTo(map);
-            markers.push(start);
-            start.getElement().setAttribute('aria-label', 'Route start');
-            const end = new mapbox.Marker({ color: '#a34f35' })
-              .setLngLat(renderGeometry[renderGeometry.length - 1]!)
-              .addTo(map);
-            markers.push(end);
-            end.getElement().setAttribute('aria-label', 'Route end');
-
-            const bounds = new mapbox.LngLatBounds();
-            renderGeometry.forEach((coordinate) => bounds.extend(coordinate));
-            map.fitBounds(bounds, { padding: 48, duration: 0, maxZoom: 15 });
+            renderRoute(currentSession, renderGeometry);
+            currentSession.loaded = true;
+            phase.current = 'ready';
             setLoading(false);
             setReady(true);
+            setRetryable(false);
+            setError('');
           } catch {
             fail();
           }
         });
       } catch {
-        fail();
+        if (ownedSession !== null) {
+          if (session.current === ownedSession) session.current = null;
+          removeSession(ownedSession);
+        }
+        if (disposed || currentRevision !== revision.current) return;
+        revision.current += 1;
+        phase.current = 'failed';
+        setLoading(false);
+        setReady(false);
+        setRetryable(true);
+        setError(unavailableMessage);
       }
     }
 
@@ -222,9 +387,14 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
     return () => {
       disposed = true;
       revision.current += 1;
-      removeMap();
+      const currentSession = session.current;
+      if (currentSession?.revision === currentRevision) {
+        session.current = null;
+        removeSession(currentSession);
+      }
+      phase.current = 'idle';
     };
-  }, [attempt, geometry]);
+  }, [attempt]);
 
   return (
     <section className="route-map" aria-label="Route map preview">

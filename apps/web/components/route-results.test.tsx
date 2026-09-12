@@ -3,8 +3,23 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { RouteResult } from '@routiqo/shared';
 import { RouteResults } from './route-results';
-vi.mock('./route-map', () => ({ RouteMap: () => <div>Map component</div> }));
-afterEach(cleanup);
+const lifecycle = vi.hoisted(() => ({ mount: vi.fn(), unmount: vi.fn() }));
+vi.mock('./route-map', async () => {
+  const { useEffect } = await import('react');
+  return {
+    RouteMap: () => {
+      useEffect(() => {
+        lifecycle.mount();
+        return () => lifecycle.unmount();
+      }, []);
+      return <div>Map component</div>;
+    },
+  };
+});
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 const result: RouteResult = {
   provider: 'mapbox',
   calculatedAt: '2026-09-12T04:00:00Z',
@@ -63,6 +78,8 @@ it('bounds manual step review and resets it when selecting an alternative', () =
   fireEvent.click(screen.getByRole('button', { name: /Route 2/ }));
   expect(screen.getByRole('status').textContent).toContain('Step 1 of 1');
   expect(screen.getByRole('status').textContent).toContain('Take the eastern road');
+  expect(lifecycle.mount).toHaveBeenCalledOnce();
+  expect(lifecycle.unmount).not.toHaveBeenCalled();
 });
 it('does not invent directions for legacy route responses', () => {
   const first = result.routes[0]!;

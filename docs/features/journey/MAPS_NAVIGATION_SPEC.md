@@ -20,6 +20,12 @@ never expose the backend routing token. Fixed streets-v12 style, local bundled
 CSS, provider attribution/logo, route line, endpoint markers and bounded fit view.
 Ignore stale imports/events and remove maps/observers on unmount/account changes.
 Keep token/provider errors out of UI/logs. No geolocation control or hidden watcher.
+After explicit map load, selecting an alternative updates the existing map's route
+source, endpoint markers and bounds without recreating its renderer. The newest
+selection wins if the SDK or style is still loading. This works with loaded map
+resources during connection loss; tiles for newly viewed areas may be unavailable.
+Offline tile errors after readiness retain the map and directions. Invalid route
+geometry must not leave a previous route displayed as the selected alternative.
 
 Permit same-origin geolocation through Permissions-Policy, keeping microphone and
 camera denied. Permission remains browser-controlled and requested only from an
