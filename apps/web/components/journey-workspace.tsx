@@ -17,6 +17,7 @@ import { Modal } from './modal';
 import { RoutePlanner } from './route-planner';
 import { JournalEditor } from './journal-editor';
 import { CommuteSummaries } from './commute-summaries';
+import { JourneyHistory } from './journey-history';
 import { listBrowserJournals } from '../lib/journal-storage';
 import { readBrowserJourney } from '../lib/browser-journeys';
 import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
@@ -372,6 +373,9 @@ export function JourneyWorkspace() {
       {availability === 'ready' && account && <RoutePlanner account={account} />}
       {availability === 'ready' && account && partition && (
         <CommuteSummaries key={account} snapshots={partition.snapshots} account={account} />
+      )}
+      {availability === 'ready' && account && (
+        <JourneyHistory key={account} account={account} onOpenJournal={setJournal} />
       )}
       {availability === 'ready' &&
         account &&
