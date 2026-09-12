@@ -1,6 +1,7 @@
 package com.routiqo.core.routing;
 
 import com.routiqo.core.routing.domain.*;
+import com.routiqo.core.routing.application.PlaceProvider;
 import com.routiqo.core.routing.infrastructure.MapboxPlaceProvider;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -19,6 +20,7 @@ class MapboxPlaceProviderTest {
     @Test void encodesPrivateQueryAndRequestsOnlyTemporaryExplicitResults() {
         var captured = new AtomicReference<URI>();
         var provider = new MapboxPlaceProvider("synthetic-token", uri -> { captured.set(uri); return collection(FEATURE); });
+        assertThat(provider.identity()).isEqualTo(PlaceProvider.Identity.MAPBOX);
         var query = new PlaceQuery("  Chennai & street?limit=999  ");
         var result = provider.search(query);
         assertThat(captured.get().getHost()).isEqualTo("api.mapbox.com");

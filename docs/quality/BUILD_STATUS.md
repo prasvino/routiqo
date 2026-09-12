@@ -129,8 +129,22 @@ Latest backend validation remains98 Java tests; backend source was unchanged.
 
 Map provider direction changed by user (2026-09-12): ADR0021 selects MapLibre,
 self-hosted Valhalla/Photon and regional OSM-derived tiles under Routiqo control.
-Mapbox migration has not started; existing behavior and test results above still
+Provider identity migration has started; existing renderer/adapters and earlier test results still
 refer to Mapbox. Prioritize provider contract generalization, web renderer/adapters,
 regional hosting and Android offline feasibility in that order. No Mapbox account
 setup is required for the new target. Public free tiles are optional prototype-only;
 true phone-offline rerouting remains a distinct native engineering gate.
+
+Open-source migration phase 1 (2026-09-12): Java routing/search adapters now declare
+mandatory typed identities, controllers emit the actual identity, and OpenAPI0.10.0
+plus generated/shared clients accept only mapbox/valhalla routes and mapbox/photon
+places. Unknown/cross-purpose identities and malformed/bounded results are rejected.
+Route estimate labels follow the response identity. Existing Mapbox adapters still
+serve production-configured requests; no Valhalla/Photon service or MapLibre renderer
+has been enabled. Synthetic authenticated HTTP tests verify alternative identities.
+Root review found no unresolved integration issue. Full TS check passed **242 tests
+across 40 files**, contracts/format/types/lint; final contract drift check and secret
+scan passed. Full core-api check/bootJar passed **98 Java tests across 21 suites,
+zero failures/errors/skips**. No live provider/device/UI visual verification or new
+production web build in this boundary pass. Next: migrate renderer and implement
+bounded self-hosted provider adapters, then regional data/device verification.

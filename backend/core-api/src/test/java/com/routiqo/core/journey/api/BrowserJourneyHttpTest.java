@@ -32,15 +32,27 @@ class BrowserJourneyHttpTest {
     }
     @TestConfiguration static class TestIdentity {
         @Bean @Primary com.routiqo.core.routing.application.PlaceProvider syntheticPlaces() {
-            return query -> new com.routiqo.core.routing.domain.PlaceResults(java.util.List.of(
-                    new com.routiqo.core.routing.domain.PlaceMatch("synthetic-place", "Synthetic town",
-                    new com.routiqo.core.routing.domain.RouteRequest.Coordinate(80, 13))), "Synthetic attribution");
+            return new com.routiqo.core.routing.application.PlaceProvider() {
+                @Override public Identity identity() { return Identity.PHOTON; }
+                @Override public com.routiqo.core.routing.domain.PlaceResults search(
+                        com.routiqo.core.routing.domain.PlaceQuery query) {
+                    return new com.routiqo.core.routing.domain.PlaceResults(java.util.List.of(
+                            new com.routiqo.core.routing.domain.PlaceMatch("synthetic-place", "Synthetic town",
+                            new com.routiqo.core.routing.domain.RouteRequest.Coordinate(80, 13))), "Synthetic attribution");
+                }
+            };
         }
         @Bean @Primary com.routiqo.core.routing.application.RouteProvider syntheticRoutes() {
-            return request -> java.util.List.of(new com.routiqo.core.routing.domain.RouteOption(1200, 600,
-                    java.util.List.of(request.origin(), request.destination()), java.util.List.of(
-                    new com.routiqo.core.routing.domain.RouteStep("Continue to the destination", 1200, 600,
-                            request.destination()))));
+            return new com.routiqo.core.routing.application.RouteProvider() {
+                @Override public Identity identity() { return Identity.VALHALLA; }
+                @Override public java.util.List<com.routiqo.core.routing.domain.RouteOption> routes(
+                        com.routiqo.core.routing.domain.RouteRequest request) {
+                    return java.util.List.of(new com.routiqo.core.routing.domain.RouteOption(1200, 600,
+                            java.util.List.of(request.origin(), request.destination()), java.util.List.of(
+                            new com.routiqo.core.routing.domain.RouteStep("Continue to the destination", 1200, 600,
+                                    request.destination()))));
+                }
+            };
         }
         @Bean @Primary GoogleIdentityVerifier syntheticIdentity() {
             return (token, nonce) -> {
@@ -91,7 +103,7 @@ class BrowserJourneyHttpTest {
             var result = send(owner, "routes", body);
             assertThat(result.statusCode()).isEqualTo(200);
             assertThat(result.headers().firstValue("Cache-Control")).contains("no-store");
-            assertThat(JsonPath.<String>read(result.body(), "$.provider")).isEqualTo("mapbox");
+            assertThat(JsonPath.<String>read(result.body(), "$.provider")).isEqualTo("valhalla");
             assertThat(JsonPath.<String>read(result.body(), "$.routes[0].steps[0].instruction"))
                     .isEqualTo("Continue to the destination");
             assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account());
@@ -109,6 +121,7 @@ class BrowserJourneyHttpTest {
             var result = send(owner, "routes/places", body);
             assertThat(result.statusCode()).isEqualTo(200);
             assertThat(result.headers().firstValue("Cache-Control")).contains("no-store");
+            assertThat(JsonPath.<String>read(result.body(), "$.provider")).isEqualTo("photon");
             assertThat(JsonPath.<String>read(result.body(), "$.places[0].label")).isEqualTo("Synthetic town");
             assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account(), "Chennai");
         }

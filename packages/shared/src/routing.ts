@@ -18,7 +18,7 @@ export interface RouteStep {
   location: RouteCoordinate;
 }
 export interface RouteResult {
-  provider: 'mapbox';
+  provider: 'mapbox' | 'valhalla';
   calculatedAt: string;
   routes: RouteOption[];
 }
@@ -26,7 +26,7 @@ export interface RouteResult {
 export function readRouteResult(input: unknown): RouteResult {
   if (
     !record(input) ||
-    input.provider !== 'mapbox' ||
+    (input.provider !== 'mapbox' && input.provider !== 'valhalla') ||
     typeof input.calculatedAt !== 'string' ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(input.calculatedAt) ||
     input.calculatedAt.startsWith('0000') ||
@@ -46,7 +46,7 @@ export function readRouteResult(input: unknown): RouteResult {
       false,
     );
   });
-  return { provider: 'mapbox', calculatedAt: input.calculatedAt, routes };
+  return { provider: input.provider, calculatedAt: input.calculatedAt, routes };
 }
 const record = (input: unknown): input is Record<string, unknown> =>
   typeof input === 'object' && input !== null && !Array.isArray(input);

@@ -55,7 +55,7 @@ public final class BrowserRoutingController {
         if (!rates.allow(actor.toString(), "place-search-account", 20))
             return ResponseEntity.status(429).header("Retry-After", "60").build();
         var result = places.search(query);
-        return ResponseEntity.ok(new SearchResult("mapbox", result.places().stream().map(place ->
+        return ResponseEntity.ok(new SearchResult(places.identity().wireValue(), result.places().stream().map(place ->
                 new Place(place.id(), place.label(), List.of(place.coordinate().longitude(), place.coordinate().latitude()))).toList(), result.attribution()));
     }
     @PostMapping public ResponseEntity<Result> routes(@RequestBody Input input, HttpServletRequest request) {
@@ -73,7 +73,7 @@ public final class BrowserRoutingController {
                 route.durationSeconds(), route.geometry().stream().map(point -> List.of(point.longitude(), point.latitude())).toList(),
                 route.steps().stream().map(step -> new Step(step.instruction(), step.distanceMetres(), step.durationSeconds(),
                         List.of(step.location().longitude(), step.location().latitude()))).toList())).toList();
-        return ResponseEntity.ok(new Result("mapbox", clock.instant(), routes));
+        return ResponseEntity.ok(new Result(provider.identity().wireValue(), clock.instant(), routes));
     }
     private static RouteRequest.Coordinate coordinate(List<Double> values) {
         if (values == null || values.size() != 2 || values.get(0) == null || values.get(1) == null)

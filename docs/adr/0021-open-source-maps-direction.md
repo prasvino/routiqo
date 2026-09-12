@@ -1,6 +1,6 @@
 # ADR 0021: Open-source mapping direction
 
-Status: accepted and explicitly confirmed by user, 2026-09-12; migration not implemented.
+Status: accepted and explicitly confirmed by user, 2026-09-12; migration in progress: provider identity contracts implemented; renderer/services pending.
 
 The user selected open-source maps and requested an assessment of
 map-alternate-discussion.txt. That attachment is a proposal, not verified technical

@@ -20,6 +20,11 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
+it('labels Valhalla estimates without claiming they came from Mapbox', () => {
+  render(<RouteResults result={{ ...result, provider: 'valhalla' }} />);
+  expect(screen.getByText(/Valhalla estimates/)).toBeTruthy();
+  expect(screen.queryByText(/Mapbox estimates/)).toBeNull();
+});
 const result: RouteResult = {
   provider: 'mapbox',
   calculatedAt: '2026-09-12T04:00:00Z',

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.9.0
+  version: 0.10.0
   description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. No live traffic or user presence.
 servers:
   - url: http://localhost:8080
@@ -438,7 +438,7 @@ paths:
     post:
       operationId: searchPrivateRoutePlaces
       security: [{ browserSession: [] }]
-      description: Explicit temporary Mapbox place lookup. No persistence or presence. Twenty requests per account per minute.
+      description: Explicit temporary lookup through the configured place provider. No persistence or presence. Twenty requests per account per minute.
       parameters:
         - { $ref: '#/components/parameters/JourneyAccount' }
         - { $ref: '#/components/parameters/AuthOrigin' }
@@ -461,7 +461,7 @@ paths:
                 type: object
                 required: [provider, places, attribution]
                 properties:
-                  provider: { type: string, enum: [mapbox] }
+                  provider: { type: string, enum: [mapbox, photon] }
                   attribution: { type: string, minLength: 1, maxLength: 2048 }
                   places:
                     type: array
@@ -484,7 +484,7 @@ paths:
     post:
       operationId: calculatePrivateRoute
       security: [{ browserSession: [] }]
-      description: Opt-in routing profile. Sends selected endpoints to Mapbox; does not start a journey or publish presence. Twenty requests per account per minute. Results are estimates; empty routes means no route found.
+      description: Opt-in routing profile. Sends selected endpoints to the configured routing provider; does not start a journey or publish presence. Twenty requests per account per minute. Results are estimates; empty routes means no route found.
       parameters:
         - { $ref: '#/components/parameters/JourneyAccount' }
         - { $ref: '#/components/parameters/AuthOrigin' }
@@ -509,7 +509,7 @@ paths:
                 type: object
                 required: [provider, calculatedAt, routes]
                 properties:
-                  provider: { type: string, enum: [mapbox] }
+                  provider: { type: string, enum: [mapbox, valhalla] }
                   calculatedAt: { type: string, format: date-time }
                   routes:
                     type: array

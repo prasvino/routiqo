@@ -5,7 +5,7 @@ export interface PlaceMatch {
   coordinate: RouteCoordinate;
 }
 export interface PlaceResults {
-  provider: 'mapbox';
+  provider: 'mapbox' | 'photon';
   places: PlaceMatch[];
   attribution: string;
 }
@@ -39,7 +39,7 @@ function text(value: unknown, limit: number): string {
 export function readPlaceResults(input: unknown): PlaceResults {
   if (
     !record(input) ||
-    input.provider !== 'mapbox' ||
+    (input.provider !== 'mapbox' && input.provider !== 'photon') ||
     !Array.isArray(input.places) ||
     input.places.length > 5
   )
@@ -54,5 +54,5 @@ export function readPlaceResults(input: unknown): PlaceResults {
   });
   if (new Set(places.map((place) => place.id)).size !== places.length)
     throw new Error('Place results are unavailable.');
-  return { provider: 'mapbox', places, attribution: text(input.attribution, 2048) };
+  return { provider: input.provider, places, attribution: text(input.attribution, 2048) };
 }

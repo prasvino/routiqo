@@ -24,6 +24,7 @@ public final class MapboxRouteProvider implements RouteProvider {
             throw new IllegalArgumentException("Routing provider is not configured");
         this.token = token; this.transport = transport;
     }
+    @Override public Identity identity() { return Identity.MAPBOX; }
     @Override public List<RouteOption> routes(RouteRequest request) {
         if (request == null) throw new IllegalArgumentException("Route request is required");
         try {

@@ -19,6 +19,7 @@ public final class MapboxPlaceProvider implements PlaceProvider {
             throw new IllegalArgumentException("Place provider is not configured");
         this.token = token; this.transport = transport;
     }
+    @Override public Identity identity() { return Identity.MAPBOX; }
     @Override public PlaceResults search(PlaceQuery query) {
         if (query == null) throw new IllegalArgumentException("Place query is required");
         try {

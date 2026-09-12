@@ -25,3 +25,11 @@ provider identity must be a validated supported value, not arbitrary input. Nati
 guidance and on-device rerouting remain separate from the server routing service.
 
 Existing Mapbox transport acceptance (retain these bounds during migration): POST `/api/v1/routes` requires a verified session and matching account header, exact origin and CSRF. Requests are bounded to 20 KiB; provider and browser response bodies to 1 MiB. Account quota is 20 calculations per minute using the shared database rate gate. Provider redirects are refused and its request timeout is 10 seconds. Invalid inputs are rejected before calling Mapbox. Browser cancellation prevents posting after an abandoned CSRF setup and aborts active fetches. Empty routes mean no route found; authentication, throttling and service failures remain errors. Synthetic HTTP/provider tests cover these boundaries; real provider verification remains pending; the planner UI is mounted, with live authenticated validation still required.
+
+Provider-identity migration acceptance: route results permit only mapbox/valhalla;
+place results permit only mapbox/photon. Each configured Java adapter declares its
+own typed identity; controllers emit it and clients preserve it after validation.
+Unknown/cross-purpose identities fail closed. Retain existing Mapbox identity while
+its adapter is active. Adding identifiers does not enable new services or imply a
+Valhalla/Photon request occurred. Route estimate labels follow response identity;
+map renderer/provider disclosure remains separate until rendering is migrated.

@@ -1,5 +1,6 @@
 package com.routiqo.core.routing;
 
+import com.routiqo.core.routing.application.RouteProvider;
 import com.routiqo.core.routing.domain.RouteOption;
 import com.routiqo.core.routing.domain.RouteRequest;
 import com.routiqo.core.routing.domain.RouteStep;
@@ -21,6 +22,7 @@ class MapboxRouteProviderTest {
             captured.set(uri);
             return routeJson("[" + STEP + "]");
         });
+        assertEquals(RouteProvider.Identity.MAPBOX, provider.identity());
         var result = provider.routes(request);
         assertEquals(1200, result.getFirst().distanceMetres());
         assertEquals(new RouteStep("Continue south", 1200, 600, request.origin()), result.getFirst().steps().getFirst());

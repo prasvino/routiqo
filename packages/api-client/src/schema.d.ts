@@ -349,7 +349,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Explicit temporary Mapbox place lookup. No persistence or presence. Twenty requests per account per minute. */
+        /** @description Explicit temporary lookup through the configured place provider. No persistence or presence. Twenty requests per account per minute. */
         post: operations["searchPrivateRoutePlaces"];
         delete?: never;
         options?: never;
@@ -366,7 +366,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Opt-in routing profile. Sends selected endpoints to Mapbox; does not start a journey or publish presence. Twenty requests per account per minute. Results are estimates; empty routes means no route found. */
+        /** @description Opt-in routing profile. Sends selected endpoints to the configured routing provider; does not start a journey or publish presence. Twenty requests per account per minute. Results are estimates; empty routes means no route found. */
         post: operations["calculatePrivateRoute"];
         delete?: never;
         options?: never;
@@ -1361,7 +1361,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        provider: "mapbox";
+                        provider: "mapbox" | "photon";
                         attribution: string;
                         places: {
                             id: string;
@@ -1425,7 +1425,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        provider: "mapbox";
+                        provider: "mapbox" | "valhalla";
                         /** Format: date-time */
                         calculatedAt: string;
                         routes: {
