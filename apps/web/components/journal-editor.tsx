@@ -10,6 +10,7 @@ import {
 import {
   acknowledgeBrowserJournalDraft,
   cacheBrowserTripJournal,
+  discardBrowserJournalDraft,
   readBrowserJournal,
   saveBrowserJournalDraft,
   type BrowserJournalDraft,
@@ -22,7 +23,8 @@ interface JournalEditorProps {
   onClose: () => void;
 }
 
-type BusyState = 'draft' | 'account' | null;
+type SaveDestination = 'draft' | 'account';
+type BusyState = SaveDestination | 'discard' | null;
 const historyGuardKey = '__routiqoJournalGuard';
 interface JournalHistoryGuard {
   marker: string;
@@ -45,6 +47,7 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
   const [notice, setNotice] = useState('');
   const [latestServer, setLatestServer] = useState<TripJournal | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmUseAccount, setConfirmUseAccount] = useState(false);
   const [accountFresh, setAccountFresh] = useState(false);
   const mounted = useRef(true);
   const operation = useRef<AbortController | null>(null);
@@ -226,7 +229,7 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
     return saveBrowserJournalDraft(account, edit, draft?.mutationId ?? null);
   };
 
-  const save = async (destination: Exclude<BusyState, null>) => {
+  const save = async (destination: SaveDestination) => {
     if (busy || loading || !journal) return;
     setBusy(destination);
     setError('');
@@ -320,6 +323,44 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
     }
   };
 
+  const applyAccountVersion = async () => {
+    if (busy || !draft || !latestServer) return;
+    setBusy('discard');
+    setError('');
+    setNotice('');
+    const controller = new AbortController();
+    operation.current?.abort();
+    operation.current = controller;
+    try {
+      const confirmed = await discardBrowserJournalDraft(
+        account,
+        journeyId,
+        draft.mutationId,
+        latestServer,
+      );
+      if (!mounted.current || controller.signal.aborted) return;
+      setJournal(confirmed);
+      setDraft(null);
+      setTitle(confirmed.annotation.title);
+      setNotes(confirmed.annotation.notes);
+      setLatestServer(null);
+      setConfirmUseAccount(false);
+      setAccountFresh(true);
+      setNotice('Using the account version. The device draft was removed.');
+    } catch (failure) {
+      if (!mounted.current || controller.signal.aborted) return;
+      setConfirmUseAccount(false);
+      setError(
+        errorMessage(
+          failure,
+          'The device draft could not be removed. Your text is still available here.',
+        ),
+      );
+    } finally {
+      if (mounted.current && !controller.signal.aborted) setBusy(null);
+    }
+  };
+
   const context = journal ? (
     <div className="journal-context" aria-label="Trip dates">
       <span>
@@ -380,6 +421,35 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
               }}
             >
               Discard changes
+            </button>
+          </div>
+        </div>
+      ) : confirmUseAccount ? (
+        <div className="journal-discard">
+          <p className="eyebrow">DEVICE DRAFT</p>
+          <h3>Use the account version?</h3>
+          <p>
+            This removes the device draft and any current unsaved edits. It does not change the
+            journal saved to your account.
+          </p>
+          <div className="detail-actions">
+            <button
+              className="button secondary"
+              type="button"
+              disabled={busy !== null}
+              onClick={() => setConfirmUseAccount(false)}
+            >
+              Keep device draft
+            </button>
+            <button
+              className="button danger"
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void applyAccountVersion()}
+            >
+              {busy === 'discard'
+                ? 'Removing device draft…'
+                : 'Remove draft and use account version'}
             </button>
           </div>
         </div>
@@ -447,6 +517,20 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
               <p className="fine-print">
                 Account version {latestServer.annotation.version}. Review only.
               </p>
+              {draft && (
+                <button
+                  className="button secondary"
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => {
+                    setError('');
+                    setNotice('');
+                    setConfirmUseAccount(true);
+                  }}
+                >
+                  Use account version
+                </button>
+              )}
             </section>
           )}
           <div className="detail-actions journal-actions">

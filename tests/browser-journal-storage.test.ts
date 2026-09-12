@@ -5,6 +5,7 @@ import {
   cacheBrowserTripJournal,
   readBrowserJournal,
   listBrowserJournals,
+  discardBrowserJournalDraft,
   retireBrowserJournalPartition,
   saveBrowserJournalDraft,
   type BrowserJournalDraft,
@@ -15,6 +16,52 @@ const otherAccount = '00000000-0000-4000-8000-000000000002';
 const journeyId = '00000000-0000-4000-8000-000000000003';
 const firstMutation = '00000000-0000-4000-8000-000000000004';
 const secondMutation = '00000000-0000-4000-8000-000000000005';
+
+it('discards only the exact reviewed local draft while retaining its confirmed account journal', async () => {
+  const reviewed = await cacheBrowserTripJournal(account, journal());
+  await saveBrowserJournalDraft(account, draft(), null);
+  await expect(
+    discardBrowserJournalDraft(otherAccount, journeyId, firstMutation, reviewed),
+  ).rejects.toThrow();
+  expect(await discardBrowserJournalDraft(account, journeyId, firstMutation, reviewed)).toEqual(
+    reviewed,
+  );
+  expect(await readBrowserJournal(account, journeyId)).toEqual({ journal: reviewed, draft: null });
+  await expect(
+    discardBrowserJournalDraft(account, journeyId, firstMutation, reviewed),
+  ).rejects.toThrow();
+});
+
+it('refuses discard when another tab changed the draft or the reviewed account version', async () => {
+  const reviewed = await cacheBrowserTripJournal(account, journal());
+  await saveBrowserJournalDraft(account, draft(), null);
+  await saveBrowserJournalDraft(account, draft(journeyId, secondMutation), firstMutation);
+  await expect(
+    discardBrowserJournalDraft(account, journeyId, firstMutation, reviewed),
+  ).rejects.toThrow('another tab');
+  await cacheBrowserTripJournal(account, journal(journeyId, 1, 'New account text'));
+  await expect(
+    discardBrowserJournalDraft(account, journeyId, secondMutation, reviewed),
+  ).rejects.toThrow('version changed');
+  expect((await readBrowserJournal(account, journeyId)).draft?.mutationId).toBe(secondMutation);
+});
+
+it('preserves drafts on failed discard transactions and rejects late discard after deletion', async () => {
+  const reviewed = await cacheBrowserTripJournal(account, journal());
+  await saveBrowserJournalDraft(account, draft(), null);
+  const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+    throw new DOMException('Synthetic failure', 'QuotaExceededError');
+  });
+  await expect(
+    discardBrowserJournalDraft(account, journeyId, firstMutation, reviewed),
+  ).rejects.toThrow();
+  put.mockRestore();
+  expect((await readBrowserJournal(account, journeyId)).draft).toEqual(draft());
+  await retireBrowserJournalPartition(account);
+  await expect(
+    discardBrowserJournalDraft(account, journeyId, firstMutation, reviewed),
+  ).rejects.toThrow('deleted');
+});
 
 it('lists retained drafts independently of journey history and rejects retired accounts', async () => {
   const confirmed = await cacheBrowserTripJournal(account, journal());

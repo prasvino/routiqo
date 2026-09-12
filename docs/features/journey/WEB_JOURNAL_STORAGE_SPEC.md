@@ -1,5 +1,11 @@
 # Browser journal drafts and confirmed snapshots
 
+## Explicit conflict recovery
+
+After a conflict, a user may review the latest confirmed account journal and choose to discard the device draft. Require an in-dialog confirmation explaining that the device draft and current unsaved edits will be removed; do not send a server write. Atomically compare the expected local mutation ID and the exact reviewed confirmed journal against current storage before deleting the draft. Reject changed/missing drafts, changed confirmed versions/content, retired accounts and transaction failures without modifying data. On success return the confirmed journal and replace the editor fields with it. On failure retain editor text and the draft. No automatic merge, rebase or overwrite. Ordinary Save to account remains an explicit subsequent action.
+
+Applicable threats: T02 account isolation, T10 plain-text rendering, T12 private cache/UI leakage, T13 reordered/concurrent actions, T19 deletion resurrection and T20 authoritative server version conflicts. Review local CAS with two tabs and deletion races. Root owns residual risk; authenticated browser/device navigation QA remains a release prerequisite.
+
 Use a dedicated IndexedDB database `routiqo-journal-v1`, account-keyed records, strict read/write transactions and bounded open timeout. One record contains version1/accountId, up to20 durable drafts and up to20 confirmed TripJournal snapshots. Bound serialized UTF-8 size to1MiB. Validate every stored read; reject corruption, unsupported versions and account mismatch without resetting data. Ordinary logout preserves this partition. Planning backups exclude it.
 
 A BrowserJournalDraft is a validated TripJournalWrite plus journeyId. Each content change uses a new mutationId, but a network retry reuses the exact saved draft. Draft save takes an expected previous local mutationId (null for absent) and rejects mismatch atomically, preventing silent cross-tab overwrites. Require a confirmed eligible trip snapshot for that journey before creating/editing a draft. Do not modify supplied base version automatically. Capacity errors preserve all existing drafts; never evict unsent text.

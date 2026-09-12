@@ -316,6 +316,35 @@ export function acknowledgeBrowserJournalDraft(
   });
 }
 
+/** Remove only the draft and confirmed version the user explicitly reviewed. */
+export function discardBrowserJournalDraft(
+  account: string,
+  journeyId: string,
+  expectedMutationId: string,
+  reviewed: TripJournal,
+): Promise<TripJournal> {
+  if (!uuid.test(journeyId) || !uuid.test(expectedMutationId))
+    return Promise.reject(new Error('Invalid journal discard identity.'));
+  const expected = readTripJournal(reviewed);
+  if (expected.journey.id !== journeyId)
+    return Promise.reject(new Error('Reviewed journal does not match this trip.'));
+  return transaction(account, (partition) => {
+    const draft = partition.drafts.find((item) => item.journeyId === journeyId);
+    const confirmed = partition.journals.find((item) => item.journey.id === journeyId);
+    if (!draft || draft.mutationId !== expectedMutationId)
+      throw new Error('This journal draft changed in another tab. Reopen it before discarding.');
+    if (!confirmed || !sameJournal(confirmed, expected))
+      throw new Error('The saved account version changed. Review it again before discarding.');
+    return {
+      value: stored({
+        ...partition,
+        drafts: partition.drafts.filter((item) => item.journeyId !== journeyId),
+      }),
+      result: confirmed,
+    };
+  });
+}
+
 /** Account deletion keeps an opaque marker so late work cannot recreate private content. */
 export function retireBrowserJournalPartition(account: string): Promise<void> {
   return transaction(

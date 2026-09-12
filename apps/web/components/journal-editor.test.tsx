@@ -11,6 +11,7 @@ import {
 import {
   acknowledgeBrowserJournalDraft,
   cacheBrowserTripJournal,
+  discardBrowserJournalDraft,
   readBrowserJournal,
   saveBrowserJournalDraft,
   type BrowserJournalDraft,
@@ -64,6 +65,9 @@ beforeEach(() => {
   );
   vi.mocked(saveBrowserJournalDraft).mockImplementation(async (_account, input) => stored(input));
   vi.mocked(acknowledgeBrowserJournalDraft).mockResolvedValue(true);
+  vi.mocked(discardBrowserJournalDraft).mockImplementation(
+    async (_account, _journeyId, _mutationId, reviewed) => reviewed,
+  );
 });
 
 afterEach(() => {
@@ -172,6 +176,101 @@ it('retains authored fields and shows a read-only account version after a confli
   );
   expect(screen.getByText('Synthetic account title')).toBeTruthy();
   expect(acknowledgeBrowserJournalDraft).not.toHaveBeenCalled();
+});
+
+async function openConflict() {
+  const latest = journal('Synthetic account title', 'Synthetic account note', 1);
+  vi.mocked(readBrowserTripJournal).mockResolvedValueOnce(journal()).mockResolvedValueOnce(latest);
+  vi.mocked(saveBrowserTripJournal).mockRejectedValueOnce(new BrowserJournalError(409));
+  const view = await open();
+  fireEvent.change(screen.getByLabelText('Title'), {
+    target: { value: 'Synthetic retained title' },
+  });
+  fireEvent.change(screen.getByLabelText('Notes'), {
+    target: { value: 'Synthetic retained note' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save to account' }));
+  await screen.findByRole('region', { name: 'Latest account version' });
+  return { latest, view };
+}
+
+it('cancels account-version recovery without changing the draft', async () => {
+  await openConflict();
+  fireEvent.click(screen.getByRole('button', { name: 'Use account version' }));
+  await screen.findByRole('heading', { name: 'Use the account version?' });
+  fireEvent.click(screen.getByRole('button', { name: 'Keep device draft' }));
+
+  expect(discardBrowserJournalDraft).not.toHaveBeenCalled();
+  expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+    'Synthetic retained title',
+  );
+  expect(screen.getByRole('region', { name: 'Latest account version' })).toBeTruthy();
+});
+
+it('uses the reviewed account version locally without another POST', async () => {
+  const { latest } = await openConflict();
+  const savedDraft = vi.mocked(saveBrowserJournalDraft).mock.calls[0]![1];
+  fireEvent.click(screen.getByRole('button', { name: 'Use account version' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove draft and use account version' }));
+
+  await screen.findByDisplayValue('Synthetic account title');
+  expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe(
+    'Synthetic account note',
+  );
+  expect(discardBrowserJournalDraft).toHaveBeenCalledWith(
+    accountA,
+    journeyId,
+    savedDraft.mutationId,
+    latest,
+  );
+  expect(saveBrowserTripJournal).toHaveBeenCalledOnce();
+  expect(screen.queryByRole('region', { name: 'Latest account version' })).toBeNull();
+});
+
+it('retains authored text when account-version recovery loses its local CAS', async () => {
+  await openConflict();
+  vi.mocked(discardBrowserJournalDraft).mockRejectedValueOnce(
+    new Error('The saved account version changed. Review it again before discarding.'),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Use account version' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove draft and use account version' }));
+
+  await screen.findByText('The saved account version changed. Review it again before discarding.');
+  expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+    'Synthetic retained title',
+  );
+  expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe(
+    'Synthetic retained note',
+  );
+  expect(screen.getByRole('region', { name: 'Latest account version' })).toBeTruthy();
+});
+
+it('ignores a late account-version recovery after the account changes', async () => {
+  let resolveDiscard!: (value: TripJournal) => void;
+  vi.mocked(discardBrowserJournalDraft).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveDiscard = resolve;
+      }),
+  );
+  const { latest, view } = await openConflict();
+  fireEvent.click(screen.getByRole('button', { name: 'Use account version' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove draft and use account version' }));
+
+  vi.mocked(readBrowserJournal).mockResolvedValueOnce({
+    draft: null,
+    journal: journal('Synthetic account B title', '', 1),
+  });
+  vi.mocked(readBrowserTripJournal).mockResolvedValueOnce(
+    journal('Synthetic account B title', '', 1),
+  );
+  view.rerender(<JournalEditor account={accountB} journeyId={journeyId} onClose={vi.fn()} />);
+  await screen.findByDisplayValue('Synthetic account B title');
+  resolveDiscard(latest);
+  await Promise.resolve();
+
+  expect(screen.queryByDisplayValue('Synthetic account title')).toBeNull();
+  expect(screen.queryByText(/device draft was removed/i)).toBeNull();
 });
 
 it('resets private fields on account change and ignores a late save callback', async () => {
