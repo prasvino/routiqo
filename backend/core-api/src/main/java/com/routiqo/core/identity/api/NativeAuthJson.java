@@ -18,8 +18,8 @@ final class NativeAuthJson {
     private NativeAuthJson() {}
 
     static JsonNode object(HttpServletRequest request, Set<String> expected) {
-        try (var parser = MAPPER.tokenStreamFactory().createParser(request.getInputStream())) {
-            JsonNode node = MAPPER.readTree(parser);
+        try {
+            JsonNode node = MAPPER.readTree(request.getInputStream());
             if (node == null || !node.isObject() || !node.propertyNames().equals(expected)) throw malformed();
             return node;
         } catch (IOException | RuntimeException error) {
