@@ -883,8 +883,14 @@ rather than proxying large media through the Java API.
 
 ### Maps
 
--   **Mapbox** is the preferred initial map platform because the Living
-    Route requires substantial custom map visualization.
+-   **MapLibre** for web/native rendering, **self-hosted Valhalla** for routing,
+    **self-hosted Photon** for place search, and regional OSM-derived vector tiles
+    delivered through **Martin** from versioned archives. See ADR 0021.
+-   User confirmed this open-source direction on 2026-09-12. Existing Mapbox code
+    awaits migration. Mapbox accounts/tokens are not prerequisites for the target.
+-   Own-host styles, sprites and glyphs as well as tiles. Phone-offline rerouting
+    requires a separately validated on-device engine and graph; server hosting
+    and offline map downloads alone do not provide it.
 
 ### Mobile local persistence
 
@@ -1573,8 +1579,10 @@ React Native Mobile       Next.js Web/Admin
         |
    Java Realtime Gateway
 
+Routiqo-controlled map services (target, ADR 0021):
+- Valhalla / Photon / Martin and regional OSM-derived datasets
+
 External:
-- Mapbox
 - Push providers
 - AI provider
 - CDN
@@ -1764,7 +1772,7 @@ Implement:
 
 Implement:
 
--   Mapbox.
+-   MapLibre rendering and self-hosted Valhalla/Photon/Martin (ADR 0021).
 -   Route display.
 -   YOU marker.
 -   Destination.

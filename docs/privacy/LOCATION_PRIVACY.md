@@ -3,3 +3,14 @@ A displayed city is an explicit discovery context, not detected GPS. Optional ro
 Future raw GPS must pass restricted ingestion, route matching, privacy transformation and aggregation before social outputs.
 No individual stranger dots, exact endpoints, stable trackable identifiers or coordinate-based enumeration.
 Pure domain policy can enforce expiry, Ghost Mode exclusion, and configurable minimum crowd size; an isolated policy is not proof of end-to-end anonymity. Production thresholds, query budgets and smoothing require a dedicated presence specification before enabling exposure.
+
+## Open-source migration target (ADR 0021)
+
+The user confirmed MapLibre with Routiqo-controlled Valhalla/Photon/Martin.
+Migration is pending; the existing Mapbox behavior documented above remains true
+until replaced. Target search and route inputs stay within controlled services;
+own-host tile/style/font/sprite resources too. Public tile providers can observe
+IP and viewport requests, so are not an automatic private fallback. Hosting
+providers and operational logs remain part of the privacy boundary. Minimize
+logs and never promise zero third-party exposure merely because software is open
+source. Preserve explicit location intent and no public individual tracking.

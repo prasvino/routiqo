@@ -210,3 +210,18 @@ See `docs/features/journey/MAPS_NAVIGATION_SPEC.md` and
 A change must not ship when it introduces an unmitigated Critical or High threat, silently weakens a security/privacy/safety invariant, lacks required authorization or abuse tests, or leaves sensitive behavior ambiguous.
 
 Risk acceptance must be explicit, authorized, time-bounded where appropriate, and accompanied by an owner and follow-up plan.
+
+## Open-source map migration controls (ADR 0021, 2026-09-12)
+
+Target rendering/routing/search/tiles are MapLibre, Valhalla, Photon and Martin.
+Current Mapbox findings remain until migration. Self-hosting retains T01/T02 account
+authorization, T04/T12 endpoint/viewport privacy, T13 cancellation/update races,
+T14 resource exhaustion and T19 retention/deletion obligations. Internal service
+URLs are configuration, never caller input; constrain outbound destinations and
+redirects, keep services private, and preserve database-backed rate limits and
+bounded bodies/timeouts. Do not log search terms, coordinates or sensitive URLs.
+Inspect style/sprite/glyph URLs for external requests. Dataset/archive ingestion
+requires trusted sources, pinned versions, integrity checks and bounded extraction;
+updates need atomic activation/rollback and disk headroom. Offline packages must
+not leak account-associated region selections or resurrect deleted route state.
+Synthetic tests do not validate real regional coverage or native offline guidance.

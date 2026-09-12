@@ -29,13 +29,13 @@ Both version commands should report 25 for Routiqo development. Avoid changing o
 
 Android Studio supplies the Android SDK, platform tools, and emulator/device tooling. Install the SDK/platform versions selected by the eventual Expo/native build rather than guessing versions in advance. A physical Android device can substitute for an emulator.
 
-Native Mapbox integration will require a compatible development build; do not assume Expo Go supports arbitrary native modules. Exact Expo/Mapbox compatibility will be checked when that integration is selected.
+Native MapLibre integration requires a compatible Expo development build; Expo Go is not supported. Verify the pinned React Native/MapLibre native combination on Android before offline integration (ADR 0021).
 
 ## Managed by the project
 
 The foundation will pin pnpm, TypeScript/React/Next/Expo and Java dependencies, add a Gradle wrapper, and run PostgreSQL/PostGIS, Redis, and local S3-compatible storage through Docker Compose. Separate host installations of these services are unnecessary.
 
-AWS credentials, Mapbox credentials, AI providers, and push configuration are not needed to initialize the repository. Introduce provider configuration at the phase that needs it; keep secrets out of source control and client bundles. Native iOS builds require macOS/Xcode or a suitable cloud build workflow later.
+AWS credentials, AI providers, and push configuration are not needed to initialize the repository. Introduce provider configuration at the phase that needs it; keep secrets out of source control and client bundles. Native iOS builds require macOS/Xcode or a suitable cloud build workflow later.
 
 ## Next foundation acceptance criteria
 
@@ -82,7 +82,9 @@ GET /api/v1/auth/csrf sets its HttpOnly cookie and returns a masked token. Send 
 
 Rate limits use the socket peer, not forwarded headers. A reverse proxy therefore shares a peer bucket until trusted forwarding is explicitly configured. Cleanup runs in bounded batches; measure backlog/capacity before launch. Sessions expire after 15 minutes; bounded refresh rotation supports a maximum 12-hour lineage.
 
-## Opt-in private routing
+## Existing Mapbox routing setup (legacy, migration pending)
+
+The user confirmed the open-source target in ADR 0021. The configuration below is retained only to explain existing code; do not obtain Mapbox credentials as a prerequisite for the new implementation. Target setup follows this legacy section.
 
 Add `routing` to `persistence,google-auth,web-auth` and supply `ROUTIQO_MAPBOX_TOKEN` only to the backend process through external secret configuration. Missing token fails startup when this profile is active. Never use a `NEXT_PUBLIC_` variable for this token. The web proxy uses the same backend configuration as authentication.
 
@@ -90,9 +92,13 @@ Web maps additionally require a **separate public, read-only** Mapbox token in `
 
 Live verification sequence: configure Google/web-auth and routing as above; sign in; choose two places; calculate; select an alternative; open its map; check provider attribution and directions. Test offline/reconnect while keeping the view open: instructions remain, new searches/calculations do not run, and reconnection must not recalculate automatically. No real GPS should be requested in automated QA. Current directions are manually reviewed, not live turn announcements.
 
-Downloaded offline maps/native navigation remain separate gates: Android Studio/SDK, a native Mapbox Maps/Navigation integration and valid tokens, bounded region downloads, storage eviction/deletion, offline rerouting, and real-device tests. The web app does not download tiles or persist temporary geocoding results. In-memory directions do not survive reload.
+The former Mapbox native navigation plan is superseded by ADR 0021. Future downloaded maps/navigation use the open-source target and still require Android Studio/SDK, a compatible development build, bounded region downloads, storage eviction/deletion, an on-device routing engine and real-device tests. The web app does not download tiles or persist temporary geocoding results. In-memory directions do not survive reload.
 
 The endpoint is POST `/api/v1/routes`, with mode `driving`, `walking` or `cycling`, and two longitude/latitude coordinate arrays named `origin` and `destination`. It requires the browser session, CSRF, exact origin and matching account header. It returns private Mapbox estimates without creating journeys or presence. POST `/api/v1/routes/places` accepts a `query` for temporary city/street/address lookup using the same token and guards. Trips includes authenticated place selection, route alternatives, optional web map display and manual provider directions, with an optional one-time current-location origin. Live provider verification, GPS-following navigation and downloaded offline maps remain pending. No real Mapbox request has been tested; automated tests use synthetic transport responses.
+## Open-source maps target setup
+
+Use MapLibre for web/native rendering and opt-in, Routiqo-controlled Valhalla, Photon and Martin services with a bounded regional dataset. Service containers/configuration are not yet implemented; no runnable profile names or environment variables are prescribed here until code exists. Keep service ports private or loopback-only, configure fixed destinations, and never silently fall back to public routing/geocoding demos. Own-host style/sprite/glyph resources as well as tiles. Start with a regional data and Android compatibility spike, including import/update disk headroom. Use the Android prerequisite checker below; native mapping still needs a development build and device QA. Hosting, datasets, downloads and on-device rerouting require separate verification. See ADR 0021 and MAPS_NAVIGATION_SPEC.md for acceptance.
+
 ## Native authentication API
 
 The `native-auth` profile is intended to run with `persistence,google-auth` and the

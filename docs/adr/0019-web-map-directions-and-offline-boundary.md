@@ -1,5 +1,10 @@
 # ADR 0019: Web maps, directions and offline boundary
 
+Renderer/provider choice superseded by ADR 0021 on 2026-09-12: MapLibre and
+Routiqo-controlled tiles are the target. The text below records current Mapbox
+behavior and its unresolved cache boundary until migration is verified. Existing
+lifecycle/cancellation and honest offline disclosures remain acceptance criteria.
+
 Status: accepted, 2026-09-12.
 
 Use Mapbox GL JS 3.30.0 for the existing authenticated web planner, preserving the

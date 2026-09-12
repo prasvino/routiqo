@@ -1,5 +1,9 @@
 # ADR0014: Initial route provider boundary
 
+Provider choice superseded by ADR 0021 on 2026-09-12: self-hosted Valhalla is the
+target. The text below records the existing Mapbox implementation. Authentication,
+privacy, normalization and bounded-transport requirements remain in force.
+
 Status: accepted; backend, browser transport and initial estimate UI implemented; map rendering and live configuration pending, 2026-09-10.
 
 Follow the existing product preference for Mapbox. Normalize only validated GeoJSON route coordinates, distance and duration into a provider-independent result. Initially support two endpoints and driving/walking/cycling. Missing credentials, NoRoute and unavailable service must remain distinct; never invent route geometry or time.

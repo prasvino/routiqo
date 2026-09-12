@@ -28,10 +28,12 @@ A focused journey-planning dialog, subtle image hover affordance, and short stat
 
 ## Deferred sections
 - Auth provider/session implementation: document secure model, do not create bypass.
-- Mapbox: credentials and compatible native development build required.
+- Maps migration: follow ADR 0021 (MapLibre/Valhalla/Photon/Martin); first generalize
+  provider contracts and migrate web rendering/adapters, then verify regional data
+  services and native downloads/navigation. Android development build/device and
+  regional datasets are prerequisites; Mapbox credentials are not required.
 - Live presence/rooms: anonymity thresholds, retention, trust and geographic admission need feature decisions and tests before exposure.
 - Real Android/iOS validation: no device/emulator available yet.
 - External AI, S3 production, push, cloud deployment: require provider configuration.
 
 Offline draft persistence is implemented alongside planning; it is not postponed to a late phase. Local planning does not claim a live server journey.
-

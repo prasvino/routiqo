@@ -210,7 +210,7 @@ Give it a narrow question.
 
 Good example:
 
-> Find the files implementing route planning, Mapbox route requests, related tests, and relevant ADRs. Return paths and concise findings only.
+> Find the files implementing route planning, routing provider requests, related tests, and relevant ADRs. Return paths and concise findings only.
 
 Bad example:
 
@@ -234,7 +234,7 @@ Relevant files:
 
 Findings:
 1. Route requests currently pass through core-api.
-2. Frontend does not directly call Mapbox.
+2. Frontend route/search requests use the authenticated backend; renderer asset requests follow ADR 0021 and the explicitly configured tile/style origin.
 3. Browser location is one-time only.
 4. Existing tests cover X and Y.
 5. ADR 0016 prohibits Z.
@@ -421,7 +421,7 @@ Good examples:
 ```text
 Explorer A → backend route implementation
 Explorer B → frontend route UI
-Researcher → current Mapbox API detail
+Researcher → current selected routing/rendering provider API detail
 ```
 
 when those investigations do not depend on one another.

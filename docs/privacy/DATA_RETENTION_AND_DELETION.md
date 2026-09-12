@@ -10,3 +10,13 @@ Account deletion must revoke sessions promptly and be tested end to end; do not 
 Native journey storage retirement retains only the deleted account UUID in a local marker table, atomically removing its queue and snapshots. This marker prevents delayed work from recreating data and remains until app storage is removed. It contains no journey content, credentials or dates and is excluded from planning backups. This storage primitive is not yet connected to native account deletion. Ordinary sign-out must preserve the partition without retiring it. SQLite logical row removal does not establish physical page erasure or OS-backup deletion; those remain device/release validation requirements.
 
 The native session vault stores one opaque credential and account/expiry metadata through Expo SecureStore, separate from planning and journey SQLite data. It is not yet populated by a native sign-in flow. Credentials are excluded from Android backup configuration and use device-only unlocked Keychain accessibility. Local clear removes the record but does not revoke the server session; future logout must combine both. Expired records are not returned as sessions. Do not assume iOS uninstall erases Keychain records; reinstall and physical-deletion behavior require device verification.
+
+## Open-source migration target (ADR 0021)
+
+MapLibre and self-hosted services are selected; current Mapbox cache behavior above
+remains applicable until migration. Changing providers does not authorize new
+retention of search text, endpoints, routes or location history. Before enabling
+native downloads, define disk quotas, update/deletion semantics, region metadata
+privacy and account-switch/account-deletion handling. Validate renderer and HTTP
+cache behavior; local route clearing must not claim to erase resources it cannot
+remove. Keep public basemap content separate from account-specific route records.

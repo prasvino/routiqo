@@ -1,6 +1,36 @@
 # Maps, directions and connection loss
 
-## Current implementation slice
+## Confirmed target and migration acceptance
+
+ADR 0021 supersedes the Mapbox provider preference. Target: MapLibre GL JS on web,
+MapLibre React Native on mobile, self-hosted Valhalla/Photon, and regional
+OSM-derived vector archives delivered by Martin. Own-host style JSON, sprites,
+glyphs and tiles; do not leave hidden third-party asset references. Preserve
+attribution for every dataset/style/font. Public OpenFreeMap is an optional,
+explicitly chosen prototype source, never an automatic production fallback.
+
+Migration must preserve every interaction, geometry/step bound, cancellation,
+timeout, account reset and accessibility behavior documented below. Update provider
+identifiers/contracts, imports/CSS/configuration, UI copy and privacy disclosures
+alongside adapters; distinguish MapLibre (renderer), Valhalla (routing) and OSM
+(data attribution). Remove token requirements only when their replacement works.
+No Mapbox setup is required for future development of the selected stack.
+
+Downloaded maps use reviewed, bounded MapLibre offline packs against our own tile
+endpoints first, subject to a pinned-version Android spike. PMTiles archives may
+back the tile server; direct native PMTiles sources do not use standard offline-pack
+downloads/caching. Direct-file downloads require their own versioned lifecycle.
+Include styles/fonts, quotas, resumability, integrity checks, atomic updates and
+deletion. Separate on-device routing graphs/engine and guidance from map resources.
+Test cold-start airplane mode, interrupted downloads, storage exhaustion, revoked
+location permission, region boundaries and safe off-route behavior. Never fabricate
+reroutes when offline engine/data are unavailable. See OFFLINE_ARCHITECTURE.md.
+
+## Existing Mapbox implementation — pending migration
+
+The following records implemented behavior and Mapbox-specific cache disclosures.
+It is not the target provider instruction. Retain truthful disclosures until the
+MapLibre migration and actual cache/network behavior are verified.
 
 Extend the authenticated web route planner with Mapbox maps, explicit alternative
 selection and a provider-supplied directions list with manual Previous/Next review.
@@ -76,9 +106,10 @@ HTTP caches may also retain tiles. The explicit Show map disclosure explains thi
 clearing site data is the available complete browser-storage cleanup action.
 Do not claim zero persistence or disable undocumented SDK internals.
 
-Reloading/closing the page loses this in-memory route. True downloaded offline
-regions and offline rerouting require the native Mapbox Maps/Navigation SDKs,
-provider configuration, download/storage management and Android device validation.
+Reloading/closing the page loses this in-memory route. ADR 0021 supersedes the
+former native Mapbox dependency. Downloaded regions require the selected MapLibre
+integration and download/storage management; offline rerouting additionally needs
+an on-device engine/graph and Android validation.
 Temporary geocoding results must not be persisted. These remaining gates prevent
 claiming this web slice completes the full maps/navigation roadmap.
 

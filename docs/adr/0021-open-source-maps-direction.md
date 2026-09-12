@@ -1,11 +1,11 @@
 # ADR 0021: Open-source mapping direction
 
-Status: selected architecture direction, 2026-09-12; migration not implemented.
+Status: accepted and explicitly confirmed by user, 2026-09-12; migration not implemented.
 
 The user selected open-source maps and requested an assessment of
 map-alternate-discussion.txt. That attachment is a proposal, not verified technical
 documentation. This decision supersedes the Mapbox preference in earlier roadmap
-documents and ADRs 0014/0019 for future implementation. Existing Mapbox code remains
+documents and provider choices in ADRs 0014/0016/0019 for future implementation. Existing Mapbox code remains
 the current implementation until migrated; previous privacy/security bounds remain.
 
 ## Selected stack
