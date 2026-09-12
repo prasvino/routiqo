@@ -11,6 +11,7 @@
 | P0 / L0.2b — next | Cohort publication and block-safe suppression design | Fixed partitions/windows, independent evidence, query limits and adversarial acceptance before projections |
 | P0 / L0.3 | Resolve storage/retention ADR and idempotent replacement/withdrawal lifecycle | Transaction and cleanup design, stale retry/delete/consent race tests |
 | P0 / L0.3a — complete | Internal context-linked receipt state, terminal withdrawal/supersession and exact replay comparison | 8 focused tests; full 158 Java tests/check/bootJar and review passed; no durable store or publication permission |
+| P0 / L0.3b — designed, next internal slice | ADR 0024 admission-bound server command identity and transactional receipt storage | Common authority/lock order and migration review, then disposable database race/replay/purge tests |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
