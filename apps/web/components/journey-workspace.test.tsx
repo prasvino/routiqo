@@ -234,6 +234,28 @@ it('closes an old start dialog when the verified account changes', async () => {
   await screen.findByRole('link', { name: 'Sign in from Profile' });
   expect(screen.queryByRole('dialog')).toBeNull();
 });
+it('keeps local journey starts available offline while server restoration waits for connectivity', async () => {
+  const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  render(<JourneyWorkspace />);
+  const restore = (await screen.findByRole('button', {
+    name: 'Restore recent journeys',
+  })) as HTMLButtonElement;
+  online.mockReturnValue(false);
+  fireEvent(window, new Event('offline'));
+  expect(screen.getByText(/You’re offline. Start and finish actions/)).toBeTruthy();
+  expect(restore.disabled).toBe(true);
+  expect(
+    (screen.getByRole('button', { name: 'Start a journey' }) as HTMLButtonElement).disabled,
+  ).toBe(false);
+  fireEvent.click(restore);
+  expect(restoreRecentBrowserJourneyHistory).not.toHaveBeenCalled();
+  online.mockReturnValue(true);
+  fireEvent(window, new Event('online'));
+  expect(restore.disabled).toBe(false);
+  expect(screen.queryByText(/You’re offline. Start and finish actions/)).toBeNull();
+  expect(restoreRecentBrowserJourneyHistory).not.toHaveBeenCalled();
+});
+
 it('restores confirmed history through the account-bound service and keeps failures visible', async () => {
   vi.mocked(restoreRecentBrowserJourneyHistory).mockResolvedValue({
     partition: empty(),

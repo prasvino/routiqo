@@ -23,6 +23,17 @@ import { readBrowserJourney } from '../lib/browser-journeys';
 import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 
 export function JourneyWorkspace() {
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    const update = () => setOffline(!navigator.onLine);
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
   const [availability, setAvailability] = useState<
     'checking' | 'disabled' | 'signed-out' | 'ready'
   >('checking');
@@ -155,7 +166,7 @@ export function JourneyWorkspace() {
   );
   const head = partition?.outbox.entries[0];
   async function restoreRecent() {
-    if (!account || locked.current) return;
+    if (!account || locked.current || !navigator.onLine) return;
     locked.current = true;
     setBusy(true);
     setError('');
@@ -177,7 +188,7 @@ export function JourneyWorkspace() {
     }
   }
   async function reviewConflict() {
-    if (!account || !head || locked.current) return;
+    if (!account || !head || locked.current || !navigator.onLine) return;
     locked.current = true;
     setBusy(true);
     setReview('');
@@ -284,10 +295,16 @@ export function JourneyWorkspace() {
       {availability === 'ready' && (
         <>
           <p role="status">{status}</p>
+          {offline && (
+            <p role="status">
+              You’re offline. Start and finish actions can be saved on this device. Server checks
+              need a connection; eligible saved actions retry when connected with this view open.
+            </p>
+          )}
           <div className="detail-actions">
             <button
               className="button secondary"
-              disabled={busy}
+              disabled={busy || offline}
               onClick={() => void restoreRecent()}
             >
               Restore recent journeys
@@ -309,7 +326,9 @@ export function JourneyWorkspace() {
             {head && (
               <button
                 className="button secondary"
-                disabled={busy || head.blocked === 'conflict' || head.blocked === 'rejected'}
+                disabled={
+                  busy || offline || head.blocked === 'conflict' || head.blocked === 'rejected'
+                }
                 onClick={() => void perform()}
               >
                 {busy ? 'Checking…' : 'Retry saved actions'}
@@ -319,7 +338,7 @@ export function JourneyWorkspace() {
             {(head?.blocked === 'conflict' || head?.blocked === 'rejected') && (
               <button
                 className="button secondary"
-                disabled={busy}
+                disabled={busy || offline}
                 onClick={() => void reviewConflict()}
               >
                 Check server status

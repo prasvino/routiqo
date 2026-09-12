@@ -16,3 +16,12 @@ Conflict inspection: Check server status performs an owner-bound GET, validates 
 Confirmed reconciliation now atomically imports the matching server result and acknowledges only the still-blocked matching head. Different kind, incomplete finish, stale head and inconsistent lifecycle preserve work. Recent server restoration fetches at most20 owner-bound records and merges snapshots transactionally without acknowledging pending actions; inconsistent batches roll back. This is bounded recent history, not full account synchronization. Account deletion racing a history fetch still needs a partition tombstone/generation guard before release.
 
 Component verification uses pinned development-only @testing-library/react16.3.0 and jsdom26.1.0 in the web workspace. Vitest includes web TSX tests with the installed Vite8 Oxc automatic JSX transform. Tests cover configuration gating, save failure, account-switch dialog closure, offline start/finish, reconnect, blocked retries and completed feedback. These simulate the server boundary, not live Google OAuth. Disabled-state layout verified at390px; authenticated visual QA remains pending.
+## Offline action availability
+
+For an already verified account, an offline banner explains that start/finish can
+be saved locally and eligible queued work retries when connected with this view
+open. Restore recent journeys, Retry saved actions and Check server status are
+disabled offline; server history/conflict reads also recheck connectivity in their
+handlers. Reconnect enables these reads without automatically restoring history or
+checking conflicts. Existing due-time, lease, authentication and visibility gates
+continue to govern queued dispatch. Blocked actions are never advertised as sent.
