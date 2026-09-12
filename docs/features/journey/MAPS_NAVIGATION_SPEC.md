@@ -40,6 +40,11 @@ state and that new map tiles and rerouting need a connection. Reconnection updat
 the banner without silently recalculating or changing the selected alternative.
 Network failure during an explicit recalculation preserves the previous route and
 labels it as the last successful result. Changing endpoints/mode clears that result.
+An explicit Swap starting point and destination action exchanges both selected
+places, their input text and attribution. It requires both selections and no pending
+operation, works offline, clears old estimates/matches, and never calculates or
+requests location automatically. Reversed directions must come from a new provider
+calculation; never reverse the old instruction list or reuse its travel time.
 Connection loss aborts pending network work and releases its busy state immediately;
 late responses cannot replace retained directions or interfere with an explicit retry.
 Reconnection never retries automatically. A pending explicit local location reading

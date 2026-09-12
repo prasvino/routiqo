@@ -97,6 +97,66 @@ it('keeps an explicit pending location reading alive when connectivity changes',
   expect(searchBrowserPlaces).not.toHaveBeenCalled();
   expect(calculateBrowserRoute).not.toHaveBeenCalled();
 });
+it('swaps selected endpoints offline and requires a fresh explicit calculation', async () => {
+  const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  vi.mocked(readBrowserLocation).mockResolvedValue({ coordinate: [80, 13], accuracyMetres: 20 });
+  vi.mocked(searchBrowserPlaces).mockResolvedValueOnce(place('End town', 79));
+  vi.mocked(calculateBrowserRoute).mockResolvedValue({
+    provider: 'mapbox',
+    calculatedAt: '2026-09-12T04:00:00Z',
+    routes: [
+      {
+        distanceMetres: 1200,
+        durationSeconds: 600,
+        geometry: [
+          [80, 13],
+          [79, 13],
+        ],
+      },
+    ],
+  });
+  open();
+  const swap = screen.getByRole('button', {
+    name: 'Swap starting point and destination',
+  }) as HTMLButtonElement;
+  expect(swap.disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Use my current location' }));
+  await screen.findByText('Selected: My current location');
+  expect(swap.disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'Ending query' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find destination' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'End town' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
+  expect(swap.disabled).toBe(true);
+  await screen.findByText('1.2 km');
+  online.mockReturnValue(false);
+  act(() => window.dispatchEvent(new Event('offline')));
+  expect(swap.disabled).toBe(false);
+  fireEvent.click(swap);
+  expect(screen.queryByText('1.2 km')).toBeNull();
+  expect((screen.getByLabelText('From') as HTMLInputElement).value).toBe('Ending query');
+  expect((screen.getByLabelText('To') as HTMLInputElement).value).toBe('My current location');
+  expect(screen.getByLabelText('From').closest('.route-endpoints > div')!.textContent).toContain(
+    'Synthetic attribution',
+  );
+  expect(screen.getByLabelText('To').closest('.route-endpoints > div')!.textContent).not.toContain(
+    'Synthetic attribution',
+  );
+  expect(readBrowserLocation).toHaveBeenCalledOnce();
+  expect(searchBrowserPlaces).toHaveBeenCalledOnce();
+  expect(calculateBrowserRoute).toHaveBeenCalledOnce();
+  online.mockReturnValue(true);
+  act(() => window.dispatchEvent(new Event('online')));
+  expect(calculateBrowserRoute).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
+  await waitFor(() => expect(calculateBrowserRoute).toHaveBeenCalledTimes(2));
+  expect(calculateBrowserRoute).toHaveBeenLastCalledWith(
+    account,
+    { mode: 'driving', origin: [79, 13], destination: [80, 13] },
+    expect.any(AbortSignal),
+  );
+});
+
 it('requires explicit selection and discards estimates after endpoints change', async () => {
   vi.mocked(searchBrowserPlaces)
     .mockResolvedValueOnce(place('Starting town', 80))

@@ -256,6 +256,23 @@ function Planner({ account }: { account: string }) {
           </div>
         ))}
       </div>
+      <button
+        type="button"
+        className="button secondary"
+        disabled={busy || !selected.origin || !selected.destination}
+        onClick={() => {
+          clearRequest();
+          setQuery({ origin: query.destination, destination: query.origin });
+          setSelected({ origin: selected.destination, destination: selected.origin });
+          setAttribution({ origin: attribution.destination, destination: attribution.origin });
+          setMatches({});
+          setMessage(
+            'Starting point and destination swapped. Calculate when connected for new directions.',
+          );
+        }}
+      >
+        Swap starting point and destination
+      </button>
       <label className="journey-kind">
         Travel mode
         <select
