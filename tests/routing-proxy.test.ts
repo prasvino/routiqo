@@ -16,6 +16,27 @@ const request = (url = 'http://localhost:3000/api/v1/routes') =>
     },
     body: '{}',
   });
+it('returns a bodyless coverage failure and cancels unexpected private upstream details', async () => {
+  const cancel = vi.fn();
+  const upstream = vi.fn(
+    async () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('private provider details'));
+          },
+          cancel,
+        }),
+        { status: 422, headers: { 'X-Private-Region': 'private' } },
+      ),
+  );
+  const response = await proxyBrowserRouting(request(), config, upstream);
+  expect(response.status).toBe(422);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(response.headers.get('x-private-region')).toBeNull();
+  expect(await response.text()).toBe('');
+  expect(cancel).toHaveBeenCalledOnce();
+});
 it('forwards only the fixed routing endpoint and rejects query injection', async () => {
   const upstream = vi.fn(async () => Response.json({ routes: [] }));
   expect((await proxyBrowserRouting(request(), config, upstream)).status).toBe(200);

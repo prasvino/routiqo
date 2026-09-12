@@ -7,14 +7,19 @@ import {
 } from '@routiqo/shared';
 import { browserCsrf, BrowserAuthError } from './browser-auth';
 
+export const routingCoverageMessage =
+  'This route is outside the supported routing area. Choose different places and try again.';
+
 export class BrowserRoutingError extends Error {
   constructor(public readonly status: number) {
     super(
       status === 401 || status === 403
         ? 'Sign in again to calculate a route.'
-        : status === 429
-          ? 'Too many route requests. Wait a minute and try again.'
-          : 'Routing is unavailable. Check your connection and try again.',
+        : status === 422
+          ? routingCoverageMessage
+          : status === 429
+            ? 'Too many route requests. Wait a minute and try again.'
+            : 'Routing is unavailable. Check your connection and try again.',
     );
   }
 }
@@ -66,7 +71,10 @@ async function privateRequest<T>(
       body: JSON.stringify(body),
       signal: cancellation,
     });
-    if (!response.ok) throw new BrowserRoutingError(response.status);
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new BrowserRoutingError(response.status);
+    }
     if (!response.body) throw new BrowserRoutingError(503);
     const reader = response.body.getReader();
     let bytes = 0;

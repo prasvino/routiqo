@@ -1449,6 +1449,13 @@ export interface operations {
             403: components["responses"]["AuthForbidden"];
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
+            /** @description Route endpoints or returned geometry exceed configured routing coverage. Empty body; no region or coordinate details are returned. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             429: components["responses"]["AuthLimited"];
             /** @description Routing provider unavailable */
             503: {

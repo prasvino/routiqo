@@ -20,14 +20,30 @@ clip, invent or persist geometry. Return immutable results without modifying the
 delegate's records. Failure messages and string representations contain no
 coordinates. Missing region/provider configuration fails closed.
 
-The first slice is unmounted. Before activation, map the dedicated coverage
-exception to an explicit HTTP/client outcome, add fixed runtime configuration and
-provider disclosures, and exercise authenticated routes. The exception alone is
-not a completed browser error flow. Actual region boundaries, cross-border routes,
-dataset versions and known-route quality remain deployment verification gates.
+The guard remains unmounted in runtime configuration. The dedicated HTTP/client
+outcome is implemented and tested through authenticated synthetic routes. Before
+activation, add fixed runtime configuration and provider disclosures. Actual region
+boundaries, cross-border routes, dataset versions and known-route quality remain
+deployment verification gates.
 
 Synthetic acceptance tests cover invalid/wrapping/overwide regions, inclusive
 boundaries, rejecting endpoints before transport, identity/no-path preservation,
 out-of-region geometry/maneuvers/alternatives, immutable results and redacted
 diagnostics. Existing auth, origin/CSRF, quotas and response bounds remain required
 when mounted; this guard does not substitute for them.
+
+## HTTP and browser acceptance
+
+Dedicated coverage failures map to HTTP422 with an empty body on route calculation.
+The authenticated account/origin/CSRF checks and rate limit precede coverage work;
+unauthorized callers must not discover region membership. The web proxy preserves
+this status with no-store and discards any unexpected upstream error body. Other
+validation/no-path/provider failures retain their existing distinct semantics.
+
+The browser displays a fixed actionable coverage message in the existing alert.
+A failed recalculation preserves and labels the last successful route; it does not
+clear authentication, silently retry, clip a route or fabricate a new result.
+Changing places continues to invalidate the old route; account-switch/cancellation
+and offline behavior remain unchanged. Error bodies are cancelled without parsing
+or displaying upstream details. OpenAPI0.11.0 documents the bodyless422 response.
+The provider guard/runtime selection remain unmounted until deployment setup.

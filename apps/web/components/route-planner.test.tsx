@@ -406,6 +406,16 @@ it('retains loaded directions through connection loss and failed recalculation b
   await screen.findByText('Route planning is unavailable. Try again later.');
   expect(screen.getByText(/Showing the last successful route/)).toBeTruthy();
   expect(screen.getByText('1.2 km')).toBeTruthy();
+  vi.mocked(calculateBrowserRoute).mockRejectedValueOnce(new BrowserRoutingError(422));
+  fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
+  await screen.findByText(
+    'This route is outside the supported routing area. Choose different places and try again.',
+  );
+  expect(screen.getByRole('alert').textContent).toContain('supported routing area');
+  expect(screen.getByText(/Showing the last successful route/)).toBeTruthy();
+  expect(screen.getByText('1.2 km')).toBeTruthy();
+  expect(screen.getByText('Selected: Start')).toBeTruthy();
+  expect(calculateBrowserRoute).toHaveBeenCalledTimes(5);
   vi.mocked(calculateBrowserRoute).mockRejectedValueOnce(new BrowserRoutingError(401));
   fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
   await screen.findByText('Sign in again from Profile to continue.');

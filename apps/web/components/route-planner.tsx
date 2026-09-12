@@ -7,6 +7,7 @@ import {
   calculateBrowserRoute,
   searchBrowserPlaces,
   BrowserRoutingError,
+  routingCoverageMessage,
 } from '../lib/browser-routing';
 
 type Endpoint = 'origin' | 'destination';
@@ -93,9 +94,11 @@ function Planner({ account }: { account: string }) {
             : failure instanceof BrowserRoutingError
               ? failure.status === 401 || failure.status === 403
                 ? 'Sign in again from Profile to continue.'
-                : failure.status === 429
-                  ? 'Too many requests. Wait a minute and try again.'
-                  : 'Route planning is unavailable. Try again later.'
+                : failure.status === 422
+                  ? routingCoverageMessage
+                  : failure.status === 429
+                    ? 'Too many requests. Wait a minute and try again.'
+                    : 'Route planning is unavailable. Try again later.'
               : 'Check your places and try again.',
         );
       }

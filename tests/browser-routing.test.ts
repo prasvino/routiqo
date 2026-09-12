@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { calculateBrowserRoute } from '../apps/web/lib/browser-routing';
+import { calculateBrowserRoute, routingCoverageMessage } from '../apps/web/lib/browser-routing';
 const account = '00000000-0000-4000-8000-000000000001';
 const request = { mode: 'walking', origin: [77, 12], destination: [77.1, 12.1] };
 const result = {
@@ -42,6 +42,25 @@ it('posts an account-bound private calculation and strips unrelated response fie
       body: JSON.stringify(request),
     }),
   );
+});
+it('recognizes coverage failures without consuming or exposing provider details', async () => {
+  const cancel = vi.fn();
+  respond(
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('private upstream details'));
+        },
+        cancel,
+      }),
+      { status: 422 },
+    ),
+  );
+  await expect(calculateBrowserRoute(account, request)).rejects.toMatchObject({
+    status: 422,
+    message: routingCoverageMessage,
+  });
+  expect(cancel).toHaveBeenCalledOnce();
 });
 it('rejects invalid endpoints before making any request and honors pre-cancellation', async () => {
   const fetcher = vi.fn();

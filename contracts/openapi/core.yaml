@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.10.0
+  version: 0.11.0
   description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. No live traffic or user presence.
 servers:
   - url: http://localhost:8080
@@ -531,6 +531,7 @@ paths:
                           description: Normalized English turn instructions. Optional only for compatibility with route responses produced before instructions were added.
                           items: { $ref: '#/components/schemas/RouteStep' }
         '400': { description: Invalid mode or endpoints }
+        '422': { description: Route endpoints or returned geometry exceed configured routing coverage. Empty body; no region or coordinate details are returned. }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }

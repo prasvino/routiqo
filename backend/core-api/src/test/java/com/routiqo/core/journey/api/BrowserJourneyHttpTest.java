@@ -5,6 +5,7 @@ import com.jayway.jsonpath.JsonPath;
 import java.net.*;
 import java.net.http.*;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.*;
 import org.springframework.boot.test.context.*;
@@ -42,17 +43,27 @@ class BrowserJourneyHttpTest {
                 }
             };
         }
-        @Bean @Primary com.routiqo.core.routing.application.RouteProvider syntheticRoutes() {
-            return new com.routiqo.core.routing.application.RouteProvider() {
+        @Bean AtomicInteger syntheticRouteCalls() { return new AtomicInteger(); }
+        @Bean @Primary com.routiqo.core.routing.application.RouteProvider syntheticRoutes(
+                @Qualifier("syntheticRouteCalls") AtomicInteger calls) {
+            var delegate = new com.routiqo.core.routing.application.RouteProvider() {
                 @Override public Identity identity() { return Identity.VALHALLA; }
                 @Override public java.util.List<com.routiqo.core.routing.domain.RouteOption> routes(
                         com.routiqo.core.routing.domain.RouteRequest request) {
+                    calls.incrementAndGet();
+                    var geometry = request.destination().longitude() == 79.5
+                            ? java.util.List.of(request.origin(),
+                                new com.routiqo.core.routing.domain.RouteRequest.Coordinate(81.5, 12.5),
+                                request.destination())
+                            : java.util.List.of(request.origin(), request.destination());
                     return java.util.List.of(new com.routiqo.core.routing.domain.RouteOption(1200, 600,
-                            java.util.List.of(request.origin(), request.destination()), java.util.List.of(
+                            geometry, java.util.List.of(
                             new com.routiqo.core.routing.domain.RouteStep("Continue to the destination", 1200, 600,
                                     request.destination()))));
                 }
             };
+            return new com.routiqo.core.routing.application.RegionLimitedRouteProvider(delegate,
+                    new com.routiqo.core.routing.domain.RoutingRegion(78, 11, 81, 14));
         }
         @Bean @Primary GoogleIdentityVerifier syntheticIdentity() {
             return (token, nonce) -> {
@@ -63,7 +74,11 @@ class BrowserJourneyHttpTest {
     }
     @Value("${local.server.port}") int port;
     @Autowired JdbcTemplate jdbc;
-    @BeforeEach void rateBuckets() { jdbc.update("DELETE FROM auth_rate_bucket"); }
+    @Autowired @Qualifier("syntheticRouteCalls") AtomicInteger routeCalls;
+    @BeforeEach void rateBuckets() {
+        jdbc.update("DELETE FROM auth_rate_bucket");
+        routeCalls.set(0);
+    }
     record Browser(HttpClient client, String csrf, String account) {}
     HttpClient client() { return HttpClient.newBuilder().cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL)).build(); }
     HttpResponse<String> send(HttpClient client, String path, String body, String csrf, String origin) throws Exception {
@@ -109,6 +124,52 @@ class BrowserJourneyHttpTest {
             assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account());
         }
         assertThat(send(owner, "routes", body).statusCode()).isEqualTo(429);
+    }
+    @Test void routeCoverageIsExplicitWithoutBypassingOrRevealingThroughBrowserGuards() throws Exception {
+        String outside = "{\"mode\":\"driving\",\"origin\":[80,13],\"destination\":[82,12]}";
+        var unauthenticated = client();
+        String unauthenticatedCsrf = JsonPath.read(
+                send(unauthenticated, "auth/csrf", null, null, null).body(), "$.token");
+        assertThat(send(unauthenticated, "routes", outside, unauthenticatedCsrf, "http://localhost:3000",
+                UUID.randomUUID().toString()).statusCode()).isEqualTo(401);
+
+        var owner = login();
+        assertThat(send(owner.client(), "routes", outside, owner.csrf(), "http://localhost:3000",
+                UUID.randomUUID().toString()).statusCode()).isEqualTo(401);
+        assertThat(send(owner.client(), "routes", outside, null, "http://localhost:3000",
+                owner.account()).statusCode()).isEqualTo(403);
+        assertThat(send(owner.client(), "routes", outside, owner.csrf(), "https://wrong.example",
+                owner.account()).statusCode()).isEqualTo(403);
+        assertThat(routeCalls).hasValue(0);
+
+        var outsideResult = send(owner, "routes", outside);
+        assertThat(outsideResult.statusCode()).isEqualTo(422);
+        assertThat(outsideResult.body()).isEmpty();
+        assertThat(outsideResult.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(routeCalls).hasValue(0);
+
+        String outsideInterior = "{\"mode\":\"driving\",\"origin\":[80,13],\"destination\":[79.5,12]}";
+        var interiorResult = send(owner, "routes", outsideInterior);
+        assertThat(interiorResult.statusCode()).isEqualTo(422);
+        assertThat(interiorResult.body()).isEmpty();
+        assertThat(interiorResult.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(routeCalls).hasValue(1);
+
+        String covered = "{\"mode\":\"driving\",\"origin\":[80,13],\"destination\":[79,12]}";
+        var validResult = send(owner, "routes", covered);
+        assertThat(validResult.statusCode()).isEqualTo(200);
+        assertThat(validResult.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(JsonPath.<String>read(validResult.body(), "$.provider")).isEqualTo("valhalla");
+        assertThat(routeCalls).hasValue(2);
+
+        for (int attempt = 0; attempt < 17; attempt++)
+            assertThat(send(owner, "routes", covered).statusCode()).isEqualTo(200);
+        assertThat(routeCalls).hasValue(19);
+        var throttledOutside = send(owner, "routes", outside);
+        assertThat(throttledOutside.statusCode()).isEqualTo(429);
+        assertThat(throttledOutside.body()).isEmpty();
+        assertThat(throttledOutside.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(routeCalls).hasValue(19);
     }
     @Test void placeSearchRequiresAccountCsrfAndEnforcesItsOwnQuota() throws Exception {
         var owner = login();

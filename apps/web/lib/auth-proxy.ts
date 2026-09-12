@@ -212,6 +212,10 @@ async function forwardBrowserRequest(
       await result.body?.cancel();
       return failure(502);
     }
+    if (path === 'routes' && result.status === 422) {
+      await result.body?.cancel().catch(() => undefined);
+      return failure(422);
+    }
     const output = new Headers({
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',

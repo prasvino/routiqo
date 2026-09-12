@@ -30,6 +30,19 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 ## Verification
 
+Coverage HTTP/browser pass: **249 TypeScript/component tests and 130 Java tests
+across 25 Java suites passed**. Contract generation/drift, formatting, strict types,
+lint, production web build, core check/bootJar and secret scanning passed.
+The first full TS run had one unchanged Xcode dependency test exceed its 5-second
+timeout while the production build was running; a full isolated rerun passed all
+249 tests without source or timeout changes. Independent security review approved.
+Coverage rejection is bodyless HTTP 422 after authentication, account, origin,
+CSRF and quota checks; the proxy discards upstream error details. The planner
+shows a fixed message and retains the last successful route. Component regressions
+verify this behavior; actual browser visual QA remains pending because the browser
+automation runtime fails during initialization. Runtime provider selection and
+regional service activation remain pending; no real provider or device was used.
+
 Offline journey controls pass: **227 TypeScript/component tests passed**, plus contracts, formatting, strict types, lint and secret scanning. The verified-account workspace announces offline local-save behavior and disables server history restore, manual dispatch retry and conflict checks until online. Restore/conflict handlers recheck connectivity. Local start/finish queuing and existing due/lease/authentication/visibility dispatch gates remain unchanged. Regression confirms local starts remain available, restore makes no offline request and reconnect enables the control without fetching history automatically. Existing conflict reconnect tests pass. No backend/native changes, new build or live authenticated visual QA in this pass.
 
 Temporary planner reset pass: **226 TypeScript/component tests passed**, plus contracts, formatting, strict types, lint and secret scanning. Clear route planning aborts pending work and resets temporary places, attribution, estimates and mode offline. Regression verifies that a late location callback cannot recreate the cleared selection. The status explicitly discloses that provider browser caches may remain; saved journeys are unaffected. No backend/native or storage-policy changes, new production build or live browser/provider QA in this pass.

@@ -5,6 +5,7 @@ import com.routiqo.core.identity.application.GoogleSessionService;
 import com.routiqo.core.routing.application.RouteProvider;
 import com.routiqo.core.routing.application.PlaceProvider;
 import com.routiqo.core.routing.domain.PlaceQuery;
+import com.routiqo.core.routing.domain.RouteOutsideCoverageException;
 import com.routiqo.core.routing.domain.RouteRequest;
 import com.routiqo.core.security.BrowserAuthPolicy;
 import com.routiqo.core.security.BrowserCookies;
@@ -81,6 +82,8 @@ public final class BrowserRoutingController {
         return new RouteRequest.Coordinate(values.get(0), values.get(1));
     }
     @ExceptionHandler(SecurityException.class) ResponseEntity<Void> unauthenticated() { return ResponseEntity.status(401).build(); }
+    @ExceptionHandler(RouteOutsideCoverageException.class)
+    ResponseEntity<Void> outsideCoverage() { return ResponseEntity.status(422).build(); }
     @ExceptionHandler({IllegalArgumentException.class, org.springframework.http.converter.HttpMessageNotReadableException.class})
     ResponseEntity<Void> invalid() { return ResponseEntity.badRequest().build(); }
     @ExceptionHandler(IllegalStateException.class) ResponseEntity<Void> unavailable() { return ResponseEntity.status(503).build(); }
