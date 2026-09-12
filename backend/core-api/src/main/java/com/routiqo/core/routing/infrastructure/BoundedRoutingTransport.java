@@ -13,9 +13,12 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /** Bounded streaming body; only called with URLs built by the fixed-host provider adapter. */
-public final class BoundedRoutingTransport implements MapboxRouteProvider.Transport {
+public final class BoundedRoutingTransport implements RoutingTransport {
     private final int maximumBytes;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
             .followRedirects(HttpClient.Redirect.NEVER).build();
@@ -27,9 +30,22 @@ public final class BoundedRoutingTransport implements MapboxRouteProvider.Transp
     @Override public String get(URI uri) throws Exception {
         var request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10))
                 .header("Accept", "application/json").GET().build();
-        var response = client.send(request, info -> new LimitedBody(maximumBytes));
+        var operation = client.sendAsync(request, info -> new LimitedBody(maximumBytes));
+        HttpResponse<byte[]> response;
+        try {
+            // HttpRequest.timeout alone does not bound a body stalled after its headers.
+            response = operation.get(10, TimeUnit.SECONDS);
+        } catch (TimeoutException timeout) {
+            operation.cancel(true);
+            throw new IOException("Routing provider timed out");
+        } catch (InterruptedException interrupted) {
+            operation.cancel(true);
+            throw interrupted;
+        } catch (ExecutionException failure) {
+            throw new IOException("Routing provider unavailable");
+        }
         if (response.statusCode() != 200) throw new IOException("Routing provider unavailable");
-        return new String(response.body(), StandardCharsets.UTF_8);
+        return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(response.body())).toString();
     }
     private static final class LimitedBody implements HttpResponse.BodySubscriber<byte[]> {
         private final int maximum;

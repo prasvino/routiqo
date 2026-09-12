@@ -15,11 +15,10 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** Fixed provider host. Exceptions deliberately omit request URLs, credentials and response bodies. */
 public final class MapboxRouteProvider implements RouteProvider {
-    @FunctionalInterface public interface Transport { String get(URI uri) throws Exception; }
     private final String token;
-    private final Transport transport;
+    private final RoutingTransport transport;
     private final JsonMapper mapper = JsonMapper.builder().build();
-    public MapboxRouteProvider(String token, Transport transport) {
+    public MapboxRouteProvider(String token, RoutingTransport transport) {
         if (token == null || token.isBlank() || token.length() > 2048 || transport == null)
             throw new IllegalArgumentException("Routing provider is not configured");
         this.token = token; this.transport = transport;

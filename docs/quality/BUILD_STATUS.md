@@ -177,3 +177,30 @@ then native MapLibre compatibility and downloaded-region lifecycle. Production
 static-service redirect, logging, attribution and actual network verification are
 still release gates. This completes web renderer migration, not maps/navigation
 or full offline functionality. No push or deployment in this phase.
+
+## Open-source migration phase 3 — Photon adapter
+
+Implemented an unmounted Photon place provider with fixed operator-origin
+validation, encoded explicit search, five-result limit, deterministic OSM IDs and
+bounded multilingual labels/Point coordinates. Duplicate/trailing JSON, invalid
+UTF-8 or surrogate pairs, malformed identifiers and oversized results fail closed;
+errors are redacted and interruption preserved. Fixed OSM attribution replaces
+untrusted provider attribution fields. No live configuration or browser flow changes.
+
+Extracted a provider-neutral RoutingTransport shared with the existing Mapbox
+adapters. The bounded HTTP implementation now rejects malformed UTF-8 and enforces
+a whole-operation10-second timeout including a stalled response body, cancelling
+on timeout/interruption. This corrects an existing header-only timeout limitation.
+
+Final core-api check/bootJar passed **108 Java tests across22 suites**, with zero
+failures/errors/skips, including7 Photon and4 transport tests. Synthetic loopback
+HTTP verifies valid integration, no redirect following, byte bounds, invalid UTF-8,
+stalled-body timeout and interrupted callers. Positive Tamil/non-BMP labels and
+malformed-provider regressions passed. Secret scan and diff checks passed. Root and
+independent security reviews resolved the timeout and Unicode/control findings.
+No TypeScript/UI changes; prior247 TS tests and web build remain latest validation.
+
+Pending: configure a controlled Photon regional service, implement Valhalla,
+coordinate backend selection with truthful browser disclosures, and verify live
+regional quality/logging/egress. No external query, dataset download, deployment,
+provider switch or native navigation change occurred in this phase.

@@ -13,3 +13,8 @@ IP and viewport requests, so are not an automatic private fallback. Hosting
 providers and operational logs remain part of the privacy boundary. Minimize
 logs and never promise zero third-party exposure merely because software is open
 source. Preserve explicit location intent and no public individual tracking.
+
+A Photon adapter is now implemented behind the existing place-provider interface,
+but the live routing configuration still uses Mapbox. This introduces no new
+browser data flow yet. Future Photon activation must update that disclosure and
+verify internal request-URL logging controls before accepting real search text.

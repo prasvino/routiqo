@@ -85,7 +85,7 @@ Routiqo's existing domain contract. Do not pass raw provider responses through.
 
 Keep existing cancellation, stale-result, timeout, attribution, manual directions,
 account isolation and offline tests. Remove Mapbox imports/endpoints/configuration
-only after replacement verification. Provider contracts now carry strict adapter identities and the web renderer uses MapLibre GL JS 6.9.0. Current backend adapters still use Mapbox; Valhalla/Photon and regional map assets remain to be implemented.
+only after replacement verification. Provider contracts now carry strict adapter identities and the web renderer uses MapLibre GL JS 6.9.0. Current backend adapters still use Mapbox; A bounded Photon adapter is now implemented but not configured; Valhalla and regional map assets remain to be implemented.
 
 Next bring up an opt-in regional data stack, validate known routes and place search,
 then perform the Android map/offline spike. Start with a Tamil Nadu-area pilot as a

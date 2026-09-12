@@ -12,9 +12,9 @@ import tools.jackson.databind.json.JsonMapper;
 /** Temporary results only. Never include query text or credentials in failures. */
 public final class MapboxPlaceProvider implements PlaceProvider {
     private final String token;
-    private final MapboxRouteProvider.Transport transport;
+    private final RoutingTransport transport;
     private final JsonMapper mapper = JsonMapper.builder().build();
-    public MapboxPlaceProvider(String token, MapboxRouteProvider.Transport transport) {
+    public MapboxPlaceProvider(String token, RoutingTransport transport) {
         if (token == null || token.isBlank() || token.length() > 2048 || transport == null)
             throw new IllegalArgumentException("Place provider is not configured");
         this.token = token; this.transport = transport;

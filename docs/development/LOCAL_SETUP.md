@@ -139,3 +139,9 @@ into ignored `public/maplibre/6.9.0/`; include these generated public assets in 
 production artifact. Direct `next dev` calls must run that script first. No CDN or
 network download is used by this step. Dependency upgrades require reviewing the
 script version guard and the renderer worker URL together.
+
+Photon adapter status: the backend has an independently tested place adapter but
+no Photon profile/environment switch yet. The current `routing` profile still
+constructs Mapbox adapters. Do not infer that a Photon service is running or route
+real search traffic to a public demo. A controlled regional service and coordinated
+configuration/disclosure changes are the next integration step.

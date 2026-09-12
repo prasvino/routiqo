@@ -242,3 +242,21 @@ in `/maps/`, no credential/location-linked access logs, reviewed styles and nest
 assets, and actual browser network behavior. Do not claim cookie-free requests or
 redirect containment from transformRequest alone. Browser caches and legacy
 Mapbox caches survive account deletion; disclosure and site-data removal remain.
+
+## Photon adapter boundary (ADR 0021)
+
+The unmounted Photon place adapter accepts an operator-constructed fixed service
+origin, never a traveller-supplied destination. It encodes submitted search text
+and returns only bounded IDs/labels/coordinates with fixed OSM attribution. Strict
+JSON shape, duplicate-key/trailing-data rejection, UTF-8 byte limits and coordinate
+validation contain malformed or compromised provider responses. Transport refuses
+redirects, bounds chunked bodies and rejects malformed UTF-8. Provider failures
+are replaced with generic errors without a cause; interruption is preserved.
+
+This is not an egress firewall or permission to expose internal Photon publicly.
+Configured DNS, destination ownership, TLS/private network and proxy/service logs
+must be reviewed before wiring it into the authenticated routing profile. Search
+terms appear in the internal provider query URL; infrastructure must avoid request
+URL logging. No public demo fallback, browser configuration switch, persistence,
+proximity tracking or dataset download is introduced by this adapter-only slice.
+Review found and corrected a shared transport slow-body gap: request-header timeout alone did not bound body completion. A whole-operation10s deadline now cancels the HTTP future on timeout/interruption; loopback stalled-body regression exercises this boundary.
