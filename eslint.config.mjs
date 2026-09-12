@@ -6,6 +6,7 @@ export default tseslint.config(
   {
     ignores: [
       '**/.next/**',
+      'apps/web/public/maplibre/**',
       '**/dist/**',
       '**/node_modules/**',
       '**/schema.d.ts',

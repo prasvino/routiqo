@@ -17,7 +17,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
-| Route planning | Authenticated temporary place search, private Mapbox estimates with bounded directions, route alternatives and explicit web map display. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
+| Route planning | Authenticated temporary place search, private Mapbox estimates with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence policy | Internal consent generation and bounded lease rules tested; Ghost Mode invalidates older generations. No discoverable presence, durable consent service or realtime publication enabled |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
@@ -148,3 +148,32 @@ scan passed. Full core-api check/bootJar passed **98 Java tests across 21 suites
 zero failures/errors/skips**. No live provider/device/UI visual verification or new
 production web build in this boundary pass. Next: migrate renderer and implement
 bounded self-hosted provider adapters, then regional data/device verification.
+
+## Open-source migration phase 2 — web renderer
+
+MapLibre GL JS 6.9.0 replaces the direct Mapbox GL web dependency and CSS. Explicit
+Show map now requires a reviewed same-origin `/maps/...json` style; missing/invalid
+configuration leaves directions available without loading the SDK. No public map
+provider or token fallback exists. URL guards reject external/out-of-namespace
+resources, credentials, query/fragment, controls and encoded traversal/separators.
+
+The pinned worker/shared module and license are generated locally during dev/build
+under `/maplibre/6.9.0/`. Browser QA caught missing worker packaging, which is fixed;
+route readiness now waits for source processing within the existing 20s deadline.
+Reuse, offline retention, cancellation, latest geometry and cleanup remain tested.
+
+Verification: full contracts/format/types/lint check passed; final suite **247 tests
+across 40 files**, including **18 map tests**, passed. Production web build passed;
+secret scan clean; production dependency audit reports no known vulnerabilities.
+Independent security review approved URL guards, packaging and source-readiness
+races. Actual CUA browser screenshots verified a synthetic local background style,
+line, markers, alternative updates at 360px and missing-style fallback. Temporary
+QA page/style, diagnostics and alternate build output were removed before build.
+No real tiles, locations, OAuth, backend provider calls or Android device were used.
+Backend unchanged; prior 98 Java tests remain the latest backend validation.
+
+Next: bounded Valhalla/Photon adapters and controlled regional data/tile services,
+then native MapLibre compatibility and downloaded-region lifecycle. Production
+static-service redirect, logging, attribution and actual network verification are
+still release gates. This completes web renderer migration, not maps/navigation
+or full offline functionality. No push or deployment in this phase.

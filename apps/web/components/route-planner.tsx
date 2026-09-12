@@ -188,7 +188,7 @@ function Planner({ account }: { account: string }) {
           setMatches({});
           setAttribution({ origin: '', destination: '' });
           setMode('driving');
-          setMessage('Route planning cleared from this view. Mapbox browser caches may remain.');
+          setMessage('Route planning cleared from this view. Browser map caches may remain.');
         }}
       >
         Clear route planning

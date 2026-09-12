@@ -39,6 +39,7 @@ const sdk = vi.hoisted(() => {
   const controls: object[] = [];
   const bounds: Array<{ extend: ReturnType<typeof vi.fn> }> = [];
   const sources: GeoJsonSourceDouble[] = [];
+  const sourceUpdate = { promise: null as Promise<void> | null };
   const MapConstructor = vi.fn(function (options: Record<string, unknown>) {
     let routeSource: GeoJsonSourceDouble | undefined;
     const instance: MapDouble = {
@@ -58,7 +59,7 @@ const sdk = vi.hoisted(() => {
     };
     instance.addControl.mockImplementation(() => instance);
     instance.addSource.mockImplementation(() => {
-      routeSource = { setData: vi.fn() };
+      routeSource = { setData: vi.fn(() => sourceUpdate.promise ?? Promise.resolve()) };
       sources.push(routeSource);
       return instance;
     });
@@ -104,7 +105,7 @@ const sdk = vi.hoisted(() => {
     NavigationControl,
     Marker,
     LngLatBounds,
-    accessToken: 'global-token-must-not-change',
+    setWorkerUrl: vi.fn(),
   };
   return {
     api,
@@ -112,23 +113,25 @@ const sdk = vi.hoisted(() => {
     NavigationControl,
     Marker,
     LngLatBounds,
+    setWorkerUrl: api.setWorkerUrl,
     instances,
     markers,
     controls,
     bounds,
     sources,
+    sourceUpdate,
     moduleLoads: 0,
     importGate: null as Promise<void> | null,
   };
 });
 
-vi.mock('mapbox-gl', async () => {
+vi.mock('maplibre-gl', async () => {
   sdk.moduleLoads += 1;
   if (sdk.importGate) await sdk.importGate;
-  return { default: sdk.api };
+  return sdk.api;
 });
 
-const publicToken = `pk.${'a'.repeat(40)}`;
+const stylePath = '/maps/styles/routiqo.json';
 const geometry: RouteCoordinate[] = [
   [80.2, 13.1],
   [80.25, 13.08],
@@ -160,18 +163,20 @@ function resetSdkDoubles() {
   sdk.NavigationControl.mockClear();
   sdk.Marker.mockClear();
   sdk.LngLatBounds.mockClear();
+  sdk.setWorkerUrl.mockClear();
   sdk.instances.splice(0);
   sdk.markers.splice(0);
   sdk.controls.splice(0);
   sdk.bounds.splice(0);
   sdk.sources.splice(0);
+  sdk.sourceUpdate.promise = null;
   sdk.importGate = null;
   ResizeObserverDouble.instances.splice(0);
 }
 
 beforeEach(() => {
   resetSdkDoubles();
-  vi.stubEnv('NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN', publicToken);
+  vi.stubEnv('NEXT_PUBLIC_MAP_STYLE_PATH', stylePath);
   vi.stubGlobal('ResizeObserver', ResizeObserverDouble);
   setOnline(true);
 });
@@ -184,27 +189,47 @@ afterEach(() => {
 });
 
 describe('RouteMap', () => {
-  it('does not import Mapbox on mount or for non-public and oversized tokens', async () => {
-    const view = render(<RouteMap geometry={geometry} />);
-    expect(sdk.moduleLoads).toBe(0);
-    expect(sdk.MapConstructor).not.toHaveBeenCalled();
+  it('does not import MapLibre on mount or for missing and unsafe style paths', async () => {
+    const invalidPaths: Array<string | undefined> = [
+      undefined,
+      '',
+      'https://maps.example/maps/style.json',
+      '//maps.example/style.json',
+      '/other/style.json',
+      '/maps/style.yaml',
+      '/maps//style.json',
+      '/maps/style.json?version=1',
+      '/maps/style.json#section',
+      '/maps/..\\private/style.json',
+      '/maps/%2e%2e/private/style.json',
+      '/maps/%252e%252e/private/style.json',
+      '/maps/%252525252e%252525252e/private/style.json',
+      '/maps/%25252525252e%25252525252e/private/style.json',
+      '/maps/styles%2fprivate/style.json',
+      '/maps/styles%255cprivate/style.json',
+      '/maps/styles%2525252fprivate/style.json',
+      `/maps/style\u0000.json`,
+      `/maps/${'a'.repeat(2048)}.json`,
+    ];
 
-    vi.stubEnv('NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN', `sk.${'a'.repeat(40)}`);
-    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
-    expect((await screen.findByRole('alert')).textContent).toBe(
-      'Map display is unavailable. You can still review the directions.',
-    );
-    expect((view.container.querySelector('.route-map-canvas') as HTMLDivElement).hidden).toBe(true);
-    expect(sdk.moduleLoads).toBe(0);
-    expect(screen.queryByRole('button', { name: 'Retry map' })).toBeNull();
+    for (const path of invalidPaths) {
+      cleanup();
+      vi.stubEnv('NEXT_PUBLIC_MAP_STYLE_PATH', path);
+      const view = render(<RouteMap geometry={geometry} />);
+      expect(screen.getByText(/configured map service/)).toBeTruthy();
+      expect(screen.getByText(/shares the viewed area/)).toBeTruthy();
+      expect(screen.getByText(/browser caches/)).toBeTruthy();
+      expect(sdk.MapConstructor).not.toHaveBeenCalled();
 
-    view.rerender(<RouteMap key="oversized" geometry={geometry} />);
-    vi.stubEnv('NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN', `pk.${'a'.repeat(2046)}`);
-    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
-    expect((await screen.findByRole('alert')).textContent).toBe(
-      'Map display is unavailable. You can still review the directions.',
-    );
-    expect((view.container.querySelector('.route-map-canvas') as HTMLDivElement).hidden).toBe(true);
+      fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+      expect((await screen.findByRole('alert')).textContent).toBe(
+        'Map display is unavailable. You can still review the directions.',
+      );
+      expect((view.container.querySelector('.route-map-canvas') as HTMLDivElement).hidden).toBe(
+        true,
+      );
+      expect(screen.queryByRole('button', { name: 'Retry map' })).toBeNull();
+    }
     expect(sdk.moduleLoads).toBe(0);
   });
 
@@ -248,13 +273,14 @@ describe('RouteMap', () => {
     await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
     const map = sdk.instances[0]!;
     expect(map.options).toMatchObject({
-      style: 'mapbox://styles/mapbox/streets-v12',
-      accessToken: publicToken,
-      attributionControl: true,
-      collectResourceTiming: false,
-      performanceMetricsCollection: false,
+      style: stylePath,
+      attributionControl: {},
+      transformRequest: expect.any(Function),
     });
-    expect(sdk.api.accessToken).toBe('global-token-must-not-change');
+    expect(map.options).not.toHaveProperty('accessToken');
+    expect(map.options).not.toHaveProperty('collectResourceTiming');
+    expect(map.options).not.toHaveProperty('performanceMetricsCollection');
+    expect(sdk.setWorkerUrl).toHaveBeenCalledWith('/maplibre/6.9.0/maplibre-gl-worker.mjs');
     expect(map.addControl).toHaveBeenCalledWith(sdk.controls[0], 'top-right');
     expect(ResizeObserverDouble.instances[0]!.observe).toHaveBeenCalledOnce();
     act(() => ResizeObserverDouble.instances[0]!.notify());
@@ -284,6 +310,58 @@ describe('RouteMap', () => {
       duration: 0,
       maxZoom: 15,
     });
+  });
+
+  it('restricts network map resources to safe same-origin maps paths', async () => {
+    render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
+    const transformRequest = sdk.instances[0]!.options.transformRequest as (url: string) => {
+      url: string;
+      credentials?: string;
+    };
+    const origin = window.location.origin;
+    const blocked = `${origin}/maps/__blocked_map_resource__`;
+
+    expect(transformRequest('/maps/tiles/{z}/{x}/{y}.pbf')).toEqual({
+      url: `${origin}/maps/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.pbf`,
+      credentials: 'same-origin',
+    });
+    expect(transformRequest(`${origin}/maps/fonts/Noto%20Sans/0-255.pbf`)).toEqual({
+      url: `${origin}/maps/fonts/Noto%20Sans/0-255.pbf`,
+      credentials: 'same-origin',
+    });
+    expect(transformRequest('data:image/png;base64,AA==')).toEqual({
+      url: 'data:image/png;base64,AA==',
+    });
+    expect(transformRequest(`blob:${origin}/map-image`)).toEqual({
+      url: `blob:${origin}/map-image`,
+    });
+
+    for (const unsafe of [
+      'https://maps.example/tiles/1.pbf',
+      'data:text/html,not-a-map-image',
+      '/api/maps/tiles/1.pbf',
+      `${origin}/maps/tile.pbf?token=secret`,
+      `${origin}/maps/tile.pbf#fragment`,
+      `${origin}/maps/../private/tile.pbf`,
+      `${origin}/maps/%2e%2e/private/tile.pbf`,
+      `${origin}/maps/%252e%252e/private/tile.pbf`,
+      `${origin}/maps/%252525252e%252525252e/private/tile.pbf`,
+      `${origin}/maps/%25252525252e%25252525252e/private/tile.pbf`,
+      `${origin}/maps/tiles%2fprivate.pbf`,
+      `${origin}/maps/tiles%252fprivate.pbf`,
+      `${origin}/maps/tiles%2525252fprivate.pbf`,
+      `${origin}/maps/tiles%5cprivate.pbf`,
+      `${origin}/maps/tiles\\private.pbf`,
+      `${origin.replace('://', '://user@')}/maps/tile.pbf`,
+      `javascript:alert(1)`,
+    ]) {
+      expect(transformRequest(unsafe)).toEqual({
+        url: blocked,
+        credentials: 'same-origin',
+      });
+    }
   });
 
   it('unwraps antimeridian geometry consistently for the line, markers, and bounds', async () => {
@@ -337,6 +415,7 @@ describe('RouteMap', () => {
     await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
     const map = sdk.instances[0]!;
     act(() => map.emit('load'));
+    expect(await screen.findByText('Route map ready.')).toBeTruthy();
 
     act(() => map.emit('error', new Error('private online provider error')));
 
@@ -360,6 +439,7 @@ describe('RouteMap', () => {
     await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
     const map = sdk.instances[0]!;
     act(() => map.emit('load'));
+    expect(await screen.findByText('Route map ready.')).toBeTruthy();
 
     setOnline(false);
     fireEvent(window, new Event('offline'));
@@ -402,6 +482,7 @@ describe('RouteMap', () => {
     await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
     const map = sdk.instances[0]!;
     act(() => map.emit('load'));
+    expect(await screen.findByText('Route map ready.')).toBeTruthy();
     expect(sdk.markers).toHaveLength(2);
 
     view.rerender(<RouteMap geometry={alternateGeometry} />);
@@ -462,6 +543,7 @@ describe('RouteMap', () => {
     await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
     const map = sdk.instances[0]!;
     act(() => map.emit('load'));
+    expect(await screen.findByText('Route map ready.')).toBeTruthy();
 
     view.rerender(
       <RouteMap
@@ -515,12 +597,131 @@ describe('RouteMap', () => {
     expect(second.remove).not.toHaveBeenCalled();
   });
 
+  it('waits for route source processing and applies the latest pending geometry before ready', async () => {
+    vi.useFakeTimers();
+    const sourceGate = deferred<void>();
+    sdk.sourceUpdate.promise = sourceGate.promise;
+    const view = render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(sdk.MapConstructor).toHaveBeenCalledOnce();
+    const map = sdk.instances[0]!;
+
+    act(() => map.emit('load'));
+    expect(screen.getByText('Loading route map…')).toBeTruthy();
+    expect(screen.queryByText('Route map ready.')).toBeNull();
+    view.rerender(<RouteMap geometry={alternateGeometry} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(19999);
+    });
+    expect(screen.getByText('Loading route map…')).toBeTruthy();
+    expect(map.remove).not.toHaveBeenCalled();
+
+    await act(async () => {
+      sourceGate.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Route map ready.')).toBeTruthy();
+    expect(sdk.sources[0]!.setData).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        geometry: { type: 'LineString', coordinates: alternateGeometry },
+      }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(40000);
+    });
+    expect(map.remove).not.toHaveBeenCalled();
+  });
+
+  it('times out while route source processing is still pending and ignores its late completion', async () => {
+    vi.useFakeTimers();
+    const sourceGate = deferred<void>();
+    sdk.sourceUpdate.promise = sourceGate.promise;
+    render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const map = sdk.instances[0]!;
+    act(() => map.emit('load'));
+    expect(sdk.sources[0]!.setData).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20000);
+    });
+    expect(screen.getByRole('alert').textContent).toContain('Map loading took too long');
+    expect(map.remove).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      sourceGate.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('Route map ready.')).toBeNull();
+    expect(map.remove).toHaveBeenCalledOnce();
+  });
+
+  it('removes a source-processing map when geometry becomes invalid and ignores completion', async () => {
+    const sourceGate = deferred<void>();
+    sdk.sourceUpdate.promise = sourceGate.promise;
+    const view = render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
+    const map = sdk.instances[0]!;
+    act(() => map.emit('load'));
+    expect(screen.getByText('Loading route map…')).toBeTruthy();
+
+    view.rerender(<RouteMap geometry={[]} />);
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Route map is unavailable for this route.',
+    );
+    expect(map.remove).toHaveBeenCalledOnce();
+    expect(sdk.markers[0]!.remove).toHaveBeenCalledOnce();
+    expect(sdk.markers[1]!.remove).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      sourceGate.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('Route map ready.')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toBe('Route map is unavailable for this route.');
+  });
+
+  it('cleans up when unmounted during route source processing', async () => {
+    const sourceGate = deferred<void>();
+    sdk.sourceUpdate.promise = sourceGate.promise;
+    const view = render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
+    const map = sdk.instances[0]!;
+    act(() => map.emit('load'));
+    expect(screen.getByText('Loading route map…')).toBeTruthy();
+
+    view.unmount();
+    expect(map.remove).toHaveBeenCalledOnce();
+    expect(ResizeObserverDouble.instances[0]!.disconnect).toHaveBeenCalledOnce();
+    expect(sdk.markers[0]!.remove).toHaveBeenCalledOnce();
+    expect(sdk.markers[1]!.remove).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      sourceGate.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(map.remove).toHaveBeenCalledOnce();
+  });
+
   it('cleans up the ready map, observer, and markers on unmount', async () => {
     const view = render(<RouteMap geometry={geometry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
     await waitFor(() => expect(sdk.MapConstructor).toHaveBeenCalledOnce());
     const map = sdk.instances[0]!;
     act(() => map.emit('load'));
+    expect(await screen.findByText('Route map ready.')).toBeTruthy();
 
     view.unmount();
     expect(map.remove).toHaveBeenCalledOnce();

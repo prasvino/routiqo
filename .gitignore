@@ -2,6 +2,7 @@ node_modules/
 .patch-work/
 .pnpm-store/
 .next/
+apps/web/public/maplibre/
 .expo/
 .turbo/
 .gradle/

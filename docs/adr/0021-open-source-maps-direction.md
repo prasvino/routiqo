@@ -1,6 +1,6 @@
 # ADR 0021: Open-source mapping direction
 
-Status: accepted and explicitly confirmed by user, 2026-09-12; migration in progress: provider identity contracts implemented; renderer/services pending.
+Status: accepted and explicitly confirmed by user, 2026-09-12; migration in progress: provider identity contracts and web MapLibre renderer implemented; native renderer and services pending.
 
 The user selected open-source maps and requested an assessment of
 map-alternate-discussion.txt. That attachment is a proposal, not verified technical
@@ -85,9 +85,7 @@ Routiqo's existing domain contract. Do not pass raw provider responses through.
 
 Keep existing cancellation, stale-result, timeout, attribution, manual directions,
 account isolation and offline tests. Remove Mapbox imports/endpoints/configuration
-only after replacement verification. Current controllers and client validators
-hard-code 'mapbox', and route-map.tsx directly loads Mapbox: this is not a two-class
-or zero-frontend-change migration.
+only after replacement verification. Provider contracts now carry strict adapter identities and the web renderer uses MapLibre GL JS 6.9.0. Current backend adapters still use Mapbox; Valhalla/Photon and regional map assets remain to be implemented.
 
 Next bring up an opt-in regional data stack, validate known routes and place search,
 then perform the Android map/offline spike. Start with a Tamil Nadu-area pilot as a
@@ -116,3 +114,8 @@ The attachment's blanket claim that server Mapbox calls require secret-scope tok
 is also inaccurate: scopes depend on the API, not whether the caller is a server.
 See [Mapbox token documentation](https://docs.mapbox.com/help/getting-started/access-tokens/).
 We select open source for control and architectural fit, not that token claim.
+
+Web packaging follows the [MapLibre installation guide](https://maplibre.org/maplibre-gl-js/docs/)
+for Next/Turbopack: explicitly serve both pinned worker and shared module. A browser
+check caught the missing-worker failure before acceptance; mocked map lifecycle
+tests alone cannot establish successful geometry rendering.

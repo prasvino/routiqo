@@ -3,32 +3,114 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { RouteCoordinate } from '@routiqo/shared';
 
-const style = 'mapbox://styles/mapbox/streets-v12';
 const sourceId = 'routiqo-route';
 const layerId = 'routiqo-route-line';
+const blockedResourcePath = '/maps/__blocked_map_resource__';
+const workerPath = '/maplibre/6.9.0/maplibre-gl-worker.mjs';
+const maxStylePathLength = 2048;
+const maxResourceUrlLength = 8192;
 const unavailableMessage = 'Route map is unavailable. Try again later.';
 const degradedMessage =
   'Some map details may be unavailable. The displayed route is still available.';
 
-type Mapbox = typeof import('mapbox-gl').default;
-type RouteData = Parameters<import('mapbox-gl').GeoJSONSource['setData']>[0];
+type MapRenderer = typeof import('maplibre-gl');
+type RouteData = Parameters<import('maplibre-gl').GeoJSONSource['setData']>[0];
 
 interface MapSession {
   revision: number;
-  mapbox: Mapbox;
-  map: import('mapbox-gl').Map;
-  source: import('mapbox-gl').GeoJSONSource | null;
-  markers: import('mapbox-gl').Marker[];
+  renderer: MapRenderer;
+  map: import('maplibre-gl').Map;
+  source: import('maplibre-gl').GeoJSONSource | null;
+  markers: import('maplibre-gl').Marker[];
   observer: ResizeObserver | null;
   loaded: boolean;
   removed: boolean;
 }
 
-function publicToken(): string | null {
-  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-  return typeof token === 'string' && token.startsWith('pk.') && token.length <= 2048
-    ? token
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
+}
+
+function hasUnsafePath(path: string): boolean {
+  let decoded = path;
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (
+      decoded.includes('\\') ||
+      hasControlCharacters(decoded) ||
+      /%(?:2f|5c)/iu.test(decoded) ||
+      decoded.split('/').some((segment) => segment === '.' || segment === '..')
+    ) {
+      return true;
+    }
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      return true;
+    }
+    if (next === decoded) return false;
+    decoded = next;
+  }
+  return true;
+}
+
+function mapStylePath(): string | null {
+  const path = process.env.NEXT_PUBLIC_MAP_STYLE_PATH;
+  return typeof path === 'string' &&
+    path.length > '/maps/.json'.length &&
+    path.length <= maxStylePathLength &&
+    path.startsWith('/maps/') &&
+    path.endsWith('.json') &&
+    !path.includes('//') &&
+    !path.includes('?') &&
+    !path.includes('#') &&
+    !hasUnsafePath(path)
+    ? path
     : null;
+}
+
+function transformMapRequest(url: string): import('maplibre-gl').RequestParameters {
+  const origin = window.location.origin;
+  if (
+    url.length <= maxResourceUrlLength &&
+    url.startsWith('data:image/') &&
+    !hasControlCharacters(url) &&
+    !url.includes('#')
+  ) {
+    return { url };
+  }
+  if (url.length <= maxResourceUrlLength && !url.includes('?') && !url.includes('#')) {
+    try {
+      const resource = new URL(url, origin);
+      if (
+        (resource.protocol === 'http:' || resource.protocol === 'https:') &&
+        resource.origin === origin &&
+        resource.username === '' &&
+        resource.password === '' &&
+        resource.pathname.startsWith('/maps/') &&
+        resource.search === '' &&
+        resource.hash === '' &&
+        !hasUnsafePath(url) &&
+        !hasUnsafePath(resource.pathname)
+      ) {
+        return { url: resource.href, credentials: 'same-origin' };
+      }
+      if (
+        resource.protocol === 'blob:' &&
+        resource.origin === origin &&
+        resource.search === '' &&
+        resource.hash === ''
+      ) {
+        return { url: resource.href };
+      }
+    } catch {
+      // Invalid and unapproved resources use the same generic blocked path.
+    }
+  }
+  return { url: new URL(blockedResourcePath, origin).href, credentials: 'same-origin' };
 }
 
 function validGeometry(geometry: RouteCoordinate[]): boolean {
@@ -96,7 +178,7 @@ function removeSession(session: MapSession) {
   }
 }
 
-function renderRoute(session: MapSession, geometry: RouteCoordinate[]) {
+async function renderRoute(session: MapSession, geometry: RouteCoordinate[]) {
   const data = routeData(geometry);
   if (session.source === null) {
     session.map.addSource(sourceId, { type: 'geojson', data });
@@ -109,10 +191,9 @@ function renderRoute(session: MapSession, geometry: RouteCoordinate[]) {
     });
     const source = session.map.getSource(sourceId);
     if (source === undefined || !('setData' in source)) throw new Error('Route source unavailable');
-    session.source = source as import('mapbox-gl').GeoJSONSource;
-  } else {
-    session.source.setData(data);
+    session.source = source as import('maplibre-gl').GeoJSONSource;
   }
+  const sourceUpdate = session.source.setData(data);
 
   const endpoints = [geometry[0]!, geometry[geometry.length - 1]!] as const;
   if (session.markers.length === 2) {
@@ -120,20 +201,21 @@ function renderRoute(session: MapSession, geometry: RouteCoordinate[]) {
     session.markers[1]!.setLngLat(endpoints[1]);
   } else {
     removeMarkers(session);
-    const start = new session.mapbox.Marker({ color: '#2f6b5f' })
+    const start = new session.renderer.Marker({ color: '#2f6b5f' })
       .setLngLat(endpoints[0])
       .addTo(session.map);
     start.getElement().setAttribute('aria-label', 'Route start');
-    const end = new session.mapbox.Marker({ color: '#a34f35' })
+    const end = new session.renderer.Marker({ color: '#a34f35' })
       .setLngLat(endpoints[1])
       .addTo(session.map);
     end.getElement().setAttribute('aria-label', 'Route end');
     session.markers = [start, end];
   }
 
-  const bounds = new session.mapbox.LngLatBounds();
+  const bounds = new session.renderer.LngLatBounds();
   geometry.forEach((coordinate) => bounds.extend(coordinate));
   session.map.fitBounds(bounds, { padding: 48, duration: 0, maxZoom: 15 });
+  await sourceUpdate;
 }
 
 export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
@@ -204,13 +286,8 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
     }
 
     if (currentSession?.loaded && phase.current === 'ready') {
-      try {
-        renderRoute(currentSession, renderGeometry);
-        setLoading(false);
-        setReady(true);
-        setRetryable(false);
-        setError('');
-      } catch {
+      void renderRoute(currentSession, renderGeometry).catch(() => {
+        if (session.current !== currentSession || currentSession.removed) return;
         session.current = null;
         revision.current += 1;
         phase.current = 'failed';
@@ -219,14 +296,18 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
         setReady(false);
         setRetryable(true);
         setError(unavailableMessage);
-      }
+      });
+      setLoading(false);
+      setReady(true);
+      setRetryable(false);
+      setError('');
     }
   }, [attempt, preparedGeometry]);
 
   useEffect(() => {
     if (attempt === null) return;
-    const token = publicToken();
-    if (token === null) {
+    const stylePath = mapStylePath();
+    if (stylePath === null) {
       phase.current = 'failed';
       setLoading(false);
       setReady(false);
@@ -234,7 +315,7 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
       setError('Map display is unavailable. You can still review the directions.');
       return;
     }
-    const accessToken = token;
+    const configuredStyle = stylePath;
     if (latestGeometry.current === null) {
       phase.current = 'failed';
       setLoading(false);
@@ -281,7 +362,7 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
 
     async function initialize() {
       try {
-        const mapbox = (await import('mapbox-gl')).default;
+        const renderer = await import('maplibre-gl');
         if (disposed || currentRevision !== revision.current || container.current === null) return;
         if (latestGeometry.current === null) return;
         if (!navigator.onLine) {
@@ -295,17 +376,16 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
           return;
         }
 
-        const map = new mapbox.Map({
+        renderer.setWorkerUrl(workerPath);
+        const map = new renderer.Map({
           container: container.current,
-          style,
-          accessToken,
-          attributionControl: true,
-          collectResourceTiming: false,
-          performanceMetricsCollection: false,
+          style: configuredStyle,
+          attributionControl: {},
+          transformRequest: transformMapRequest,
         });
         const currentSession: MapSession = {
           revision: currentRevision,
-          mapbox,
+          renderer,
           map,
           source: null,
           markers: [],
@@ -343,7 +423,7 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
           removeSession(currentSession);
         }
 
-        map.addControl(new mapbox.NavigationControl(), 'top-right');
+        map.addControl(new renderer.NavigationControl(), 'top-right');
         if (typeof ResizeObserver !== 'undefined') {
           currentSession.observer = new ResizeObserver(() => {
             if (!current()) return;
@@ -367,15 +447,16 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
           setRetryable(false);
           setError(degradedMessage);
         });
-        map.on('load', () => {
+        map.on('load', async () => {
           if (!current()) return;
-          const renderGeometry = latestGeometry.current;
-          if (renderGeometry === null) {
-            fail();
-            return;
-          }
           try {
-            renderRoute(currentSession, renderGeometry);
+            let renderGeometry = latestGeometry.current;
+            while (current() && renderGeometry !== null) {
+              await renderRoute(currentSession, renderGeometry);
+              if (latestGeometry.current === renderGeometry) break;
+              renderGeometry = latestGeometry.current;
+            }
+            if (!current() || renderGeometry === null) return;
             currentSession.loaded = true;
             clearTimeout(loadDeadline);
             phase.current = 'ready';
@@ -420,8 +501,8 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
   return (
     <section className="route-map" aria-label="Route map preview">
       <p className="route-attribution">
-        Loading the map contacts Mapbox. Map tiles and usage data may remain in this browser until
-        you clear site data.
+        Loading the map contacts the configured map service and shares the viewed area. Map
+        resources may remain in browser caches until you clear site data.
       </p>
       {offline && <p role="status">You’re offline. The current map may not update.</p>}
       {(attempt === null || (error !== '' && retryable)) && (

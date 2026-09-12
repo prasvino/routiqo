@@ -26,13 +26,11 @@ Test cold-start airplane mode, interrupted downloads, storage exhaustion, revoke
 location permission, region boundaries and safe off-route behavior. Never fabricate
 reroutes when offline engine/data are unavailable. See OFFLINE_ARCHITECTURE.md.
 
-## Existing Mapbox implementation — pending migration
+## Current web route review
 
-The following records implemented behavior and Mapbox-specific cache disclosures.
-It is not the target provider instruction. Retain truthful disclosures until the
-MapLibre migration and actual cache/network behavior are verified.
+The web renderer now uses MapLibre; backend routing and place adapters still use Mapbox. Historical Mapbox cache disclosures below remain relevant to retained browser data.
 
-Extend the authenticated web route planner with Mapbox maps, explicit alternative
+The authenticated web route planner uses MapLibre maps, explicit alternative
 selection and a provider-supplied directions list with manual Previous/Next review.
 This is route review, not GPS-triggered turn announcements or native navigation.
 All directions offers direct selection of a provider step, marks the selected item
@@ -49,13 +47,9 @@ Maximum 500 steps per route, three route options, 10,000 overview coordinates.
 Malformed supplied steps reject the entire result. Older application responses
 without steps remain readable as an empty list; never invent instructions.
 
-Mapbox GL JS 3.30.0 loads only after explicit Show map. Use a separate public,
-origin-restricted `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` (`pk.` only), passed per map;
-never expose the backend routing token. Fixed streets-v12 style, local bundled
-CSS, provider attribution/logo, route line, endpoint markers and bounded fit view.
+MapLibre GL JS 6.9.0 loads only after explicit Show map, using the bounded same-origin style configuration described below. Local bundled CSS, configured dataset attribution, route line, endpoint markers and bounded fit view remain required. No public Mapbox map token is used.
 Ignore stale imports/events and remove maps/observers on unmount/account changes.
-Each explicit map load has a 20-second deadline spanning SDK import and style
-readiness. Timeout removes an unfinished map, invalidates late callbacks, preserves
+Each explicit map load has a 20-second deadline spanning SDK import, style and initial route-source readiness. Timeout removes an unfinished map, invalidates late callbacks, preserves
 directions and offers explicit retry. Ready maps do not expire on this deadline.
 Keep token/provider errors out of UI/logs. No geolocation control or hidden watcher.
 After explicit map load, selecting an alternative updates the existing map's route
@@ -96,13 +90,10 @@ No automatic upload, service worker, tile scraper, GPS watch or route persistenc
 Clear route planning aborts pending work, empties temporary endpoint text/selections,
 matches/attribution and estimates, restores driving mode, and unmounts the map.
 Late request responses cannot repopulate the view. This explicit action works
-offline and does not erase saved journeys or Mapbox-managed browser caches; its
+offline and does not erase saved journeys or browser map caches; its
 status message states the cache limitation.
 
-Mapbox GL itself uses browser CacheStorage for map tiles and localStorage for SDK
-event metadata. These are provider-managed caches, not Routiqo route downloads;
-they may outlive this view, account switching or account deletion. Ordinary browser
-HTTP caches may also retain tiles. The explicit Show map disclosure explains this;
+Earlier Mapbox GL versions may have left CacheStorage tiles and localStorage event metadata. These legacy caches may outlive the renderer migration, account switching or account deletion. Current MapLibre resources may remain in ordinary browser HTTP caches; these are not Routiqo route downloads. The explicit Show map disclosure explains this;
 clearing site data is the available complete browser-storage cleanup action.
 Do not claim zero persistence or disable undocumented SDK internals.
 
@@ -136,3 +127,30 @@ References checked 2026-09-12:
 - [Mapbox GL JS](https://docs.mapbox.com/mapbox-gl-js/guides/)
 - [Native offline maps](https://docs.mapbox.com/help/dive-deeper/mobile-offline/)
 - [Geocoding storage](https://docs.mapbox.com/api/search/geocoding/#storing-geocoding-results)
+
+## Web MapLibre migration acceptance
+
+Replace the web renderer/CSS dependency with pinned MapLibre GL JS. Map rendering
+uses NEXT_PUBLIC_MAP_STYLE_PATH, a same-origin absolute /maps/...json path with no
+query, fragment, credentials, protocol-relative form or path traversal. Missing or
+invalid configuration shows the existing unavailable state without importing the
+SDK. No public default tile/style service and no Mapbox map token. Backend search
+and routing remain on their current adapter until their own migration.
+
+Keep explicit Show map, route/marker/source reuse, the20-second deadline,
+cancellation/stale guards, offline degraded details, and generic errors. Reject
+external or out-of-namespace resource URLs in transformRequest. Same-origin cookies may accompany requests; static handlers must not log credentials.
+This hook is not proof of redirect containment: the trusted deployed /maps service
+must serve static resources without redirects, external imports or dynamic URLs.
+Verify actual browser network behavior before release. Do not point map resources
+at authenticated APIs or place private content in the map asset namespace. Hosting
+and browser caches remain disclosed; replacing the SDK does not delete old Mapbox
+browser caches. No geolocation watcher, live tiles or external fallback in tests.
+
+MapLibre 6 uses a separate module worker. Web dev/build commands prepare the pinned
+worker and shared sibling under `/maplibre/6.9.0/` with its license; the renderer
+sets that fixed same-origin worker URL before creating a map. These are application
+code assets, separate from the `/maps/` map-data namespace. Upgrades must review
+both worker packaging and the renderer URL. Do not rely on Turbopack to emit the
+worker's imported sibling. The initial 20-second deadline must include route-source
+loading, not merely base-style loading.

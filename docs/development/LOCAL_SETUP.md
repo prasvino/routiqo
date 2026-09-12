@@ -88,7 +88,7 @@ The user confirmed the open-source target in ADR 0021. The configuration below i
 
 Add `routing` to `persistence,google-auth,web-auth` and supply `ROUTIQO_MAPBOX_TOKEN` only to the backend process through external secret configuration. Missing token fails startup when this profile is active. Never use a `NEXT_PUBLIC_` variable for this token. The web proxy uses the same backend configuration as authentication.
 
-Web maps additionally require a **separate public, read-only** Mapbox token in `apps/web/.env.local` as `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`. Copy the empty key from `apps/web/.env.example`; configure allowed web origins in Mapbox, including the exact loopback origin used for local preview. Only `pk.` tokens are accepted for maps. Never put a secret `sk.` token or the backend credential in this setting. Restart/rebuild Next.js after changing it. The map starts only after Show map; without configuration the directions UI explains map unavailability.
+Web map rendering now uses MapLibre GL JS 6.9.0. Set `NEXT_PUBLIC_MAP_STYLE_PATH` in `apps/web/.env.local` to a reviewed same-origin `/maps/...json` path (see `.env.example`); restart/rebuild Next.js after changing it. The former public Mapbox token is unused and can be removed. Missing/invalid style configuration disables map loading while directions remain usable. There is no default public tile provider. Serve styles, sources, sprites and glyphs within `/maps/`, with no query strings, redirects, credential logging or authenticated endpoints. Browser cookies may accompany same-origin resource requests. Reserve `/maps/__blocked_map_resource__` as a static failure response with no redirects. Self-hosted map assets are not yet supplied by this repository.
 
 Live verification sequence: configure Google/web-auth and routing as above; sign in; choose two places; calculate; select an alternative; open its map; check provider attribution and directions. Test offline/reconnect while keeping the view open: instructions remain, new searches/calculations do not run, and reconnection must not recalculate automatically. No real GPS should be requested in automated QA. Current directions are manually reviewed, not live turn announcements.
 
@@ -131,3 +131,11 @@ on the machine has been searched. Keep Java 25 available for backend builds.
 Use `-RequireReady` to return a nonzero exit code if any checked prerequisite is
 missing. A Ready result verifies files only: accept SDK licenses, configure an
 emulator or USB-debugging device, then build and exercise the native app separately.
+
+
+The web `dev` and `build` commands also run `scripts/prepare-maplibre.mjs` from the
+web package. This copies the installed, pinned worker/shared module and license
+into ignored `public/maplibre/6.9.0/`; include these generated public assets in the
+production artifact. Direct `next dev` calls must run that script first. No CDN or
+network download is used by this step. Dependency upgrades require reviewing the
+script version guard and the renderer worker URL together.

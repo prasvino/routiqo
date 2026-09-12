@@ -7,8 +7,7 @@ Pure domain policy can enforce expiry, Ghost Mode exclusion, and configurable mi
 ## Open-source migration target (ADR 0021)
 
 The user confirmed MapLibre with Routiqo-controlled Valhalla/Photon/Martin.
-Migration is pending; the existing Mapbox behavior documented above remains true
-until replaced. Target search and route inputs stay within controlled services;
+Web rendering now uses MapLibre with explicitly configured same-origin `/maps/` resources. Backend routing/search migration is pending; the Mapbox behavior documented above remains true until replaced. Target search and route inputs stay within controlled services;
 own-host tile/style/font/sprite resources too. Public tile providers can observe
 IP and viewport requests, so are not an automatic private fallback. Hosting
 providers and operational logs remain part of the privacy boundary. Minimize

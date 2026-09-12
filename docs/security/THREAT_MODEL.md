@@ -225,3 +225,20 @@ requires trusted sources, pinned versions, integrity checks and bounded extracti
 updates need atomic activation/rollback and disk headroom. Offline packages must
 not leak account-associated region selections or resurrect deleted route state.
 Synthetic tests do not validate real regional coverage or native offline guidance.
+
+## Web MapLibre asset boundary (ADR 0021)
+
+MapLibre GL JS 6.9.0 loads only after explicit Show map. The configured style must
+be a bounded same-origin `/maps/...json` path. Resource transformation rejects
+external origins, credentials, query/fragment, out-of-namespace URLs, encoded
+separators and nested traversal; inline data and same-origin blobs are allowed.
+Blocked requests resolve to the constant `/maps/__blocked_map_resource__` without
+forwarding the original URL. The deployment must reserve this as a static failure.
+
+This is a trusted static-service boundary, not a sandbox for arbitrary styles.
+Cookies may accompany same-origin resource requests and SDK transports may follow
+redirects. Release verification must establish no redirects or authenticated APIs
+in `/maps/`, no credential/location-linked access logs, reviewed styles and nested
+assets, and actual browser network behavior. Do not claim cookie-free requests or
+redirect containment from transformRequest alone. Browser caches and legacy
+Mapbox caches survive account deletion; disclosure and site-data removal remain.

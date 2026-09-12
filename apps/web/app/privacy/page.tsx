@@ -36,8 +36,8 @@ export default function Page() {
             saved to plans, planning backups or Routiqo’s database.
           </p>
           <p>
-            Choosing “Show map” loads Mapbox and sends requests for the area you view. Mapbox may
-            store map tiles and usage metadata in this browser. These provider caches can remain
+            Choosing “Show map” loads MapLibre and requests map resources from this site for the
+            area you view. Browser map caches, including any left by earlier versions, can remain
             after sign-out or account deletion; clear site data in your browser to remove them.
             Routiqo does not save your calculated route or download an offline map package.
           </p>
@@ -69,8 +69,8 @@ export default function Page() {
       </div>
       <p className="fine-print">
         Routiqo serves local image assets and has no separate analytics integration. Optional map
-        display uses Mapbox’s SDK and usage services. Traveller presence and public location sharing
-        are not available.
+        display uses MapLibre with a configured map service. Traveller presence and public location
+        sharing are not available.
       </p>
       <div className="privacy-section">
         <ShieldCheck size={24} />

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import '@routiqo/design-tokens/css';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import './globals.css';
 import { PlanningProvider } from '../components/planning-provider';
 import { Shell } from '../components/shell';

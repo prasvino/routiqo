@@ -130,7 +130,7 @@ it('clears temporary planning offline and ignores a late location response', asy
   expect(screen.queryByText('Synthetic attribution')).toBeNull();
   expect(screen.queryByText('Selected: My current location')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Cancel request' })).toBeNull();
-  expect(screen.getByText(/Mapbox browser caches may remain/)).toBeTruthy();
+  expect(screen.getByText(/Browser map caches may remain/)).toBeTruthy();
 });
 
 it('keeps an explicit pending location reading alive when connectivity changes', async () => {

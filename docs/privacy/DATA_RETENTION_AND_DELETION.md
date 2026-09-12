@@ -2,7 +2,7 @@
 Current implementation: catalog content plus local plans/saved destination IDs; opt-in Google account identifiers, bounded opaque sessions, server journey lifecycle records and account-bound local outbox/snapshot caches. Users can remove planning data separately from account deletion. Browser account deletion retires its local journey partition to prevent late workers recreating it; sign-out preserves queued work. Other devices retain local caches until their own storage is cleared; do not claim remote erasure of offline device data. No messages, media or public presence are stored yet.
 Temporary Mapbox place results and calculated routes are not persisted or backed up. Optional one-time browser location stays in the route form and is sent to Mapbox only when calculating. Do not enable permanent provider result storage without a separate reviewed decision.
 
-Explicit web map display additionally sends viewport/tile requests through Mapbox GL. The installed SDK persists map tiles in browser CacheStorage and event metadata in localStorage; normal HTTP caches can also retain resources. These shared-origin provider caches can reveal viewed areas and are not retired by Routiqo account deletion. Map display discloses this before loading. Clear browser site data for local removal, preserving any desired planning backup first. Do not claim zero browser persistence or downloaded/offline navigation from this SDK cache.
+Explicit web map display uses MapLibre and the configured same-origin `/maps/` resources. Browser HTTP caches can retain viewed resources; earlier Mapbox versions may have left CacheStorage tiles or localStorage event metadata. Account deletion does not clear browser map caches. Map display discloses this before loading. Clear browser site data for local removal, preserving desired planning backups first. Do not claim zero browser persistence or downloaded/offline navigation from browser caches.
 Browser and native local planning storage must validate shape/version and expose storage failures. No silent cloud upload.
 Before public launch define category-specific retention for raw GPS, presence, messages, reports, media, journals, AI outputs, sessions, backups and providers. No default indefinite precise movement retention.
 Account deletion must revoke sessions promptly and be tested end to end; do not reuse the contradictory Wayfind reactivation specification.
@@ -13,8 +13,7 @@ The native session vault stores one opaque credential and account/expiry metadat
 
 ## Open-source migration target (ADR 0021)
 
-MapLibre and self-hosted services are selected; current Mapbox cache behavior above
-remains applicable until migration. Changing providers does not authorize new
+Web MapLibre migration is implemented; self-hosted services and native rendering remain pending. Legacy Mapbox caches may survive the SDK change. Changing providers does not authorize new
 retention of search text, endpoints, routes or location history. Before enabling
 native downloads, define disk quotas, update/deletion semantics, region metadata
 privacy and account-switch/account-deletion handling. Validate renderer and HTTP
