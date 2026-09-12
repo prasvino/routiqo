@@ -148,3 +148,20 @@ High-risk changes require manual adversarial review and, when justified, indepen
 
 No security or privacy control may be silently weakened to make a test pass, simplify implementation, or meet a deadline.
 
+## Routiqo Live implementation gate
+
+The first LIVE list and structured contribution scope is defined in
+`docs/features/live/ROUTIQO_LIVE_SPEC.md`; architecture is ADR 0022. Before protected
+endpoints or public projections, require authoritative journey admission, consent,
+expiry, distributed budgets, idempotency, report/block/moderation and server-side
+privacy transformation. Never trust client-supplied route membership or infer
+physical presence from authentication. Unknown authority fails closed.
+
+No recipient/member enumeration, raw report exports or client-side filtering of
+private presence. Recheck all delivery paths, retries, caches and future sockets
+for revocation. No permanent collection of live coordinates or independent AI
+assertions. Keep freshness and source semantics honest; expired or offline evidence
+must not be republished as new. The cohort/privacy ADR and retention decisions are
+mandatory gates before exposure/migrations, not permission to choose convenient
+unsafe defaults. Apply existing high-risk review criteria; no new model-routing
+policy is introduced here.

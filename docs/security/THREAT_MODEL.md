@@ -295,3 +295,28 @@ is trusted; syntactically valid hosts are not proof of ownership or DNS safety.
 Review egress, private ports, TLS and log suppression (especially Photon query
 URLs) before enabling services. Deploy the matching browser disclosure version
 with the backend; previous Mapbox deployments must not serve the new disclosure.
+
+## Routiqo Live: first-list threats (planned)
+
+Scope and lifecycle: `docs/features/live/ROUTIQO_LIVE_SPEC.md`; ADR 0022.
+No Live capability is enabled by this planning change. Treat authenticated actors
+as potentially malicious, including colluding accounts and commercial spammers.
+
+| Abuse case | Required design/verification |
+|---|---|
+| Fake journey admission or route/anchor scanning | Server-issued short-lived admission to fixed relevant partitions; generic denials and bounded query budgets; route intent is not physical-presence proof |
+| Correlating moment appearance, conditions or freshness | Fixed publication windows, sparse-evidence suppression, adversarial temporal/overlap tests; removing exact counts alone is insufficient |
+| Block/Ghost/deletion differencing | No individually tailored count subtraction; reviewed suppression and cache invalidation; withheld accepted evidence cannot return after retry/reconnect |
+| Coordinated false signals and commercial manipulation | Per-actor contribution replacement, duplicate suppression, independent corroboration rules, conflict states, moderation and accountable operator review |
+| Stale evidence replay or clock manipulation | Server-time expiry, exact idempotent retries, no offline report dispatch or resurrected expired moment |
+| Revocation races across replicas/cache/HTTP | Authoritative generations and current read/write checks; fail closed; do not rely solely on Pub/Sub |
+| Log/telemetry and source leakage | No raw GPS, private membership, per-user query traces or report payloads in observability; bounded operational outcomes only |
+| Resource exhaustion and scraping | Bounded list/payload/cardinality, distributed read/write/peer budgets, cleanup capacity tests and no arbitrary spatial queries |
+| Unsafe recommendations or driver distraction | Structured condition bands, uncertainty/source labels, no safety assurance from silence, no proactive driving prompts or lane-specific guidance |
+| Future Ask Ahead harassment/targeting | Separate gate for recipient consent, limited nondeterministic selection, repeated-target budgets, blocks and no recipient identifiers |
+
+Unresolved cohort/admission and evidence-retention mechanisms are explicitly listed
+in ADR 0022. They require design and adversarial acceptance before public output;
+a minimum actor threshold alone is not proof of anonymity. Previously delivered
+in-memory rows cannot be remotely erased while a client is offline: local events
+clear them and bounded expiry limits display. Do not claim stronger revocation.

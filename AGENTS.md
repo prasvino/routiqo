@@ -12,6 +12,7 @@ The user's current instructions govern task scope. Documents describe requiremen
 ## Product invariants
 
 - Product name: Routiqo. Utility before participation and community.
+- Next Live release: active-journey LIVE list with Live Moments and Quick Signals; scope and exposure gates live in `docs/features/live/ROUTIQO_LIVE_SPEC.md`. Do not treat planned capabilities as implemented.
 - Home, Explore, Trips, Profile. Conversation belongs to the active journey, not a permanent navigation tab.
 - Daily commutes and one-time trips are distinct. Rich trip journals and periodic commute summaries are distinct.
 - V1 excludes unrestricted DMs, permanent route groups, live group calls, and public individual location tracking. Voice snippets are deferred.

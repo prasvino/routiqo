@@ -143,3 +143,14 @@ If there are no findings, state that directly but still report validation limits
 
 Never claim native-device, backend, provider, security, performance, or integration verification that was not actually performed.
 
+
+## Live feature review reference
+
+For planned Live changes, review against ROUTIQO_LIVE_SPEC.md, ADR 0022, the Live
+threat register and testing matrix. Explicitly distinguish route relevance from
+verified physical presence and artifact integrity from service readiness. Check
+that expiry, consent/block revocation, retry identity and no offline report replay
+hold across persistence and projections. Confirm that no exact counts, raw member
+lists or private evidence reach the client. Numerical privacy candidates are not
+approved release defaults. Report unresolved cohort/retention gates rather than
+silently implementing around them. Existing review/model-routing rules still apply.

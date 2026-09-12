@@ -268,7 +268,7 @@ follow the privacy model described later.
 
 ## 7. Living Route Map
 
-The active journey should transition to a map-first interface.
+The active journey combines route context with a glanceable LIVE list. Map-first navigation remains a longer-term goal; the first Live release is list-first.
 
 The user should immediately understand:
 
@@ -285,7 +285,7 @@ The user should immediately understand:
 -   Route geometry.
 -   Highway/road/town context.
 -   Remaining distance/time where available.
--   Traveller density/clusters.
+-   Privacy-reviewed collective situation markers (later map projection of the LIVE list).
 -   Route incidents/updates.
 -   Useful places.
 -   Route conversation activity.
@@ -298,28 +298,24 @@ Example:
 
 Do not make the map decorative. It must provide real geographic context.
 
-### Traveller presence
+### Routiqo Live and collective situations
 
-Prefer aggregate displays:
+The first Live release is an active-journey **LIVE list with Live Moments and
+Quick Signals**, defined in `docs/features/live/ROUTIQO_LIVE_SPEC.md`.
+Keep the existing four navigation tabs. The list precedes map overlays; both will
+use the same authorized situation projection. A map is not a prerequisite to
+reading useful situation information.
 
-> **428 travellers on this route**
-
-or:
-
-> **23 travellers around this route segment**
-
-instead of exposing individual moving strangers.
-
-When zoomed out:
-
-> **1.2K travellers**
-
-When zooming in, progressively reveal smaller clusters, while still
-respecting minimum anonymity thresholds and privacy rules.
+Show situations, reported conditions and coarse freshness, not stranger dots,
+member lists or exact crowd counts. Earlier illustrative counts and progressively
+smaller clusters are not release requirements. Sparse evidence must be suppressed;
+empty does not mean safe or uncongested. The presence specification governs
+privacy gates. Do not invent activity to fill the interface.
 
 ------------------------------------------------------------------------
-
 ## 8. Route Updates
+
+First release: Quick Signals are the structured contribution form of Route Updates. Live Moments derive situations from that evidence; see ROUTIQO_LIVE_SPEC.md for the narrower initial categories and release gates. The broader categories below are later scope.
 
 Route Updates are useful, structured information associated with a
 route/location/time.
@@ -365,6 +361,8 @@ Structured updates are different from Route Chat.
 ------------------------------------------------------------------------
 
 ## 9. Temporary Route Rooms
+
+Later scope after the first LIVE list. This section is a product plan, not an implemented conversation service. Example counts below are illustrative only and cannot override the no-count first release or presence privacy gates.
 
 Users travelling along sufficiently overlapping routes during a relevant
 time window can participate in temporary route rooms.
@@ -1779,60 +1777,28 @@ Implement:
 -   Route/town/road context.
 -   Basic place markers.
 
-### Phase 5 --- Privacy-safe location and presence
+### Phases 5–7 --- Routiqo Live first release
 
-Implement:
+Follow L0–L2 in `docs/features/live/ROUTIQO_LIVE_SPEC.md` and the current
+`docs/development/BUILD_PLAN.md`. First define pure lifecycle and privacy policies;
+then implement authoritative admission/consent, structured evidence, expiry,
+idempotency, distributed abuse controls and moderation. Expose an authenticated
+active-journey LIVE list with Live Moments and Quick Signals only after the privacy
+and release tests pass. Quick Signals implement structured Route Updates; do not
+create a parallel report system. Keep the existing journey/offline foundations.
 
--   Location permission handling.
--   Sampling.
--   Backend ingestion.
--   Route matching.
--   Privacy transformation.
--   Redis presence.
--   Aggregated traveller count.
--   Ghost Mode.
--   Expiry.
--   Privacy tests.
+Start with bounded HTTP refresh. Public traveller counts and WebSocket fanout are
+not prerequisites or first-release features. Real OAuth and reviewed regional
+journey context are pilot gates. Full native offline navigation remains parallel
+work, not a prerequisite for the first useful LIVE list.
 
-This phase must be completed carefully before exposing social presence.
+### Phase 8 --- Later Live capabilities
 
-### Phase 6 --- Realtime
-
-Implement:
-
--   WebSocket gateway.
--   Authenticated connections.
--   Journey/route subscriptions.
--   Presence counts.
--   Live route events.
--   Reconnect/recovery.
-
-### Phase 7 --- Route Updates
-
-Implement:
-
--   Structured contribution.
--   Categories.
--   Map rendering.
--   Freshness/expiry.
--   Confirmation/corroboration.
--   Reporting.
-
-### Phase 8 --- Route Rooms
-
-Implement:
-
--   Ephemeral room lifecycle.
--   Membership/subscriptions.
--   Text.
--   Reactions.
--   Rate limiting.
--   Block/report.
--   Moderation pipeline.
--   Safety telemetry.
-
-Do not add DMs/live calls.
-
+After validating the first list: map projection, Ask Ahead, temporary Route Rooms,
+Routiqo Pulse and Travel Waves, in the gated order of the Live specification.
+Rooms remain planned, not existing operational chat. Ask Ahead needs its own
+anti-targeting/recipient-consent design; Pulse needs provenance and confidence.
+No unrestricted DMs, permanent social groups or live calls are introduced.
 ### Phase 9 --- Places
 
 Implement:

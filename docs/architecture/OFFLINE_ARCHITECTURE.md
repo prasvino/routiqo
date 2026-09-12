@@ -1,4 +1,12 @@
 # Offline architecture
+
+Planned Live data is separate from durable journey commands. Per ROUTIQO_LIVE_SPEC.md,
+keep Live rows in memory, mark them stale offline and remove them at expiry. Disable
+offline Quick Signal submission; do not queue stale reports in the journey outbox.
+Reconnect refreshes under current authorization and does not replay contributions.
+An uncertain write may be retried explicitly with the exact idempotency identity
+within its validity window. Account/journey changes clear Live state. Maps, saved
+plans and start/finish durability continue to follow their existing policies.
 Current: validated versioned local planning persistence, browser localStorage and native SQLite. Storage errors are visible; corrupted payloads do not silently become trusted state.
 
 Authenticated journey commands use account-partitioned durable queues and snapshots

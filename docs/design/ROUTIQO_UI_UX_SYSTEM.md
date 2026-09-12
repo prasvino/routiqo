@@ -955,3 +955,16 @@ Do not ask Codex merely to "make it beautiful." Give it these
 constraints, make it run the real product, inspect what it built,
 measure performance, and iterate until both the visual and interaction
 quality meet Routiqo standards.
+
+## Routiqo Live first-release composition (planned)
+
+Canonical scope: `docs/features/live/ROUTIQO_LIVE_SPEC.md`. Place a glanceable LIVE
+list inside the active journey; preserve the four primary tabs. Prioritize situation,
+reported condition, coarse freshness and uncertainty, followed by optional structured
+contribution. Use text/icon labels as well as color. No avatar-heavy feed, count
+badges, endless scroll, fake activity or new map query surface. Show loading,
+insufficient evidence, stale/offline, expiry and submission uncertainty distinctly.
+Do not announce freshness every second or send prompts merely to drive engagement.
+No proactive driving prompts; one-tap input is not automatically safe for drivers.
+List/map later share the same projection and selection semantics. Apply existing
+keyboard, touch target, large-text, reduced-motion and screen-reader standards.

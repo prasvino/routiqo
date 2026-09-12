@@ -2,6 +2,16 @@
 
 Status: design for the next phase; no presence ingestion, storage or public output enabled.
 
+Routiqo Live integration: `docs/features/live/ROUTIQO_LIVE_SPEC.md` composes this
+boundary into the first journey LIVE list. Same Situation is internal eligibility,
+not a public member directory. No public presence/report counts in the first
+release. Existing numerical threshold candidates below are not release approval.
+Moment existence, condition, freshness and disappearance also require suppression
+and anti-correlation tests. Admission to a validated route is relevance, not proof
+of physical location. Reading never silently enables publication. Ghost withdrawal
+invalidates accepted evidence for future projection as well as new heartbeats.
+The cohort ADR must resolve block-safe aggregation before any public projection.
+
 Internal `PresenceConsent` now defines opt-in defaults, monotonic generation changes, terminal journey completion and owner/journey-bound leases of at most90seconds. Its tests cover stale heartbeats after Ghost Mode/re-enable, expiry boundaries and generation overflow. This is a pure transition policy: callers still need authoritative membership checks, atomic durable compare-and-set, rate limits and revocation propagation. Never use it as process-local consent storage or as proof that public presence is safe.
 
 Presence must be opt-in for an owned active journey. A client-supplied route or segment identifier is not proof of membership. Before ingestion, implement server-issued route membership based on verified routing context; arbitrary coordinate or segment queries remain denied. No precise stranger points, participant lists, exact endpoints, stable public actor IDs or movement history may appear in any output.

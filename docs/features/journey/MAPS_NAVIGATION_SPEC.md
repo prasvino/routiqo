@@ -1,5 +1,13 @@
 # Maps, directions and connection loss
 
+Routiqo Live planning update: the first active-journey experience adds a LIVE list
+before collective map overlays. See `docs/features/live/ROUTIQO_LIVE_SPEC.md` and
+ADR 0022. Later moment markers use the same authorized projection and coarse
+anchors; no stranger dots, finer zoom-derived member queries or public counts.
+Keep route geometry/provider work separate from social evidence and maintain
+freshness/offline distinctions. Full on-device navigation and downloaded maps
+remain planned work but do not block the first useful LIVE list.
+
 ## Confirmed target and migration acceptance
 
 ADR 0021 supersedes the Mapbox provider preference. Target: MapLibre GL JS on web,

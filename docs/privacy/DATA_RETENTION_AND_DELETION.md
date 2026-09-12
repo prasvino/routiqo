@@ -1,6 +1,6 @@
 # Data retention and deletion
 Current implementation: catalog content plus local plans/saved destination IDs; opt-in Google account identifiers, bounded opaque sessions, server journey lifecycle records and account-bound local outbox/snapshot caches. Users can remove planning data separately from account deletion. Browser account deletion retires its local journey partition to prevent late workers recreating it; sign-out preserves queued work. Other devices retain local caches until their own storage is cleared; do not claim remote erasure of offline device data. No messages, media or public presence are stored yet.
-Temporary Mapbox place results and calculated routes are not persisted or backed up. Optional one-time browser location stays in the route form and is sent to Mapbox only when calculating. Do not enable permanent provider result storage without a separate reviewed decision.
+Temporary Photon place results and calculated routes are not persisted or backed up. Optional one-time browser location stays in the route form and is sent to Valhalla only when calculating. Do not enable permanent provider result storage without a separate reviewed decision.
 
 Explicit web map display uses MapLibre and the configured same-origin `/maps/` resources. Browser HTTP caches can retain viewed resources; earlier Mapbox versions may have left CacheStorage tiles or localStorage event metadata. Account deletion does not clear browser map caches. Map display discloses this before loading. Clear browser site data for local removal, preserving desired planning backups first. Do not claim zero browser persistence or downloaded/offline navigation from browser caches.
 Browser and native local planning storage must validate shape/version and expose storage failures. No silent cloud upload.
@@ -19,3 +19,17 @@ native downloads, define disk quotas, update/deletion semantics, region metadata
 privacy and account-switch/account-deletion handling. Validate renderer and HTTP
 cache behavior; local route clearing must not claim to erase resources it cannot
 remove. Keep public basemap content separate from account-specific route records.
+
+## Planned Live evidence lifecycle
+
+No Live evidence is currently stored. Proposed signal/receipt/client lifetimes and
+unresolved moderation holds are owned by ROUTIQO_LIVE_SPEC.md. Finalize the storage
+ADR before migrations; do not silently adopt proposed values as production policy.
+Expiry, Ghost withdrawal, block changes and deletion must invalidate derived
+projections/caches, not only the original row. Do not retain raw location history
+or put Live evidence into journals, backups, analytics or journey outboxes.
+
+Memory-only rows expire locally; remote changes cannot erase previously delivered
+information from disconnected clients immediately. Clear on local account/Ghost/
+journey-end transitions and reauthorize on reconnect. Document physical deletion,
+backup retention and lawful moderation exceptions explicitly before release.
