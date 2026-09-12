@@ -34,6 +34,10 @@ state and that new map tiles and rerouting need a connection. Reconnection updat
 the banner without silently recalculating or changing the selected alternative.
 Network failure during an explicit recalculation preserves the previous route and
 labels it as the last successful result. Changing endpoints/mode clears that result.
+Connection loss aborts pending network work and releases its busy state immediately;
+late responses cannot replace retained directions or interfere with an explicit retry.
+Reconnection never retries automatically. A pending explicit local location reading
+is independent of network connectivity and is not cancelled by an offline event.
 No automatic upload, service worker, tile scraper, GPS watch or route persistence.
 
 Mapbox GL itself uses browser CacheStorage for map tiles and localStorage for SDK

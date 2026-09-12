@@ -26,8 +26,19 @@ function Planner({ account }: { account: string }) {
   const [offline, setOffline] = useState(false);
   const [resultRevision, setResultRevision] = useState(0);
   const pending = useRef<AbortController | null>(null);
+  const pendingLocalOnly = useRef(false);
   useEffect(() => {
-    const changed = () => setOffline(!navigator.onLine);
+    const changed = () => {
+      const disconnected = !navigator.onLine;
+      setOffline(disconnected);
+      if (disconnected && pending.current && !pendingLocalOnly.current) {
+        pending.current.abort();
+        pending.current = null;
+        setBusy(false);
+        setMessage('');
+        setError('Connection lost. Connect and try again when you’re ready.');
+      }
+    };
     changed();
     window.addEventListener('online', changed);
     window.addEventListener('offline', changed);
@@ -57,6 +68,7 @@ function Planner({ account }: { account: string }) {
     }
     const controller = new AbortController();
     pending.current = controller;
+    pendingLocalOnly.current = localOnly;
     setBusy(true);
     setError('');
     setMessage(status);

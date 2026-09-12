@@ -36,6 +36,67 @@ function open(accountId = account) {
   screen.getByText('Plan a route').closest('details')!.open = true;
   return view;
 }
+it('cancels an in-flight search offline and isolates a retry from its late response', async () => {
+  const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  let finishOld!: (value: ReturnType<typeof place>) => void;
+  let finishNew!: (value: ReturnType<typeof place>) => void;
+  vi.mocked(searchBrowserPlaces)
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishNew = resolve;
+        }),
+    );
+  open();
+  fireEvent.change(screen.getByLabelText('From'), { target: { value: 'Starting' } });
+  const find = screen.getByRole('button', { name: 'Find starting place' }) as HTMLButtonElement;
+  fireEvent.click(find);
+  const oldSignal = vi.mocked(searchBrowserPlaces).mock.calls[0]![2]!;
+  online.mockReturnValue(false);
+  act(() => window.dispatchEvent(new Event('offline')));
+  expect(oldSignal.aborted).toBe(true);
+  expect(
+    (screen.getByRole('button', { name: 'Use my current location' }) as HTMLButtonElement).disabled,
+  ).toBe(false);
+  online.mockReturnValue(true);
+  act(() => window.dispatchEvent(new Event('online')));
+  expect(searchBrowserPlaces).toHaveBeenCalledOnce();
+  expect(find.disabled).toBe(false);
+  fireEvent.click(find);
+  await act(async () => finishOld(place('Stale response', 80)));
+  expect(screen.queryByRole('button', { name: 'Stale response' })).toBeNull();
+  expect(find.disabled).toBe(true);
+  await act(async () => finishNew(place('Fresh response', 79)));
+  expect(screen.getByRole('button', { name: 'Fresh response' })).toBeTruthy();
+  expect(find.disabled).toBe(false);
+});
+
+it('keeps an explicit pending location reading alive when connectivity changes', async () => {
+  const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  let finish!: (value: Awaited<ReturnType<typeof readBrowserLocation>>) => void;
+  vi.mocked(readBrowserLocation).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  open();
+  fireEvent.click(screen.getByRole('button', { name: 'Use my current location' }));
+  const signal = vi.mocked(readBrowserLocation).mock.calls[0]![0]!;
+  online.mockReturnValue(false);
+  act(() => window.dispatchEvent(new Event('offline')));
+  expect(signal.aborted).toBe(false);
+  await act(async () => finish({ coordinate: [80, 13], accuracyMetres: 20 }));
+  expect(screen.getByText('Selected: My current location')).toBeTruthy();
+  expect(searchBrowserPlaces).not.toHaveBeenCalled();
+  expect(calculateBrowserRoute).not.toHaveBeenCalled();
+});
 it('requires explicit selection and discards estimates after endpoints change', async () => {
   vi.mocked(searchBrowserPlaces)
     .mockResolvedValueOnce(place('Starting town', 80))
@@ -177,6 +238,15 @@ it('retains loaded directions through connection loss and failed recalculation b
   fireEvent.click(await screen.findByRole('button', { name: 'End' }));
   fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
   await screen.findByText('1.2 km');
+  let finishRecalculation!: (value: Awaited<ReturnType<typeof calculateBrowserRoute>>) => void;
+  vi.mocked(calculateBrowserRoute).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishRecalculation = resolve;
+      }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
+  const interruptedSignal = vi.mocked(calculateBrowserRoute).mock.calls[1]![2]!;
   online.mockReturnValue(false);
   act(() => window.dispatchEvent(new Event('offline')));
   expect(screen.getByText(/You’re offline. Loaded directions/)).toBeTruthy();
@@ -184,11 +254,20 @@ it('retains loaded directions through connection loss and failed recalculation b
     (screen.getByRole('button', { name: 'Calculate route' }) as HTMLButtonElement).disabled,
   ).toBe(true);
   expect(screen.getAllByText(/Continue west/).length).toBeGreaterThan(0);
+  expect(interruptedSignal.aborted).toBe(true);
+  await act(async () =>
+    finishRecalculation({
+      provider: 'mapbox',
+      calculatedAt: '2026-09-12T04:01:00Z',
+      routes: [],
+    }),
+  );
+  expect(screen.getByText('1.2 km')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
-  expect(calculateBrowserRoute).toHaveBeenCalledOnce();
+  expect(calculateBrowserRoute).toHaveBeenCalledTimes(2);
   online.mockReturnValue(true);
   act(() => window.dispatchEvent(new Event('online')));
-  expect(calculateBrowserRoute).toHaveBeenCalledOnce();
+  expect(calculateBrowserRoute).toHaveBeenCalledTimes(2);
   vi.mocked(calculateBrowserRoute).mockRejectedValueOnce(new BrowserRoutingError(503));
   fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
   await screen.findByText('Route planning is unavailable. Try again later.');
