@@ -28,7 +28,7 @@ reroutes when offline engine/data are unavailable. See OFFLINE_ARCHITECTURE.md.
 
 ## Current web route review
 
-The web renderer now uses MapLibre; backend routing and place adapters still use Mapbox. Historical Mapbox cache disclosures below remain relevant to retained browser data.
+The web renderer uses MapLibre; the opt-in backend configuration now selects guarded Valhalla and Photon with mandatory operator settings (ROUTING_RUNTIME_SPEC.md). Regional services and data remain pending. Historical Mapbox cache disclosures below remain relevant to retained browser data.
 
 The authenticated web route planner uses MapLibre maps, explicit alternative
 selection and a provider-supplied directions list with manual Previous/Next review.

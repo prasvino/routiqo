@@ -1,8 +1,8 @@
 # Private route endpoint lookup
 
-Purpose: let travellers resolve a typed city, street or address into a selectable endpoint before deliberately calculating a route. Curated discovery descriptions are not authoritative coordinates. Target lookup uses self-hosted Photon per ADR 0021; current Mapbox Geocoding v6 code awaits migration. POI expansion remains separate from this endpoint-search slice.
+Purpose: let travellers resolve a typed city, street or address into a selectable endpoint before deliberately calculating a route. Curated discovery descriptions are not authoritative coordinates. The opt-in runtime uses self-hosted Photon per ADR 0021 and ROUTING_RUNTIME_SPEC.md; live regional services remain pending. POI expansion remains separate from this endpoint-search slice.
 
-Search only on an explicit submit, never on every keystroke or page load. After migration, explain that search text goes to Routiqo-controlled search infrastructure; current UI must retain its truthful Mapbox disclosure until replaced. No location permission or IP-based proximity is needed. Keep results in the current interaction only; do not store them in drafts, backups, server tables, logs or analytics. Results remain temporary by product privacy policy even when self-hosted; no new retention is authorized by changing providers. Photon supports autocomplete, but explicit submit remains the accepted interaction until a separate bounded/debounced UX decision.
+Search only on an explicit submit, never on every keystroke or page load. Explain before submission that search text goes to Routiqo’s Photon search service. Deploy the matching backend and browser together. No location permission or IP-based proximity is needed. Keep results in the current interaction only; do not store them in drafts, backups, server tables, logs or analytics. Results remain temporary by product privacy policy even when self-hosted; no new retention is authorized by changing providers. Photon supports autocomplete, but explicit submit remains the accepted interaction until a separate bounded/debounced UX decision.
 
 Input: trimmed text, 3–256 characters, at most20 letter/number groups, no semicolon or control characters. Use an explicitly configured fixed service origin, never a request-supplied URL. Encode all user text and request at most5 results. No public Photon/Nominatim demo fallback; no third-party proximity lookup. Review deployed TLS/service-network boundaries and refuse redirects. Validate FeatureCollection/Point geometry, finite coordinates, bounded nonempty provider ID and display label, unique IDs, and preserve attribution. Reject malformed/oversized responses; an empty result set differs from an unavailable provider. Responses are bounded at256 KiB. No tokens or original provider errors reach the browser.
 
@@ -16,9 +16,9 @@ Optional current-location origin: request a single browser position only after t
 
 ## Photon adapter implementation acceptance
 
-The first backend slice is a tested adapter, not a live configuration switch.
-RoutingConfiguration remains on Mapbox until paired configuration and truthful UI
-provider disclosure are integrated. Photon consumes an explicitly constructed
+The tested adapter is now selected by the opt-in paired routing configuration,
+with matching browser disclosures. Regional services remain unprovisioned.
+Photon consumes an explicitly constructed
 fixed HTTP(S) origin (host required; no userinfo, query, fragment or non-root path;
 bounded length and valid port). This operator-controlled destination is a trust
 boundary; deployment must restrict egress and protect DNS/service routing. Never

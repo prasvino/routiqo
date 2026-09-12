@@ -82,11 +82,11 @@ GET /api/v1/auth/csrf sets its HttpOnly cookie and returns a masked token. Send 
 
 Rate limits use the socket peer, not forwarded headers. A reverse proxy therefore shares a peer bucket until trusted forwarding is explicitly configured. Cleanup runs in bounded batches; measure backlog/capacity before launch. Sessions expire after 15 minutes; bounded refresh rotation supports a maximum 12-hour lineage.
 
-## Existing Mapbox routing setup (legacy, migration pending)
+## Open-source routing setup (opt-in)
 
-The user confirmed the open-source target in ADR 0021. The configuration below is retained only to explain existing code; do not obtain Mapbox credentials as a prerequisite for the new implementation. Target setup follows this legacy section.
+The routing profile now uses paired Valhalla and Photon services per ADR 0021. Backend and web disclosure changes must be deployed together; legacy Mapbox adapter source is no longer selected.
 
-Add `routing` to `persistence,google-auth,web-auth` and supply `ROUTIQO_MAPBOX_TOKEN` only to the backend process through external secret configuration. Missing token fails startup when this profile is active. Never use a `NEXT_PUBLIC_` variable for this token. The web proxy uses the same backend configuration as authentication.
+Add `routing` to `persistence,google-auth,web-auth`. Supply backend process settings `ROUTIQO_VALHALLA_ORIGIN`, `ROUTIQO_PHOTON_ORIGIN` and `ROUTIQO_ROUTING_REGION_WEST`, `ROUTIQO_ROUTING_REGION_SOUTH`, `ROUTIQO_ROUTING_REGION_EAST`, `ROUTIQO_ROUTING_REGION_NORTH`. Every setting is required; missing/invalid settings fail startup with redacted errors. Origins must be fixed HTTP(S) origins without credentials, query, fragment or a path beyond `/`. Bounds are longitude/latitude degrees derived conservatively from the deployed graph; never copy invented bounds from a sample. See ROUTING_RUNTIME_SPEC.md. No Mapbox token is used. Root `.env.example` documents names but Spring does not automatically load that file. The web proxy uses the same backend configuration as authentication.
 
 Web map rendering now uses MapLibre GL JS 6.9.0. Set `NEXT_PUBLIC_MAP_STYLE_PATH` in `apps/web/.env.local` to a reviewed same-origin `/maps/...json` path (see `.env.example`); restart/rebuild Next.js after changing it. The former public Mapbox token is unused and can be removed. Missing/invalid style configuration disables map loading while directions remain usable. There is no default public tile provider. Serve styles, sources, sprites and glyphs within `/maps/`, with no query strings, redirects, credential logging or authenticated endpoints. Browser cookies may accompany same-origin resource requests. Reserve `/maps/__blocked_map_resource__` as a static failure response with no redirects. Self-hosted map assets are not yet supplied by this repository.
 
@@ -94,10 +94,10 @@ Live verification sequence: configure Google/web-auth and routing as above; sign
 
 The former Mapbox native navigation plan is superseded by ADR 0021. Future downloaded maps/navigation use the open-source target and still require Android Studio/SDK, a compatible development build, bounded region downloads, storage eviction/deletion, an on-device routing engine and real-device tests. The web app does not download tiles or persist temporary geocoding results. In-memory directions do not survive reload.
 
-The endpoint is POST `/api/v1/routes`, with mode `driving`, `walking` or `cycling`, and two longitude/latitude coordinate arrays named `origin` and `destination`. It requires the browser session, CSRF, exact origin and matching account header. It returns private Mapbox estimates without creating journeys or presence. POST `/api/v1/routes/places` accepts a `query` for temporary city/street/address lookup using the same token and guards. Trips includes authenticated place selection, route alternatives, optional web map display and manual provider directions, with an optional one-time current-location origin. Live provider verification, GPS-following navigation and downloaded offline maps remain pending. No real Mapbox request has been tested; automated tests use synthetic transport responses.
+The endpoint is POST `/api/v1/routes`, with mode `driving`, `walking` or `cycling`, and two longitude/latitude coordinate arrays named `origin` and `destination`. It requires the browser session, CSRF, exact origin and matching account header. It returns private Valhalla estimates without creating journeys or presence. POST `/api/v1/routes/places` accepts a `query` for temporary city/street/address lookup using Photon and the same authentication guards. Trips includes authenticated place selection, route alternatives, optional web map display and manual provider directions, with an optional one-time current-location origin. Live provider verification, GPS-following navigation and downloaded offline maps remain pending. No real regional provider request has been tested; automated tests use synthetic transport responses.
 ## Open-source maps target setup
 
-Use MapLibre for web/native rendering and opt-in, Routiqo-controlled Valhalla, Photon and Martin services with a bounded regional dataset. Service containers/configuration are not yet implemented; no runnable profile names or environment variables are prescribed here until code exists. Keep service ports private or loopback-only, configure fixed destinations, and never silently fall back to public routing/geocoding demos. Own-host style/sprite/glyph resources as well as tiles. Start with a regional data and Android compatibility spike, including import/update disk headroom. Use the Android prerequisite checker below; native mapping still needs a development build and device QA. Hosting, datasets, downloads and on-device rerouting require separate verification. See ADR 0021 and MAPS_NAVIGATION_SPEC.md for acceptance.
+Use MapLibre for web/native rendering and opt-in, Routiqo-controlled Valhalla, Photon and Martin services with a bounded regional dataset. Application configuration is implemented as described above; service containers and regional data are not yet provisioned. Startup validates settings without downloading data or contacting services. Disable/redact Photon query URL access logs and Valhalla request-body logging at every service/proxy. Keep service ports private or loopback-only, configure fixed destinations, and never silently fall back to public routing/geocoding demos. Own-host style/sprite/glyph resources as well as tiles. Start with a regional data and Android compatibility spike, including import/update disk headroom. Use the Android prerequisite checker below; native mapping still needs a development build and device QA. Hosting, datasets, downloads and on-device rerouting require separate verification. See ADR 0021 and MAPS_NAVIGATION_SPEC.md for acceptance.
 
 ## Native authentication API
 
@@ -140,13 +140,4 @@ production artifact. Direct `next dev` calls must run that script first. No CDN 
 network download is used by this step. Dependency upgrades require reviewing the
 script version guard and the renderer worker URL together.
 
-Photon adapter status: the backend has an independently tested place adapter but
-no Photon profile/environment switch yet. The current `routing` profile still
-constructs Mapbox adapters. Do not infer that a Photon service is running or route
-real search traffic to a public demo. A controlled regional service and coordinated
-configuration/disclosure changes are the next integration step.
-
-Valhalla adapter work follows the same staged rollout: tested route normalization
-and bounded POST come before a runtime configuration switch. Regional graph import,
-coverage enforcement and service URLs are not yet enabled. A Docker routing engine
-also does not provide phone-offline routing without an on-device engine and graph.
+Provider runtime status: the opt-in routing profile selects Photon and guarded Valhalla together. Services, graph/index imports, attribution, query quality and egress/logging checks remain operational gates. A server routing engine does not provide phone-offline routing without an on-device engine and graph.

@@ -20,9 +20,10 @@ clip, invent or persist geometry. Return immutable results without modifying the
 delegate's records. Failure messages and string representations contain no
 coordinates. Missing region/provider configuration fails closed.
 
-The guard remains unmounted in runtime configuration. The dedicated HTTP/client
-outcome is implemented and tested through authenticated synthetic routes. Before
-activation, add fixed runtime configuration and provider disclosures. Actual region
+The opt-in runtime configuration always wraps Valhalla in this guard and requires
+reviewed bounds alongside both provider origins; see ROUTING_RUNTIME_SPEC.md.
+The dedicated HTTP/client outcome is tested through authenticated synthetic routes.
+Actual region
 boundaries, cross-border routes, dataset versions and known-route quality remain
 deployment verification gates.
 
@@ -46,4 +47,4 @@ clear authentication, silently retry, clip a route or fabricate a new result.
 Changing places continues to invalidate the old route; account-switch/cancellation
 and offline behavior remain unchanged. Error bodies are cancelled without parsing
 or displaying upstream details. OpenAPI0.11.0 documents the bodyless422 response.
-The provider guard/runtime selection remain unmounted until deployment setup.
+Runtime wiring is implemented; actual services and reviewed dataset setup remain pending.

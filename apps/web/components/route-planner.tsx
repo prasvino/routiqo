@@ -178,8 +178,9 @@ function Planner({ account }: { account: string }) {
         </p>
       )}
       <p>
-        Search text and selected endpoints are sent to Mapbox. Results stay in this view and aren’t
-        saved to your plans.
+        Search text is processed by Routiqo’s Photon search service. Selected endpoints are
+        processed by Routiqo’s Valhalla routing service. Results stay in this view and aren’t saved
+        to your plans.
       </p>
       <button
         type="button"
@@ -238,7 +239,8 @@ function Planner({ account }: { account: string }) {
                   Use my current location
                 </button>
                 <p className="route-attribution">
-                  One reading for your starting point. Sent to Mapbox only when you calculate.
+                  One reading for your starting point. Sent to Routiqo’s Valhalla routing service
+                  only when you calculate.
                 </p>
               </>
             )}

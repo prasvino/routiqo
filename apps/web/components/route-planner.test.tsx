@@ -20,7 +20,7 @@ vi.mock('../lib/browser-routing', async (original) => ({
 }));
 const account = '00000000-0000-4000-8000-000000000001';
 const place = (label: string, longitude: number) => ({
-  provider: 'mapbox' as const,
+  provider: 'photon' as const,
   attribution: 'Synthetic attribution',
   places: [{ id: label, label, coordinate: [longitude, 13] as [number, number] }],
 });
@@ -36,6 +36,15 @@ function open(accountId = account) {
   screen.getByText('Plan a route').closest('details')!.open = true;
   return view;
 }
+it('discloses the paired services without starting search, routing or location on open', () => {
+  open();
+  expect(screen.getByText(/Search text is processed by Routiqo’s Photon/).textContent).toContain(
+    'Valhalla routing service',
+  );
+  expect(searchBrowserPlaces).not.toHaveBeenCalled();
+  expect(calculateBrowserRoute).not.toHaveBeenCalled();
+  expect(readBrowserLocation).not.toHaveBeenCalled();
+});
 it('cancels an in-flight search offline and isolates a retry from its late response', async () => {
   const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
   let finishOld!: (value: ReturnType<typeof place>) => void;

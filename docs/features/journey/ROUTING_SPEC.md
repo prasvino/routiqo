@@ -2,8 +2,8 @@
 
 Purpose: let a traveller deliberately request a route between selected places, independently of social presence. Route requests must never publish presence or start a journey. Precise coordinates belong only to the requesting traveller and the configured routing provider; do not place them in logs, analytics, public presence or backups by default.
 
-Target provider: self-hosted Valhalla, as confirmed in ADR 0021. Current code still
-uses Mapbox Directions v5; migration is pending. Support driving, walking and
+Configured provider: self-hosted Valhalla, as confirmed in ADR 0021. The opt-in
+runtime wiring follows ROUTING_RUNTIME_SPEC.md; live services remain pending. Support driving, walking and
 cycling by explicit adapter mapping to Valhalla costing modes. Decode and validate
 provider geometry, convert distance to metres and duration to seconds, and normalize
 maneuvers into the existing bounded domain model. Do not assume provider wire
@@ -24,7 +24,7 @@ identifiers in controllers, OpenAPI/generated types and client validators togeth
 provider identity must be a validated supported value, not arbitrary input. Native
 guidance and on-device rerouting remain separate from the server routing service.
 
-Existing Mapbox transport acceptance (retain these bounds during migration): POST `/api/v1/routes` requires a verified session and matching account header, exact origin and CSRF. Requests are bounded to 20 KiB; provider and browser response bodies to 1 MiB. Account quota is 20 calculations per minute using the shared database rate gate. Provider redirects are refused and its request timeout is 10 seconds. Invalid inputs are rejected before calling Mapbox. Browser cancellation prevents posting after an abandoned CSRF setup and aborts active fetches. Empty routes mean no route found; authentication, throttling and service failures remain errors. Synthetic HTTP/provider tests cover these boundaries; real provider verification remains pending; the planner UI is mounted, with live authenticated validation still required.
+Transport acceptance: POST `/api/v1/routes` requires a verified session and matching account header, exact origin and CSRF. Requests are bounded to 20 KiB; provider and browser response bodies to 1 MiB. Account quota is 20 calculations per minute using the shared database rate gate. Provider redirects are refused and its request timeout is 10 seconds. Invalid inputs are rejected before calling the provider. Browser cancellation prevents posting after an abandoned CSRF setup and aborts active fetches. Empty routes mean no route found; authentication, throttling and service failures remain errors. Synthetic HTTP/provider tests cover these boundaries; real provider verification remains pending; the planner UI is mounted, with live authenticated validation still required.
 
 Provider-identity migration acceptance: route results permit only mapbox/valhalla;
 place results permit only mapbox/photon. Each configured Java adapter declares its
@@ -36,9 +36,9 @@ map renderer/provider disclosure remains separate until rendering is migrated.
 
 ## Valhalla adapter acceptance
 
-The initial Valhalla slice is unmounted. No browser/provider configuration changes
-or real requests are enabled until regional coverage and paired service rollout
-are reviewed. Constructor accepts a fixed operator-owned HTTP(S) origin only:
+Valhalla is selected by the opt-in paired configuration, wrapped in the coverage
+guard. Real regional services and dataset rollout remain unverified.
+Constructor accepts a fixed operator-owned HTTP(S) origin only:
 host required, bounded length, no credentials/query/fragment/non-root path, valid
 port. POST `/route` with bounded JSON; never place traveller coordinates in a URL.
 The application owns costing (auto/pedestrian/bicycle), two break locations,
@@ -64,4 +64,4 @@ the whole-operation10-second deadline with cancellation on timeout/interruption.
 No response wrapper may print its private body. Synthetic tests cover mode mapping,
 units, alternatives, decoder/maneuver bounds, failure redaction and actual loopback
 POST transport. Reference: [Valhalla route API](https://valhalla.github.io/valhalla/api/route/api-reference/).
-The next independent prerequisite is documented in ROUTING_COVERAGE_SPEC.md: an unmounted provider decorator enforces a conservative configured region both before requests and on normalized route geometry/maneuvers. Runtime activation and an explicit browser coverage outcome remain separate.
+ROUTING_COVERAGE_SPEC.md defines the mandatory runtime decorator that enforces a conservative configured region before requests and on normalized route geometry/maneuvers. HTTP/browser coverage handling is implemented; service and dataset validation remain deployment gates.

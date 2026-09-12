@@ -245,7 +245,7 @@ Mapbox caches survive account deletion; disclosure and site-data removal remain.
 
 ## Photon adapter boundary (ADR 0021)
 
-The unmounted Photon place adapter accepts an operator-constructed fixed service
+The opt-in Photon place adapter accepts an operator-constructed fixed service
 origin, never a traveller-supplied destination. It encodes submitted search text
 and returns only bounded IDs/labels/coordinates with fixed OSM attribution. Strict
 JSON shape, duplicate-key/trailing-data rejection, UTF-8 byte limits and coordinate
@@ -255,15 +255,15 @@ are replaced with generic errors without a cause; interruption is preserved.
 
 This is not an egress firewall or permission to expose internal Photon publicly.
 Configured DNS, destination ownership, TLS/private network and proxy/service logs
-must be reviewed before wiring it into the authenticated routing profile. Search
+must be reviewed before enabling the authenticated routing profile in a deployment. Search
 terms appear in the internal provider query URL; infrastructure must avoid request
 URL logging. No public demo fallback, browser configuration switch, persistence,
-proximity tracking or dataset download is introduced by this adapter-only slice.
+proximity tracking or dataset download is introduced by the adapter or runtime wiring.
 Review found and corrected a shared transport slow-body gap: request-header timeout alone did not bound body completion. A whole-operation10s deadline now cancels the HTTP future on timeout/interruption; loopback stalled-body regression exercises this boundary.
 
 ## Valhalla adapter and routing POST boundary
 
-The unmounted Valhalla adapter sends two precise endpoints in a bounded JSON body
+The opt-in Valhalla adapter sends two precise endpoints in a bounded JSON body
 to a fixed operator-owned `/route` destination. No coordinates, account IDs or
 browser credentials enter the provider URL. POST retains only200/400 responses
 for strict adapter interpretation; redirects and unexpected statuses fail. Whole
@@ -283,5 +283,15 @@ endpoints before any provider call and rejects out-of-region returned geometry o
 maneuvers as a whole response. Bounds are a conservative operator-controlled
 non-antimeridian rectangle, not proof that all roads inside it exist in the graph.
 No coordinates enter coverage error messages or region string representations.
-The guard is unmounted until explicit authenticated HTTP/client handling and
-reviewed dataset configuration exist; no route clipping or invented rerouting.
+The opt-in routing configuration now wraps Valhalla in this guard and requires
+both provider origins and every regional bound. Authenticated HTTP/client coverage
+handling is implemented; reviewed datasets and live service validation remain
+deployment gates. No route clipping or invented rerouting.
+
+Routing runtime migration: see ROUTING_RUNTIME_SPEC.md. Missing or malformed
+operator settings fail startup without raw values or parsing causes. Both services
+are configured together with no public defaults or legacy fallback. Configuration
+is trusted; syntactically valid hosts are not proof of ownership or DNS safety.
+Review egress, private ports, TLS and log suppression (especially Photon query
+URLs) before enabling services. Deploy the matching browser disclosure version
+with the backend; previous Mapbox deployments must not serve the new disclosure.

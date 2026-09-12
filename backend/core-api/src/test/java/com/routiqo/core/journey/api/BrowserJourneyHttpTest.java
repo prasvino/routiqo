@@ -18,7 +18,9 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
     "ROUTIQO_GOOGLE_CLIENT_ID=test-client.apps.googleusercontent.com",
     "ROUTIQO_WEB_ORIGIN=http://localhost:3000", "ROUTIQO_AUTH_SECURE_COOKIES=false",
-    "ROUTIQO_MAPBOX_TOKEN=synthetic-routing-token"
+    "ROUTIQO_VALHALLA_ORIGIN=http://127.0.0.1:18002", "ROUTIQO_PHOTON_ORIGIN=http://127.0.0.1:12322",
+    "ROUTIQO_ROUTING_REGION_WEST=78", "ROUTIQO_ROUTING_REGION_SOUTH=11",
+    "ROUTIQO_ROUTING_REGION_EAST=81", "ROUTIQO_ROUTING_REGION_NORTH=14"
 })
 @ActiveProfiles({"persistence", "google-auth", "web-auth", "routing"})
 @Import(BrowserJourneyHttpTest.TestIdentity.class)
@@ -121,7 +123,7 @@ class BrowserJourneyHttpTest {
             assertThat(JsonPath.<String>read(result.body(), "$.provider")).isEqualTo("valhalla");
             assertThat(JsonPath.<String>read(result.body(), "$.routes[0].steps[0].instruction"))
                     .isEqualTo("Continue to the destination");
-            assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account());
+            assertThat(result.body()).doesNotContain(owner.account());
         }
         assertThat(send(owner, "routes", body).statusCode()).isEqualTo(429);
     }
@@ -184,7 +186,7 @@ class BrowserJourneyHttpTest {
             assertThat(result.headers().firstValue("Cache-Control")).contains("no-store");
             assertThat(JsonPath.<String>read(result.body(), "$.provider")).isEqualTo("photon");
             assertThat(JsonPath.<String>read(result.body(), "$.places[0].label")).isEqualTo("Synthetic town");
-            assertThat(result.body()).doesNotContain("synthetic-routing-token", owner.account(), "Chennai");
+            assertThat(result.body()).doesNotContain(owner.account(), "Chennai");
         }
         assertThat(send(owner, "routes/places", body).statusCode()).isEqualTo(429);
     }

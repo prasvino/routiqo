@@ -17,7 +17,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
-| Route planning | Authenticated temporary place search, private Mapbox estimates with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
+| Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence policy | Internal consent generation and bounded lease rules tested; Ghost Mode invalidates older generations. No discoverable presence, durable consent service or realtime publication enabled |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
@@ -29,6 +29,23 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Open-source runtime wiring pass: the opt-in routing profile now constructs Photon
+and region-guarded Valhalla together from six mandatory operator settings. No
+Mapbox token, public default or fallback is used. Missing/invalid configuration
+fails startup without raw values or parsing causes; startup performs no provider
+network requests. Planner and privacy disclosures, example settings, setup guide,
+ADR and feature/threat specifications were updated together. Backend and browser
+versions must be deployed together to preserve truthful disclosures.
+
+Full TypeScript check passed **250 tests across 40 files**, including contracts,
+formatting, types and lint; production web build and secret scan passed. Four
+configuration tests cover profile gating, missing/invalid settings and redaction,
+paired identities and coverage rejection before transport. Full core check and
+bootJar passed **134 Java tests across 26 suites**, with no failures/errors/skips.
+Independent configuration/security review found no actionable issues. Actual service/data
+provisioning, authenticated visual QA, provider quality and Android verification
+remain pending. No local live settings, dataset downloads or deployment occurred.
 
 Coverage HTTP/browser pass: **249 TypeScript/component tests and 130 Java tests
 across 25 Java suites passed**. Contract generation/drift, formatting, strict types,
@@ -97,7 +114,7 @@ Local PostGIS, Redis and MinIO were healthy during this audit. No production ser
 
 1. Actual Google OAuth configuration and end-to-end testing; native credential transport. Web login/proxy, bounded renewal and recent-auth account deletion are implemented. Browser HTTP security, contracts and bounded expiry cleanup are implemented; proxy trust and rate/cleanup capacity still need deployment validation.
 2. Complete cross-device restoration and unresolved-conflict UX; verify live OAuth and authenticated browser visuals. Web foreground dispatch, bounded recent restoration and confirmed-result reconciliation are implemented; native secure transport remains pending. Authenticated journey contracts/controllers, atomic native snapshots and web IndexedDB are implemented. Local plans remain separate from server journey records.
-3. Implement the confirmed open-source migration (ADR 0021): generalize provider contracts, replace web rendering with MapLibre, add bounded Valhalla/Photon adapters, and verify Routiqo-controlled regional tiles via Martin. Then validate native maps, bounded downloads/eviction/deletion, guidance and on-device rerouting. Regional datasets/services and Android development build/device QA are required; Mapbox credentials are no longer a target dependency. Existing web directions remain memory-only until a separate storage change.
+3. Implement the confirmed open-source migration (ADR 0021): provider contracts, MapLibre web rendering, bounded Valhalla/Photon adapters and paired runtime wiring are implemented. Provision and validate controlled regional routing/search services and tiles via Martin. Then validate native maps, bounded downloads/eviction/deletion, guidance and on-device rerouting. Regional datasets/services and Android development build/device QA are required; Mapbox credentials are no longer a target dependency. Existing web directions remain memory-only until a separate storage change.
 4. Privacy-reviewed presence, expiring rooms, blocking/moderation/reporting and realtime delivery. Existing pure policy tests do not implement these services.
 5. Reminders/push, trip journals/commute summaries, media and AI adapters, useful admin workflows.
 6. Android Studio/device setup and native SQLite/restart/accessibility/performance QA; broader web large-text/reduced-motion/storage-error QA; native backup sharing/paste/device QA.

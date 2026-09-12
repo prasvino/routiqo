@@ -30,10 +30,11 @@ export default function Page() {
             position, or show live traveller presence.
           </p>
           <p>
-            When route planning is enabled, submitting a place search sends that text to Mapbox.
-            Calculating a route sends your selected endpoints, including a location reading if you
-            chose one. Place results and route estimates stay in the current view; they are not
-            saved to plans, planning backups or Routiqo’s database.
+            When route planning is enabled, submitting a place search sends that text to Routiqo’s
+            Photon search service. Calculating a route sends your selected endpoints to Routiqo’s
+            Valhalla routing service, including a location reading if you chose one. These services
+            run on infrastructure configured for Routiqo. Place results and route estimates stay in
+            the current view; they are not saved to plans, planning backups or Routiqo’s database.
           </p>
           <p>
             Choosing “Show map” loads MapLibre and requests map resources from this site for the
