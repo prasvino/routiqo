@@ -1,10 +1,11 @@
 # Routiqo Live: first release plan
 
-Status: planned, not implemented. Agreed planning scope: an active-journey LIVE
+Status: first release not implemented; internal domain work has started under
+QUICK_SIGNAL_DOMAIN_SPEC.md. Agreed scope: an active-journey LIVE
 list with Live Moments and Quick Signals. This specification reconciles the
 user-supplied ROUTIQO_LIVE_PRODUCT_PLAN.md; examples in that input are illustrative,
-not evidence of activity or authorization to enable services. No coding is part
-of this documentation change.
+not evidence of activity or authorization to enable services. Only BUILD_STATUS.md
+records verified implementation; internal primitives are not a working LIVE list.
 
 ## Product and ownership
 

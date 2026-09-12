@@ -30,6 +30,22 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 ## Verification
 
+Live L0.1 domain pass: internal QuickSignal and QuickSignalValue implement 17
+closed values across five categories, immutable non-nil identity/context fields,
+nonnegative consent generation, bounded receipt/expiry windows and half-open
+freshness. Contribution-slot matching uses actor/anchor/category across journey
+changes; exact submission matching never renews timestamps. Generic errors and
+redacted string output omit private evidence metadata. These are pure primitives,
+not storage idempotency, membership authorization, aggregation or a LIVE UI.
+
+Full core check/bootJar passed **141 Java tests across 27 suites**, zero failures,
+errors or skips; seven signal tests cover enum values, null/invalid context,
+temporal extremes/boundaries, slots, replay matching and diagnostics. Independent
+review and secret scan passed. No TypeScript/UI/provider changes; prior 257 TS
+tests and web production build remain the latest relevant evidence. Next is the
+cohort/admission design, including the missing server journey-to-route binding,
+then persistence/withdrawal and protected ingestion. No Live endpoint is enabled.
+
 Regional dataset integrity tooling pass: `pnpm maps:check -- <directory>` verifies
 a bounded versioned inventory of three local Valhalla/Photon/tile artifacts,
 coverage metadata, source/attribution fields, exact sizes and streamed SHA-256

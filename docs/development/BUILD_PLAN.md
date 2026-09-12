@@ -2,6 +2,31 @@
 
 ## Next priority: Routiqo Live first release
 
+### Execution queue
+
+| Priority | Next concrete task | Completion evidence |
+|---|---|---|
+| P0 / L0.1 — complete | Immutable Quick Signal category/value and evidence lifecycle, contribution slot and replay matching primitives | 7 focused tests; full 141 Java tests, architecture/check/bootJar and independent review passed; no public output |
+| P0 / L0.2 — next | Design cohort/admission and block-safe suppression ADR with adversarial scenarios | Fixed partitions/windows, eligibility authority, query limits and explicit acceptance criteria |
+| P0 / L0.3 | Resolve storage/retention ADR and idempotent replacement/withdrawal lifecycle | Transaction and cleanup design, stale retry/delete/consent race tests |
+| P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
+| P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
+| Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
+| Later | Map Live overlay, Ask Ahead, rooms, Pulse, Travel Waves | Separate feature/privacy gates after first-list utility is validated |
+
+The immediate coding slice is specified in
+`docs/features/live/QUICK_SIGNAL_DOMAIN_SPEC.md`. It does not implement admission,
+storage idempotency, confidence or a publicly visible Live Moment. Complete and
+verify this slice before promoting the next queue item; do not advance status for
+future features based on their plans or primitive tests.
+
+Current dependency discovered during execution: server journey creation accepts
+only an ID and kind; stored journeys have no validated route/anchor association.
+L0.2 must define a server-issued route-context binding and bounded anchor admission
+before L1 ingestion. Existing client-selected places, route estimates or active
+journey ownership alone are not admission authority. Preserve the current
+memory-only route privacy policy unless that separate storage decision is reviewed.
+
 Planning update, 2026-09-12; no new functionality is claimed. Canonical behavior:
 `docs/features/live/ROUTIQO_LIVE_SPEC.md`; architectural decision: ADR 0022.
 Verified implementation remains recorded separately in `docs/quality/BUILD_STATUS.md`.
