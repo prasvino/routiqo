@@ -1,6 +1,7 @@
 # ADR 0024: Admission-bound command identity and bounded receipt storage
 
-Status: accepted design for the next internal persistence slice; not implemented.
+Status: accepted design. Internal grant state and command decision policy are
+implemented (SIGNAL_COMMAND_SPEC.md); issuance and durable storage are pending.
 Public signal ingestion and moment publication remain disabled.
 
 ## Problem
@@ -33,6 +34,11 @@ is still published. Changed fingerprints conflict. "Exists" means logically
 retained at server time, not an expired row awaiting physical cleanup. After
 retainUntil do not return the stored outcome. For a missing or logically expired
 receipt, a current unused grant and current authoritative admission are mandatory.
+These are necessary conditions, not sufficient permission: if an expired receipt
+row is still present, deny new acceptance because it proves prior acceptance and
+contradicts an UNUSED grant. Logical expiry forbids returning an old outcome; it
+does not require ignoring evidence of an inconsistent consumed state. After
+physical purge, the consumed or missing grant must independently prevent replay.
 An expired/missing grant cannot be recreated from the request. Thus a purged old receipt cannot turn
 an old envelope into a fresh write. No fresh grant is minted implicitly by replay.
 

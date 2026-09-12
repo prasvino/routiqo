@@ -30,6 +30,22 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 ## Verification
 
+Live L0.3b command-policy pass: internal SignalCommandGrant models irreversible
+consumption within the admission lifetime; SignalCommandPolicy distinguishes new
+candidates, retained private replays, changed-payload conflicts and denials. Replay
+requires current authenticated journey ownership. Supplied expired receipts deny
+even with an UNUSED grant; missing receipts never reset consumed grants. No
+timestamps are renewed. Command/fingerprint diagnostics redact private metadata.
+
+Full core check and bootJar passed **173 Java tests across 31 suites**, zero
+failures, errors or skips, including 15 focused command tests. Root and independent
+review approved the expired-row correction; secret scan and diff checks passed.
+Specs, ADR 0024 and threat model are aligned. No frontend change or new public
+endpoint; previous 257 TS tests and web production build remain latest evidence.
+Next: domain-owned authority transaction interfaces, common lock order, migrations
+and disposable database race/cleanup tests. Durable idempotency and public Live
+publication are still pending; these pure decisions do not provide either.
+
 Live L0.3a receipt pass: internal QuickSignalReceipt binds evidence to route context
 and revision, with explicit retention bounded by 24 hours and the evidence expiry.
 Withdrawal and supersession are terminal and preserve the original timestamps;

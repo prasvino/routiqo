@@ -328,3 +328,13 @@ in ADR 0022. They require design and adversarial acceptance before public output
 a minimum actor threshold alone is not proof of anonymity. Previously delivered
 in-memory rows cannot be remotely erased while a client is offline: local events
 clear them and bounded expiry limits display. Do not claim stronger revocation.
+
+Command replay controls (ADR 0024, SIGNAL_COMMAND_SPEC.md) distinguish retained
+private outcomes from permission to accept new evidence. Current authenticated
+ownership is required even for replay; a known command UUID is not authentication.
+Changed retained fingerprints conflict, while an expired receipt cannot restore
+an unused grant. Consumed grant state is independent of receipt cleanup. Pure
+decision checks cover these branches, but only a future atomic database boundary
+can prevent concurrent replay, deletion and consent races across replicas. Never
+deserialize grants/admissions from client input or expose internal decision codes
+as an existence oracle. No public Live endpoint is enabled by these primitives.

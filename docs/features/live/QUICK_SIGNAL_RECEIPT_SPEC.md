@@ -5,7 +5,8 @@ Live submission service. See BUILD_STATUS.md for verification.
 
 ADR 0024 now defines the next command/grant and persistence direction, including
 atomic grant consumption and replay denial after receipt purge. It is a reviewed
-design, not implemented durable idempotency.
+design with internal command grant/decision primitives in SIGNAL_COMMAND_SPEC.md,
+not implemented durable idempotency.
 
 Scope: pure receipt state and evidence-to-context linkage, not database idempotency
 or a submission service. The public Live release and cohort design remain gated.
