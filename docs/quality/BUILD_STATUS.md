@@ -113,3 +113,16 @@ requests exercise the intended cases. Added read-only Android prerequisite docto
 normal and RequireReady modes ran under Windows PowerShell. SDK installation is in
 progress: SDK folder, Build Tools and Platform Tools detected; API36, command-line
 tools and selected JDK17 are not yet ready. This is file inspection, not device QA.
+
+Native restoration prerequisite (2026-09-12): added an unmounted coordinator that
+loads the secure vault, verifies the credential through an injected adapter and
+returns only a matching accountId snapshot. Stale loads/responses, account changes,
+expiry during verification, invalid clocks and storage/provider failures fail
+closed. Clear invalidates pending verification before removing local credentials;
+it does not claim server logout. External vault writers must invalidate restoration
+before changing credentials. Eight new tests cover these boundaries; independent
+security review approved. Contracts/format/types/lint and secret scan passed.
+The first full test run hit a pre-existing Xcode dependency import timeout; targeted
+rerun passed without changes and the final complete run passed **238 tests across
+39 files**. No native transport/UI mounting or device/provider verification occurred.
+Latest backend validation remains98 Java tests; backend source was unchanged.

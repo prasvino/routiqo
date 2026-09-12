@@ -29,3 +29,10 @@ Native credential storage has a separate specification in `NATIVE_SESSION_STORAG
 Read GOOGLE_SIGN_IN_SPEC.md, SESSION_EXCHANGE_SPEC.md and WEB_AUTH_SPEC.md under docs/features/auth, and ADRs 0007–0009. Earlier specifications describe the implementation sequence; WEB_AUTH_SPEC.md describes the browser HTTP boundary; NATIVE_AUTH_HTTP_SPEC.md and ADR 0020 describe the separate native boundary. Google subject is the external identity key, not email or phone. Never merge accounts based only on matching contact details.
 
 See SESSION_RENEWAL_SPEC.md, ACCOUNT_DELETION_SPEC.md and ADR 0011 for current lifecycle behavior. Session hashes remain for the 12-hour lineage lifetime plus bounded-cleanup backlog; account deletion removes them immediately.
+
+The unmounted native session restorer now loads the vault and requires a matching
+server-verified account response before returning an accountId snapshot. It checks
+expiry again after verification and rejects stale work after clear, invalidation
+or a newer restore. Local clear is not server logout. Future vault writers must
+invalidate restoration before changing credentials, and callers must discard old
+verified state while restoring or after failure. See NATIVE_SESSION_RESTORE_SPEC.md.
