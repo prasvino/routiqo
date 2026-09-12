@@ -97,6 +97,16 @@ The former Mapbox native navigation plan is superseded by ADR 0021. Future downl
 The endpoint is POST `/api/v1/routes`, with mode `driving`, `walking` or `cycling`, and two longitude/latitude coordinate arrays named `origin` and `destination`. It requires the browser session, CSRF, exact origin and matching account header. It returns private Valhalla estimates without creating journeys or presence. POST `/api/v1/routes/places` accepts a `query` for temporary city/street/address lookup using Photon and the same authentication guards. Trips includes authenticated place selection, route alternatives, optional web map display and manual provider directions, with an optional one-time current-location origin. Live provider verification, GPS-following navigation and downloaded offline maps remain pending. No real regional provider request has been tested; automated tests use synthetic transport responses.
 ## Open-source maps target setup
 
+Before importing regional data, use the local artifact inventory checker:
+`pnpm maps:check -- map-data/<region-version>`. Supply `manifest.json` with the
+schema and limits in `docs/features/journey/MAP_DATASET_SPEC.md`, plus the three
+reviewed Valhalla/Photon/tile export artifacts. `map-data/` is ignored by Git.
+The checker reads bounded metadata, verifies sizes and streamed SHA-256 hashes,
+and rejects path escapes. It does not fetch, unpack, import or start services.
+Success establishes artifact integrity against the supplied inventory only;
+trusted provenance, format compatibility, coverage and route/search quality still
+require operator verification. Do not use personal locations in inventories.
+
 Use MapLibre for web/native rendering and opt-in, Routiqo-controlled Valhalla, Photon and Martin services with a bounded regional dataset. Application configuration is implemented as described above; service containers and regional data are not yet provisioned. Startup validates settings without downloading data or contacting services. Disable/redact Photon query URL access logs and Valhalla request-body logging at every service/proxy. Keep service ports private or loopback-only, configure fixed destinations, and never silently fall back to public routing/geocoding demos. Own-host style/sprite/glyph resources as well as tiles. Start with a regional data and Android compatibility spike, including import/update disk headroom. Use the Android prerequisite checker below; native mapping still needs a development build and device QA. Hosting, datasets, downloads and on-device rerouting require separate verification. See ADR 0021 and MAPS_NAVIGATION_SPEC.md for acceptance.
 
 ## Native authentication API

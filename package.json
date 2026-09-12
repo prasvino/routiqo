@@ -24,7 +24,8 @@
     "backend:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backend.ps1 :core-api:bootRun",
     "format": "prettier --write apps packages tests scripts *.mjs *.mts *.json .github",
     "format:check": "prettier --check apps packages tests scripts *.mjs *.mts *.json .github",
-    "secrets:check": "node scripts/scan-secrets.mjs"
+    "secrets:check": "node scripts/scan-secrets.mjs",
+    "maps:check": "node scripts/check-map-dataset.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.3",

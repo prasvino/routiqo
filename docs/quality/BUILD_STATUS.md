@@ -30,6 +30,22 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 ## Verification
 
+Regional dataset integrity tooling pass: `pnpm maps:check -- <directory>` verifies
+a bounded versioned inventory of three local Valhalla/Photon/tile artifacts,
+coverage metadata, source/attribution fields, exact sizes and streamed SHA-256
+hashes. It rejects traversal, escaping junctions, Windows device paths, non-files,
+invalid metadata and corruption with redacted errors. Local artifacts under
+`map-data/` are ignored by Git. No downloads, extraction, services, personal data
+or runtime configuration writes occur. This verifies bytes against the operator's
+inventory, not authenticity, provider formats, route quality or live availability.
+
+Full check passed **257 tests across 41 files**, contracts, formatting, types and
+lint. The script also passed explicit ESLint. Independent review and seven focused
+tests passed, including a real Windows junction escape and malformed/oversized
+manifest checks. The five-minute streaming timeout and POSIX FIFO behavior were
+source-reviewed, not exercised in this Windows run. Backend/web runtime source
+is unchanged; prior 134 Java tests and web build remain the latest build evidence.
+
 Open-source runtime wiring pass: the opt-in routing profile now constructs Photon
 and region-guarded Valhalla together from six mandatory operator settings. No
 Mapbox token, public default or fallback is used. Missing/invalid configuration

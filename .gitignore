@@ -52,3 +52,4 @@ secrets/
 *.backup
 # Agent recovery state is local to this machine/task.
 docs/development/WORK_CHECKPOINT.md
+map-data/
