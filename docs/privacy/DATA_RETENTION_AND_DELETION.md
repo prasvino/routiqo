@@ -22,6 +22,12 @@ remove. Keep public basemap content separate from account-specific route records
 
 ## Planned Live evidence lifecycle
 
+Internal receipt primitive: QUICK_SIGNAL_RECEIPT_SPEC.md defines explicit bounded
+retention and terminal withdrawal/supersession. Withdrawal stops temporal evidence
+eligibility but retains the private immutable fingerprint until purge; it is not
+physical deletion. No database or endpoint stores these receipts yet. Production
+retention/cleanup and preventing replay after purge remain explicit storage gates.
+
 No Live evidence is currently stored. Proposed signal/receipt/client lifetimes and
 unresolved moderation holds are owned by ROUTIQO_LIVE_SPEC.md. Finalize the storage
 ADR before migrations; do not silently adopt proposed values as production policy.

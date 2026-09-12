@@ -30,6 +30,22 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 ## Verification
 
+Live L0.3a receipt pass: internal QuickSignalReceipt binds evidence to route context
+and revision, with explicit retention bounded by 24 hours and the evidence expiry.
+Withdrawal and supersession are terminal and preserve the original timestamps;
+exact replay comparison remains separate from evidence eligibility. Retained
+metadata is not physically erased by withdrawal. The new cohort design checkpoint
+records unresolved block/withdrawal/differencing cases and keeps public projection
+closed instead of claiming that a threshold-only publisher is safe.
+
+Full core check/bootJar passed **158 Java tests across 29 suites**, zero failures,
+errors or skips. Eight receipt tests cover retention/expiry/extreme time bounds,
+terminal state, replay context and redaction. Root/independent review and secret
+scan passed. No database, API, UI, live providers or private user data were used.
+No TS change; previous 257 TS tests and production web build remain latest.
+Next independent work is admission-bound command identity and transactional
+storage/retention design; publication still requires the cohort privacy ADR.
+
 Live L0.2a admission pass: added immutable bounded LiveRouteContext and
 SignalAdmission models and an application-layer consistency policy using an
 independently authenticated actor plus current journey/consent/context snapshots.

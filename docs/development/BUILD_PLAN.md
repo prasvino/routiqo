@@ -10,6 +10,7 @@
 | P0 / L0.2a — complete | ADR 0023 and internal route-context/admission policy | 9 focused tests; full 150 Java tests/check/bootJar and review passed; no public issuer |
 | P0 / L0.2b — next | Cohort publication and block-safe suppression design | Fixed partitions/windows, independent evidence, query limits and adversarial acceptance before projections |
 | P0 / L0.3 | Resolve storage/retention ADR and idempotent replacement/withdrawal lifecycle | Transaction and cleanup design, stale retry/delete/consent race tests |
+| P0 / L0.3a — complete | Internal context-linked receipt state, terminal withdrawal/supersession and exact replay comparison | 8 focused tests; full 158 Java tests/check/bootJar and review passed; no durable store or publication permission |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -28,6 +29,12 @@ L0.2 must define a server-issued route-context binding and bounded anchor admiss
 before L1 ingestion. Existing client-selected places, route estimates or active
 journey ownership alone are not admission authority. Preserve the current
 memory-only route privacy policy unless that separate storage decision is reviewed.
+
+Cohort publication decision checkpoint: `COHORT_PUBLICATION_DESIGN.md` in the Live
+feature directory documents the remaining block/withdrawal/differencing issues.
+Do not replace that review with a threshold-only publisher. Receipt lifecycle work
+under `QUICK_SIGNAL_RECEIPT_SPEC.md` can proceed independently; public output stays
+closed until the cohort ADR and adversarial acceptance are complete.
 
 Planning update, 2026-09-12; no new functionality is claimed. Canonical behavior:
 `docs/features/live/ROUTIQO_LIVE_SPEC.md`; architectural decision: ADR 0022.
