@@ -263,12 +263,29 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
     setError('');
     setRetryable(false);
 
+    const loadDeadline = setTimeout(() => {
+      if (disposed || currentRevision !== revision.current || phase.current === 'ready') return;
+      revision.current += 1;
+      if (ownedSession !== null) {
+        if (session.current === ownedSession) session.current = null;
+        removeSession(ownedSession);
+      }
+      phase.current = 'failed';
+      setLoading(false);
+      setReady(false);
+      setRetryable(true);
+      setError(
+        'Map loading took too long. Your directions are still available. Try again when connected.',
+      );
+    }, 20000);
+
     async function initialize() {
       try {
         const mapbox = (await import('mapbox-gl')).default;
         if (disposed || currentRevision !== revision.current || container.current === null) return;
         if (latestGeometry.current === null) return;
         if (!navigator.onLine) {
+          clearTimeout(loadDeadline);
           phase.current = 'failed';
           setOffline(true);
           setLoading(false);
@@ -315,6 +332,7 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
 
         function fail() {
           if (!current()) return;
+          clearTimeout(loadDeadline);
           session.current = null;
           revision.current += 1;
           phase.current = 'failed';
@@ -359,6 +377,7 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
           try {
             renderRoute(currentSession, renderGeometry);
             currentSession.loaded = true;
+            clearTimeout(loadDeadline);
             phase.current = 'ready';
             setLoading(false);
             setReady(true);
@@ -369,6 +388,7 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
           }
         });
       } catch {
+        clearTimeout(loadDeadline);
         if (ownedSession !== null) {
           if (session.current === ownedSession) session.current = null;
           removeSession(ownedSession);
@@ -386,6 +406,7 @@ export function RouteMap({ geometry }: { geometry: RouteCoordinate[] }) {
     void initialize();
     return () => {
       disposed = true;
+      clearTimeout(loadDeadline);
       revision.current += 1;
       const currentSession = session.current;
       if (currentSession?.revision === currentRevision) {

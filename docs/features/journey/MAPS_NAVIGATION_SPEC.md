@@ -24,6 +24,9 @@ origin-restricted `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` (`pk.` only), passed per map
 never expose the backend routing token. Fixed streets-v12 style, local bundled
 CSS, provider attribution/logo, route line, endpoint markers and bounded fit view.
 Ignore stale imports/events and remove maps/observers on unmount/account changes.
+Each explicit map load has a 20-second deadline spanning SDK import and style
+readiness. Timeout removes an unfinished map, invalidates late callbacks, preserves
+directions and offers explicit retry. Ready maps do not expire on this deadline.
 Keep token/provider errors out of UI/logs. No geolocation control or hidden watcher.
 After explicit map load, selecting an alternative updates the existing map's route
 source, endpoint markers and bounds without recreating its renderer. The newest

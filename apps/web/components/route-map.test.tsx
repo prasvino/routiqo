@@ -178,6 +178,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
@@ -481,6 +482,37 @@ describe('RouteMap', () => {
     act(() => map.emit('error', new Error('late')));
     expect(screen.queryByText('Route map ready.')).toBeNull();
     expect(screen.getByRole('alert').textContent).toBe('Route map is unavailable for this route.');
+  });
+
+  it('times out an unfinished map, ignores late load and permits a successful explicit retry', async () => {
+    vi.useFakeTimers();
+    render(<RouteMap geometry={geometry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show map' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(sdk.MapConstructor).toHaveBeenCalledOnce();
+    const first = sdk.instances[0]!;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20000);
+    });
+    expect(screen.getByRole('alert').textContent).toContain('Map loading took too long');
+    expect(first.remove).toHaveBeenCalledOnce();
+    expect(ResizeObserverDouble.instances[0]!.disconnect).toHaveBeenCalledOnce();
+    act(() => first.emit('load'));
+    expect(first.addSource).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry map' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(sdk.MapConstructor).toHaveBeenCalledTimes(2);
+    const second = sdk.instances[1]!;
+    act(() => second.emit('load'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(40000);
+    });
+    expect(screen.getByText('Route map ready.')).toBeTruthy();
+    expect(second.remove).not.toHaveBeenCalled();
   });
 
   it('cleans up the ready map, observer, and markers on unmount', async () => {
