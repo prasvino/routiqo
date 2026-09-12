@@ -23,6 +23,9 @@ export async function initializeJourneyOutbox(db: Pick<OutboxDatabase, 'execAsyn
     account_id TEXT PRIMARY KEY NOT NULL,
     payload TEXT NOT NULL
   );`);
+  await db.execAsync(`CREATE TABLE IF NOT EXISTS journey_retired_accounts_v1 (
+    account_id TEXT PRIMARY KEY NOT NULL
+  );`);
 }
 
 /** No network inside change. Return only after SQLite commits the new queue. */
@@ -31,8 +34,14 @@ export async function updateJourneyOutbox(
   accountId: string,
   change: (current: JourneyOutbox) => JourneyOutbox,
 ): Promise<JourneyOutbox> {
+  readJourneyOutbox(null, accountId); // Validate before opening a transaction.
   let committed: JourneyOutbox | undefined;
   await db.withExclusiveTransactionAsync(async (tx) => {
+    const retired = await tx.getFirstAsync<{ account_id: string }>(
+      'SELECT account_id FROM journey_retired_accounts_v1 WHERE account_id = ?',
+      accountId,
+    );
+    if (retired) throw new Error('Journey partition is retired.');
     const row = await tx.getFirstAsync<{ payload: string }>(
       'SELECT payload FROM journey_outbox_v1 WHERE account_id = ?',
       accountId,
@@ -59,8 +68,14 @@ export async function acknowledgeJourneyResult(
   response: unknown,
   now: number,
 ): Promise<boolean> {
+  readJourneyOutbox(null, accountId); // Validate before opening a transaction.
   let accepted = false;
   await db.withExclusiveTransactionAsync(async (tx) => {
+    const retired = await tx.getFirstAsync<{ account_id: string }>(
+      'SELECT account_id FROM journey_retired_accounts_v1 WHERE account_id = ?',
+      accountId,
+    );
+    if (retired) return;
     const queueRow = await tx.getFirstAsync<{ payload: string }>(
       'SELECT payload FROM journey_outbox_v1 WHERE account_id = ?',
       accountId,
@@ -94,10 +109,15 @@ export async function acknowledgeJourneyResult(
   return accepted;
 }
 
-/** Invoke only for an explicitly deleted account/local partition, never on ordinary sign-out. */
+/** Permanently retire only a deleted account. Never use for logout or a local cache reset. */
 export async function clearJourneyPartition(db: OutboxDatabase, accountId: string): Promise<void> {
   readJourneyOutbox(null, accountId); // Validate before any mutation.
   await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync(
+      `INSERT INTO journey_retired_accounts_v1 (account_id) VALUES (?)
+      ON CONFLICT(account_id) DO NOTHING`,
+      accountId,
+    );
     await tx.runAsync('DELETE FROM journey_outbox_v1 WHERE account_id = ?', accountId);
     await tx.runAsync('DELETE FROM journey_snapshots_v1 WHERE account_id = ?', accountId);
   });

@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   initializeJourneyOutbox,
   updateJourneyOutbox,
@@ -14,6 +14,7 @@ import {
   claimJourneyCommand,
   enqueueJourneyCommand,
   settleJourneyCommand,
+  type JourneyOutbox,
 } from '../packages/shared/src/journey-outbox';
 
 const owner = '00000000-0000-4000-8000-000000000001';
@@ -139,7 +140,7 @@ describe('native outbox SQL on file-backed SQLite', () => {
     expect(db.prepare('SELECT count(*) AS total FROM journey_snapshots_v1').get()?.total).toBe(0);
     expect((await updateJourneyOutbox(adapter, owner, (state) => state)).entries).toHaveLength(1);
   });
-  it('removes only the selected account partition and rejects late acknowledgement', async () => {
+  it('permanently retires only the selected account and rejects delayed work', async () => {
     const { db, adapter } = await setup();
     await pending(adapter);
     await pending(adapter, other);
@@ -155,7 +156,130 @@ describe('native outbox SQL on file-backed SQLite', () => {
     expect(
       db.prepare('SELECT payload FROM journey_snapshots_v1 WHERE account_id = ?').get(other),
     ).toBeDefined();
+    let changed = false;
+    await expect(
+      updateJourneyOutbox(adapter, owner, (state) => {
+        changed = true;
+        return state;
+      }),
+    ).rejects.toThrow('retired');
+    expect(changed).toBe(false);
+    const marker = db
+      .prepare('SELECT * FROM journey_retired_accounts_v1 WHERE account_id = ?')
+      .get(owner) as Record<string, unknown> | undefined;
+    expect(marker?.account_id).toBe(owner);
+    expect(Object.keys(marker ?? {})).toEqual(['account_id']);
     expect(await acknowledgeJourneyResult(adapter, owner, lease, result, 2)).toBe(false);
+    expect((await updateJourneyOutbox(adapter, other, (state) => state)).accountId).toBe(other);
+    await clearJourneyPartition(adapter, owner);
+    expect(
+      db
+        .prepare('SELECT count(*) AS total FROM journey_retired_accounts_v1 WHERE account_id = ?')
+        .get(owner)?.total,
+    ).toBe(1);
+  });
+  it('preserves retirement across reopening and additive initialization', async () => {
+    const { db, adapter, path } = await setup();
+    await pending(adapter);
+    await clearJourneyPartition(adapter, owner);
+    db.close();
+    const reopened = open(path);
+    await initializeJourneyOutbox(reopened.adapter);
+    const change = vi.fn((state: JourneyOutbox) => state);
+    await expect(updateJourneyOutbox(reopened.adapter, owner, change)).rejects.toThrow('retired');
+    expect(change).not.toHaveBeenCalled();
+    expect(
+      reopened.db
+        .prepare('SELECT account_id FROM journey_retired_accounts_v1 WHERE account_id = ?')
+        .get(owner)?.account_id,
+    ).toBe(owner);
+  });
+  it('rolls back the marker when retirement marker persistence fails', async () => {
+    const { db, adapter } = await setup();
+    await pending(adapter);
+    db.exec(
+      "CREATE TRIGGER reject_retirement BEFORE INSERT ON journey_retired_accounts_v1 BEGIN SELECT RAISE(ABORT, 'test marker failure'); END;",
+    );
+    await expect(clearJourneyPartition(adapter, owner)).rejects.toThrow();
+    expect(
+      db
+        .prepare('SELECT account_id FROM journey_retired_accounts_v1 WHERE account_id = ?')
+        .get(owner),
+    ).toBeUndefined();
+    expect(
+      db.prepare('SELECT payload FROM journey_outbox_v1 WHERE account_id = ?').get(owner),
+    ).toBeDefined();
+  });
+  it('rolls back the marker and queue deletion when snapshot deletion fails', async () => {
+    const { db, adapter } = await setup();
+    await pending(adapter);
+    await acknowledgeJourneyResult(adapter, owner, lease, result, 1);
+    await pending(adapter);
+    db.exec(
+      "CREATE TRIGGER reject_snapshot_delete BEFORE DELETE ON journey_snapshots_v1 BEGIN SELECT RAISE(ABORT, 'test deletion failure'); END;",
+    );
+    await expect(clearJourneyPartition(adapter, owner)).rejects.toThrow();
+    expect(
+      db
+        .prepare('SELECT account_id FROM journey_retired_accounts_v1 WHERE account_id = ?')
+        .get(owner),
+    ).toBeUndefined();
+    expect(
+      db.prepare('SELECT payload FROM journey_outbox_v1 WHERE account_id = ?').get(owner),
+    ).toBeDefined();
+    expect(
+      db.prepare('SELECT payload FROM journey_snapshots_v1 WHERE account_id = ?').get(owner),
+    ).toBeDefined();
+  });
+  it('adds the retirement table without changing legacy queue or snapshot tables', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'routiqo-outbox-test-'));
+    folders.push(folder);
+    const opened = open(join(folder, 'legacy.db'));
+    opened.db.exec(`CREATE TABLE journey_outbox_v1 (
+      account_id TEXT PRIMARY KEY NOT NULL,
+      payload TEXT NOT NULL
+    ); CREATE TABLE journey_snapshots_v1 (
+      account_id TEXT PRIMARY KEY NOT NULL,
+      payload TEXT NOT NULL
+    );`);
+    const queue = JSON.stringify({ version: 1, accountId: owner, entries: [] });
+    const snapshots = JSON.stringify({ version: 1, accountId: owner, journeys: [] });
+    opened.db.prepare('INSERT INTO journey_outbox_v1 VALUES (?, ?)').run(owner, queue);
+    opened.db.prepare('INSERT INTO journey_snapshots_v1 VALUES (?, ?)').run(owner, snapshots);
+
+    await initializeJourneyOutbox(opened.adapter);
+
+    expect(
+      opened.db.prepare('SELECT payload FROM journey_outbox_v1 WHERE account_id = ?').get(owner)
+        ?.payload,
+    ).toBe(queue);
+    expect(
+      opened.db.prepare('SELECT payload FROM journey_snapshots_v1 WHERE account_id = ?').get(owner)
+        ?.payload,
+    ).toBe(snapshots);
+    expect(
+      opened.db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get('journey_retired_accounts_v1')?.name,
+    ).toBe('journey_retired_accounts_v1');
+  });
+  it('rejects invalid account identities before starting a transaction', async () => {
+    const { db, adapter } = await setup();
+    const transaction = vi.fn(adapter.withExclusiveTransactionAsync);
+    const observed: OutboxDatabase = { ...adapter, withExclusiveTransactionAsync: transaction };
+    const change = vi.fn((state: JourneyOutbox) => state);
+
+    await expect(updateJourneyOutbox(observed, 'invalid', change)).rejects.toThrow();
+    await expect(acknowledgeJourneyResult(observed, 'invalid', lease, result, 1)).rejects.toThrow();
+    await expect(clearJourneyPartition(observed, 'invalid')).rejects.toThrow();
+
+    expect(transaction).not.toHaveBeenCalled();
+    expect(change).not.toHaveBeenCalled();
+    expect(db.prepare('SELECT count(*) AS total FROM journey_outbox_v1').get()?.total).toBe(0);
+    expect(db.prepare('SELECT count(*) AS total FROM journey_snapshots_v1').get()?.total).toBe(0);
+    expect(
+      db.prepare('SELECT count(*) AS total FROM journey_retired_accounts_v1').get()?.total,
+    ).toBe(0);
   });
   it('retains pending work across reopening and recovers a lost response with stable journey identity', async () => {
     const { db, adapter, path } = await setup();

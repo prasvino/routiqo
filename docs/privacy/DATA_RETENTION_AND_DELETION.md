@@ -4,3 +4,5 @@ Temporary Mapbox place results and calculated routes are not persisted or backed
 Browser and native local planning storage must validate shape/version and expose storage failures. No silent cloud upload.
 Before public launch define category-specific retention for raw GPS, presence, messages, reports, media, journals, AI outputs, sessions, backups and providers. No default indefinite precise movement retention.
 Account deletion must revoke sessions promptly and be tested end to end; do not reuse the contradictory Wayfind reactivation specification.
+
+Native journey storage retirement retains only the deleted account UUID in a local marker table, atomically removing its queue and snapshots. This marker prevents delayed work from recreating data and remains until app storage is removed. It contains no journey content, credentials or dates and is excluded from planning backups. This storage primitive is not yet connected to native account deletion. Ordinary sign-out must preserve the partition without retiring it. SQLite logical row removal does not establish physical page erasure or OS-backup deletion; those remain device/release validation requirements.

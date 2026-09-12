@@ -10,6 +10,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Scheduling | Shared next-departure calculation, weekday recurrence, upcoming ordering, foreground refresh, DST-gap handling; no automatic journey completion or reminders |
 | Commute summaries | Monthly counts and exact recorded elapsed minutes from the verified account's confirmed completed commutes saved on this device; time-zone-aware start-month grouping and explicit incomplete-history disclosure. Read-only, no invented distance or new persistence |
 | Local storage | Validated web localStorage with write-error handling and cross-tab refresh; native SQLite adapter; native restart behavior still needs device testing |
+| Native deletion storage | Atomic account retirement marker plus queue/snapshot removal prevents delayed updates recreating deleted data; restart, rollback and account isolation tested with file-backed SQLite. Not yet connected to native authentication/deletion UI |
+| Account history | Explicit 20-row account-history browsing, earlier/latest pages, completed-trip journal access, retry handling and account-switch isolation; no expansion of the offline cache |
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
@@ -25,6 +27,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Native retirement pass: **183 TypeScript/component tests passed**, including contracts, formatting, strict types and lint. The file-backed SQLite suite passes all 12 tests; the original code failed six retirement regression cases before the fix. Reviewed production write paths all check retirement in their exclusive transaction. Android JavaScript export passed (1,111 modules, 2.9MB Hermes bundle), and secret scanning passed. This is not an APK or device test. Backend/web source was unchanged in this pass; the prior web production build remains the latest web build evidence. Native session transport, secure credentials, deletion UI and device/backup erasure verification remain pending.
 
 Commute/navigation pass: **166 TypeScript/component tests passed**, with contracts, formatting, types and lint. Tests cover multi-entry journal history restoration, account-bound commute aggregation, DST, microsecond totals and browser ICU formatting differences. A temporary synthetic commute component page was inspected in the actual browser; it exposed a month-format mismatch that was fixed and rechecked successfully. The temporary page and diagnostic were removed. This verifies the summary component, not live authentication or native device behavior. Web production build, Android JavaScript export (2.9MB Hermes bundle) and secret scanning passed. Backend code was unchanged in this pass; Android export is not device QA.
 
