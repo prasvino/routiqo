@@ -17,6 +17,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
+| Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Durable Live consent/context/receipts remain pending |
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence policy | Internal consent generation and bounded lease rules tested; Ghost Mode invalidates older generations. No discoverable presence, durable consent service or realtime publication enabled |
@@ -29,6 +30,26 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Account/journey authority pass (ADR 0025): identity owns the enabled-account
+transaction boundary and Journey owns locked current-journey callbacks. Existing
+start/completion now participate, sharing account-first order with token-based
+deletion. Ambient transaction entry is rejected. SQL/transaction exceptions are
+redacted before rollback logging and at the outer boundary; browser journey writes
+return empty no-store 503 responses for unavailability, preserving queue retries.
+
+Full core check and bootJar passed **184 Java tests across 32 suites**, zero
+failures, errors or skips. Targeted database/HTTP validation passed 34 tests,
+including 10 authority tests with actual PostgreSQL lock waits, timeout, rollback,
+deletion and separate-actor progress. Independent review approved after the
+pre-rollback logging correction and dual-interface bean wiring test. Secret scan,
+diff checks, generated-contract drift, workspace typecheck and 11 browser journey/
+dispatch tests passed. No visual changes; prior full 257 TS tests/web build remain
+the latest full frontend run. Testcontainers databases only; no user migrations.
+
+Next: durable consent and bounded route-context transaction participants, followed
+by grant/receipt/slot migrations and race/cleanup tests. This slice does not provide
+Ghost Mode persistence, signal storage, issuer endpoints or public Live output.
 
 Live L0.3b command-policy pass: internal SignalCommandGrant models irreversible
 consumption within the admission lifetime; SignalCommandPolicy distinguishes new

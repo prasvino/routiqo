@@ -1,6 +1,7 @@
 package com.routiqo.core.journey.api;
 
 import com.routiqo.core.identity.application.GoogleSessionService;
+import com.routiqo.core.identity.application.AccountWriteUnavailable;
 import com.routiqo.core.journey.application.*;
 import com.routiqo.core.journey.domain.Journey;
 import com.routiqo.core.security.BrowserAuthPolicy;
@@ -80,6 +81,9 @@ public final class BrowserJourneyController {
     @ExceptionHandler(SecurityException.class) ResponseEntity<Void> unauthenticated() { return ResponseEntity.status(401).build(); }
     @ExceptionHandler(JourneyNotFound.class) ResponseEntity<Void> missing() { return ResponseEntity.notFound().build(); }
     @ExceptionHandler(JourneyConflict.class) ResponseEntity<Void> conflict() { return ResponseEntity.status(409).build(); }
+    @ExceptionHandler(AccountWriteUnavailable.class) ResponseEntity<Void> unavailable() {
+        return ResponseEntity.status(503).build();
+    }
     @ExceptionHandler({IllegalArgumentException.class, org.springframework.http.converter.HttpMessageNotReadableException.class,
         org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
     ResponseEntity<Void> invalid() { return ResponseEntity.badRequest().build(); }

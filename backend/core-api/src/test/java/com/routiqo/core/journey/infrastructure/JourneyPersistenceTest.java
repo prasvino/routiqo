@@ -2,6 +2,7 @@ package com.routiqo.core.journey.infrastructure;
 
 import com.routiqo.core.journey.application.*;
 import com.routiqo.core.journey.domain.Journey;
+import com.routiqo.core.identity.infrastructure.JdbcAccountWriteAuthority;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -42,8 +43,10 @@ class JourneyPersistenceTest {
         return id;
     }
     JourneyService service(Instant time) {
-        return new JourneyService(new JdbcJourneyStore(new JdbcTemplate(dataSource),
-                new DataSourceTransactionManager(dataSource)), Clock.fixed(time, ZoneOffset.UTC));
+        var manager = new DataSourceTransactionManager(dataSource);
+        var jdbc = new JdbcTemplate(dataSource);
+        return new JourneyService(new JdbcJourneyStore(jdbc,
+                new JdbcAccountWriteAuthority(jdbc, manager)), Clock.fixed(time, ZoneOffset.UTC));
     }
 
     @Test void migrationAndConfiguredServiceWork() {

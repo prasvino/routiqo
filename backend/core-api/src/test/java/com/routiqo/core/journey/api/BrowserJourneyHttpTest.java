@@ -46,6 +46,23 @@ class BrowserJourneyHttpTest {
             };
         }
         @Bean AtomicInteger syntheticRouteCalls() { return new AtomicInteger(); }
+        @Bean java.util.concurrent.atomic.AtomicBoolean accountWriteUnavailable() {
+            return new java.util.concurrent.atomic.AtomicBoolean();
+        }
+        @Bean @Primary com.routiqo.core.identity.application.AccountWriteAuthority controlledAccountWrites(
+                JdbcTemplate jdbc,
+                org.springframework.transaction.PlatformTransactionManager manager,
+                @Qualifier("accountWriteUnavailable") java.util.concurrent.atomic.AtomicBoolean unavailable) {
+            var delegate = new com.routiqo.core.identity.infrastructure.JdbcAccountWriteAuthority(jdbc, manager);
+            return new com.routiqo.core.identity.application.AccountWriteAuthority() {
+                @Override public <T> T withEnabledAccount(UUID actorId, Work<T> work) {
+                    if (unavailable.get()) {
+                        throw new com.routiqo.core.identity.application.AccountWriteUnavailable();
+                    }
+                    return delegate.withEnabledAccount(actorId, work);
+                }
+            };
+        }
         @Bean @Primary com.routiqo.core.routing.application.RouteProvider syntheticRoutes(
                 @Qualifier("syntheticRouteCalls") AtomicInteger calls) {
             var delegate = new com.routiqo.core.routing.application.RouteProvider() {
@@ -77,9 +94,11 @@ class BrowserJourneyHttpTest {
     @Value("${local.server.port}") int port;
     @Autowired JdbcTemplate jdbc;
     @Autowired @Qualifier("syntheticRouteCalls") AtomicInteger routeCalls;
+    @Autowired @Qualifier("accountWriteUnavailable") java.util.concurrent.atomic.AtomicBoolean accountWriteUnavailable;
     @BeforeEach void rateBuckets() {
         jdbc.update("DELETE FROM auth_rate_bucket");
         routeCalls.set(0);
+        accountWriteUnavailable.set(false);
     }
     record Browser(HttpClient client, String csrf, String account) {}
     HttpClient client() { return HttpClient.newBuilder().cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL)).build(); }
@@ -209,6 +228,23 @@ class BrowserJourneyHttpTest {
         assertThat(JsonPath.<String>read(completed.body(), "$.status")).isEqualTo("completed");
         assertThat(send(owner, "journeys/" + id + "/complete", "{}").body()).isEqualTo(completed.body());
         assertThat(send(owner, "journeys", start(id, "trip")).body()).isEqualTo(completed.body());
+    }
+    @Test void accountWriteDatabaseFailureIsAnEmptyUnavailableResponseForStartAndCompletion() throws Exception {
+        var owner = login();
+        UUID existing = UUID.randomUUID();
+        assertThat(send(owner, "journeys", start(existing, "trip")).statusCode()).isEqualTo(200);
+        accountWriteUnavailable.set(true);
+        try {
+            var start = send(owner, "journeys", start(UUID.randomUUID(), "trip"));
+            var complete = send(owner, "journeys/" + existing + "/complete", "{}");
+            for (var response : java.util.List.of(start, complete)) {
+                assertThat(response.statusCode()).isEqualTo(503);
+                assertThat(response.body()).isEmpty();
+                assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+            }
+        } finally {
+            accountWriteUnavailable.set(false);
+        }
     }
     @Test void authenticationOriginAndCsrfAreRequiredForJourneyWrites() throws Exception {
         assertThat(send(client(), "journeys", null, null, null).statusCode()).isEqualTo(401);

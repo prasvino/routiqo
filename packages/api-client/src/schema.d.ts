@@ -700,6 +700,13 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
+            /** @description Journey write temporarily unavailable; retry the same command without changing its identity. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getBrowserJourney: {
@@ -778,6 +785,13 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
+            /** @description Journey write temporarily unavailable; retry the same completion command. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getBrowserCsrf: {

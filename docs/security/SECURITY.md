@@ -12,6 +12,11 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
 - Authorization is enforced server-side for every object and action; possession of an identifier is never sufficient.
 - Ownership and tenant boundaries apply to reads, writes, search, exports, notifications, caches, and realtime events.
 - Deny by default when identity, permission, privacy state, or policy evaluation is missing, stale, ambiguous, or fails.
+- Journey/Live database authority follows ADR 0025: account before journey locks,
+  domain-owned application interfaces, one synchronous transaction, and no ambient
+  transaction joining that can reverse the lock order. Database unavailability is
+  distinct from authentication denial; redact persistence errors and retain safe
+  retry behavior. Live consent/context/receipt integration remains a separate gate.
 - Raw stranger GPS and unnecessary precise-location data are never exposed.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.

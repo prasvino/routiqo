@@ -10,6 +10,7 @@ import com.routiqo.core.journey.application.JourneyNotFound;
 import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.domain.Journey;
 import com.routiqo.core.journey.infrastructure.JdbcJourneyStore;
+import com.routiqo.core.identity.infrastructure.JdbcAccountWriteAuthority;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -57,7 +58,9 @@ class JournalPersistenceTest {
         return id;
     }
     JourneyService journeys(Instant now) {
-        return new JourneyService(new JdbcJourneyStore(jdbc(), transactions()), Clock.fixed(now, ZoneOffset.UTC));
+        var jdbc = jdbc();
+        return new JourneyService(new JdbcJourneyStore(jdbc,
+                new JdbcAccountWriteAuthority(jdbc, transactions())), Clock.fixed(now, ZoneOffset.UTC));
     }
     JournalService journals(Instant now) {
         return new JournalService(journeys(now), new JdbcJournalStore(jdbc(), transactions()), Clock.fixed(now, ZoneOffset.UTC));

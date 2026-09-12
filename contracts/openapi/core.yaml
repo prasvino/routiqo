@@ -82,6 +82,7 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '409': { description: Journey identity/kind conflict or another active journey }
+        '503': { description: Journey write temporarily unavailable; retry the same command without changing its identity. Empty response body. }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
@@ -117,6 +118,7 @@ paths:
             schema: { type: object }
       responses:
         '200': { $ref: '#/components/responses/JourneyResult' }
+        '503': { description: Journey write temporarily unavailable; retry the same completion command. Empty response body. }
         '400': { description: Invalid identifier }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }

@@ -338,3 +338,12 @@ decision checks cover these branches, but only a future atomic database boundary
 can prevent concurrent replay, deletion and consent races across replicas. Never
 deserialize grants/admissions from client input or expose internal decision codes
 as an existence oracle. No public Live endpoint is enabled by these primitives.
+
+ADR 0025 addresses T02/T13 races between current ownership, journey mutation and
+account deletion with a PostgreSQL account-before-journey transaction boundary.
+Independent adapter instances must serialize on database rows, not process-local
+locks. An ambient transaction is rejected to prevent reversed acquisition; unknown
+SQL/transaction failures become redacted availability errors. A per-actor gate
+also creates a contention surface: bound transaction/query work and keep provider
+calls and asynchronous callbacks outside it. Remaining durable consent/context
+participants and grant/receipt race tests are mandatory before Live storage.

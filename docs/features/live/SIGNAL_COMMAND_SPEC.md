@@ -44,17 +44,18 @@ a consumed unexpired grant, missing grants and changed consent/context/completio
 
 ## Storage integration follow-through
 
-Current source constraints: JdbcSessionStore deletes accounts while holding the
-account lock before session locks; JdbcJourneyStore.complete currently locks only
-the owned journey. PresenceConsent and LiveRouteContext have no durable authority
-store. A new receipt repository alone therefore cannot establish the required
-atomic acceptance boundary.
+ADR 0025 and JOURNEY_AUTHORITY_TRANSACTION_SPEC.md now implement the account-first
+transaction boundary. JdbcSessionStore deletes accounts while holding the account
+lock before session locks; JdbcJourneyStore start/completion and owned-journey
+callbacks share the account gate. PresenceConsent and LiveRouteContext still have
+no durable authority store. A receipt repository alone therefore cannot establish
+the complete atomic acceptance boundary.
 
-Before wiring storage, design domain-owned transaction participants so acceptance,
-completion, consent change and context replacement all follow a common account-
-before-journey order compatible with deletion. Specify the remaining consent,
-context, grant and contribution-slot locks and missing-row creation arbitration;
+Before wiring signal storage, add durable consent and route-context participants
+to the account-before-journey order compatible with deletion. Apply ADR 0025's
+remaining consent, context, grant, contribution-slot and receipt lock order with
+unique constraints for missing-row creation arbitration;
 do not introduce direct routeupdate access to other domains' repositories.
-Exercise rollback and opposite-order contention against a disposable PostgreSQL
-database. Route provider calls stay outside the transaction. These are pending
-integration requirements, not guarantees of this pure policy.
+Exercise their rollback and revocation/cleanup races against a disposable
+PostgreSQL database. Route provider calls stay outside the transaction. These
+remaining signal integration requirements are not guarantees of this pure policy.
