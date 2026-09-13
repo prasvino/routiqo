@@ -27,8 +27,10 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.
 - Persisted consent is necessary authority, not publication permission. Future
-  public mutations must use ADR 0029's explicit-intent path; they must not expose
-  or auto-retry the legacy same-state transition contract.
+  mutations must use ADR 0029's explicit-intent path; they must not expose or
+  auto-retry the legacy same-state transition contract. ADR 0030's owner-only
+  browser adapter is separately default off, encodes generations as strings and
+  retains cookie/account/origin/CSRF/body plus database peer/account limits.
 - Blocked, hidden, expired, or deleted information must not reappear through search, caches, exports, logs, notifications, analytics, or realtime replay.
 - Tokens, credentials, secrets, and precise location are absent from fixtures, source control, logs, analytics, error payloads, and screenshots.
 - Inputs, payloads, queries, fan-out, retries, subscriptions, uploads, and expensive operations are bounded.

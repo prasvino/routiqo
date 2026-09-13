@@ -82,6 +82,16 @@ GET /api/v1/auth/csrf sets its HttpOnly cookie and returns a masked token. Send 
 
 Rate limits use the socket peer, not forwarded headers. A reverse proxy therefore shares a peer bucket until trusted forwarding is explicitly configured. Cleanup runs in bounded batches; measure backlog/capacity before launch. Sessions expire after 15 minutes; bounded refresh rotation supports a maximum 12-hour lineage.
 
+The private journey consent transport is separately disabled by default. Set
+`ROUTIQO_LIVE_CONSENT_API_ENABLED=true` on the backend only after configuring the
+web-auth requirements above and reviewing the matching UI/reconciliation and
+downstream revocation plan. GET and POST
+`/api/v1/journeys/{id}/consent` require the verified session account header; POST
+also requires exact origin, CSRF and strict JSON. Generations are decimal strings,
+not JavaScript numbers. The same-origin proxy already has an exact GET/POST
+allowlist, but no UI calls it. Enabling this flag does not enable signal ingestion
+or public presence.
+
 ## Open-source routing setup (opt-in)
 
 The routing profile now uses paired Valhalla and Photon services per ADR 0021. Backend and web disclosure changes must be deployed together; legacy Mapbox adapter source is no longer selected.

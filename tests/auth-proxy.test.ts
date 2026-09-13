@@ -85,6 +85,48 @@ describe('same-origin auth proxy', () => {
     expect(new Headers(options?.headers).get('cookie')).toBe('routiqo_session=opaque');
     expect(new Headers(options?.headers).get('authorization')).toBeNull();
   });
+  it('allows only GET and POST for the exact journey consent path', async () => {
+    const upstream = vi.fn<typeof fetch>().mockImplementation(async () =>
+      Response.json({
+        journeyId: '00000000-0000-4000-8000-000000000001',
+        generation: '9223372036854775807',
+        sharing: false,
+        journeyActive: true,
+      }),
+    );
+    const id = '00000000-0000-4000-8000-000000000001';
+    const get = new Request(`${config.origin}/api/v1/journeys/${id}/consent`, {
+      headers: { Cookie: 'routiqo_session=opaque', 'X-Routiqo-Account': id },
+    });
+    const getResponse = await proxyBrowserJourneys(get, [id, 'consent'], config, upstream);
+    expect(getResponse.status).toBe(200);
+    expect((await getResponse.json()).generation).toBe('9223372036854775807');
+    expect(upstream.mock.calls[0]?.[0]).toBe(`http://127.0.0.1:8080/api/v1/journeys/${id}/consent`);
+    const post = new Request(`${config.origin}/api/v1/journeys/${id}/consent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: config.origin,
+        'X-XSRF-TOKEN': 'masked',
+        'X-Routiqo-Account': id,
+      },
+      body: JSON.stringify({ expectedGeneration: '0', sharing: false }),
+    });
+    const postResponse = await proxyBrowserJourneys(post, [id, 'consent'], config, upstream);
+    expect(postResponse.status).toBe(200);
+    expect((await postResponse.json()).generation).toBe('9223372036854775807');
+    expect(String(upstream.mock.calls[1]?.[1]?.body)).toBe(
+      JSON.stringify({ expectedGeneration: '0', sharing: false }),
+    );
+    for (const request of [
+      new Request(`${config.origin}/api/v1/journeys/${id}/consent`, { method: 'PUT' }),
+      new Request(`${config.origin}/api/v1/journeys/${id}/consent?actor=${id}`),
+    ])
+      expect((await proxyBrowserJourneys(request, [id, 'consent'], config, upstream)).status).toBe(
+        request.method === 'PUT' ? 405 : 400,
+      );
+    expect(upstream).toHaveBeenCalledTimes(2);
+  });
   it('fails closed for missing/invalid configuration and unsupported destinations', async () => {
     expect(readBrowserAuthConfig({})).toBeNull();
     expect(() =>

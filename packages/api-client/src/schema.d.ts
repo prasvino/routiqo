@@ -340,6 +340,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/consent": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Returns the authenticated owner's private consent state. Separately enabled by the default-off server consent API flag. Sixty reads per account per minute. */
+        get: operations["getPrivateJourneyConsent"];
+        put?: never;
+        /** @description Applies an explicit consent intent. Enables require the exact current generation and are never automatically retried; stale or current disables take precedence. Ten enables or twenty disables per account per minute. */
+        post: operations["submitPrivateJourneyConsentIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/routes/places": {
         parameters: {
             query?: never;
@@ -416,6 +439,19 @@ export interface components {
         TripJournal: {
             journey: components["schemas"]["Journey"];
             annotation: components["schemas"]["TripJournalAnnotation"];
+        };
+        BrowserJourneyConsent: {
+            /** Format: uuid */
+            journeyId: string;
+            /** @description Canonical decimal signed-long value encoded as a string to preserve exact JavaScript precision. */
+            generation: string;
+            sharing: boolean;
+            journeyActive: boolean;
+        };
+        BrowserJourneyConsentIntent: {
+            /** @description Canonical decimal string from zero through 9223372036854775807. */
+            expectedGeneration: string;
+            sharing: boolean;
         };
         TripJournalAnnotation: {
             /** @description Plain text; UTF-16 code-unit limit enforced by server */
@@ -1342,6 +1378,121 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
+        };
+    };
+    getPrivateJourneyConsent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current private journey consent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserJourneyConsent"];
+                };
+            };
+            /** @description Invalid canonical journey identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Consent authority or rate store temporarily unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    submitPrivateJourneyConsentIntent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserJourneyConsentIntent"];
+            };
+        };
+        responses: {
+            /** @description Current committed private journey consent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserJourneyConsent"];
+                };
+            };
+            /** @description Invalid canonical journey identifier or exact JSON intent */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Consent generation conflict or completed-journey enable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Consent authority or rate store temporarily unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     searchPrivateRoutePlaces: {

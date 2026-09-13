@@ -16,6 +16,7 @@
 | P0 / L0.3d — durable consent and internal intent ordering complete | ADRs 0026/0029 privacy-owned latest state, legacy CAS compatibility, revocation-precedence explicit intents and saturating terminal revocation | 45 focused domain/PostgreSQL/composition tests and independent review passed; full verification recorded in build status; no HTTP, leases, cache publication or automatic enable retry |
 | P0 / L0.3e — durable route context complete, provider validation pending | ADR 0027 Route Update-owned latest context, post-lock time checks, exact-ID CAS, completion deletion and bounded leaf cleanup | 20 focused domain/PostgreSQL lifecycle/race/cleanup tests; full 218 Java tests/check/bootJar and independent review passed; no HTTP, provider anchor validation, scheduler or public output |
 | P0 / L0.3f — internal signal storage complete, public ingestion pending | ADR 0028 durable grants/receipts, partial-unique contribution slot, atomic acceptance/withdrawal, database budgets and bounded cleanup | 16 focused PostgreSQL transaction/race/cleanup tests; full 234 Java tests/check/bootJar and independent review passed; no HTTP, provider anchor validation, moderation, scheduler or public projection |
+| P0 / L0.3g — private browser consent transport complete, default off | ADR 0030 owner-only GET/explicit-intent POST with string generations, durable peer/account budgets and exact proxy allowlist | Real HTTP/PostgreSQL, default-deny, strict-input and failure tests; no UI, automatic enable retry, signal ingestion or public output |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -26,8 +27,9 @@ The completed internal slices are specified in
 `QUICK_SIGNAL_RECEIPT_SPEC.md` and `SIGNAL_COMMAND_SPEC.md`.
 Durable consent, route context and internal signal storage are specified in
 `DURABLE_CONSENT_SPEC.md`, `DURABLE_ROUTE_CONTEXT_SPEC.md`,
-`SIGNAL_STORAGE_SPEC.md`, `CONSENT_INTENT_SPEC.md`, and ADRs 0026–0029. These internal slices do not expose
-public command issuance or ingestion, confidence, moderation or a publicly visible
+`SIGNAL_STORAGE_SPEC.md`, `CONSENT_INTENT_SPEC.md`, `BROWSER_CONSENT_API_SPEC.md`,
+and ADRs 0026–0030. The private consent transport is default off; these slices do not expose
+public signal command issuance or ingestion, confidence, moderation or a publicly visible
 Live Moment. Complete and
 verify this slice before promoting the next queue item; do not advance status for
 future features based on their plans or primitive tests.

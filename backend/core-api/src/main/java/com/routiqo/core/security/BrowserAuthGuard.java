@@ -20,8 +20,12 @@ public final class BrowserAuthGuard extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String category = path.endsWith("/challenge") ? "challenge" : path.endsWith("/exchange") ? "exchange" : "other";
         int limit = category.equals("challenge") ? 10 : category.equals("exchange") ? 20 : 120;
-        if (!rates.allow(request.getRemoteAddr(), category, limit)) {
-            response.setHeader("Retry-After", "60"); response.setStatus(429); return;
+        try {
+            if (!rates.allow(request.getRemoteAddr(), category, limit)) {
+                response.setHeader("Retry-After", "60"); response.setStatus(429); return;
+            }
+        } catch (RuntimeException unavailable) {
+            response.setStatus(503); return;
         }
         if ("POST".equals(request.getMethod())) {
             String contentType = request.getContentType();

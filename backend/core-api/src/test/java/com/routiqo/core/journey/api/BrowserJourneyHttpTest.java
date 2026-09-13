@@ -95,6 +95,7 @@ class BrowserJourneyHttpTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired @Qualifier("syntheticRouteCalls") AtomicInteger routeCalls;
     @Autowired @Qualifier("accountWriteUnavailable") java.util.concurrent.atomic.AtomicBoolean accountWriteUnavailable;
+    @Autowired org.springframework.context.ApplicationContext applicationContext;
     @BeforeEach void rateBuckets() {
         jdbc.update("DELETE FROM auth_rate_bucket");
         routeCalls.set(0);
@@ -283,5 +284,20 @@ class BrowserJourneyHttpTest {
         assertThat(send(owner, "journeys", start(UUID.randomUUID(), "unknown")).statusCode()).isEqualTo(400);
         assertThat(send(owner, "journeys", "x".repeat(20481)).statusCode()).isEqualTo(413);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM journey WHERE owner_id = ?", Long.class, UUID.fromString(owner.account()))).isZero();
+    }
+    @Test void browserConsentRouteIsDeniedWhenItsDefaultOffFlagIsAbsent() throws Exception {
+        assertThat(applicationContext.getBeansOfType(
+                com.routiqo.core.privacy.api.BrowserConsentController.class)).isEmpty();
+        var owner = login();
+        UUID journey = UUID.randomUUID();
+        assertThat(send(owner, "journeys", start(journey, "trip")).statusCode()).isEqualTo(200);
+        for (var response : java.util.List.of(
+                send(owner, "journeys/" + journey + "/consent", null),
+                send(owner, "journeys/" + journey + "/consent",
+                        "{\"expectedGeneration\":\"0\",\"sharing\":false}"))) {
+            assertThat(response.statusCode()).isIn(401, 403);
+            assertThat(response.body()).isEmpty();
+            assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        }
     }
 }

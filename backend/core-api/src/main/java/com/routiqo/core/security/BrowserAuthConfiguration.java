@@ -14,7 +14,9 @@ import org.springframework.security.web.csrf.*;
 public class BrowserAuthConfiguration {
     @Bean BrowserAuthPolicy browserAuthPolicy(@Value("${ROUTIQO_WEB_ORIGIN}") String origin,
             @Value("${ROUTIQO_AUTH_SECURE_COOKIES:true}") boolean secure) { return new BrowserAuthPolicy(origin, secure); }
-    @Bean @Order(1) SecurityFilterChain browserAuthSecurity(HttpSecurity http, BrowserAuthPolicy policy, AuthRateGate rates) throws Exception {
+    @Bean @Order(1) SecurityFilterChain browserAuthSecurity(HttpSecurity http, BrowserAuthPolicy policy,
+            AuthRateGate rates,
+            @Value("${ROUTIQO_LIVE_CONSENT_API_ENABLED:false}") boolean consentEnabled) throws Exception {
         var csrf = new CookieCsrfTokenRepository();
         csrf.setCookieName(policy.cookieName("routiqo_csrf")); csrf.setCookiePath("/");
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(policy.secureCookies()).sameSite("Strict"));
@@ -23,13 +25,20 @@ public class BrowserAuthConfiguration {
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.csrfTokenRepository(csrf))
                 .addFilterBefore(new BrowserAuthGuard(policy, rates), CsrfFilter.class)
-                .authorizeHttpRequests(a -> a
-                    .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/routes", "/api/v1/routes/places").permitAll()
-                    .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/auth/csrf", "/api/v1/auth/session").permitAll()
-                    .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/journeys", "/api/v1/journeys/*", "/api/v1/journeys/*/journal").permitAll()
-                    .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/journeys", "/api/v1/journeys/*/complete", "/api/v1/journeys/*/journal").permitAll()
-                    .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/google/challenge", "/api/v1/auth/google/exchange", "/api/v1/auth/logout", "/api/v1/auth/session/renew", "/api/v1/auth/account/delete").permitAll()
-                    .anyRequest().denyAll())
+                .authorizeHttpRequests(a -> {
+                    a.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/routes", "/api/v1/routes/places").permitAll();
+                    a.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/auth/csrf", "/api/v1/auth/session").permitAll();
+                    a.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/journeys", "/api/v1/journeys/*", "/api/v1/journeys/*/journal").permitAll();
+                    a.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/journeys", "/api/v1/journeys/*/complete", "/api/v1/journeys/*/journal").permitAll();
+                    if (consentEnabled) {
+                        a.requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/v1/journeys/*/consent").permitAll();
+                        a.requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/v1/journeys/*/consent").permitAll();
+                    }
+                    a.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/google/challenge", "/api/v1/auth/google/exchange", "/api/v1/auth/logout", "/api/v1/auth/session/renew", "/api/v1/auth/account/delete").permitAll();
+                    a.anyRequest().denyAll();
+                })
                 .exceptionHandling(e -> e.authenticationEntryPoint((request, response, error) -> response.setStatus(401))
                     .accessDeniedHandler((request, response, error) -> response.setStatus(403)))
                 .build();

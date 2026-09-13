@@ -102,9 +102,10 @@ export async function proxyBrowserJourneys(
   const detail = path.length === 1 && journeyId.test(path[0] ?? '');
   const complete = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'complete';
   const journal = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'journal';
-  if (!listing && !detail && !complete && !journal) return failure(404);
+  const consent = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'consent';
+  if (!listing && !detail && !complete && !journal && !consent) return failure(404);
   if (
-    !(listing || journal
+    !(listing || journal || consent
       ? ['GET', 'POST'].includes(request.method)
       : request.method === (detail ? 'GET' : 'POST'))
   )

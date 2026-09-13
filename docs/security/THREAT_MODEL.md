@@ -365,6 +365,15 @@ enable generations and gives stale/current revocation precedence under the same
 database locks. Future public adapters must use that path without automatic enable
 retry. Delivered caches still require reliable revocation before publication.
 
+ADR 0030 exposes that explicit-intent path only to the authenticated journey owner
+through a separately default-off browser route. Exact account partition, cookie,
+origin, CSRF and bounded JSON checks precede mutation; database peer and stable
+account budgets deny on store failure. Separate enable and disable budgets prevent
+enable traffic from consuming the revocation allowance. Canonical decimal strings
+avoid JavaScript generation truncation. Responses are private and no-store, and
+owner/missing journeys share 404 behavior. This does not solve offline ordering,
+cache/delivery revocation, location proof or public presence safety.
+
 ADR 0027 adds one Route Update-owned latest context row per account. Owned-journey
 constraints, exact current-ID replacement, fresh identities, post-row-lock time
 sampling and ordered completion deletion reduce stale-context and cross-replica

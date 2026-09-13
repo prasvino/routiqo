@@ -20,7 +20,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion invokes consent then route-context participants atomically; signal acceptance composes both current authorities |
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
-| Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. No HTTP consent commands, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
+| Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; no UI, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. Internal grants bind this state; no public provider anchor registration, scheduler or output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. No HTTP ingestion, provider anchor validation, moderation, scheduler or publication |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
@@ -32,6 +32,29 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Default-off browser consent pass (ADR 0030): owner-only GET and explicit-intent
+POST use the existing browser session, account partition, origin/CSRF and bounded
+body guards. Consent generations remain exact decimal strings through HTTP,
+OpenAPI, generated TypeScript and the same-origin proxy. Durable database budgets
+permit 60 reads, 10 enables and 20 disables per account/minute in separate
+categories. Peer, account-rate, session-store and consent-authority failures deny
+with bodyless no-store 503 responses. The sample flag remains false and no UI,
+automatic enable retry, signal ingestion, lease, cache invalidation or public Live
+output was added.
+
+The focused real HTTP/PostgreSQL set passed **17 tests**: 8 enabled consent tests
+and 9 existing journey/default-off regressions. It covers owner roundtrip and
+ordering, completed/replaced/wrong-owner journeys, exact maximum generation,
+strict JSON/path/media/body handling, session/account/origin/CSRF isolation,
+distributed budgets and redacted failure paths. The focused proxy suite passed
+**7 tests**, including exact-path/method denial, exact maximum-generation response
+and string request forwarding. Full core check and bootJar passed **254 Java tests
+across 37 suites**, zero failures, errors or skips. Full workspace checks passed
+**258 TypeScript/component tests across 41 files**, generated-contract drift,
+formatting, strict types and lint; the web production build, secret scan and diff
+check passed. Root and independent review approved the corrected source and tests.
+Disposable PostgreSQL and synthetic test identity only; no user data was migrated.
 
 Explicit consent-intent pass (ADR 0029): the internal `submitIntent` path runs under
 the existing account, owned-journey and consent locks. Active-journey enable needs

@@ -23,10 +23,12 @@ Internal `PresenceConsent` defines opt-in defaults, monotonic generation changes
 terminal journey completion and owner/journey-bound leases of at most 90 seconds.
 ADR 0026 now persists one minimal latest row per account with journey-scoped CAS,
 opt-out reads and completion revocation under the account/journey transaction.
-There is still no public consent command or lease issuer. ADR 0029 adds an internal
-explicit-intent path where every accepted off fences delayed enables, stale off is
-accepted and enable requires the exact current generation. The legacy trusted
-state-change operation retains its same-state behavior.
+ADR 0029 adds an explicit-intent path where every accepted off fences delayed
+enables, stale off is accepted and enable requires the exact current generation.
+ADR 0030 exposes only this private owner intent behind a separate default-off
+browser flag and durable budgets. No UI calls it, and there is still no presence
+lease issuer or public consent/presence surface. The legacy trusted state-change
+operation retains its same-state behavior.
 
 ADR 0027 persists only the current bounded Live route context under the same
 account/journey authority. Exact context identity and revision changes invalidate
