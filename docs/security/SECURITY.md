@@ -17,8 +17,9 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   transaction joining that can reverse the lock order. Database unavailability is
   distinct from authentication denial; redact persistence errors and retain safe
   retry behavior. Durable consent and route context use this boundary with
-  journey-scoped CAS and ordered atomic completion handling; receipt integration
-  remains a separate gate. Expiry cleanup is a bounded context-row-only leaf path.
+  journey-scoped CAS and ordered atomic completion handling. ADR 0028 composes
+  them with durable grants and receipts plus database budgets; public ingestion
+  remains gated. Expiry cleanup paths are bounded leaf-only operations.
 - Raw stranger GPS and unnecessary precise-location data are never exposed.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.

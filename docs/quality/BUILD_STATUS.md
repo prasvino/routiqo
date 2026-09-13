@@ -17,11 +17,12 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
-| Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion invokes consent then route-context participants atomically; durable receipts remain pending |
+| Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion invokes consent then route-context participants atomically; signal acceptance composes both current authorities |
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence consent | Privacy-owned PostgreSQL latest-row state with journey-scoped CAS, opt-out reads and atomic completion revocation. No HTTP consent commands, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
-| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. No provider anchor registration, admission issuer, scheduler, signal storage or public output |
+| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. Internal grants bind this state; no public provider anchor registration, scheduler or output |
+| Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. No HTTP ingestion, provider anchor validation, moderation, scheduler or publication |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -31,6 +32,31 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Transactional signal-storage pass (ADR 0028): migration V10 persists complete
+UNUSED/CONSUMED grants independently from retained receipts, enforces closed
+categories and partial-unique ACTIVE contribution slots, and keeps one fixed-minute
+budget per actor/action. Issuance and new acceptance run under account, journey,
+consent and context authority; acceptance atomically budgets, supersedes, consumes
+and inserts. Exact retained replay ignores new lifetime settings and consumes no
+budget. Withdrawal is terminal without renewal.
+
+Focused disposable PostgreSQL tests cover owned/current issuance, category and
+anchor binding, microsecond duration rules, partial-work rollback, concurrent
+duplicate acceptance, changed payload conflict, cross-journey slot replacement,
+withdrawal, Ghost/context/completion invalidation, expiry after a grant-lock wait,
+minute budgets across adapters/journeys, independent grant/receipt cleanup,
+receipt purge before live consumed-grant expiry, retained retry after grant cleanup,
+missing/expired denial, SKIP LOCKED bounds, account deletion and redaction.
+No HTTP, public projection, provider registration, moderation or scheduler exists.
+
+Full core check and bootJar passed **234 Java tests across 36 suites**, zero
+failures, errors or skips. All 16 focused transactional storage tests passed after
+the authority-race, cleanup-identity and duration-ordering corrections. Root and
+independent security review approved the final source, V10 schema, tests and docs.
+Secret and diff checks passed. No frontend contracts or UI changed; prior 257 TS
+tests and web production build remain the latest frontend evidence. Disposable
+Testcontainers databases only; no user data was migrated.
 
 Durable route-context pass (ADR 0027): migration V9 stores one minimal latest
 context per account with owned-journey, UUID, revision, distinct-anchor and

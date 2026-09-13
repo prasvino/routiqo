@@ -1,7 +1,7 @@
 # ADR 0024: Admission-bound command identity and bounded receipt storage
 
-Status: accepted design. Internal grant state and command decision policy are
-implemented (SIGNAL_COMMAND_SPEC.md); issuance and durable storage are pending.
+Status: accepted and implemented for internal grants, receipts, contribution slots,
+budgets and cleanup (SIGNAL_COMMAND_SPEC.md, SIGNAL_STORAGE_SPEC.md and ADR 0028).
 Public signal ingestion and moment publication remain disabled.
 
 ## Problem

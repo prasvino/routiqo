@@ -4,6 +4,10 @@ import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.routeupdate.application.LiveRouteContextExpiryMaintenance;
 import com.routiqo.core.routeupdate.application.LiveRouteContextParticipant;
 import com.routiqo.core.routeupdate.application.LiveRouteContextService;
+import com.routiqo.core.routeupdate.application.SignalStorageExpiryMaintenance;
+import com.routiqo.core.routeupdate.application.SignalStorageService;
+import com.routiqo.core.routeupdate.application.SignalStorageStore;
+import com.routiqo.core.privacy.application.PresenceConsentParticipant;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,5 +33,23 @@ public class RouteUpdatePersistenceConfiguration {
     LiveRouteContextExpiryMaintenance liveRouteContextExpiryMaintenance(
             JdbcTemplate jdbc, PlatformTransactionManager manager) {
         return new JdbcLiveRouteContextExpiryMaintenance(jdbc, manager, Clock.systemUTC());
+    }
+
+    @Bean
+    JdbcSignalStorageStore signalStorageStore(JdbcTemplate jdbc) {
+        return new JdbcSignalStorageStore(jdbc);
+    }
+
+    @Bean
+    SignalStorageService signalStorageService(JourneyWriteAuthority journeys,
+            PresenceConsentParticipant consents, LiveRouteContextParticipant contexts,
+            SignalStorageStore store) {
+        return new SignalStorageService(journeys, consents, contexts, store, Clock.systemUTC());
+    }
+
+    @Bean
+    SignalStorageExpiryMaintenance signalStorageExpiryMaintenance(
+            JdbcTemplate jdbc, PlatformTransactionManager manager) {
+        return new JdbcSignalStorageExpiryMaintenance(jdbc, manager, Clock.systemUTC());
     }
 }

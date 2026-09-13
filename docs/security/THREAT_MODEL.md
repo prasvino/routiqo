@@ -339,6 +339,14 @@ can prevent concurrent replay, deletion and consent races across replicas. Never
 deserialize grants/admissions from client input or expose internal decision codes
 as an existence oracle. No public Live endpoint is enabled by these primitives.
 
+ADR 0028 persists server-issued grants and private receipts under the complete
+account/journey/consent/context lock order. Durable consumed state survives receipt
+cleanup, retained retries do not consume quota, and a partial unique index limits
+each actor/anchor/category to one ACTIVE contribution across journeys. Fixed-minute
+database budgets resist context or connection rotation across replicas. ACTIVE is
+only lifecycle state; provider anchor proof, peer limits, anti-Sybil moderation,
+durable Ghost/block invalidation and cohort-safe publication remain mandatory.
+
 ADR 0025 addresses T02/T13 races between current ownership, journey mutation and
 account deletion with a PostgreSQL account-before-journey transaction boundary.
 Independent adapter instances must serialize on database rows, not process-local
