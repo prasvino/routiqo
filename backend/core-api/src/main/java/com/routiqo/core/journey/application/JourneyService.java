@@ -4,6 +4,7 @@ import com.routiqo.core.journey.domain.Journey;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.List;
 import java.util.UUID;
@@ -19,7 +20,9 @@ public final class JourneyService {
             List<JourneyCompletionParticipant> completionParticipants, Clock clock) {
         this.store = Objects.requireNonNull(store);
         this.writes = Objects.requireNonNull(writes);
-        this.completionParticipants = List.copyOf(completionParticipants);
+        this.completionParticipants = completionParticipants.stream()
+                .sorted(Comparator.comparingInt(JourneyCompletionParticipant::completionOrder))
+                .toList();
         this.clock = Objects.requireNonNull(clock);
     }
     public Journey start(UUID actorId, UUID journeyId, Journey.Kind kind) {

@@ -26,6 +26,12 @@ There is still no public consent command or lease issuer. A same-state off write
 does not advance generation, so public intent ordering must prevent a delayed
 enable with that same generation before claiming all reordered opt-outs win.
 
+ADR 0027 persists only the current bounded Live route context under the same
+account/journey authority. Exact context identity and revision changes invalidate
+old admission snapshots, and completion deletes the matching context after consent
+revocation. These private anchors still require trusted provider/region validation
+and do not establish physical presence or permission to publish.
+
 Presence must be opt-in for an owned active journey. Durable consent state alone
 is not proof of presence or publication eligibility. A client-supplied route or
 segment identifier is not proof of membership. Before ingestion, implement

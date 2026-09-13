@@ -354,5 +354,13 @@ endpoint. Reads are opt-out and nonmutating; account deletion cascades state.
 An unchanged off state preserves its generation, so it cannot by itself reject a
 delayed enable carrying the same expected generation. Future public consent
 commands require durable intent ordering, and delivered caches still require
-reliable revocation. Durable context and grant/receipt race tests remain mandatory
-before Live storage or publication.
+reliable revocation. Grant/receipt race tests remain mandatory before Live storage
+or publication.
+
+ADR 0027 adds one Route Update-owned latest context row per account. Owned-journey
+constraints, exact current-ID replacement, fresh identities, post-row-lock time
+sampling and ordered completion deletion reduce stale-context and cross-replica
+races. Expiry maintenance is bounded, skips locked rows and cannot acquire earlier
+authority locks. Stored anchors remain sensitive route intent and are not proof of
+location, admission or publication permission. Provider-to-anchor validation,
+signal storage and durable invalidation remain mandatory before public Live use.

@@ -16,8 +16,9 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   domain-owned application interfaces, one synchronous transaction, and no ambient
   transaction joining that can reverse the lock order. Database unavailability is
   distinct from authentication denial; redact persistence errors and retain safe
-  retry behavior. Durable consent uses this boundary with journey-scoped CAS and
-  atomic completion revocation; context/receipt integration remains a separate gate.
+  retry behavior. Durable consent and route context use this boundary with
+  journey-scoped CAS and ordered atomic completion handling; receipt integration
+  remains a separate gate. Expiry cleanup is a bounded context-row-only leaf path.
 - Raw stranger GPS and unnecessary precise-location data are never exposed.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.

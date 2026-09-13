@@ -98,6 +98,11 @@ public final class JdbcPresenceConsentParticipant
         }
     }
 
+    @Override
+    public int completionOrder() {
+        return JourneyCompletionParticipant.CONSENT_ORDER;
+    }
+
     private PresenceConsent stateFor(Journey journey, Stored stored) {
         if (stored == null || !stored.journeyId().equals(journey.id())) {
             return journey.status() == Journey.Status.ACTIVE
