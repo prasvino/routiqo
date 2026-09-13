@@ -14,8 +14,12 @@ tables. Callbacks execute synchronously in the same local JDBC transaction.
 AccountWriteAuthority owns the outer transaction and rejects an ambient active
 transaction rather than joining potentially reversed lock acquisition. Its
 callback follows a checked enabled-account FOR UPDATE read. JourneyWriteAuthority
-adds an owned journey FOR UPDATE read inside that callback. The existing journey
-start and completion paths use the same gate, preserving lifecycle/idempotency.
+adds an owned journey FOR UPDATE read inside that callback. Journey start enters
+the account gate in its repository; JourneyService owns completion orchestration,
+enters JourneyWriteAuthority, then invokes repository and configured completion
+participants in the same transaction. Raw repository completion is a trusted
+participant and rejects calls outside a transaction; an arbitrary transaction is
+not evidence that the required account and journey locks were acquired.
 Session renewal, logout and account deletion already take account before session
 locks, so no session-first path is introduced by this change.
 
@@ -52,9 +56,10 @@ datasource/transaction manager and same thread. No runtime enforcement can make
 arbitrary independently configured adapters participate atomically. Wiring,
 architecture review and disposable database tests must verify the composition.
 
-This step needs no migration or new public endpoint. The contract documents
-retryable 503 responses for existing journey writes. It does not yet
-persist consent, contexts, grants, slots or receipts. Follow ADR 0024 for their
-retention and replay rules and JOURNEY_AUTHORITY_TRANSACTION_SPEC.md for tests.
+The authority step needed no migration or new public endpoint. The contract
+documents retryable 503 responses for existing journey writes. ADR 0026 now uses
+the boundary for durable consent; contexts, grants, slots and receipts remain
+pending. Follow ADR 0024 for their retention and replay rules and
+JOURNEY_AUTHORITY_TRANSACTION_SPEC.md for tests.
 Do not enable signal storage until all mutable authorities and cleanup participate
 in the reviewed boundary and the remaining race tests pass.

@@ -1,9 +1,12 @@
 package com.routiqo.core.journey.infrastructure;
 
+import com.routiqo.core.journey.application.JourneyCompletionParticipant;
 import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.application.JourneyStore;
+import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.identity.application.AccountWriteAuthority;
 import java.time.Clock;
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -17,7 +20,8 @@ public class JourneyPersistenceConfiguration {
         return new JdbcJourneyStore(jdbc, accounts);
     }
     @Bean
-    JourneyService journeyService(JourneyStore store) {
-        return new JourneyService(store, Clock.systemUTC());
+    JourneyService journeyService(JourneyStore store, JourneyWriteAuthority writes,
+            List<JourneyCompletionParticipant> completionParticipants) {
+        return new JourneyService(store, writes, completionParticipants, Clock.systemUTC());
     }
 }

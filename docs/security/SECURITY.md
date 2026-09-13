@@ -16,11 +16,15 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   domain-owned application interfaces, one synchronous transaction, and no ambient
   transaction joining that can reverse the lock order. Database unavailability is
   distinct from authentication denial; redact persistence errors and retain safe
-  retry behavior. Live consent/context/receipt integration remains a separate gate.
+  retry behavior. Durable consent uses this boundary with journey-scoped CAS and
+  atomic completion revocation; context/receipt integration remains a separate gate.
 - Raw stranger GPS and unnecessary precise-location data are never exposed.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.
+- Persisted consent is necessary authority, not publication permission. A same-state
+  opt-out that preserves generation needs separate durable command ordering before
+  reordered public commands can be considered safe.
 - Blocked, hidden, expired, or deleted information must not reappear through search, caches, exports, logs, notifications, analytics, or realtime replay.
 - Tokens, credentials, secrets, and precise location are absent from fixtures, source control, logs, analytics, error payloads, and screenshots.
 - Inputs, payloads, queries, fan-out, retries, subscriptions, uploads, and expensive operations are bounded.

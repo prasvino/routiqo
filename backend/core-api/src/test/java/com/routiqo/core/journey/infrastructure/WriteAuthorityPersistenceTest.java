@@ -5,10 +5,14 @@ import com.routiqo.core.identity.application.AccountWriteUnavailable;
 import com.routiqo.core.identity.infrastructure.JdbcAccountWriteAuthority;
 import com.routiqo.core.identity.infrastructure.JdbcSessionStore;
 import com.routiqo.core.journey.application.JourneyNotFound;
+import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.journey.domain.Journey;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -198,7 +202,7 @@ class WriteAuthorityPersistenceTest {
         })).isInstanceOf(IllegalArgumentException.class).hasMessage("rollback");
         assertThat(store.find(actor, journeyId).orElseThrow().status()).isEqualTo(Journey.Status.ACTIVE);
 
-        store.complete(actor, journeyId, START.plusSeconds(60));
+        journeyService(store, START.plusSeconds(60)).complete(actor, journeyId);
         assertThat(store.withOwnedJourney(actor, journeyId, Journey::status))
                 .isEqualTo(Journey.Status.COMPLETED);
     }
@@ -220,7 +224,7 @@ class WriteAuthorityPersistenceTest {
             }));
             assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
             var completion = executor.submit(
-                    () -> completer.complete(actor, journeyId, START.plusSeconds(60)));
+                    () -> journeyService(completer, START.plusSeconds(60)).complete(actor, journeyId));
             try {
                 assertThat(waitingForAccountLock()).isTrue();
             } finally {
@@ -311,6 +315,10 @@ class WriteAuthorityPersistenceTest {
     private JdbcJourneyStore journeyStore() {
         var jdbc = new JdbcTemplate(dataSource);
         return new JdbcJourneyStore(jdbc, new JdbcAccountWriteAuthority(jdbc, manager()));
+    }
+
+    private static JourneyService journeyService(JdbcJourneyStore store, Instant now) {
+        return new JourneyService(store, store, List.of(), Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private UUID account(boolean enabled) {

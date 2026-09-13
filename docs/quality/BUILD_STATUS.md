@@ -1,4 +1,4 @@
-# Build status — 2026-09-12
+# Build status — 2026-09-13
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
 
@@ -17,10 +17,10 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
-| Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Durable Live consent/context/receipts remain pending |
+| Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion now invokes configured participants atomically; durable context/receipts remain pending |
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
-| Presence policy | Internal consent generation and bounded lease rules tested; Ghost Mode invalidates older generations. No discoverable presence, durable consent service or realtime publication enabled |
+| Presence consent | Privacy-owned PostgreSQL latest-row state with journey-scoped CAS, opt-out reads and atomic completion revocation. No HTTP consent commands, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -30,6 +30,31 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Durable consent pass (ADR 0026): migration V8 stores one minimal latest consent
+row per account with owned-journey and state constraints. Reads run under current
+owned-journey authority and return opt-out without mutation. Explicit changes use
+journey-scoped expected generations; actual Ghost transitions fence stale enables.
+Configured journey completion revokes matching consent in the same account and
+journey transaction, while failures and generation overflow roll back both.
+
+Disposable PostgreSQL tests cover schema ownership/cascade, default reads, one-row
+replacement, same-state updates, stale/reordered generations, independent-adapter
+CAS races, consent/completion serialization with observed database lock waiting,
+configured participant wiring, terminal retries and rollback. A same-state off
+write preserves generation and therefore does not fence a delayed enable with the
+same expected generation; a future public command API needs durable intent ordering.
+No public endpoint, lease, cache/realtime invalidation or signal storage was added.
+
+Full core check and bootJar passed **198 Java tests across 33 suites**, zero
+failures, errors or skips. The 14 focused durable-consent tests exercise generation
+overflow rollback, concurrent CAS writers, completion rollback, completion versus
+stale enable with observed PostgreSQL lock waiting, deletion cascade and the
+documented same-state-off ordering limit. Root and independent security review
+approved the final source and documentation. Secret scan and diff checks passed.
+No frontend contracts or UI changed; prior 257 TS tests and web production build
+remain the latest frontend evidence. Testcontainers databases only; no user data
+was migrated.
 
 Account/journey authority pass (ADR 0025): identity owns the enabled-account
 transaction boundary and Journey owns locked current-journey callbacks. Existing
@@ -47,9 +72,10 @@ diff checks, generated-contract drift, workspace typecheck and 11 browser journe
 dispatch tests passed. No visual changes; prior full 257 TS tests/web build remain
 the latest full frontend run. Testcontainers databases only; no user migrations.
 
-Next: durable consent and bounded route-context transaction participants, followed
-by grant/receipt/slot migrations and race/cleanup tests. This slice does not provide
-Ghost Mode persistence, signal storage, issuer endpoints or public Live output.
+Next: bounded route-context transaction participation, followed by grant/receipt/
+slot migrations and race/cleanup tests. This slice does not provide
+public Ghost Mode commands, delivered-cache revocation, signal storage, issuer
+endpoints or public Live output.
 
 Live L0.3b command-policy pass: internal SignalCommandGrant models irreversible
 consumption within the admission lifetime; SignalCommandPolicy distinguishes new

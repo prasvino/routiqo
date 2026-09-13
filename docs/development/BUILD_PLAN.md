@@ -13,6 +13,7 @@
 | P0 / L0.3a — complete | Internal context-linked receipt state, terminal withdrawal/supersession and exact replay comparison | 8 focused tests; full 158 Java tests/check/bootJar and review passed; no durable store or publication permission |
 | P0 / L0.3b — internal command policy implemented; storage pending | Admission-bound grant consumption and retained retry decisions; ADR 0024 remains the storage contract | 15 focused tests; full 173 Java tests/check/bootJar and independent review passed; durable consent/context participants and migrations next, then database signal race/replay/purge tests |
 | P0 / L0.3c — account/journey transaction boundary complete | ADR 0025 domain-owned write authority, account-before-journey locks integrated with start/completion, redacted retryable failures | Full 184 Java tests/check/bootJar; 34 targeted database/HTTP tests, independent review; future Live persistence still pending |
+| P0 / L0.3d — durable consent complete, public command ordering pending | ADR 0026 privacy-owned latest consent row, journey-scoped CAS and atomic completion revocation | 14 focused disposable PostgreSQL ownership/CAS/race/rollback tests; full 198 Java tests/check/bootJar and independent review passed; no HTTP, leases, cache publication or claim that unchanged opt-out fences delayed enable |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -21,7 +22,8 @@
 The completed internal slices are specified in
 `docs/features/live/QUICK_SIGNAL_DOMAIN_SPEC.md`, `SIGNAL_ADMISSION_SPEC.md`,
 `QUICK_SIGNAL_RECEIPT_SPEC.md` and `SIGNAL_COMMAND_SPEC.md`.
-They do not implement admission issuance, storage idempotency, confidence or a
+Durable consent is specified in `DURABLE_CONSENT_SPEC.md` and ADR 0026. These
+internal slices do not implement admission issuance, signal storage idempotency, confidence or a
 publicly visible Live Moment. Complete and
 verify this slice before promoting the next queue item; do not advance status for
 future features based on their plans or primitive tests.

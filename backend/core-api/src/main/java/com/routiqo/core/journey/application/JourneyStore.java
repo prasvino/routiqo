@@ -9,6 +9,7 @@ import java.util.UUID;
 public interface JourneyStore {
     Journey start(UUID actorId, UUID journeyId, Journey.Kind kind, Instant now);
     Optional<Journey> find(UUID actorId, UUID journeyId);
+    /** Trusted repository participant; caller must already hold account and owned-journey authority. */
     Journey complete(UUID actorId, UUID journeyId, Instant now);
     Page list(UUID actorId, Cursor before, int limit);
 

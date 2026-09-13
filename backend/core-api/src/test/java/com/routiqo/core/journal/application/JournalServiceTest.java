@@ -4,6 +4,7 @@ import com.routiqo.core.journal.domain.JournalAnnotation;
 import com.routiqo.core.journal.domain.JournalMutation;
 import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.application.JourneyStore;
+import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.journey.domain.Journey;
 import java.time.Clock;
 import java.time.Instant;
@@ -57,8 +58,13 @@ class JournalServiceTest {
             @Override public Journey complete(UUID actorId, UUID journeyId, Instant now) { throw new UnsupportedOperationException(); }
             @Override public Page list(UUID actorId, Cursor before, int limit) { throw new UnsupportedOperationException(); }
         };
+        JourneyWriteAuthority writes = new JourneyWriteAuthority() {
+            @Override public <T> T withOwnedJourney(UUID actorId, UUID journeyId, Work<T> work) {
+                throw new UnsupportedOperationException();
+            }
+        };
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        return new JournalService(new JourneyService(journeys, clock), journals, clock);
+        return new JournalService(new JourneyService(journeys, writes, List.of(), clock), journals, clock);
     }
 
     private static JournalMutation mutation() { return new JournalMutation("", "", 0, UUID.randomUUID()); }

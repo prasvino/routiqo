@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 public final class JdbcJourneyStore implements JourneyStore, JourneyWriteAuthority {
     private static final String COLUMNS = "id, owner_id, kind, status, started_at, completed_at";
@@ -65,16 +66,18 @@ public final class JdbcJourneyStore implements JourneyStore, JourneyWriteAuthori
     @Override
     public Journey complete(UUID actorId, UUID journeyId, Instant now) {
         Objects.requireNonNull(now);
-        return withOwnedJourney(actorId, journeyId, stored -> {
-            Journey completed = stored.complete(actorId, now.truncatedTo(ChronoUnit.MICROS));
-            if (stored.status() == Journey.Status.ACTIVE) {
-                jdbc.update("""
-                    UPDATE journey SET status = 'COMPLETED', completed_at = ?
-                    WHERE owner_id = ? AND id = ? AND status = 'ACTIVE'
-                    """, timestamp(completed.completedAt()), actorId, journeyId);
-            }
-            return completed;
-        });
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Journey completion transaction is required");
+        }
+        Journey stored = findOwned(actorId, journeyId, true).orElseThrow(JourneyNotFound::new);
+        Journey completed = stored.complete(actorId, now.truncatedTo(ChronoUnit.MICROS));
+        if (stored.status() == Journey.Status.ACTIVE) {
+            jdbc.update("""
+                UPDATE journey SET status = 'COMPLETED', completed_at = ?
+                WHERE owner_id = ? AND id = ? AND status = 'ACTIVE'
+                """, timestamp(completed.completedAt()), actorId, journeyId);
+        }
+        return completed;
     }
 
     @Override

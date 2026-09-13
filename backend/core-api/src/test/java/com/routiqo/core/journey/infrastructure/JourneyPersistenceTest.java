@@ -45,8 +45,8 @@ class JourneyPersistenceTest {
     JourneyService service(Instant time) {
         var manager = new DataSourceTransactionManager(dataSource);
         var jdbc = new JdbcTemplate(dataSource);
-        return new JourneyService(new JdbcJourneyStore(jdbc,
-                new JdbcAccountWriteAuthority(jdbc, manager)), Clock.fixed(time, ZoneOffset.UTC));
+        var store = new JdbcJourneyStore(jdbc, new JdbcAccountWriteAuthority(jdbc, manager));
+        return new JourneyService(store, store, List.of(), Clock.fixed(time, ZoneOffset.UTC));
     }
 
     @Test void migrationAndConfiguredServiceWork() {

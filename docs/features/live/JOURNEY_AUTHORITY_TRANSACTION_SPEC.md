@@ -3,7 +3,8 @@
 Status: PostgreSQL boundary implemented; final verification is recorded in
 BUILD_STATUS.md. ADR 0025 defines the accepted integration contract.
 Scope: real PostgreSQL account/journey serialization, not signal receipt storage,
-durable consent, route registration or public Live ingestion.
+route registration or public Live ingestion. Durable consent now uses this
+boundary under ADR 0026.
 
 ## Contract and ownership
 
@@ -40,7 +41,11 @@ transaction, retain transaction capabilities or run providers/projections.
 
 JdbcJourneyStore implements JourneyWriteAuthority using AccountWriteAuthority;
 it does not query identity tables. Its start operation enters the account boundary
-before insertion, and complete enters the owned-journey boundary before updating.
+before insertion. JourneyService is the complete-operation boundary: it enters
+owned-journey authority, calls the repository completion participant and then all
+configured completion participants before commit. Raw JdbcJourneyStore completion
+requires that existing account/journey transaction and is not safe under an
+arbitrary transaction or as a direct application entry point.
 Existing retry, owner isolation, microsecond timestamps and one-active-journey
 semantics remain. Persistence-profile wiring shares the existing datasource and
 transaction manager; default preview remains unchanged. No compatibility
@@ -58,10 +63,10 @@ must occur under the account gate and have unique constraints. Never independent
 enter this account boundary from inside an already active callback.
 
 This serializes writes for one actor across processes without a global lock.
-Durable consent/context implementations, grant/receipt migrations, cleanup and
-publication invalidation remain subsequent work. They must participate in this
+Durable consent now participates in this transaction. Context, grant/receipt
+migrations, cleanup and publication invalidation remain subsequent work. They must participate in this
 same transaction before SignalCommandPolicy can authorize actual storage. No
-claim of Ghost Mode persistence is made by this slice.
+public Ghost Mode, presence lease or cache-revocation claim is made by this slice.
 
 ## Acceptance
 

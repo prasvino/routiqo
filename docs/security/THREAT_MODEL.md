@@ -345,5 +345,14 @@ Independent adapter instances must serialize on database rows, not process-local
 locks. An ambient transaction is rejected to prevent reversed acquisition; unknown
 SQL/transaction failures become redacted availability errors. A per-actor gate
 also creates a contention surface: bound transaction/query work and keep provider
-calls and asynchronous callbacks outside it. Remaining durable consent/context
-participants and grant/receipt race tests are mandatory before Live storage.
+calls and asynchronous callbacks outside it.
+
+ADR 0026 adds one privacy-owned latest consent row per account under that boundary.
+Journey-scoped CAS, owned-journey constraints and atomic completion revocation
+reduce T02/T06/T13/T19/T20 stale-consent and race risks without exposing a new
+endpoint. Reads are opt-out and nonmutating; account deletion cascades state.
+An unchanged off state preserves its generation, so it cannot by itself reject a
+delayed enable carrying the same expected generation. Future public consent
+commands require durable intent ordering, and delivered caches still require
+reliable revocation. Durable context and grant/receipt race tests remain mandatory
+before Live storage or publication.

@@ -59,8 +59,8 @@ class JournalPersistenceTest {
     }
     JourneyService journeys(Instant now) {
         var jdbc = jdbc();
-        return new JourneyService(new JdbcJourneyStore(jdbc,
-                new JdbcAccountWriteAuthority(jdbc, transactions())), Clock.fixed(now, ZoneOffset.UTC));
+        var store = new JdbcJourneyStore(jdbc, new JdbcAccountWriteAuthority(jdbc, transactions()));
+        return new JourneyService(store, store, List.of(), Clock.fixed(now, ZoneOffset.UTC));
     }
     JournalService journals(Instant now) {
         return new JournalService(journeys(now), new JdbcJournalStore(jdbc(), transactions()), Clock.fixed(now, ZoneOffset.UTC));
