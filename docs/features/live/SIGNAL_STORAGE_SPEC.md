@@ -1,8 +1,9 @@
 # Internal transactional signal storage
 
 Status: implemented and tested as internal persistence under ADR 0024 and ADR 0028.
-No public API, provider-based anchor validation, moderation, projection, queue
-dispatch or scheduler is enabled.
+ADR 0033 adds a separately default-off catalog-aware facade over the same
+transaction service. No public API, moderation, projection, queue dispatch or
+scheduler is enabled.
 
 Implement routeupdate-owned grant and receipt persistence plus an internal service
 that composes JourneyWriteAuthority, PresenceConsentParticipant and
@@ -85,3 +86,11 @@ replay after grant cleanup; expired receipt denial; receipt purge before consume
 grant expiry; missing grant denial; locked-row cleanup/replacement safety; bounded
 cleanup and account deletion. Use actual current authority services, no mock consent
 or invented route validity. Record exact remaining public/operational gates.
+
+ADR 0033's configured path does not accept a caller-selected category set at
+issuance: it derives all categories from the current immutable server catalog and
+requires matching stored context provenance. New acceptance rechecks current
+catalog anchor/category eligibility inside this same transaction before mutation.
+The trusted low-level methods remain for internal compatibility and are forbidden
+to API packages by an architecture test. Retained exact private replay remains
+independent of current catalog and consent eligibility.

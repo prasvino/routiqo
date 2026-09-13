@@ -2,16 +2,26 @@ package com.routiqo.core.routeupdate.domain;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 
 /** Internal durable envelope; it is private route intent and never a public DTO or permission. */
 public record StoredLiveRouteContext(
         LiveRouteContext context,
         Instant issuedAt,
-        Instant expiresAt) {
+        Instant expiresAt,
+        Optional<UUID> catalogVersion) {
     private static final Duration MAX_LIFETIME = Duration.ofHours(24);
+    private static final UUID NIL_ID = new UUID(0, 0);
+
+    public StoredLiveRouteContext(LiveRouteContext context, Instant issuedAt,
+            Instant expiresAt) {
+        this(context, issuedAt, expiresAt, Optional.empty());
+    }
 
     public StoredLiveRouteContext {
-        if (context == null || issuedAt == null || expiresAt == null) {
+        if (context == null || issuedAt == null || expiresAt == null || catalogVersion == null
+                || catalogVersion.filter(value -> NIL_ID.equals(value)).isPresent()) {
             throw invalid();
         }
         Duration lifetime = Duration.between(issuedAt, expiresAt);

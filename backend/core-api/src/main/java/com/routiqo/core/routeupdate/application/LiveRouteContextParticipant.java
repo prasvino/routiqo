@@ -16,4 +16,7 @@ public interface LiveRouteContextParticipant {
 
     StoredLiveRouteContext replace(Journey journey, Set<UUID> anchorIds, Duration lifetime,
             Optional<UUID> expectedCurrentContextId, UUID newContextId);
+
+    StoredLiveRouteContext replaceBound(Journey journey, Set<UUID> anchorIds, Duration lifetime,
+            Optional<UUID> expectedCurrentContextId, UUID newContextId, UUID catalogVersion);
 }

@@ -21,8 +21,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; no UI, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
-| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration, scheduler or output |
-| Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. No HTTP ingestion, provider anchor validation, moderation, scheduler or publication |
+| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration, scheduler or output |
+| Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no HTTP ingestion, moderation, scheduler or publication |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -32,6 +32,27 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Catalog-aware signal authority pass (ADR 0033): V12 adds nullable non-nil catalog
+provenance to private route contexts. Provider binding stores the actual catalog
+version; ordinary replacement clears it and historical rows remain unvalidated.
+The configured default-off facade derives complete grant categories from the
+server catalog and rechecks context provenance, anchor membership and current
+category eligibility inside the existing new-acceptance transaction before grant,
+budget, slot or receipt mutation. Exact retained replay remains first after
+catalog removal/version changes, consent withdrawal or completion. An architecture
+rule forbids API packages from depending on the trusted low-level storage service.
+
+The focused set passed **66 tests** across stored-context domain and PostgreSQL,
+binding, signal storage, production configuration and architecture suites. It
+covers nullable/non-nil migration constraints, legacy/raw provenance clearing,
+actual configured binding-to-issue-to-accept, exact catalog-derived categories,
+missing/changed/removed provenance, disallowed current categories, consent/context
+changes with no partial mutation, retained exact replay and changed retry conflict,
+plus all affected low-level and route-binding regressions. Full core check and
+bootJar passed **300 Java tests across 44 suites**, zero failures, errors or skips.
+No public HTTP/UI, TTL change, feature activation,
+provider data, scheduler or Live output was added.
 
 Internal route-binding pass (ADR 0032): an account-scoped durable attempt fences
 fresh provider work between two short authority transactions. The first transaction

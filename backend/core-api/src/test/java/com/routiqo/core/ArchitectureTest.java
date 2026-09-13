@@ -14,4 +14,10 @@ class ArchitectureTest {
        .resideInAnyPackage("org.springframework..","jakarta.persistence..","..api..","..infrastructure..")
        .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("com.routiqo.core"));
  }
+ @Test void apiLayerCannotUseTheLowLevelSignalStorageService() {
+   noClasses().that().resideInAPackage("..api..").should().dependOnClassesThat()
+       .haveFullyQualifiedName("com.routiqo.core.routeupdate.application.SignalStorageService")
+       .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+           .importPackages("com.routiqo.core"));
+ }
 }

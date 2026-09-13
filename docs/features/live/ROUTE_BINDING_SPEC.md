@@ -39,8 +39,9 @@ expectation, exact latest PENDING attempt identity/journey/catalog and result
 catalog version. Sample server time after relevant row locks and deny future or
 expired attempts. No stale result may overwrite current state. All checks and
 mutation share one transaction. Consume the attempt BEFORE invoking context replace;
-then persist only resolved anchor IDs through the existing context participant,
-with a fresh context UUID and a fixed 15-minute context lifetime. Context write
+then persist only resolved anchor IDs plus their immutable catalog version through
+the existing context participant, with a fresh context UUID and a fixed 15-minute
+context lifetime. Context write
 failure rolls back consumption. Do not accept caller-selected lifetime or new UUID.
 
 Return private typed BOUND/NO_ROUTE/NO_ELIGIBLE_ANCHORS outcomes. Empty route/match

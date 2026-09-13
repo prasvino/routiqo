@@ -82,8 +82,9 @@ public final class RouteBindingService {
             if (result.anchors().isEmpty()) {
                 return RouteBindingOutcome.empty(RouteBindingOutcome.Status.NO_ELIGIBLE_ANCHORS);
             }
-            StoredLiveRouteContext context = contexts.replace(journey, result.anchors().keySet(),
-                    CONTEXT_LIFETIME, attempt.expectedContextId(), requiredNewId());
+            StoredLiveRouteContext context = contexts.replaceBound(journey,
+                    result.anchors().keySet(), CONTEXT_LIFETIME, attempt.expectedContextId(),
+                    requiredNewId(), result.catalogVersion());
             return RouteBindingOutcome.bound(context);
         });
     }

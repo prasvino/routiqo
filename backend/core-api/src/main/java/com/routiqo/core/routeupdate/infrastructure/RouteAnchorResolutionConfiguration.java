@@ -4,6 +4,8 @@ import com.routiqo.core.routeupdate.application.RouteAnchorResolver;
 import com.routiqo.core.routeupdate.application.RouteBindingAttemptParticipant;
 import com.routiqo.core.routeupdate.application.RouteBindingService;
 import com.routiqo.core.routeupdate.application.LiveRouteContextParticipant;
+import com.routiqo.core.routeupdate.application.CatalogSignalService;
+import com.routiqo.core.routeupdate.application.SignalStorageService;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
@@ -52,6 +54,13 @@ public class RouteAnchorResolutionConfiguration {
             RouteBindingAttemptParticipant attempts, RouteAnchorResolver resolver,
             AuthRateGate rates) {
         return new RouteBindingService(journeys, consents, contexts, attempts, resolver, rates);
+    }
+
+    @Bean
+    @Profile("persistence")
+    CatalogSignalService catalogSignalService(
+            SignalStorageService storage, RouteAnchorCatalog catalog) {
+        return new CatalogSignalService(storage, catalog);
     }
 
     private static IllegalStateException invalid() {

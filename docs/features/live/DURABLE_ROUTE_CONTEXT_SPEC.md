@@ -5,6 +5,11 @@ default-off provider-backed resolver and private two-transaction binding; no
 public registration, admission issuer or projection exists. ADR 0027 records the
 storage behavior and limits.
 
+ADR 0033 adds nullable catalog provenance to the stored envelope. Provider-bound
+replacement requires and stores the resolver's non-nil immutable catalog version.
+Historical and ordinary trusted replacements remain unvalidated and explicitly
+clear provenance; matching anchor IDs never manufacture it.
+
 Add a routeupdate-owned stored context envelope around LiveRouteContext with server
 issuedAt/expiresAt. Validate the original requested lifetime as positive and at
 most 24 hours, then floor computed expiry to PostgreSQL microsecond precision and

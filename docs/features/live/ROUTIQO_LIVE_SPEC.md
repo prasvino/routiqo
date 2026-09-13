@@ -75,6 +75,9 @@ ADR 0031 resolves a curated anchor catalog against fresh guarded Valhalla vertic
 with endpoint exclusion. ADR 0032 binds that result internally to an active owned
 journey and current consent/context through a durable newest-attempt fence. Both
 paths remain default off; they do not prove presence or authorize publication.
+ADR 0033 uses that bound catalog provenance only for internal signal issuance and
+new-acceptance category checks. Exact retained private replay is unchanged. No
+public signal transport or Live projection is enabled.
 Client GPS remains untrusted. Claims remain traveller reports, not verified
 observations of physical presence. Arbitrary bounds, segments and membership
 probing are denied; no account-independent live discovery endpoint is planned.

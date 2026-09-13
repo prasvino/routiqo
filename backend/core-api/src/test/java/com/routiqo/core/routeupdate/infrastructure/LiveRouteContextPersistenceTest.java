@@ -74,6 +74,41 @@ class LiveRouteContextPersistenceTest {
     @Autowired JdbcPresenceConsentParticipant configuredConsent;
 
     @Test
+    void boundReplacementStoresCatalogProvenanceAndOrdinaryReplacementClearsIt() {
+        Services services = services(START);
+        UUID actor = account();
+        UUID journey = start(services.journeys(), actor);
+        UUID catalog = UUID.randomUUID();
+        StoredLiveRouteContext raw = services.contexts().replace(actor, journey, anchors(1),
+                Duration.ofMinutes(5), Optional.empty());
+        assertThat(raw.catalogVersion()).isEmpty();
+
+        StoredLiveRouteContext bound = services.store().withOwnedJourney(actor, journey,
+                owned -> services.participant().replaceBound(owned, anchors(2),
+                        Duration.ofMinutes(5), Optional.of(raw.context().contextId()),
+                        UUID.randomUUID(), catalog));
+        assertThat(bound.catalogVersion()).contains(catalog);
+        assertThat(services.contexts().read(actor, journey)).contains(bound);
+
+        StoredLiveRouteContext cleared = services.contexts().replace(actor, journey, anchors(1),
+                Duration.ofMinutes(5), Optional.of(bound.context().contextId()));
+        assertThat(cleared.catalogVersion()).isEmpty();
+        assertThat(jdbc().queryForObject(
+                "SELECT catalog_version FROM live_route_context WHERE actor_id = ?",
+                UUID.class, actor)).isNull();
+
+        assertThatThrownBy(() -> services.store().withOwnedJourney(actor, journey,
+                owned -> services.participant().replaceBound(owned, anchors(1),
+                        Duration.ofMinutes(1), Optional.of(cleared.context().contextId()),
+                        UUID.randomUUID(), new UUID(0, 0))))
+                .isInstanceOf(LiveRouteContextConflict.class).hasNoCause();
+        assertThatThrownBy(() -> jdbc().update(
+                "UPDATE live_route_context SET catalog_version = ? WHERE actor_id = ?",
+                new UUID(0, 0), actor))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void migrationEnforcesIdentityOwnershipAnchorsRevisionAndLifetimeThenAccountDeletionCascades() {
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         UUID actor = account();

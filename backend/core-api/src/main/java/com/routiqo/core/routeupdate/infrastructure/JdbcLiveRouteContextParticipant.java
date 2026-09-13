@@ -61,6 +61,23 @@ public final class JdbcLiveRouteContextParticipant
     @Override
     public StoredLiveRouteContext replace(Journey journey, Set<UUID> anchorIds, Duration lifetime,
             Optional<UUID> expectedCurrentContextId, UUID newContextId) {
+        return replace(journey, anchorIds, lifetime, expectedCurrentContextId, newContextId,
+                Optional.empty());
+    }
+
+    @Override
+    public StoredLiveRouteContext replaceBound(Journey journey, Set<UUID> anchorIds,
+            Duration lifetime, Optional<UUID> expectedCurrentContextId, UUID newContextId,
+            UUID catalogVersion) {
+        requireTransaction();
+        if (invalidId(catalogVersion)) throw conflict();
+        return replace(journey, anchorIds, lifetime, expectedCurrentContextId, newContextId,
+                Optional.of(catalogVersion));
+    }
+
+    private StoredLiveRouteContext replace(Journey journey, Set<UUID> anchorIds, Duration lifetime,
+            Optional<UUID> expectedCurrentContextId, UUID newContextId,
+            Optional<UUID> catalogVersion) {
         requireTransaction();
         if (journey == null || anchorIds == null || lifetime == null
                 || expectedCurrentContextId == null || invalidId(newContextId)
@@ -108,7 +125,7 @@ public final class JdbcLiveRouteContextParticipant
             }
             LiveRouteContext context = new LiveRouteContext(newContextId, journey.ownerId(),
                     journey.id(), revision, anchorIds);
-            replacement = new StoredLiveRouteContext(context, now, expiresAt);
+            replacement = new StoredLiveRouteContext(context, now, expiresAt, catalogVersion);
         } catch (DateTimeException | IllegalArgumentException invalid) {
             throw conflict();
         }
@@ -117,20 +134,23 @@ public final class JdbcLiveRouteContextParticipant
         if (stored == null) {
             jdbc.update("""
                 INSERT INTO live_route_context
-                    (actor_id, journey_id, context_id, revision, anchor_ids, issued_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (actor_id, journey_id, context_id, revision, anchor_ids, issued_at, expires_at,
+                     catalog_version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, replacement.context().actorId(), replacement.context().journeyId(),
                     replacement.context().contextId(), replacement.context().revision(), anchors,
-                    timestamp(replacement.issuedAt()), timestamp(replacement.expiresAt()));
+                    timestamp(replacement.issuedAt()), timestamp(replacement.expiresAt()),
+                    replacement.catalogVersion().orElse(null));
         } else {
             int updated = jdbc.update("""
                 UPDATE live_route_context
                 SET journey_id = ?, context_id = ?, revision = ?, anchor_ids = ?,
-                    issued_at = ?, expires_at = ?
+                    issued_at = ?, expires_at = ?, catalog_version = ?
                 WHERE actor_id = ? AND context_id = ?
                 """, replacement.context().journeyId(), replacement.context().contextId(),
                     replacement.context().revision(), anchors, timestamp(replacement.issuedAt()),
-                    timestamp(replacement.expiresAt()), replacement.context().actorId(),
+                    timestamp(replacement.expiresAt()), replacement.catalogVersion().orElse(null),
+                    replacement.context().actorId(),
                     stored.context().contextId());
             if (updated != 1) {
                 throw conflict();
@@ -159,7 +179,8 @@ public final class JdbcLiveRouteContextParticipant
 
     private List<StoredLiveRouteContext> findLocked(UUID actorId) {
         return jdbc.query("""
-            SELECT actor_id, journey_id, context_id, revision, anchor_ids, issued_at, expires_at
+            SELECT actor_id, journey_id, context_id, revision, anchor_ids, issued_at, expires_at,
+                   catalog_version
             FROM live_route_context WHERE actor_id = ? FOR UPDATE
             """, JdbcLiveRouteContextParticipant::map, actorId);
     }
@@ -178,7 +199,8 @@ public final class JdbcLiveRouteContextParticipant
                 row.getLong("revision"), distinct);
         return new StoredLiveRouteContext(context,
                 row.getTimestamp("issued_at").toInstant(),
-                row.getTimestamp("expires_at").toInstant());
+                row.getTimestamp("expires_at").toInstant(),
+                Optional.ofNullable(row.getObject("catalog_version", UUID.class)));
     }
 
     private Instant currentTime() {

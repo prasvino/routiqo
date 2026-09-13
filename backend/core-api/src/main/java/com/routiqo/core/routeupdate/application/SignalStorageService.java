@@ -7,6 +7,7 @@ import com.routiqo.core.privacy.domain.PresenceConsent;
 import com.routiqo.core.routeupdate.domain.QuickSignal;
 import com.routiqo.core.routeupdate.domain.QuickSignalReceipt;
 import com.routiqo.core.routeupdate.domain.QuickSignalValue;
+import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routeupdate.domain.SignalAdmission;
 import com.routiqo.core.routeupdate.domain.SignalCommandGrant;
 import com.routiqo.core.routeupdate.domain.StoredLiveRouteContext;
@@ -46,9 +47,20 @@ public final class SignalStorageService {
 
     public SignalCommandGrant issue(UUID actorId, UUID journeyId, UUID anchorId,
             Set<QuickSignalValue.Category> permittedCategories) {
+        return issue(actorId, journeyId, anchorId, permittedCategories, null);
+    }
+
+    SignalCommandGrant issueFromCatalog(UUID actorId, UUID journeyId, UUID anchorId,
+            RouteAnchorCatalog catalog) {
+        return issue(actorId, journeyId, anchorId, null, Objects.requireNonNull(catalog));
+    }
+
+    private SignalCommandGrant issue(UUID actorId, UUID journeyId, UUID anchorId,
+            Set<QuickSignalValue.Category> permittedCategories, RouteAnchorCatalog catalog) {
         return journeys.withOwnedJourney(actorId, journeyId, journey -> {
-            if (journey.status() != Journey.Status.ACTIVE || permittedCategories == null
-                    || permittedCategories.isEmpty() || anchorId == null) {
+            if (journey.status() != Journey.Status.ACTIVE || anchorId == null
+                    || catalog == null && (permittedCategories == null
+                            || permittedCategories.isEmpty())) {
                 throw denied();
             }
             PresenceConsent consent = consents.read(journey);
@@ -60,6 +72,9 @@ public final class SignalStorageService {
                     || !storedContext.context().anchorIds().contains(anchorId)) {
                 throw denied();
             }
+            Set<QuickSignalValue.Category> effectiveCategories = catalog == null
+                    ? permittedCategories
+                    : catalogCategories(catalog, storedContext, anchorId);
             Instant expiresAt = min(normalizedAfter(now, GRANT_LIFETIME), storedContext.expiresAt());
             if (!expiresAt.isAfter(now)) {
                 throw denied();
@@ -69,7 +84,7 @@ public final class SignalStorageService {
                 admission = new SignalAdmission(actorId, journeyId,
                         storedContext.context().contextId(), anchorId,
                         storedContext.context().revision(), consent.generation(),
-                        permittedCategories, now, expiresAt);
+                        effectiveCategories, now, expiresAt);
             } catch (IllegalArgumentException invalid) {
                 throw denied();
             }
@@ -84,6 +99,19 @@ public final class SignalStorageService {
     public QuickSignalReceipt accept(UUID actorId, UUID commandId,
             SignalCommandPolicy.SubmissionFingerprint submission,
             Duration evidenceLifetime, Duration retention) {
+        return accept(actorId, commandId, submission, evidenceLifetime, retention, null);
+    }
+
+    QuickSignalReceipt acceptFromCatalog(UUID actorId, UUID commandId,
+            SignalCommandPolicy.SubmissionFingerprint submission,
+            Duration evidenceLifetime, Duration retention, RouteAnchorCatalog catalog) {
+        return accept(actorId, commandId, submission, evidenceLifetime, retention,
+                Objects.requireNonNull(catalog));
+    }
+
+    private QuickSignalReceipt accept(UUID actorId, UUID commandId,
+            SignalCommandPolicy.SubmissionFingerprint submission,
+            Duration evidenceLifetime, Duration retention, RouteAnchorCatalog catalog) {
         return journeys.withOwnedJourney(actorId, requiredJourney(submission), journey -> {
             Optional<QuickSignalReceipt> existing = store.findReceipt(actorId, commandId);
             if (existing.isPresent()) {
@@ -113,6 +141,11 @@ public final class SignalStorageService {
             if (!storedContext.isCurrentAt(now)) {
                 throw denied();
             }
+            if (catalog != null) {
+                Set<QuickSignalValue.Category> allowed = catalogCategories(
+                        catalog, storedContext, submission.anchorId());
+                if (!allowed.contains(category)) throw denied();
+            }
             SignalCommandPolicy.Decision decision = policy.decide(actorId, commandId,
                     submission, null, grant, storedContext.context(), journey, consent, now);
             if (decision != SignalCommandPolicy.Decision.NEW_ACCEPTANCE_CANDIDATE) {
@@ -141,6 +174,19 @@ public final class SignalStorageService {
             store.insertReceipt(receipt);
             return receipt;
         });
+    }
+
+    private static Set<QuickSignalValue.Category> catalogCategories(RouteAnchorCatalog catalog,
+            StoredLiveRouteContext storedContext, UUID anchorId) {
+        if (!storedContext.catalogVersion().equals(Optional.of(catalog.version()))
+                || !storedContext.context().anchorIds().contains(anchorId)) {
+            throw denied();
+        }
+        return catalog.anchors().stream()
+                .filter(anchor -> anchor.anchorId().equals(anchorId))
+                .findFirst()
+                .map(anchor -> anchor.categories())
+                .orElseThrow(SignalStorageService::denied);
     }
 
     public QuickSignalReceipt withdraw(UUID actorId, UUID journeyId, UUID commandId) {

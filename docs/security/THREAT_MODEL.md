@@ -400,3 +400,11 @@ context is replaced and physically expired. Provider work holds no authority
 locks, and only opaque anchor IDs enter the 15-minute context. This still does not
 prove physical presence. Public authenticated transport, grant category
 revalidation and cohort-safe publication remain mandatory before exposure.
+
+ADR 0033 prevents matching opaque anchor IDs alone from being treated as provider
+provenance. Only a context bound to the current immutable catalog may issue through
+the configured facade, and new acceptance rechecks the current anchor and category
+inside the storage transaction before any quota or receipt mutation. Raw context
+replacement clears provenance. Retained replay remains private command recovery,
+not renewed evidence or publication authority. Catalog-version reuse, rollout
+consistency, moderation and cohort-safe output remain operational release risks.

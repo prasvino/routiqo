@@ -32,6 +32,12 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   account budget, exact consent/context/catalog rechecks and post-lock expiry stop
   stale provider responses. Context replacement and completion invalidate pending
   work atomically. Requests and provider geometry are never persisted.
+- ADR 0033 requires bound catalog provenance for configured signal issuance and
+  rechecks current catalog anchor/category eligibility inside the existing new-
+  acceptance transaction before budgets or mutations. Ordinary context writes
+  clear provenance. API packages cannot depend on the trusted low-level signal
+  storage service; exact retained private replay remains independent of current
+  publication eligibility.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.
