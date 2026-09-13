@@ -1,6 +1,7 @@
 package com.routiqo.core.routeupdate.infrastructure;
 
 import com.routiqo.core.routeupdate.application.RouteAnchorResolver;
+import com.routiqo.core.routeupdate.application.RouteBindingService;
 import com.routiqo.core.routeupdate.domain.ResolvedRouteAnchors;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routing.application.RegionLimitedRouteProvider;
@@ -36,6 +37,7 @@ class RouteAnchorResolutionConfigurationTest {
             if (!profiles.isEmpty()) runner = runner.withPropertyValues("spring.profiles.active=" + profiles);
             runner.run(context -> assertThat(context).hasNotFailed()
                     .doesNotHaveBean(RouteAnchorResolver.class)
+                    .doesNotHaveBean(RouteBindingService.class)
                     .doesNotHaveBean(RouteAnchorCatalog.class));
         }
 
@@ -46,7 +48,8 @@ class RouteAnchorResolutionConfigurationTest {
                             "ROUTIQO_LIVE_ANCHOR_CATALOG_PATH=" + catalog);
             if (!profiles.isEmpty()) runner = runner.withPropertyValues("spring.profiles.active=" + profiles);
             runner.run(context -> assertThat(context).hasNotFailed()
-                    .doesNotHaveBean(RouteAnchorResolver.class));
+                    .doesNotHaveBean(RouteAnchorResolver.class)
+                    .doesNotHaveBean(RouteBindingService.class));
         }
     }
 

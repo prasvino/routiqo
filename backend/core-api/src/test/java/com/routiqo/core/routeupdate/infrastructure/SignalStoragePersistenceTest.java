@@ -340,7 +340,8 @@ class SignalStoragePersistenceTest {
         JdbcTemplate jdbc = jdbc();
         var store = new JdbcJourneyStore(jdbc, new JdbcAccountWriteAuthority(jdbc, manager()));
         var consent = new JdbcPresenceConsentParticipant(jdbc);
-        var context = new JdbcLiveRouteContextParticipant(jdbc, fixture.clock());
+        var context = new JdbcLiveRouteContextParticipant(jdbc, fixture.clock(),
+                new JdbcRouteBindingAttemptParticipant(jdbc, fixture.clock()));
         CountDownLatch completed = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         com.routiqo.core.journey.application.JourneyCompletionParticipant blocker = journey -> {
@@ -533,7 +534,8 @@ class SignalStoragePersistenceTest {
         JdbcTemplate jdbc = jdbc();
         var store = new JdbcJourneyStore(jdbc, new JdbcAccountWriteAuthority(jdbc, manager()));
         var consentParticipant = new JdbcPresenceConsentParticipant(jdbc);
-        var contextParticipant = new JdbcLiveRouteContextParticipant(jdbc, clock);
+        var attempts = new JdbcRouteBindingAttemptParticipant(jdbc, clock);
+        var contextParticipant = new JdbcLiveRouteContextParticipant(jdbc, clock, attempts);
         var journeys = new JourneyService(store, store,
                 List.of(contextParticipant, consentParticipant), clock);
         var consents = new PresenceConsentService(store, consentParticipant);

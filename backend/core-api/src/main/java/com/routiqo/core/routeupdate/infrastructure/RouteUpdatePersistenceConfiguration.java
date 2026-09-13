@@ -19,8 +19,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Profile("persistence")
 public class RouteUpdatePersistenceConfiguration {
     @Bean
-    JdbcLiveRouteContextParticipant liveRouteContextParticipant(JdbcTemplate jdbc) {
-        return new JdbcLiveRouteContextParticipant(jdbc, Clock.systemUTC());
+    JdbcRouteBindingAttemptParticipant routeBindingAttemptParticipant(JdbcTemplate jdbc) {
+        return new JdbcRouteBindingAttemptParticipant(jdbc, Clock.systemUTC());
+    }
+
+    @Bean
+    JdbcLiveRouteContextParticipant liveRouteContextParticipant(JdbcTemplate jdbc,
+            com.routiqo.core.routeupdate.application.RouteBindingAttemptParticipant attempts) {
+        return new JdbcLiveRouteContextParticipant(jdbc, Clock.systemUTC(), attempts);
     }
 
     @Bean

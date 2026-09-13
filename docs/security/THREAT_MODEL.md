@@ -391,6 +391,12 @@ is held only in memory. Vertex-only 100-metre matching avoids invented segment
 membership, and inclusive 1,000-metre requested/provider endpoint exclusion reduces
 home/work inference. The output omits coordinates and rejects more than 128
 matches. These heuristics do not prove physical presence, accessibility, grade
-separation, catalog safety or anonymity. Authenticated journey binding, budgets,
-post-provider consent/context revalidation and cohort-safe publication remain
-mandatory before exposure.
+separation, catalog safety or anonymity.
+
+ADR 0032 adds internal journey binding, an account budget and post-provider
+consent/context/catalog revalidation. A single durable latest attempt prevents an
+older or failed provider request from regaining authority, including after another
+context is replaced and physically expired. Provider work holds no authority
+locks, and only opaque anchor IDs enter the 15-minute context. This still does not
+prove physical presence. Public authenticated transport, grant category
+revalidation and cohort-safe publication remain mandatory before exposure.

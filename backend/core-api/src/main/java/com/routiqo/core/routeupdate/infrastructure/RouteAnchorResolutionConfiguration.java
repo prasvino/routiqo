@@ -1,7 +1,13 @@
 package com.routiqo.core.routeupdate.infrastructure;
 
 import com.routiqo.core.routeupdate.application.RouteAnchorResolver;
+import com.routiqo.core.routeupdate.application.RouteBindingAttemptParticipant;
+import com.routiqo.core.routeupdate.application.RouteBindingService;
+import com.routiqo.core.routeupdate.application.LiveRouteContextParticipant;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
+import com.routiqo.core.identity.application.AuthRateGate;
+import com.routiqo.core.journey.application.JourneyWriteAuthority;
+import com.routiqo.core.privacy.application.PresenceConsentParticipant;
 import com.routiqo.core.routing.application.RouteProvider;
 import com.routiqo.core.routing.domain.RoutingRegion;
 import java.nio.file.Path;
@@ -37,6 +43,15 @@ public class RouteAnchorResolutionConfiguration {
         } catch (RuntimeException invalidConfiguration) {
             throw invalid();
         }
+    }
+
+    @Bean
+    @Profile("persistence")
+    RouteBindingService routeBindingService(JourneyWriteAuthority journeys,
+            PresenceConsentParticipant consents, LiveRouteContextParticipant contexts,
+            RouteBindingAttemptParticipant attempts, RouteAnchorResolver resolver,
+            AuthRateGate rates) {
+        return new RouteBindingService(journeys, consents, contexts, attempts, resolver, rates);
     }
 
     private static IllegalStateException invalid() {

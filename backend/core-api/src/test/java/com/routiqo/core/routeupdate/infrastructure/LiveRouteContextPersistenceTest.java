@@ -556,8 +556,9 @@ class LiveRouteContextPersistenceTest {
         JdbcTemplate jdbc = jdbc();
         var store = new JdbcJourneyStore(jdbc, new JdbcAccountWriteAuthority(jdbc, manager()));
         var consent = new JdbcPresenceConsentParticipant(jdbc);
-        var participant = new JdbcLiveRouteContextParticipant(jdbc, clock);
-        var journeys = new JourneyService(store, store, List.of(participant, consent), clock);
+        var attempts = new JdbcRouteBindingAttemptParticipant(jdbc, clock);
+        var participant = new JdbcLiveRouteContextParticipant(jdbc, clock, attempts);
+        var journeys = new JourneyService(store, store, List.of(participant, consent, attempts), clock);
         return new Services(store, consent, participant, journeys,
                 new LiveRouteContextService(store, participant), clock);
     }

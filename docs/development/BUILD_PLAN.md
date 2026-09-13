@@ -18,6 +18,7 @@
 | P0 / L0.3f — internal signal storage complete, public ingestion pending | ADR 0028 durable grants/receipts, partial-unique contribution slot, atomic acceptance/withdrawal, database budgets and bounded cleanup | 16 focused PostgreSQL transaction/race/cleanup tests; full 234 Java tests/check/bootJar and independent review passed; no HTTP, provider anchor validation, moderation, scheduler or public projection |
 | P0 / L0.3g — private browser consent transport complete, default off | ADR 0030 owner-only GET/explicit-intent POST with string generations, durable peer/account budgets and exact proxy allowlist | Real HTTP/PostgreSQL, default-deny, strict-input and failure tests; no UI, automatic enable retry, signal ingestion or public output |
 | P0 / L0.3h — provider-backed anchor resolution complete, default off | ADR 0031 strict curated catalog and fresh region-guarded Valhalla vertex matching with endpoint exclusion | 23 focused domain/loader/config/provider tests and full 273 Java tests passed; no journey binding, provider quality claim, HTTP, geometry persistence or public output |
+| P0 / L0.3i — internal route binding complete, default off | ADR 0032 two short authority transactions around fresh resolution, durable newest-attempt fencing and atomic context replacement | Focused PostgreSQL/domain/race tests and full backend verification; no HTTP, physical-presence claim, public grant issuer or Live output |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -29,7 +30,7 @@ The completed internal slices are specified in
 Durable consent, route context and internal signal storage are specified in
 `DURABLE_CONSENT_SPEC.md`, `DURABLE_ROUTE_CONTEXT_SPEC.md`,
 `SIGNAL_STORAGE_SPEC.md`, `CONSENT_INTENT_SPEC.md`, `BROWSER_CONSENT_API_SPEC.md`,
-`ROUTE_ANCHOR_RESOLUTION_SPEC.md`, and ADRs 0026–0031. The private consent transport
+`ROUTE_ANCHOR_RESOLUTION_SPEC.md`, `ROUTE_BINDING_SPEC.md`, and ADRs 0026–0032. The private consent transport
 and internal anchor resolver are default off; these slices do not expose
 public signal command issuance or ingestion, confidence, moderation or a publicly visible
 Live Moment. Complete and
@@ -38,10 +39,11 @@ future features based on their plans or primitive tests.
 
 Current dependency discovered during execution: server journey creation accepts
 only an ID and kind; stored journeys still have no validated route/anchor
-association. ADR 0031 resolves a fresh route against a curated catalog internally,
-but a future authority transaction must bind that result to an owned journey and
-current consent/context before grant issuance. Existing client-selected places,
-route estimates or active journey ownership alone are not admission authority.
+association. ADR 0032 now binds a fresh ADR 0031 result to an active owned journey,
+current consent and exact context through a durable newest-attempt fence. This
+internal path remains default off and has no public transport or grant issuer.
+Existing client-selected places, route estimates or active journey ownership alone
+are not admission authority.
 
 Cohort publication decision checkpoint: `COHORT_PUBLICATION_DESIGN.md` in the Live
 feature directory documents the remaining block/withdrawal/differencing issues.

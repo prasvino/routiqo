@@ -1,8 +1,9 @@
 # Durable Live route context
 
-Status: implemented and tested as internal storage. No public registration,
-provider-to-anchor validation, admission issuer, signal store or projection.
-ADR 0027 records the accepted behavior and limits.
+Status: implemented and tested as internal storage. ADRs 0031 and 0032 add a
+default-off provider-backed resolver and private two-transaction binding; no
+public registration, admission issuer or projection exists. ADR 0027 records the
+storage behavior and limits.
 
 Add a routeupdate-owned stored context envelope around LiveRouteContext with server
 issuedAt/expiresAt. Validate the original requested lifetime as positive and at
@@ -34,6 +35,14 @@ mandatory. Overflow fails without mutation. Do not recycle an expired context,
 mint new identity on an implicit retry, or perform provider work in a transaction.
 Returning anchors does not authorize admission or establish physical presence.
 
+ADR 0032 adds a mandatory Route Update attempt participant to the JDBC context
+writer. Every successful replacement invalidates a pending binding attempt for
+the account after the context write in the same transaction, preserving context
+then attempt lock order. The binding coordinator consumes its own attempt before
+replacement, so this invalidation is a no-op for a successful bind. This rule is
+enforced at the persistence participant rather than only at a service facade, so
+trusted direct participants cannot bypass the stale-provider fence.
+
 Implement JourneyCompletionParticipant to delete only the matching current context
 atomically with real service completion. This follows consent in the documented
 account -> journey -> consent -> context order. Make participant ordering explicit
@@ -60,5 +69,6 @@ boundaries and time sampling after lock wait; fresh identity and stale replaceme
 rejection; independent-adapter same-expected race; expired and purged contexts
 cannot restore admission; completion/deletion/rollback; explicit participant order;
 bounded cleanup skipping a locked row and preserving a concurrent replacement;
-cleanup failures/transaction requirements/redaction. Keep public Live gates and
-the existing consent-command ordering limitation explicit in docs/status.
+cleanup failures/transaction requirements/redaction. Keep public Live, grant
+category validation, physical-presence and cohort-publication gates explicit in
+docs/status.

@@ -9,6 +9,7 @@ import com.routiqo.core.routing.domain.RouteRequest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
@@ -29,6 +30,11 @@ public final class RouteAnchorResolver {
         }
         this.routes = routes;
         this.catalog = catalog;
+    }
+
+    /** Private catalog identity captured before provider work for two-transaction binding. */
+    public UUID catalogVersion() {
+        return catalog.version();
     }
 
     public ResolvedRouteAnchors resolve(RouteRequest request, int selectedAlternative) {

@@ -21,7 +21,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; no UI, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
-| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal resolver can derive curated anchors from fresh guarded Valhalla geometry; journey binding remains unmounted, with no public registration, scheduler or output |
+| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration, scheduler or output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. No HTTP ingestion, provider anchor validation, moderation, scheduler or publication |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
@@ -32,6 +32,30 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Internal route-binding pass (ADR 0032): an account-scoped durable attempt fences
+fresh provider work between two short authority transactions. The first transaction
+validates active ownership, sharing consent and exact context, charges the shared
+ten-per-minute database budget and persists a 90-second newest-attempt snapshot.
+The second rechecks journey, consent generation, context, catalog, attempt identity
+and post-lock time, consumes before a fixed 15-minute context replacement, and
+rolls consumption back with a failed context write. No-route and no-match outcomes
+consume without replacing context. Direct context writes and completion invalidate
+pending work atomically; leaf expiry cleanup cannot resurrect an older response.
+
+The focused set passed **56 tests** across route-binding domain/persistence,
+configured production composition, and affected context, signal-storage and
+resolver-configuration suites. It covers provider calls outside transactions,
+success and private empty outcomes, exact context expectations, quota sharing and
+failure charging, redacted rate/provider/persistence failures, newest-attempt
+ordering in both response orders, a newer failed attempt, consent/completion/direct-
+context invalidation, replacement plus physical purge, deletion, future/deadline
+denial after observed row-lock waiting, database precision/constraints and
+consumption rollback. A bounded loopback Valhalla fixture exercises the real
+region-guarded configured binder with PostgreSQL authority. Full verification
+passed **291 Java tests across 44 suites**, zero failures, errors or skips, and
+bootJar succeeded. Secret and diff checks passed. The resolver remains default
+off; no public HTTP, signal issuance, geometry persistence or Live output was added.
 
 Provider-backed anchor resolution pass (ADR 0031): a strict bounded local catalog,
 immutable redacted models and a default-off internal resolver reuse the configured

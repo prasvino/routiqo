@@ -79,8 +79,9 @@ records, with sample flag false and no real catalog. Run focused and full releva
 Java checks/bootJar and secret/diff checks. No frontend source change is needed;
 leave the running port3000 preview and its generated next-env.d.ts untouched.
 
-Next integration must authenticate and budget the initiating actor, perform fresh
-journey/consent/context authority checks after provider work, fence superseded
-binding attempts, and revalidate catalog category eligibility before grant issuance.
+ADR 0032 now authenticates and budgets the initiating actor, performs fresh
+journey/consent/context authority checks after provider work and fences superseded
+binding attempts. The next grant integration must revalidate catalog category
+eligibility before issuance.
 Do not mount this resolver directly as a public authorization endpoint or claim
 durable binding, moderation, cache revocation or cohort publication is complete.

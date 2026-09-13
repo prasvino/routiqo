@@ -27,6 +27,11 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   catalog and fresh region-guarded Valhalla geometry. Geometry and endpoints remain
   in memory; output contains opaque anchor/category mappings only. Relevance is not
   presence proof or publication permission, and the resolver is default off.
+- ADR 0032 binds that private result through two short account/owned-journey
+  transactions separated by provider work. A durable newest-attempt row, shared
+  account budget, exact consent/context/catalog rechecks and post-lock expiry stop
+  stale provider responses. Context replacement and completion invalidate pending
+  work atomically. Requests and provider geometry are never persisted.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.

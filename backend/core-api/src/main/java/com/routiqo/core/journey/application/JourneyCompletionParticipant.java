@@ -9,6 +9,7 @@ import com.routiqo.core.journey.domain.Journey;
 public interface JourneyCompletionParticipant {
     int CONSENT_ORDER = 100;
     int ROUTE_CONTEXT_ORDER = 200;
+    int ROUTE_BINDING_ATTEMPT_ORDER = 300;
 
     void onCompleted(Journey completedJourney);
 

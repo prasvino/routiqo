@@ -36,7 +36,7 @@ reroutes when offline engine/data are unavailable. See OFFLINE_ARCHITECTURE.md.
 
 ## Current web route review
 
-The web renderer uses MapLibre; the opt-in backend configuration now selects guarded Valhalla and Photon with mandatory operator settings (ROUTING_RUNTIME_SPEC.md). ADR 0031 adds a separately default-off internal resolver that matches an operator-curated anchor catalog against fresh selected Valhalla route vertices while excluding endpoint areas. It stores no geometry and is not mounted to journey or public APIs. Regional services, reviewed catalog data and live quality validation remain pending. Historical Mapbox cache disclosures below remain relevant to retained browser data.
+The web renderer uses MapLibre; the opt-in backend configuration now selects guarded Valhalla and Photon with mandatory operator settings (ROUTING_RUNTIME_SPEC.md). ADR 0031 adds a separately default-off internal resolver that matches an operator-curated anchor catalog against fresh selected Valhalla route vertices while excluding endpoint areas. ADR 0032 binds the opaque result through two private authority transactions and a durable newest-attempt fence, still without a public route-binding API. It stores no geometry. Regional services, reviewed catalog data and live quality validation remain pending. Historical Mapbox cache disclosures below remain relevant to retained browser data.
 
 The authenticated web route planner uses MapLibre maps, explicit alternative
 selection and a provider-supplied directions list with manual Previous/Next review.

@@ -4,6 +4,7 @@ import com.routiqo.core.journey.application.JourneyCompletionParticipant;
 import com.routiqo.core.journey.domain.Journey;
 import com.routiqo.core.routeupdate.application.LiveRouteContextConflict;
 import com.routiqo.core.routeupdate.application.LiveRouteContextParticipant;
+import com.routiqo.core.routeupdate.application.RouteBindingAttemptParticipant;
 import com.routiqo.core.routeupdate.domain.LiveRouteContext;
 import com.routiqo.core.routeupdate.domain.StoredLiveRouteContext;
 import java.sql.Array;
@@ -31,10 +32,13 @@ public final class JdbcLiveRouteContextParticipant
     private static final Duration MAX_LIFETIME = Duration.ofHours(24);
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final RouteBindingAttemptParticipant bindingAttempts;
 
-    public JdbcLiveRouteContextParticipant(JdbcTemplate jdbc, Clock clock) {
+    public JdbcLiveRouteContextParticipant(JdbcTemplate jdbc, Clock clock,
+            RouteBindingAttemptParticipant bindingAttempts) {
         this.jdbc = Objects.requireNonNull(jdbc);
         this.clock = Objects.requireNonNull(clock);
+        this.bindingAttempts = Objects.requireNonNull(bindingAttempts);
     }
 
     @Override
@@ -132,6 +136,7 @@ public final class JdbcLiveRouteContextParticipant
                 throw conflict();
             }
         }
+        bindingAttempts.invalidatePending(replacement.context().actorId());
         return replacement;
     }
 
