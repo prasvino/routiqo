@@ -3,6 +3,7 @@ package com.routiqo.core.privacy.infrastructure;
 import com.routiqo.core.identity.infrastructure.JdbcAccountWriteAuthority;
 import com.routiqo.core.identity.infrastructure.JdbcSessionStore;
 import com.routiqo.core.journey.application.JourneyCompletionParticipant;
+import com.routiqo.core.journey.application.JourneyNotFound;
 import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.domain.Journey;
 import com.routiqo.core.journey.infrastructure.JdbcJourneyStore;
@@ -156,6 +157,38 @@ class PresenceConsentPersistenceTest {
         assertThat(laterEnable).isEqualTo(new PresenceConsent(actor, journey, 1, true, true));
     }
 
+    @Test void explicitIntentFencesSameStateOffAndGivesRevocationDeliveryPrecedence() {
+        UUID actor = account();
+        UUID journey = start(configuredJourneys, actor);
+
+        PresenceConsent fencedOff = configuredConsents.submitIntent(actor, journey, 0, false);
+        assertThat(fencedOff).isEqualTo(new PresenceConsent(actor, journey, 1, false, true));
+        assertConflict(() -> configuredConsents.submitIntent(actor, journey, 0, true));
+
+        PresenceConsent enabled = configuredConsents.submitIntent(actor, journey, 1, true);
+        assertThat(enabled).isEqualTo(new PresenceConsent(actor, journey, 2, true, true));
+        PresenceConsent staleOff = configuredConsents.submitIntent(actor, journey, 0, false);
+        assertThat(staleOff).isEqualTo(new PresenceConsent(actor, journey, 3, false, true));
+        assertConflict(() -> configuredConsents.submitIntent(actor, journey, 4, false));
+        assertConflict(() -> configuredConsents.submitIntent(actor, journey, 2, true));
+    }
+
+    @Test void everyRepeatedExplicitIntentAdvancesGenerationWithoutAutoEnableRetry() {
+        UUID actor = account();
+        UUID journey = start(configuredJourneys, actor);
+
+        PresenceConsent enabled = configuredConsents.submitIntent(actor, journey, 0, true);
+        PresenceConsent reaffirmed = configuredConsents.submitIntent(actor, journey, 1, true);
+        PresenceConsent firstOff = configuredConsents.submitIntent(actor, journey, 1, false);
+        PresenceConsent secondOff = configuredConsents.submitIntent(actor, journey, 0, false);
+
+        assertThat(enabled.generation()).isEqualTo(1);
+        assertThat(reaffirmed.generation()).isEqualTo(2);
+        assertThat(firstOff.generation()).isEqualTo(3);
+        assertThat(secondOff).isEqualTo(new PresenceConsent(actor, journey, 4, false, true));
+        assertConflict(() -> configuredConsents.submitIntent(actor, journey, 1, true));
+    }
+
     @Test void aNewActiveJourneyReplacesTheSingleLatestRowOnlyOnExplicitChange() {
         UUID actor = account();
         UUID first = start(configuredJourneys, actor);
@@ -218,19 +251,147 @@ class PresenceConsentPersistenceTest {
         assertThat(rowCount(other)).isZero();
     }
 
-    @Test void completionGenerationOverflowRollsBackTheJourneyUpdate() {
+    @Test void completionAtMaximumGenerationSaturatesAndStillCompletesTheJourney() {
         UUID actor = account();
         UUID journey = start(configuredJourneys, actor);
         jdbc().update("""
             INSERT INTO presence_consent
                 (actor_id, journey_id, generation, sharing, journey_active)
-            VALUES (?, ?, ?, FALSE, TRUE)
+            VALUES (?, ?, ?, TRUE, TRUE)
             """, actor, journey, Long.MAX_VALUE);
 
-        assertConflict(() -> configuredJourneys.complete(actor, journey));
-        assertThat(configuredJourneys.get(actor, journey).status()).isEqualTo(Journey.Status.ACTIVE);
+        assertThat(configuredJourneys.complete(actor, journey).status()).isEqualTo(Journey.Status.COMPLETED);
+        assertThat(configuredJourneys.get(actor, journey).status()).isEqualTo(Journey.Status.COMPLETED);
         assertThat(stored(actor)).isEqualTo(
+                new PresenceConsent(actor, journey, Long.MAX_VALUE, false, false));
+    }
+
+    @Test void explicitDisableAtMaximumGenerationSaturatesAndEnableCannotRecover() {
+        UUID actor = account();
+        UUID journey = start(configuredJourneys, actor);
+        jdbc().update("""
+            INSERT INTO presence_consent
+                (actor_id, journey_id, generation, sharing, journey_active)
+            VALUES (?, ?, ?, TRUE, TRUE)
+            """, actor, journey, Long.MAX_VALUE);
+
+        PresenceConsent disabled = configuredConsents.submitIntent(
+                actor, journey, Long.MAX_VALUE, false);
+        assertThat(disabled).isEqualTo(
                 new PresenceConsent(actor, journey, Long.MAX_VALUE, false, true));
+        assertThat(configuredConsents.submitIntent(actor, journey, 0, false)).isEqualTo(disabled);
+        assertConflict(() -> configuredConsents.submitIntent(actor, journey, Long.MAX_VALUE, true));
+        assertThat(stored(actor)).isEqualTo(disabled);
+    }
+
+    @Test void completedDisableIsNonmutatingAcrossReplacementAndIgnoresOldGeneration() {
+        UUID actor = account();
+        UUID first = start(configuredJourneys, actor);
+        configuredConsents.submitIntent(actor, first, 0, true);
+        configuredJourneys.complete(actor, first);
+        UUID second = start(configuredJourneys, actor);
+        PresenceConsent replacement = configuredConsents.submitIntent(actor, second, 0, false);
+
+        PresenceConsent oldResult = configuredConsents.submitIntent(actor, first, 999, false);
+        assertThat(oldResult).isEqualTo(new PresenceConsent(actor, first, 0, false, false));
+        assertThat(stored(actor)).isEqualTo(replacement);
+        assertConflict(() -> configuredConsents.submitIntent(actor, first, 999, true));
+    }
+
+    @Test void independentIntentReplicasSerializeAndOnlyOneExactEnableWins() throws Exception {
+        UUID actor = account();
+        Services setup = services(START);
+        UUID journey = start(setup.journeys(), actor);
+        PresenceConsentService first = services(START.plusSeconds(1)).consents();
+        PresenceConsentService second = services(START.plusSeconds(1)).consents();
+
+        List<Object> results = race(
+                () -> first.submitIntent(actor, journey, 0, true),
+                () -> second.submitIntent(actor, journey, 0, true));
+        assertThat(results.stream().filter(PresenceConsent.class::isInstance)).hasSize(1);
+        assertThat(results.stream().filter(PresenceConsentConflict.class::isInstance)).hasSize(1);
+        assertThat(stored(actor)).isEqualTo(new PresenceConsent(actor, journey, 1, true, true));
+    }
+
+    @Test void explicitOffCommitsBeforeADelayedExactEnableAndFencesIt() throws Exception {
+        UUID actor = account();
+        UUID journey = start(configuredJourneys, actor);
+        configuredConsents.submitIntent(actor, journey, 0, true);
+        var first = services(START.plusSeconds(1));
+        var second = services(START.plusSeconds(1));
+        var revoked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> off = executor.submit(() -> first.store().withOwnedJourney(actor, journey, current -> {
+                first.participant().submitIntent(current, 1, false);
+                revoked.countDown();
+                await(release);
+                return null;
+            }));
+            assertThat(revoked.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<Object> enable = executor.submit(() -> {
+                try {
+                    return second.consents().submitIntent(actor, journey, 1, true);
+                } catch (PresenceConsentConflict conflict) {
+                    return conflict;
+                }
+            });
+            try {
+                assertThat(waitingForAccountLock()).isTrue();
+            } finally {
+                release.countDown();
+            }
+            off.get(5, TimeUnit.SECONDS);
+            assertThat(enable.get(5, TimeUnit.SECONDS)).isInstanceOf(PresenceConsentConflict.class);
+        }
+        assertThat(stored(actor)).isEqualTo(new PresenceConsent(actor, journey, 2, false, true));
+    }
+
+    @Test void delayedStaleOffCommitsAfterEnableAndStillWins() throws Exception {
+        UUID actor = account();
+        UUID journey = start(configuredJourneys, actor);
+        var first = services(START.plusSeconds(1));
+        var second = services(START.plusSeconds(1));
+        var enabled = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> enable = executor.submit(() -> first.store().withOwnedJourney(actor, journey, current -> {
+                first.participant().submitIntent(current, 0, true);
+                enabled.countDown();
+                await(release);
+                return null;
+            }));
+            assertThat(enabled.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<PresenceConsent> off = executor.submit(
+                    () -> second.consents().submitIntent(actor, journey, 0, false));
+            try {
+                assertThat(waitingForAccountLock()).isTrue();
+            } finally {
+                release.countDown();
+            }
+            enable.get(5, TimeUnit.SECONDS);
+            assertThat(off.get(5, TimeUnit.SECONDS))
+                    .isEqualTo(new PresenceConsent(actor, journey, 2, false, true));
+        }
+        assertThat(stored(actor)).isEqualTo(new PresenceConsent(actor, journey, 2, false, true));
+    }
+
+    @Test void explicitIntentRequiresAnEnabledAccountAndOwnedJourney() {
+        UUID actor = account();
+        UUID journey = start(configuredJourneys, actor);
+        UUID other = account();
+
+        assertThatThrownBy(() -> configuredConsents.submitIntent(other, journey, 0, false))
+                .isInstanceOf(JourneyNotFound.class).hasNoCause();
+        jdbc().update("UPDATE routiqo_account SET enabled = FALSE WHERE id = ?", actor);
+        assertThatThrownBy(() -> configuredConsents.submitIntent(actor, journey, 0, false))
+                .isInstanceOf(SecurityException.class).hasNoCause();
+        jdbc().update("DELETE FROM routiqo_account WHERE id = ?", actor);
+        assertThatThrownBy(() -> configuredConsents.submitIntent(actor, journey, 0, false))
+                .isInstanceOf(SecurityException.class).hasNoCause();
+        assertThat(rowCount(actor)).isZero();
     }
 
     @Test void laterCompletionParticipantFailureRollsBackJourneyAndConsentTogether() {
@@ -289,7 +450,7 @@ class PresenceConsentPersistenceTest {
             assertThat(completionReached.await(5, TimeUnit.SECONDS)).isTrue();
             var enableFuture = executor.submit(() -> {
                 try {
-                    return staleWriter.change(actor, journey, 2, true);
+                    return staleWriter.submitIntent(actor, journey, 2, true);
                 } catch (PresenceConsentConflict conflict) {
                     return conflict;
                 }
@@ -316,6 +477,7 @@ class PresenceConsentPersistenceTest {
                 : List.<org.assertj.core.api.ThrowableAssert.ThrowingCallable>of(
                 () -> configuredParticipant.read(journey),
                 () -> configuredParticipant.change(journey, 0, true),
+                () -> configuredParticipant.submitIntent(journey, 0, true),
                 () -> configuredParticipant.onCompleted(journey.complete(actor, START.plusSeconds(1))))) {
             assertThatThrownBy(call)
                     .isInstanceOf(IllegalStateException.class)

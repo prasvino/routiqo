@@ -334,8 +334,8 @@ private outcomes from permission to accept new evidence. Current authenticated
 ownership is required even for replay; a known command UUID is not authentication.
 Changed retained fingerprints conflict, while an expired receipt cannot restore
 an unused grant. Consumed grant state is independent of receipt cleanup. Pure
-decision checks cover these branches, but only a future atomic database boundary
-can prevent concurrent replay, deletion and consent races across replicas. Never
+ADR 0028's atomic database boundary now prevents concurrent replay and current
+consent/context authority races across replicas. Never
 deserialize grants/admissions from client input or expose internal decision codes
 as an existence oracle. No public Live endpoint is enabled by these primitives.
 
@@ -359,11 +359,11 @@ ADR 0026 adds one privacy-owned latest consent row per account under that bounda
 Journey-scoped CAS, owned-journey constraints and atomic completion revocation
 reduce T02/T06/T13/T19/T20 stale-consent and race risks without exposing a new
 endpoint. Reads are opt-out and nonmutating; account deletion cascades state.
-An unchanged off state preserves its generation, so it cannot by itself reject a
-delayed enable carrying the same expected generation. Future public consent
-commands require durable intent ordering, and delivered caches still require
-reliable revocation. Grant/receipt race tests remain mandatory before Live storage
-or publication.
+The legacy state-change path preserves generation for unchanged off. ADR 0029's
+separate explicit-intent path advances every accepted disable, requires exact
+enable generations and gives stale/current revocation precedence under the same
+database locks. Future public adapters must use that path without automatic enable
+retry. Delivered caches still require reliable revocation before publication.
 
 ADR 0027 adds one Route Update-owned latest context row per account. Owned-journey
 constraints, exact current-ID replacement, fresh identities, post-row-lock time
@@ -371,4 +371,6 @@ sampling and ordered completion deletion reduce stale-context and cross-replica
 races. Expiry maintenance is bounded, skips locked rows and cannot acquire earlier
 authority locks. Stored anchors remain sensitive route intent and are not proof of
 location, admission or publication permission. Provider-to-anchor validation,
-signal storage and durable invalidation remain mandatory before public Live use.
+block/Ghost delivery invalidation and cohort-safe publication remain mandatory
+before public Live use. Internal transactional signal storage is implemented under
+ADR 0028.

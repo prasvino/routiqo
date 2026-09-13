@@ -48,4 +48,4 @@ physical cleanup is delayed. No scheduler is mounted.
 These private records do not authorize publication. Public HTTP, peer limits,
 anti-Sybil controls, provider-backed anchor registration, moderation, block/Ghost
 cache invalidation, cohort suppression and an operated cleanup job remain release
-gates. The durable consent same-state opt-out ordering limitation also remains.
+gates. Future consent adapters must use ADR 0029's explicit-intent ordering path.

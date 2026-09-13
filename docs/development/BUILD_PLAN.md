@@ -13,7 +13,7 @@
 | P0 / L0.3a — complete | Internal context-linked receipt state, terminal withdrawal/supersession and exact replay comparison | 8 focused tests; full 158 Java tests/check/bootJar and review passed; no durable store or publication permission |
 | P0 / L0.3b — internal command policy and storage complete | Admission-bound grant consumption and retained retry decisions; ADR 0024 remains the storage contract | 15 pure-policy tests plus ADR 0028 transactional persistence; public issuance/ingestion remains closed |
 | P0 / L0.3c — account/journey transaction boundary complete | ADR 0025 domain-owned write authority, account-before-journey locks integrated with start/completion, redacted retryable failures | Full 184 Java tests/check/bootJar; 34 targeted database/HTTP tests, independent review; future Live persistence still pending |
-| P0 / L0.3d — durable consent complete, public command ordering pending | ADR 0026 privacy-owned latest consent row, journey-scoped CAS and atomic completion revocation | 14 focused disposable PostgreSQL ownership/CAS/race/rollback tests; full 198 Java tests/check/bootJar and independent review passed; no HTTP, leases, cache publication or claim that unchanged opt-out fences delayed enable |
+| P0 / L0.3d — durable consent and internal intent ordering complete | ADRs 0026/0029 privacy-owned latest state, legacy CAS compatibility, revocation-precedence explicit intents and saturating terminal revocation | 45 focused domain/PostgreSQL/composition tests and independent review passed; full verification recorded in build status; no HTTP, leases, cache publication or automatic enable retry |
 | P0 / L0.3e — durable route context complete, provider validation pending | ADR 0027 Route Update-owned latest context, post-lock time checks, exact-ID CAS, completion deletion and bounded leaf cleanup | 20 focused domain/PostgreSQL lifecycle/race/cleanup tests; full 218 Java tests/check/bootJar and independent review passed; no HTTP, provider anchor validation, scheduler or public output |
 | P0 / L0.3f — internal signal storage complete, public ingestion pending | ADR 0028 durable grants/receipts, partial-unique contribution slot, atomic acceptance/withdrawal, database budgets and bounded cleanup | 16 focused PostgreSQL transaction/race/cleanup tests; full 234 Java tests/check/bootJar and independent review passed; no HTTP, provider anchor validation, moderation, scheduler or public projection |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
@@ -26,7 +26,7 @@ The completed internal slices are specified in
 `QUICK_SIGNAL_RECEIPT_SPEC.md` and `SIGNAL_COMMAND_SPEC.md`.
 Durable consent, route context and internal signal storage are specified in
 `DURABLE_CONSENT_SPEC.md`, `DURABLE_ROUTE_CONTEXT_SPEC.md`,
-`SIGNAL_STORAGE_SPEC.md`, and ADRs 0026–0028. These internal slices do not expose
+`SIGNAL_STORAGE_SPEC.md`, `CONSENT_INTENT_SPEC.md`, and ADRs 0026–0029. These internal slices do not expose
 public command issuance or ingestion, confidence, moderation or a publicly visible
 Live Moment. Complete and
 verify this slice before promoting the next queue item; do not advance status for

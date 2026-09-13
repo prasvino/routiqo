@@ -15,16 +15,18 @@ The cohort ADR must resolve block-safe aggregation before any public projection.
 ADR 0023 defines internal signal admission against owned active journeys, current
 consent and a versioned server-owned route context. Its pure application check is
 not an authority store or token issuer. Admission is invalid after route revision,
-consent generation or journey lifecycle changes. Future ingestion must bind the
-check atomically to accepted writes; evidence withdrawal remains a separate policy.
+consent generation or journey lifecycle changes. ADR 0028 now binds this check
+atomically to durable internal signal acceptance; evidence withdrawal remains a
+separate lifecycle operation. Public ingestion is still disabled.
 
 Internal `PresenceConsent` defines opt-in defaults, monotonic generation changes,
 terminal journey completion and owner/journey-bound leases of at most 90 seconds.
 ADR 0026 now persists one minimal latest row per account with journey-scoped CAS,
 opt-out reads and completion revocation under the account/journey transaction.
-There is still no public consent command or lease issuer. A same-state off write
-does not advance generation, so public intent ordering must prevent a delayed
-enable with that same generation before claiming all reordered opt-outs win.
+There is still no public consent command or lease issuer. ADR 0029 adds an internal
+explicit-intent path where every accepted off fences delayed enables, stale off is
+accepted and enable requires the exact current generation. The legacy trusted
+state-change operation retains its same-state behavior.
 
 ADR 0027 persists only the current bounded Live route context under the same
 account/journey authority. Exact context identity and revision changes invalidate

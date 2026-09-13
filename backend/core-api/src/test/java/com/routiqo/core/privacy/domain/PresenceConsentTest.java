@@ -45,4 +45,28 @@ class PresenceConsentTest {
         assertThatThrownBy(() -> state.changeSharing(true)).isInstanceOf(ArithmeticException.class);
         assertThat(state.toString()).doesNotContain(state.actorId().toString(), state.journeyId().toString());
     }
+    @Test void explicitIntentsFenceEveryDisableAndRequireAnExactEnableGeneration() {
+        var initial = initial();
+        var firstOff = initial.submitIntent(0, false);
+        assertThat(firstOff).isEqualTo(new PresenceConsent(
+                initial.actorId(), initial.journeyId(), 1, false, true));
+        assertThatThrownBy(() -> firstOff.submitIntent(0, true)).isInstanceOf(IllegalStateException.class);
+        var enabled = firstOff.submitIntent(1, true);
+        assertThat(enabled.generation()).isEqualTo(2);
+        var staleOff = enabled.submitIntent(0, false);
+        assertThat(staleOff).isEqualTo(new PresenceConsent(
+                initial.actorId(), initial.journeyId(), 3, false, true));
+        assertThatThrownBy(() -> staleOff.submitIntent(4, false)).isInstanceOf(IllegalStateException.class);
+    }
+    @Test void terminalRevocationSaturatesAtTheMaximumGeneration() {
+        var maximumOn = new PresenceConsent(UUID.randomUUID(), UUID.randomUUID(), Long.MAX_VALUE, true, true);
+        var disabled = maximumOn.submitIntent(Long.MAX_VALUE, false);
+        assertThat(disabled).isEqualTo(new PresenceConsent(
+                maximumOn.actorId(), maximumOn.journeyId(), Long.MAX_VALUE, false, true));
+        assertThat(disabled.submitIntent(0, false)).isEqualTo(disabled);
+        assertThat(disabled.endJourney()).isEqualTo(new PresenceConsent(
+                maximumOn.actorId(), maximumOn.journeyId(), Long.MAX_VALUE, false, false));
+        assertThatThrownBy(() -> disabled.submitIntent(Long.MAX_VALUE, true))
+                .isInstanceOf(ArithmeticException.class);
+    }
 }

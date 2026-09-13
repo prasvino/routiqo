@@ -19,14 +19,16 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   retry behavior. Durable consent and route context use this boundary with
   journey-scoped CAS and ordered atomic completion handling. ADR 0028 composes
   them with durable grants and receipts plus database budgets; public ingestion
-  remains gated. Expiry cleanup paths are bounded leaf-only operations.
+  remains gated. ADR 0029 applies explicit consent intents under the same locks:
+  enable requires an exact generation while stale or current disable takes
+  precedence. Expiry cleanup paths are bounded leaf-only operations.
 - Raw stranger GPS and unnecessary precise-location data are never exposed.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.
-- Persisted consent is necessary authority, not publication permission. A same-state
-  opt-out that preserves generation needs separate durable command ordering before
-  reordered public commands can be considered safe.
+- Persisted consent is necessary authority, not publication permission. Future
+  public mutations must use ADR 0029's explicit-intent path; they must not expose
+  or auto-retry the legacy same-state transition contract.
 - Blocked, hidden, expired, or deleted information must not reappear through search, caches, exports, logs, notifications, analytics, or realtime replay.
 - Tokens, credentials, secrets, and precise location are absent from fixtures, source control, logs, analytics, error payloads, and screenshots.
 - Inputs, payloads, queries, fan-out, retries, subscriptions, uploads, and expensive operations are bounded.

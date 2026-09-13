@@ -33,18 +33,19 @@ A successful change retried with its old generation requires a read/reconciliati
 do not claim a durable command receipt for this API. Reject generation overflow
 without partial writes or private diagnostics. No client can supply stored state.
 
-Same-state writes preserve generation by domain contract. In particular, writing
+Legacy `change` writes preserve generation by domain contract. In particular, writing
 off while already off at generation zero does not fence a delayed enable that also
 expects zero. An actual on-to-off Ghost transition advances generation and rejects
-the stale enable. A future public mutation API needs durable command ordering or
-mutation identity before claiming every reordered opt-out intention wins.
+the stale enable. The internal explicit-intent path in `CONSENT_INTENT_SPEC.md`
+now fences every accepted disable. No public mutation API is enabled.
 
 Completion must revoke the current bound consent row atomically with the journey
 update. Add an intentional journey-owned completion participant interface; privacy
 provides its implementation. Invoke participants under existing account/journey
 locks before commit; failures roll back both updates. No consent row means no-op;
 a row bound to a different journey is unchanged. Terminal retries do not increment
-again. Avoid dependency cycles: privacy JDBC participant has no Journey service
+again. At maximum generation terminal completion saturates rather than overflowing,
+as superseded by ADR 0029. Avoid dependency cycles: privacy JDBC participant has no Journey service
 dependency; the application consent service depends on JourneyWriteAuthority and
 the privacy participant. Production wiring must include the participant, with a
 configured-service test proving real completion revokes consent.

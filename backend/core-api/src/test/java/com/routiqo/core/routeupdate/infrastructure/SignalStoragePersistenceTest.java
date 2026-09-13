@@ -6,6 +6,7 @@ import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.domain.Journey;
 import com.routiqo.core.journey.infrastructure.JdbcJourneyStore;
 import com.routiqo.core.privacy.application.PresenceConsentService;
+import com.routiqo.core.privacy.domain.PresenceConsent;
 import com.routiqo.core.privacy.infrastructure.JdbcPresenceConsentParticipant;
 import com.routiqo.core.routeupdate.application.LiveRouteContextService;
 import com.routiqo.core.routeupdate.application.SignalCommandPolicy;
@@ -249,6 +250,27 @@ class SignalStoragePersistenceTest {
     }
 
     @Test
+    void maximumGenerationExplicitRevocationInvalidatesAnAlreadyIssuedGrant() {
+        Fixture fixture = fixture(START, 1);
+        jdbc().update("""
+            UPDATE presence_consent
+            SET generation = ?, sharing = TRUE
+            WHERE actor_id = ? AND journey_id = ?
+            """, Long.MAX_VALUE, fixture.actor(), fixture.journey());
+        SignalCommandGrant grant = issue(fixture, QuickSignalValue.Category.QUEUE);
+        assertThat(grant.admission().consentGeneration()).isEqualTo(Long.MAX_VALUE);
+
+        PresenceConsent revoked = fixture.consents().submitIntent(
+                fixture.actor(), fixture.journey(), Long.MAX_VALUE, false);
+        assertThat(revoked.generation()).isEqualTo(Long.MAX_VALUE);
+        assertDenied(() -> accept(fixture, grant, QuickSignalValue.QUEUE_UNDER_5));
+        assertThat(receiptCount(fixture.actor())).isZero();
+        assertThat(budget(fixture.actor(), "ACCEPT")).isZero();
+        assertThat(storedGrant(fixture.actor(), grant.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+    }
+
+    @Test
     void contextExpiryAfterWaitingForGrantLockDeniesAndRollsBack() throws Exception {
         Fixture fixture = fixture(START, 1, Duration.ofSeconds(2));
         SignalCommandGrant grant = issue(fixture, QuickSignalValue.Category.QUEUE);
@@ -287,7 +309,7 @@ class SignalStoragePersistenceTest {
         try (var executor = Executors.newFixedThreadPool(2)) {
             Future<?> ghost = executor.submit(() -> store.withOwnedJourney(
                     fixture.actor(), fixture.journey(), journey -> {
-                        consent.change(journey, 1, false);
+                        consent.submitIntent(journey, 1, false);
                         revoked.countDown();
                         await(release);
                         return null;

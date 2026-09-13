@@ -24,7 +24,8 @@ and journey authority, performs the repository update, then invokes synchronous
 Journey-owned completion participants before commit. Privacy implements that
 participant and revokes a matching consent row in the same transaction. Missing
 or differently bound rows are unchanged, completed retries skip participants,
-and participant or generation-overflow failures roll back journey and consent.
+and participant failures roll back journey and consent. ADR 0029 supersedes the
+completion-overflow behavior: terminal revocation now saturates at the maximum.
 Raw repository completion is a trusted transaction participant, not an authority
 entry point.
 
@@ -37,17 +38,19 @@ replace a newer journey's state. The privacy participant rejects calls without
 an active transaction, and persistence failures remain covered by ADR 0025's
 redacted account-boundary availability behavior.
 
-A same-state opt-out preserves its generation by domain contract. Therefore an
+The legacy `change` operation preserves generation for a same-state opt-out by
+domain contract. Therefore an
 initial explicit off write at generation zero does not fence a delayed enable
 that also expects generation zero. Only an actual transition, such as sharing on
-to Ghost Mode off, advances the generation and rejects that stale enable. Any
-future public consent command API needs durable command ordering or mutation
-identity before it can claim that all reordered opt-out intentions win.
+to Ghost Mode off, advances the generation and rejects that stale enable. ADR 0029
+adds a separate internal `submitIntent` operation where every accepted disable
+fences delayed enables and revocation has precedence. No public command API is
+enabled.
 
 ## Limits and follow-up
 
-This state does not issue presence leases, revoke already delivered caches,
-authorize signal storage or make public aggregation safe. Durable route context,
-command grants, receipts, contribution slots, cleanup, quotas, block enforcement
+This state does not issue presence leases, revoke already delivered caches or make
+public aggregation safe. Route context and internal signal storage are now durable
+under ADRs 0027 and 0028; provider anchor validation, block enforcement, moderation
 and publication invalidation remain required. No HTTP, Redis, timer or background
-cleanup path is added by this decision.
+cleanup path was added by this decision.

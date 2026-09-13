@@ -20,7 +20,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion invokes consent then route-context participants atomically; signal acceptance composes both current authorities |
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
-| Presence consent | Privacy-owned PostgreSQL latest-row state with journey-scoped CAS, opt-out reads and atomic completion revocation. No HTTP consent commands, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
+| Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. No HTTP consent commands, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. Internal grants bind this state; no public provider anchor registration, scheduler or output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. No HTTP ingestion, provider anchor validation, moderation, scheduler or publication |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
@@ -32,6 +32,32 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Explicit consent-intent pass (ADR 0029): the internal `submitIntent` path runs under
+the existing account, owned-journey and consent locks. Active-journey enable needs
+the exact generation and every accepted enable advances it. Stale or current
+disable takes precedence and advances even when already off. Future generations
+deny. Completed disable returns inactive off without mutation; completed enable
+denies. Explicit disable and completion saturate safely at maximum generation.
+The trusted legacy `change` contract remains unchanged.
+
+Focused domain and disposable PostgreSQL tests cover both delivery orders with
+observed database lock waiting, concurrent replicas, repeated intents, future and
+stale generations, replacement/completion isolation, wrong/disabled/deleted
+accounts, maximum generation and transaction-required diagnostics. Signal-storage
+composition proves explicit revocation racing acceptance creates no receipt,
+spends no acceptance budget and leaves the grant unused; a maximum-generation
+revocation also invalidates an already issued grant. No HTTP, consent UI, command
+receipt, offline enable queue, cache invalidation, lease issuer or public output
+was added.
+
+Full core check and bootJar passed **245 Java tests across 36 suites**, zero
+failures, errors or skips. All **45 focused tests** passed: 6 consent-domain, 22
+consent-persistence and 17 signal-storage tests. Root and independent security
+review approved the source, tests and saturating terminal behavior. Secret and
+diff checks passed. No frontend contracts or UI changed; prior 257 TypeScript
+tests and web production build remain the latest frontend evidence. Disposable
+Testcontainers databases only; no user data was migrated.
 
 Transactional signal-storage pass (ADR 0028): migration V10 persists complete
 UNUSED/CONSUMED grants independently from retained receipts, enforces closed
@@ -89,15 +115,16 @@ row per account with owned-journey and state constraints. Reads run under curren
 owned-journey authority and return opt-out without mutation. Explicit changes use
 journey-scoped expected generations; actual Ghost transitions fence stale enables.
 Configured journey completion revokes matching consent in the same account and
-journey transaction, while failures and generation overflow roll back both.
+journey transaction, while participant failures roll back both. ADR 0029 later
+changed maximum-generation completion to saturating terminal revocation.
 
 Disposable PostgreSQL tests cover schema ownership/cascade, default reads, one-row
 replacement, same-state updates, stale/reordered generations, independent-adapter
 CAS races, consent/completion serialization with observed database lock waiting,
-configured participant wiring, terminal retries and rollback. A same-state off
-write preserves generation and therefore does not fence a delayed enable with the
-same expected generation; a future public command API needs durable intent ordering.
-No public endpoint, lease, cache/realtime invalidation or signal storage was added.
+configured participant wiring, terminal retries and rollback. The legacy same-state
+off write preserves generation; the later ADR 0029 explicit-intent path resolves
+this ordering for future adapters. This historical phase added no public endpoint,
+lease, cache/realtime invalidation or signal storage.
 
 Full core check and bootJar passed **198 Java tests across 33 suites**, zero
 failures, errors or skips. The 14 focused durable-consent tests exercise generation
@@ -125,10 +152,9 @@ diff checks, generated-contract drift, workspace typecheck and 11 browser journe
 dispatch tests passed. No visual changes; prior full 257 TS tests/web build remain
 the latest full frontend run. Testcontainers databases only; no user migrations.
 
-Next: bounded route-context transaction participation, followed by grant/receipt/
-slot migrations and race/cleanup tests. This slice does not provide
-public Ghost Mode commands, delivered-cache revocation, signal storage, issuer
-endpoints or public Live output.
+Route-context and grant/receipt/slot persistence were subsequently completed in
+ADRs 0027 and 0028. Public Ghost Mode commands, delivered-cache revocation, issuer
+endpoints and public Live output remain unavailable.
 
 Live L0.3b command-policy pass: internal SignalCommandGrant models irreversible
 consumption within the admission lifetime; SignalCommandPolicy distinguishes new

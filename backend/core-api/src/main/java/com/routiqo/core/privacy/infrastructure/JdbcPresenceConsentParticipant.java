@@ -53,6 +53,36 @@ public final class JdbcPresenceConsentParticipant
         if (existing != null && existing.journeyId().equals(journey.id()) && changed.equals(current)) {
             return current;
         }
+        upsert(changed);
+        return changed;
+    }
+
+    @Override
+    public PresenceConsent submitIntent(Journey journey, long expectedGeneration, boolean sharing) {
+        requireTransaction();
+        Objects.requireNonNull(journey);
+        Stored existing = findLocked(journey.ownerId()).stream().findFirst().orElse(null);
+        PresenceConsent current = stateFor(journey, existing);
+        if (journey.status() == Journey.Status.COMPLETED) {
+            if (sharing) {
+                throw conflict();
+            }
+            return current;
+        }
+
+        PresenceConsent changed;
+        try {
+            changed = current.submitIntent(expectedGeneration, sharing);
+        } catch (ArithmeticException | IllegalStateException invalid) {
+            throw conflict();
+        }
+        if (!changed.equals(current)) {
+            upsert(changed);
+        }
+        return changed;
+    }
+
+    private void upsert(PresenceConsent changed) {
         jdbc.update("""
             INSERT INTO presence_consent
                 (actor_id, journey_id, generation, sharing, journey_active)
@@ -64,7 +94,6 @@ public final class JdbcPresenceConsentParticipant
                 journey_active = EXCLUDED.journey_active
             """, changed.actorId(), changed.journeyId(), changed.generation(),
                 changed.sharing(), changed.journeyActive());
-        return changed;
     }
 
     @Override
@@ -79,12 +108,7 @@ public final class JdbcPresenceConsentParticipant
             return;
         }
         PresenceConsent current = stored.toDomain();
-        PresenceConsent ended;
-        try {
-            ended = current.endJourney();
-        } catch (ArithmeticException invalid) {
-            throw conflict();
-        }
+        PresenceConsent ended = current.endJourney();
         if (ended.equals(current)) {
             return;
         }

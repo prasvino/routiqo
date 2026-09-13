@@ -18,9 +18,25 @@ public record PresenceConsent(UUID actorId, UUID journeyId, long generation, boo
         if (enabled == sharing) return this;
         return new PresenceConsent(actorId, journeyId, Math.incrementExact(generation), enabled, journeyActive);
     }
+    /** Applies an explicit ordered user intent. Persistence must hold the consent row lock. */
+    public PresenceConsent submitIntent(long expectedGeneration, boolean enabled) {
+        if (!journeyActive) {
+            if (enabled) throw new IllegalStateException("Presence consent changed");
+            return this;
+        }
+        if (expectedGeneration < 0 || expectedGeneration > generation
+                || (enabled && expectedGeneration != generation)) {
+            throw new IllegalStateException("Presence consent changed");
+        }
+        long nextGeneration = enabled
+                ? Math.incrementExact(generation)
+                : generation == Long.MAX_VALUE ? Long.MAX_VALUE : generation + 1;
+        return new PresenceConsent(actorId, journeyId, nextGeneration, enabled, true);
+    }
     public PresenceConsent endJourney() {
         if (!journeyActive) return this;
-        return new PresenceConsent(actorId, journeyId, Math.incrementExact(generation), false, false);
+        long nextGeneration = generation == Long.MAX_VALUE ? Long.MAX_VALUE : generation + 1;
+        return new PresenceConsent(actorId, journeyId, nextGeneration, false, false);
     }
     public Lease issueLease(long expectedGeneration, Instant now) {
         Objects.requireNonNull(now);

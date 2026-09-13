@@ -23,4 +23,14 @@ public final class PresenceConsentService {
         return journeys.withOwnedJourney(actorId, journeyId,
                 journey -> consents.change(journey, expectedGeneration, sharing));
     }
+
+    /**
+     * Applies an explicit user intent under account, owned-journey and consent locks.
+     * Actor identity must come from independent authentication; callers must not auto-retry enables.
+     */
+    public PresenceConsent submitIntent(
+            UUID actorId, UUID journeyId, long expectedGeneration, boolean sharing) {
+        return journeys.withOwnedJourney(actorId, journeyId,
+                journey -> consents.submitIntent(journey, expectedGeneration, sharing));
+    }
 }

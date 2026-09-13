@@ -11,4 +11,7 @@ public interface PresenceConsentParticipant {
     PresenceConsent read(Journey journey);
 
     PresenceConsent change(Journey journey, long expectedGeneration, boolean sharing);
+
+    /** Explicit intent path for future public adapters; implementations apply revocation precedence. */
+    PresenceConsent submitIntent(Journey journey, long expectedGeneration, boolean sharing);
 }
