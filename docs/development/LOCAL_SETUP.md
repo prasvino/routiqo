@@ -105,6 +105,15 @@ Live verification sequence: configure Google/web-auth and routing as above; sign
 The former Mapbox native navigation plan is superseded by ADR 0021. Future downloaded maps/navigation use the open-source target and still require Android Studio/SDK, a compatible development build, bounded region downloads, storage eviction/deletion, an on-device routing engine and real-device tests. The web app does not download tiles or persist temporary geocoding results. In-memory directions do not survive reload.
 
 The endpoint is POST `/api/v1/routes`, with mode `driving`, `walking` or `cycling`, and two longitude/latitude coordinate arrays named `origin` and `destination`. It requires the browser session, CSRF, exact origin and matching account header. It returns private Valhalla estimates without creating journeys or presence. POST `/api/v1/routes/places` accepts a `query` for temporary city/street/address lookup using Photon and the same authentication guards. Trips includes authenticated place selection, route alternatives, optional web map display and manual provider directions, with an optional one-time current-location origin. Live provider verification, GPS-following navigation and downloaded offline maps remain pending. No real regional provider request has been tested; automated tests use synthetic transport responses.
+
+The internal route-anchor resolver is separately disabled by default. Enabling it
+requires `ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true` and
+`ROUTIQO_LIVE_ANCHOR_CATALOG_PATH` pointing to an operator-reviewed local catalog
+that follows `ROUTE_ANCHOR_RESOLUTION_SPEC.md`. The file is strict UTF-8 JSON up to
+256 KiB and every anchor must be inside the configured routing region. No catalog
+is included. Startup loads only the local file and does not contact Valhalla.
+Enabling this internal bean does not mount HTTP, bind a journey or publish Live
+data; production catalog review and live regional route quality remain required.
 ## Open-source maps target setup
 
 Before importing regional data, use the local artifact inventory checker:

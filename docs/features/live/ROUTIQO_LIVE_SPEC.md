@@ -71,6 +71,9 @@ stopped/passenger context and suppress proactive prompts.
 Ownership of a journey or possession of a route ID is not evidence that a person
 is physically present. The server must bind an active owned journey to a validated
 route context, fixed corridor partitions/public anchors, and short-lived admission.
+ADR 0031 implements only the internal, default-off step that resolves a curated
+anchor catalog against fresh guarded Valhalla vertices with endpoint exclusion.
+It does not bind the result to a journey, prove presence or authorize publication.
 Client GPS remains untrusted. Claims remain traveller reports, not verified
 observations of physical presence. Arbitrary bounds, segments and membership
 probing are denied; no account-independent live discovery endpoint is planned.

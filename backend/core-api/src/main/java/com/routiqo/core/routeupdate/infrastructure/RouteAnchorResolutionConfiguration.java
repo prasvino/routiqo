@@ -1,0 +1,45 @@
+package com.routiqo.core.routeupdate.infrastructure;
+
+import com.routiqo.core.routeupdate.application.RouteAnchorResolver;
+import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
+import com.routiqo.core.routing.application.RouteProvider;
+import com.routiqo.core.routing.domain.RoutingRegion;
+import java.nio.file.Path;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
+
+@Configuration(proxyBeanMethods = false)
+@Profile("web-auth & routing")
+@ConditionalOnProperty(name = "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED", havingValue = "true")
+public class RouteAnchorResolutionConfiguration {
+    private static final String CONFIGURATION_ERROR = "Route anchor resolver is not configured";
+
+    @Bean RouteAnchorCatalog routeAnchorCatalog(Environment environment, RoutingRegion region) {
+        try {
+            String configured = environment.getProperty("ROUTIQO_LIVE_ANCHOR_CATALOG_PATH");
+            if (configured == null || configured.isBlank() || configured.length() > 4096) throw invalid();
+            RouteAnchorCatalog catalog = new RouteAnchorCatalogLoader().load(Path.of(configured));
+            if (catalog.anchors().stream().anyMatch(anchor -> !region.contains(anchor.location()))) {
+                throw invalid();
+            }
+            return catalog;
+        } catch (RuntimeException invalidConfiguration) {
+            throw invalid();
+        }
+    }
+
+    @Bean RouteAnchorResolver routeAnchorResolver(RouteProvider routes, RouteAnchorCatalog catalog) {
+        try {
+            return new RouteAnchorResolver(routes, catalog);
+        } catch (RuntimeException invalidConfiguration) {
+            throw invalid();
+        }
+    }
+
+    private static IllegalStateException invalid() {
+        return new IllegalStateException(CONFIGURATION_ERROR);
+    }
+}

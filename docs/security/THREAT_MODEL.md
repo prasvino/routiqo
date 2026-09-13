@@ -383,3 +383,14 @@ location, admission or publication permission. Provider-to-anchor validation,
 block/Ghost delivery invalidation and cohort-safe publication remain mandatory
 before public Live use. Internal transactional signal storage is implemented under
 ADR 0028.
+
+ADR 0031 adds a default-off internal route-anchor resolver without accepting route
+geometry from a caller. A strict 256 KiB local catalog and the same configured
+routing region constrain the trusted anchor set; fresh guarded Valhalla geometry
+is held only in memory. Vertex-only 100-metre matching avoids invented segment
+membership, and inclusive 1,000-metre requested/provider endpoint exclusion reduces
+home/work inference. The output omits coordinates and rejects more than 128
+matches. These heuristics do not prove physical presence, accessibility, grade
+separation, catalog safety or anonymity. Authenticated journey binding, budgets,
+post-provider consent/context revalidation and cohort-safe publication remain
+mandatory before exposure.

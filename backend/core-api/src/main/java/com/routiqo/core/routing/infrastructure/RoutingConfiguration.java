@@ -15,15 +15,22 @@ import org.springframework.core.env.Environment;
 public class RoutingConfiguration {
     private static final String CONFIGURATION_ERROR = "Routing providers are not configured";
 
-    @Bean Providers routingProviders(Environment environment) {
+    @Bean RoutingRegion routingRegion(Environment environment) {
         try {
-            URI valhallaOrigin = URI.create(required(environment, "ROUTIQO_VALHALLA_ORIGIN"));
-            URI photonOrigin = URI.create(required(environment, "ROUTIQO_PHOTON_ORIGIN"));
-            var region = new RoutingRegion(
+            return new RoutingRegion(
                     coordinate(environment, "ROUTIQO_ROUTING_REGION_WEST"),
                     coordinate(environment, "ROUTIQO_ROUTING_REGION_SOUTH"),
                     coordinate(environment, "ROUTIQO_ROUTING_REGION_EAST"),
                     coordinate(environment, "ROUTIQO_ROUTING_REGION_NORTH"));
+        } catch (RuntimeException invalidConfiguration) {
+            throw misconfigured();
+        }
+    }
+
+    @Bean Providers routingProviders(Environment environment, RoutingRegion region) {
+        try {
+            URI valhallaOrigin = URI.create(required(environment, "ROUTIQO_VALHALLA_ORIGIN"));
+            URI photonOrigin = URI.create(required(environment, "ROUTIQO_PHOTON_ORIGIN"));
             RouteProvider routes = new RegionLimitedRouteProvider(
                     new ValhallaRouteProvider(valhallaOrigin, new BoundedRoutingTransport()), region);
             PlaceProvider places = new PhotonPlaceProvider(

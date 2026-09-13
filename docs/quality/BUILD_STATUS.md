@@ -21,7 +21,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; no UI, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
-| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. Internal grants bind this state; no public provider anchor registration, scheduler or output |
+| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal resolver can derive curated anchors from fresh guarded Valhalla geometry; journey binding remains unmounted, with no public registration, scheduler or output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. No HTTP ingestion, provider anchor validation, moderation, scheduler or publication |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
@@ -32,6 +32,28 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Provider-backed anchor resolution pass (ADR 0031): a strict bounded local catalog,
+immutable redacted models and a default-off internal resolver reuse the configured
+region and guarded Valhalla provider. Fresh selected-route geometry stays in
+memory. Matching is vertex-only within 100 metres, excludes requested and geometry
+endpoints through 1,000 metres, handles longitude wrap and denies more than 128
+matches. No journey binding, provider-quality claim, HTTP, storage migration,
+signal issuance or public output was added.
+
+The focused set passed **23 tests**: 19 new catalog/domain/resolver/configuration
+tests plus 4 existing routing configuration regressions. It covers immutable and
+redacted models, exact/oversized/malformed UTF-8 input, strict schema/category/UUID
+rules, one to 512 anchors, disabled/missing/invalid startup, region constraints,
+alternative selection, no-route versus no-match, exact 100-metre matching and
+1,000-metre exclusions, sparse vertices, dateline/polar math, 128-match overflow,
+ambient transactions and provider failures. A bounded local HTTP fixture exercises
+the real configured guarded Valhalla composition and out-of-region denial without
+external traffic. Full core check and bootJar passed **273 Java tests across 41
+suites**, zero failures, errors or skips. Root and independent review approved the
+source and tests; secret and diff checks passed. The existing port-3000 preview and
+its pre-existing generated `next-env.d.ts` diff were untouched. No frontend build
+or provider-quality test was run or claimed.
 
 Default-off browser consent pass (ADR 0030): owner-only GET and explicit-intent
 POST use the existing browser session, account partition, origin/CSRF and bounded

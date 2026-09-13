@@ -23,6 +23,10 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   enable requires an exact generation while stale or current disable takes
   precedence. Expiry cleanup paths are bounded leaf-only operations.
 - Raw stranger GPS and unnecessary precise-location data are never exposed.
+- ADR 0031 route-anchor resolution accepts only an operator-selected bounded local
+  catalog and fresh region-guarded Valhalla geometry. Geometry and endpoints remain
+  in memory; output contains opaque anchor/category mappings only. Relevance is not
+  presence proof or publication permission, and the resolver is default off.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.
