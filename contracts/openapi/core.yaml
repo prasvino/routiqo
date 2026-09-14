@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.13.0
-  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. Browser consent and private route-context transports are separately default-off; no live traffic or public user presence.
+  version: 0.14.0
+  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. Browser consent, private route-context and private signal-command transports are separately default-off; no public live traffic or user presence.
 servers:
   - url: http://localhost:8080
 paths:
@@ -285,7 +285,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/NativeEmptyRequest' }
+            schema: { $ref: '#/components/schemas/BrowserSignalWithdrawRequest' }
       responses:
         '200':
           description: Native Google challenge
@@ -537,6 +537,101 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Provider, persistence, session or rate infrastructure unavailable. Empty response body. }
+  /api/v1/journeys/{id}/signal-commands:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: issuePrivateSignalCommand
+      security: [{ browserSession: [] }]
+      description: Issues a private short-lived command from current owned journey, consent, bound context and catalog authority. Separately default off. Thirty requests and ten successful grants per account per minute.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserSignalIssueRequest' }
+      responses:
+        '200':
+          description: Private signal command grant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserSignalCommandGrant' }
+        '400': { description: Invalid canonical path identifier or exact JSON request }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: Current journey, consent, context, anchor or catalog authority denied issuance }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Session, authority or rate infrastructure unavailable. Empty response body. }
+  /api/v1/journeys/{id}/signals/{commandId}:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - $ref: '#/components/parameters/PrivateSignalCommandId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: acceptPrivateSignalCommand
+      security: [{ browserSession: [] }]
+      description: Accepts a command once with a 15-minute private evidence lifetime and 24-hour private receipt retention, or returns an exact retained replay without renewal. Sixty requests and five new acceptances per account per minute.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserSignalAcceptanceRequest' }
+      responses:
+        '200':
+          description: New acceptance or exact retained private replay
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserSignalReceipt' }
+        '400': { description: Invalid canonical path identifier or exact JSON fingerprint }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: Missing, expired, denied or conflicting command/fingerprint }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Session, authority or rate infrastructure unavailable. Empty response body. }
+  /api/v1/journeys/{id}/signals/{commandId}/withdraw:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - $ref: '#/components/parameters/PrivateSignalCommandId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: withdrawPrivateSignalCommand
+      security: [{ browserSession: [] }]
+      description: Idempotently makes a retained private receipt terminal without renewal or physical erasure. Thirty requests per account per minute.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeEmptyRequest' }
+      responses:
+        '200':
+          description: Retained terminal receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserSignalReceipt' }
+        '400': { description: Invalid canonical path identifier or nonempty JSON request }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: Missing, foreign or expired command }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Session, authority or rate infrastructure unavailable. Empty response body. }
   /api/v1/routes/places:
     post:
       operationId: searchPrivateRoutePlaces
@@ -653,6 +748,24 @@ components:
       scheme: bearer
       description: Exactly one Authorization header containing Bearer, one space, and a 43-character URL-safe opaque credential.
   parameters:
+    PrivateJourneyId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      description: Canonical lowercase non-nil journey UUID.
+    PrivateSignalCommandId:
+      name: commandId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      description: Canonical lowercase non-nil private command UUID.
     JourneyAccount:
       in: header
       name: X-Routiqo-Account
@@ -825,6 +938,85 @@ components:
           nullable: true
           allOf:
             - { $ref: '#/components/schemas/BrowserRouteContext' }
+    BrowserSignalIssueRequest:
+      type: object
+      additionalProperties: false
+      required: [anchorId]
+      properties:
+        anchorId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+    BrowserSignalAcceptanceRequest:
+      type: object
+      additionalProperties: false
+      required: [anchorId, value, contextId, routeRevision, consentGeneration]
+      properties:
+        anchorId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        value: { $ref: '#/components/schemas/QuickSignalValue' }
+        contextId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        routeRevision: { $ref: '#/components/schemas/PrivateLongString' }
+        consentGeneration: { $ref: '#/components/schemas/PrivateLongString' }
+    BrowserSignalWithdrawRequest:
+      type: object
+      additionalProperties: false
+      maxProperties: 0
+    BrowserSignalCommandGrant:
+      type: object
+      additionalProperties: false
+      required: [commandId, anchorId, contextId, routeRevision, consentGeneration, categories, issuedAt, expiresAt]
+      properties:
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        anchorId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        contextId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        routeRevision: { $ref: '#/components/schemas/PrivateLongString' }
+        consentGeneration: { $ref: '#/components/schemas/PrivateLongString' }
+        categories:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items: { type: string, enum: [queue, traffic, parking, food_queue, restroom] }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+    BrowserSignalReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, status, receivedAt, expiresAt, retainUntil]
+      properties:
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        status: { type: string, enum: [accepted, withdrawn, superseded] }
+        receivedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        retainUntil: { type: string, format: date-time }
+    PrivateSignalUuid:
+      type: string
+      format: uuid
+      pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      description: Canonical lowercase non-nil UUID.
+    PrivateLongString:
+      type: string
+      minLength: 1
+      maxLength: 19
+      pattern: '^(0|[1-9][0-9]{0,18})$'
+      description: Canonical decimal string from zero through 9223372036854775807.
+    QuickSignalValue:
+      type: string
+      enum:
+        - queue_under_5
+        - queue_5_to_15
+        - queue_15_to_30
+        - queue_over_30
+        - traffic_moving
+        - traffic_slow
+        - traffic_very_slow
+        - traffic_stopped
+        - parking_available
+        - parking_filling
+        - parking_full
+        - food_queue_none
+        - food_queue_short
+        - food_queue_long
+        - restroom_usable
+        - restroom_busy
+        - restroom_problem_reported
     TripJournalAnnotation:
       type: object
       required: [title, notes, version, updatedAt]

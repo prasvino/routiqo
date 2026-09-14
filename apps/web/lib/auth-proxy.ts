@@ -105,12 +105,36 @@ export async function proxyBrowserJourneys(
   const consent = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'consent';
   const routeContext =
     path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'route-context';
-  if (!listing && !detail && !complete && !journal && !consent && !routeContext)
+  const signalCommands =
+    path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'signal-commands';
+  const signal =
+    path.length === 3 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'signals' &&
+    journeyId.test(path[2] ?? '');
+  const signalWithdraw =
+    path.length === 4 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'signals' &&
+    journeyId.test(path[2] ?? '') &&
+    path[3] === 'withdraw';
+  if (
+    !listing &&
+    !detail &&
+    !complete &&
+    !journal &&
+    !consent &&
+    !routeContext &&
+    !signalCommands &&
+    !signal &&
+    !signalWithdraw
+  )
     return failure(404);
   if (
     !(listing || journal || consent || routeContext
       ? ['GET', 'POST'].includes(request.method)
-      : request.method === (detail ? 'GET' : 'POST'))
+      : request.method === (detail ? 'GET' : 'POST')) ||
+    ((signalCommands || signal || signalWithdraw) && request.method !== 'POST')
   )
     return failure(405);
   const query = new URL(request.url).searchParams;

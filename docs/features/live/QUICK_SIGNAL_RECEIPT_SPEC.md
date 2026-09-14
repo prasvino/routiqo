@@ -1,15 +1,18 @@
 # Internal Quick Signal receipt lifecycle (L0.3a)
 
-Status: internal primitive implemented and tested; no durable receipt store or
-Live submission service. See BUILD_STATUS.md for verification.
+Status: internal primitive implemented and tested. ADRs 0028 and 0033 now provide
+durable transactional receipts and catalog-aware authority; ADR 0035 exposes only
+a separately default-off private browser command transport. Public Live output
+remains gated. See BUILD_STATUS.md for verification.
 
-ADR 0024 now defines the next command/grant and persistence direction, including
-atomic grant consumption and replay denial after receipt purge. It is a reviewed
-design with internal command grant/decision primitives in SIGNAL_COMMAND_SPEC.md,
-not implemented durable idempotency.
+ADR 0024 defines the command/grant and persistence direction, including atomic
+grant consumption and replay denial after receipt purge. ADR 0028 implements that
+durable idempotency contract; SIGNAL_COMMAND_SPEC.md retains the pure decision
+primitive acceptance criteria.
 
-Scope: pure receipt state and evidence-to-context linkage, not database idempotency
-or a submission service. The public Live release and cohort design remain gated.
+This specification's scope is the pure receipt state and evidence-to-context
+linkage. Later ADRs implement persistence and a private facade/transport without
+changing these domain rules. The public Live release and cohort design remain gated.
 
 QuickSignalReceipt binds immutable QuickSignal evidence to non-nil contextId and
 nonnegative routeRevision. It retains the original private signal fields for exact

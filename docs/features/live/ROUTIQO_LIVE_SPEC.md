@@ -81,6 +81,9 @@ public signal transport or Live projection is enabled.
 ADR 0034 exposes only a separately default-off private owner route-context
 read/bind leaf with minimal opaque output and the same authority rechecks. It is a
 recovery/intent boundary, not proof of location, signal permission or public Live.
+ADR 0035 exposes separately default-off private owner command issue, acceptance
+and withdrawal through the catalog-aware authority. Accepted receipts remain
+private recovery evidence and do not authorize a public moment.
 Client GPS remains untrusted. Claims remain traveller reports, not verified
 observations of physical presence. Arbitrary bounds, segments and membership
 probing are denied; no account-independent live discovery endpoint is planned.
@@ -116,9 +119,9 @@ before migrations or public endpoints:
 
 | Record | Proposed lifecycle |
 |---|---|
-| Quick Signal | Server-received timestamp; useful for 15 minutes; one current contribution per actor/anchor/category; replacement cannot add independent corroboration |
+| Quick Signal | Server-received timestamp; useful for 15 minutes in the disabled ADR 0035 private transport; one current contribution per actor/anchor/category; replacement cannot add independent corroboration |
 | Live Moment | Derived only from eligible, nonexpired evidence; disappears when publication rules cease to hold; no permanent browsable archive |
-| Submission receipt | Account-bound idempotency key and request fingerprint, retained 24 hours; a retry after evidence expiry cannot resurrect evidence |
+| Submission receipt | Account-bound command and request fingerprint, retained 24 hours in the disabled ADR 0035 private transport; a retry after evidence expiry cannot resurrect evidence |
 | Raw signal | Purge by 24 hours unless a specific bounded moderation hold applies; never store a raw GPS trail |
 | Moderation hold | Separate access-controlled minimal evidence; duration, deletion exceptions and audit policy must be agreed before retention is enabled |
 | Client LIVE state | Memory only; no planning backup, journal, persistent offline cache or analytics payload containing live evidence |

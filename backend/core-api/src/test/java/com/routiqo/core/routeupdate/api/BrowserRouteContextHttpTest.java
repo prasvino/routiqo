@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +44,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -57,7 +59,8 @@ import static org.assertj.core.api.Assertions.assertThat;
     "ROUTIQO_ROUTING_REGION_WEST=-1", "ROUTIQO_ROUTING_REGION_SOUTH=-1",
     "ROUTIQO_ROUTING_REGION_EAST=1", "ROUTIQO_ROUTING_REGION_NORTH=1",
     "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true",
-    "ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED=true"
+    "ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED=true",
+    "ROUTIQO_LIVE_SIGNAL_API_ENABLED=true"
 })
 @ActiveProfiles({"persistence", "google-auth", "web-auth", "routing"})
 @Import(BrowserRouteContextHttpTest.TestIdentity.class)
@@ -147,7 +150,8 @@ class BrowserRouteContextHttpTest {
             AuthRateGate delegate = new JdbcAuthRateGate(jdbc, secret, Clock.systemUTC());
             return (identity, category, limit) -> {
                 if (category.equals("other") && peerUnavailable.get()
-                        || category.startsWith("route-context-") && accountUnavailable.get()) {
+                        || (category.startsWith("route-context-")
+                            || category.startsWith("signal-")) && accountUnavailable.get()) {
                     throw new IllegalStateException("Synthetic rate failure");
                 }
                 return delegate.allow(identity, category, limit);
@@ -215,6 +219,7 @@ class BrowserRouteContextHttpTest {
 
     @Value("${local.server.port}") int port;
     @Autowired JdbcTemplate jdbc;
+    @Autowired DataSource dataSource;
     @Autowired PresenceConsentService consents;
     @Autowired ApplicationContext context;
     @Autowired @Qualifier("peerRateUnavailable") AtomicBoolean peerRateUnavailable;
@@ -449,6 +454,376 @@ class BrowserRouteContextHttpTest {
         assertThat(PROVIDER_CALLS).hasValue(0);
     }
 
+    @Test void signalIssueAcceptReplayAndWithdrawUseMinimalStableReceipts() throws Exception {
+        assertThat(context.getBeansOfType(BrowserSignalController.class)).hasSize(1);
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        PROVIDER_CALLS.set(0);
+
+        HttpResponse<String> issued = issue(owner, journey, anchor);
+        assertThat(issued.statusCode()).isEqualTo(200);
+        String command = JsonPath.read(issued.body(), "$.commandId");
+        assertThat(JsonPath.<String>read(issued.body(), "$.anchorId")).isEqualTo(anchor.toString());
+        assertThat(JsonPath.<String>read(issued.body(), "$.contextId"))
+                .isEqualTo(bound.get("contextId"));
+        assertThat(JsonPath.<String>read(issued.body(), "$.routeRevision")).isEqualTo("0");
+        assertThat(JsonPath.<String>read(issued.body(), "$.consentGeneration")).isEqualTo("1");
+        assertThat(JsonPath.<List<String>>read(issued.body(), "$.categories"))
+                .containsExactly("queue");
+        Map<String, Object> grantFields = JsonPath.read(issued.body(), "$");
+        assertThat(grantFields.keySet()).containsOnly(
+                "commandId", "anchorId", "contextId", "routeRevision", "consentGeneration",
+                "categories", "issuedAt", "expiresAt");
+
+        String acceptance = acceptance(anchor, "queue_under_5", bound, "1");
+        HttpResponse<String> accepted = accept(owner, journey, command, acceptance);
+        assertReceipt(accepted, command, "accepted");
+        String receivedAt = JsonPath.read(accepted.body(), "$.receivedAt");
+        String expiresAt = JsonPath.read(accepted.body(), "$.expiresAt");
+        String retainUntil = JsonPath.read(accepted.body(), "$.retainUntil");
+        assertThat(Duration.between(Instant.parse(receivedAt), Instant.parse(expiresAt)))
+                .isEqualTo(Duration.ofMinutes(15));
+        assertThat(Duration.between(Instant.parse(receivedAt), Instant.parse(retainUntil)))
+                .isEqualTo(Duration.ofHours(24));
+        HttpResponse<String> replay = accept(owner, journey, command, acceptance);
+        assertReceipt(replay, command, "accepted");
+        assertReceiptTimes(replay, receivedAt, expiresAt, retainUntil);
+        assertEmpty(postSignal(owner,
+                "journeys/" + journey + "/signals/" + command + "/withdraw", "{\"x\":1}"),
+                400);
+        assertEmpty(postSignal(owner,
+                "journeys/" + journey + "/signals/" + command + "/withdraw", "{}{}"), 400);
+        HttpResponse<String> withdrawn = withdraw(owner, journey, command);
+        assertReceipt(withdrawn, command, "withdrawn");
+        assertReceiptTimes(withdrawn, receivedAt, expiresAt, retainUntil);
+        HttpResponse<String> repeated = withdraw(owner, journey, command);
+        assertReceipt(repeated, command, "withdrawn");
+        assertReceiptTimes(repeated, receivedAt, expiresAt, retainUntil);
+        assertThat(PROVIDER_CALLS).hasValue(0);
+        assertThat(jdbc.queryForObject("""
+            SELECT used_count FROM signal_actor_budget WHERE actor_id = ? AND action = 'GRANT'
+            """, Integer.class, owner.account())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT used_count FROM signal_actor_budget WHERE actor_id = ? AND action = 'ACCEPT'
+            """, Integer.class, owner.account())).isEqualTo(1);
+    }
+
+    @Test void supersededReplayAndWithdrawalPreserveTheFirstTerminalOutcome() throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String first = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String second = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String firstBody = acceptance(anchor, "queue_under_5", bound, "1");
+        String secondBody = acceptance(anchor, "queue_over_30", bound, "1");
+        assertReceipt(accept(owner, journey, first, firstBody), first, "accepted");
+        assertReceipt(accept(owner, journey, second, secondBody), second, "accepted");
+        assertReceipt(accept(owner, journey, first, firstBody), first, "superseded");
+        assertReceipt(withdraw(owner, journey, first), first, "superseded");
+    }
+
+    @Test void retainedReplayAndWithdrawSurviveGhostCompletionAndGrantCleanup() throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String command = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String unused = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String acceptedBody = acceptance(anchor, "queue_under_5", bound, "1");
+        assertReceipt(accept(owner, journey, command, acceptedBody), command, "accepted");
+        jdbc.update("DELETE FROM signal_command_grant WHERE actor_id = ? AND command_id = ?",
+                owner.account(), UUID.fromString(command));
+        disable(owner, journey, 1);
+        assertReceipt(accept(owner, journey, command, acceptedBody), command, "accepted");
+        assertEmpty(accept(owner, journey, unused, acceptedBody), 409);
+        assertThat(postJourney(owner, journey, "complete").statusCode()).isEqualTo(200);
+        assertReceipt(accept(owner, journey, command, acceptedBody), command, "accepted");
+        assertReceipt(withdraw(owner, journey, command), command, "withdrawn");
+        String changed = acceptance(anchor, "queue_over_30", bound, "1");
+        assertEmpty(accept(owner, journey, command, changed), 409);
+    }
+
+    @Test void signalInputSecurityAndAccountIsolationFailBeforeMutation() throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        Browser other = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        UUID otherJourney = start(other);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        int before = count("signal_command_grant", owner.account());
+        for (String invalid : List.of("{}", "null", "[]", "{", "{\"anchorId\":null}",
+                "{\"anchorId\":\"00000000-0000-0000-0000-000000000000\"}",
+                "{\"anchorId\":\"AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA\"}",
+                "{\"anchorId\":\"" + anchor + "\",\"extra\":1}",
+                "{\"anchorId\":\"" + anchor + "\",\"anchorId\":\"" + anchor + "\"}",
+                "{\"anchorId\":\"" + anchor + "\"}{}")) {
+            assertEmpty(postSignal(owner, signalCommands(journey), invalid), 400);
+        }
+        String command = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        for (String invalid : List.of(
+                acceptance(anchor, "QUEUE_UNDER_5", bound, "1"),
+                acceptance(anchor, "unknown", bound, "1"),
+                acceptance(anchor, "queue_under_5", bound, "01"),
+                acceptanceNumber(anchor, "queue_under_5", bound),
+                acceptance(anchor, "queue_under_5", bound, "9223372036854775808"))) {
+            assertEmpty(accept(owner, journey, command, invalid), 400);
+        }
+        assertEmpty(postSignal(owner, signalCommands(journey) + "?actor=x",
+                "{\"anchorId\":\"" + anchor + "\"}"), 400);
+        assertEmpty(send(owner, "POST", signalCommands(journey),
+                "{\"anchorId\":\"" + anchor + "\"}", "text/plain", owner.csrf(),
+                owner.account().toString(), null, "http://localhost:3000"), 415);
+        assertEmpty(send(owner, "POST", signalCommands(journey), "x".repeat(20 * 1024 + 1),
+                "application/json", owner.csrf(), owner.account().toString(), null,
+                "http://localhost:3000"), 413);
+        assertEmpty(sendMalformedUtf8(owner, signalCommands(journey)), 400);
+        assertEmpty(send(owner, "POST", signalCommands(journey),
+                "{\"anchorId\":\"" + anchor + "\"}", "application/json", null,
+                owner.account().toString(), null, "http://localhost:3000"), 403);
+        assertEmpty(send(owner, "POST", signalCommands(journey),
+                "{\"anchorId\":\"" + anchor + "\"}", "application/json", owner.csrf(),
+                UUID.randomUUID().toString(), null, "http://localhost:3000"), 401);
+        assertEmpty(issue(other, journey, anchor), 404);
+        assertEmpty(accept(other, otherJourney, command,
+                acceptance(anchor, "queue_under_5", bound, "1")), 409);
+        assertEmpty(accept(owner, journey, UUID.randomUUID().toString(),
+                acceptance(anchor, "queue_under_5", bound, "1")), 409);
+        assertThat(count("signal_command_grant", owner.account())).isEqualTo(before + 1);
+        assertThat(count("quick_signal_receipt", owner.account())).isZero();
+    }
+
+    @Test void requestAndStorageBudgetsRemainSeparateWithReplayUnchargedByStorage() throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID missing = UUID.randomUUID();
+        for (int i = 0; i < 30; i++) assertEmpty(issue(owner, journey, missing), 409);
+        assertLimited(issue(owner, journey, missing));
+
+        jdbc.update("DELETE FROM auth_rate_bucket");
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String command = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String body = acceptance(anchor, "queue_under_5", bound, "1");
+        assertReceipt(accept(owner, journey, command, body), command, "accepted");
+        for (int i = 1; i < 60; i++) assertThat(accept(owner, journey, command, body).statusCode())
+                .isEqualTo(200);
+        assertLimited(accept(owner, journey, command, body));
+        assertThat(jdbc.queryForObject("""
+            SELECT used_count FROM signal_actor_budget WHERE actor_id = ? AND action = 'ACCEPT'
+            """, Integer.class, owner.account())).isEqualTo(1);
+
+        jdbc.update("DELETE FROM auth_rate_bucket");
+        for (int i = 0; i < 30; i++) assertThat(withdraw(owner, journey, command).statusCode())
+                .isEqualTo(200);
+        assertLimited(withdraw(owner, journey, command));
+    }
+
+    @Test void storageBudgetsLimitOnlySuccessfulNewGrantsAndAcceptances() throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        var commands = new java.util.ArrayList<String>();
+        for (int i = 0; i < 10; i++) {
+            HttpResponse<String> result = issue(owner, journey, anchor);
+            assertThat(result.statusCode()).isEqualTo(200);
+            commands.add(JsonPath.read(result.body(), "$.commandId"));
+        }
+        assertLimited(issue(owner, journey, anchor));
+        for (int i = 0; i < 5; i++) assertThat(accept(owner, journey, commands.get(i),
+                acceptance(anchor, i % 2 == 0 ? "queue_under_5" : "queue_over_30", bound, "1"))
+                .statusCode()).isEqualTo(200);
+        assertLimited(accept(owner, journey, commands.get(5),
+                acceptance(anchor, "queue_under_5", bound, "1")));
+        assertThat(count("quick_signal_receipt", owner.account())).isEqualTo(5);
+    }
+
+    @Test void grantAndReceiptExpiryDenyWithoutRecreatingEvidence() throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String expiredGrant = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        jdbc.update("""
+            UPDATE signal_command_grant SET issued_at = now() - interval '2 minutes',
+                expires_at = now() - interval '1 minute'
+            WHERE actor_id = ? AND command_id = ?
+            """, owner.account(), UUID.fromString(expiredGrant));
+        assertEmpty(accept(owner, journey, expiredGrant,
+                acceptance(anchor, "queue_under_5", bound, "1")), 409);
+
+        String command = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String body = acceptance(anchor, "queue_under_5", bound, "1");
+        assertReceipt(accept(owner, journey, command, body), command, "accepted");
+        jdbc.update("""
+            UPDATE quick_signal_receipt
+            SET received_at = now() - interval '16 minutes',
+                evidence_expires_at = now() - interval '1 minute',
+                retain_until = now() + interval '23 hours 44 minutes'
+            WHERE actor_id = ? AND command_id = ?
+            """, owner.account(), UUID.fromString(command));
+        assertReceipt(accept(owner, journey, command, body), command, "accepted");
+        jdbc.update("""
+            UPDATE quick_signal_receipt
+            SET received_at = now() - interval '24 hours',
+                evidence_expires_at = now() - interval '23 hours 45 minutes',
+                retain_until = now() - interval '1 microsecond'
+            WHERE actor_id = ? AND command_id = ?
+            """, owner.account(), UUID.fromString(command));
+        assertEmpty(accept(owner, journey, command, body), 409);
+        assertEmpty(withdraw(owner, journey, command), 409);
+        assertThat(count("quick_signal_receipt", owner.account())).isEqualTo(1);
+    }
+
+    @Test void concurrentExactHttpAcceptancePersistsOneReceiptAndOneStorageCharge()
+            throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String command = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String body = acceptance(anchor, "queue_under_5", bound, "1");
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var holder = executor.submit(() -> {
+                new TransactionTemplate(new DataSourceTransactionManager(dataSource))
+                        .execute(status -> {
+                            jdbc.queryForObject(
+                                    "SELECT id FROM routiqo_account WHERE id = ? FOR UPDATE",
+                                    UUID.class, owner.account());
+                            locked.countDown();
+                            await(release);
+                            return null;
+                        });
+                return null;
+            });
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            var first = executor.submit(() -> accept(owner, journey, command, body));
+            var second = executor.submit(() -> accept(owner, journey, command, body));
+            assertThat(waitingAccountWriters(2)).isTrue();
+            release.countDown();
+            holder.get(5, TimeUnit.SECONDS);
+            HttpResponse<String> a = first.get(10, TimeUnit.SECONDS);
+            HttpResponse<String> b = second.get(10, TimeUnit.SECONDS);
+            assertReceipt(a, command, "accepted");
+            assertReceipt(b, command, "accepted");
+            assertThat(JsonPath.<String>read(a.body(), "$.receivedAt"))
+                    .isEqualTo(JsonPath.<String>read(b.body(), "$.receivedAt"));
+        } finally {
+            release.countDown();
+        }
+        assertThat(count("quick_signal_receipt", owner.account())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT used_count FROM signal_actor_budget WHERE actor_id = ? AND action = 'ACCEPT'
+            """, Integer.class, owner.account())).isEqualTo(1);
+    }
+
+    @Test void signalSessionRateAndAuthorityFailuresAreSanitizedWithoutPartialWrites()
+            throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        sessionReadUnavailable.set(true);
+        assertEmpty(issue(owner, journey, anchor), 503);
+        sessionReadUnavailable.set(false);
+        accountRateUnavailable.set(true);
+        assertEmpty(issue(owner, journey, anchor), 503);
+        accountRateUnavailable.set(false);
+        accountWriteUnavailable.set(true);
+        assertEmpty(issue(owner, journey, anchor), 503);
+        accountWriteUnavailable.set(false);
+        peerRateUnavailable.set(true);
+        assertEmpty(issue(owner, journey, anchor), 503);
+        assertThat(count("signal_command_grant", owner.account())).isZero();
+    }
+
+    private Map<String, Object> bind(Browser owner, UUID journey) throws Exception {
+        HttpResponse<String> response = post(owner, journey, routeBody(-0.02, 0.02, null));
+        assertThat(response.statusCode()).isEqualTo(200);
+        return JsonPath.read(response.body(), "$.context");
+    }
+
+    private HttpResponse<String> issue(Browser owner, UUID journey, UUID anchor)
+            throws Exception {
+        return postSignal(owner, signalCommands(journey),
+                "{\"anchorId\":\"" + anchor + "\"}");
+    }
+
+    private HttpResponse<String> accept(Browser owner, UUID journey, String command,
+            String body) throws Exception {
+        return postSignal(owner, "journeys/" + journey + "/signals/" + command, body);
+    }
+
+    private HttpResponse<String> withdraw(Browser owner, UUID journey, String command)
+            throws Exception {
+        return postSignal(owner,
+                "journeys/" + journey + "/signals/" + command + "/withdraw", "{}");
+    }
+
+    private HttpResponse<String> postSignal(Browser owner, String path, String body)
+            throws Exception {
+        return send(owner, "POST", path, body, "application/json", owner.csrf(),
+                owner.account().toString(), null, "http://localhost:3000");
+    }
+
+    private static String signalCommands(UUID journey) {
+        return "journeys/" + journey + "/signal-commands";
+    }
+
+    private static String acceptance(UUID anchor, String value, Map<String, Object> context,
+            String generation) {
+        return "{\"anchorId\":\"" + anchor + "\",\"value\":\"" + value
+                + "\",\"contextId\":\"" + context.get("contextId")
+                + "\",\"routeRevision\":\"" + context.get("revision")
+                + "\",\"consentGeneration\":\"" + generation + "\"}";
+    }
+
+    private static String acceptanceNumber(UUID anchor, String value,
+            Map<String, Object> context) {
+        return "{\"anchorId\":\"" + anchor + "\",\"value\":\"" + value
+                + "\",\"contextId\":\"" + context.get("contextId")
+                + "\",\"routeRevision\":0,\"consentGeneration\":1}";
+    }
+
+    private int count(String table, UUID actor) {
+        return jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE actor_id = ?",
+                Integer.class, actor);
+    }
+
+    private static void assertReceipt(HttpResponse<String> response, String command,
+            String status) {
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(JsonPath.<String>read(response.body(), "$.commandId")).isEqualTo(command);
+        assertThat(JsonPath.<String>read(response.body(), "$.status")).isEqualTo(status);
+        Map<String, Object> fields = JsonPath.read(response.body(), "$");
+        assertThat(fields.keySet()).containsOnly(
+                "commandId", "status", "receivedAt", "expiresAt", "retainUntil");
+        assertThat(response.body()).doesNotContain("actorId", "journeyId", "anchorId",
+                "contextId", "value", "catalogVersion");
+    }
+
+    private static void assertReceiptTimes(HttpResponse<String> response, String receivedAt,
+            String expiresAt, String retainUntil) {
+        assertThat(JsonPath.<String>read(response.body(), "$.receivedAt")).isEqualTo(receivedAt);
+        assertThat(JsonPath.<String>read(response.body(), "$.expiresAt")).isEqualTo(expiresAt);
+        assertThat(JsonPath.<String>read(response.body(), "$.retainUntil")).isEqualTo(retainUntil);
+    }
+
     private Browser login(UUID subject) throws Exception {
         HttpClient client = HttpClient.newBuilder().cookieHandler(
                 new CookieManager(null, CookiePolicy.ACCEPT_ALL)).build();
@@ -538,8 +913,13 @@ class BrowserRouteContextHttpTest {
     }
 
     private HttpResponse<String> sendMalformedUtf8(Browser owner, UUID journey) throws Exception {
+        return sendMalformedUtf8(owner, path(journey));
+    }
+
+    private HttpResponse<String> sendMalformedUtf8(Browser owner, String requestPath)
+            throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create(
-                "http://localhost:" + port + "/api/v1/" + path(journey)))
+                "http://localhost:" + port + "/api/v1/" + requestPath))
                 .header("Content-Type", "application/json")
                 .header("Origin", "http://localhost:3000")
                 .header("X-XSRF-TOKEN", owner.csrf())
@@ -547,6 +927,21 @@ class BrowserRouteContextHttpTest {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(new byte[] {(byte) 0xc3, 0x28}))
                 .build();
         return owner.client().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private boolean waitingAccountWriters(int expected) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            Integer waiting = jdbc.queryForObject("""
+                SELECT count(*) FROM pg_stat_activity activity
+                WHERE activity.datname = current_database()
+                  AND cardinality(pg_blocking_pids(activity.pid)) > 0
+                  AND activity.query LIKE '%routiqo_account%FOR UPDATE%'
+                """, Integer.class);
+            if (waiting != null && waiting >= expected) return true;
+            Thread.sleep(20);
+        }
+        return false;
     }
 
     private static String routeBody(double origin, double destination, String expected) {

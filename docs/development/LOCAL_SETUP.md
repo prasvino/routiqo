@@ -122,6 +122,16 @@ The owner route-context transport is also independently disabled. Set
 startup. GET is private recovery; POST calls the configured binder once. The web
 proxy permits this exact leaf only, uses a 25-second POST deadline and does not
 retry. No sample enables the flag or supplies catalog data.
+
+The private Quick Signal command transport has a third independent gate. Set
+`ROUTIQO_LIVE_SIGNAL_API_ENABLED=true` only with the same persistence, web-auth,
+routing, resolver/catalog and route-binding configuration. Its three owner-only
+POST leaves issue a short server grant, accept an exact structured signal and
+withdraw a retained private receipt. The proxy has exact path allowlists and an
+eight-second deadline with no retries. The example remains false. Enabling this
+transport does not publish Live output or supply the required moderation,
+hourly/category abuse controls, operated purge job or regional launch evidence.
+
 ## Open-source maps target setup
 
 Before importing regional data, use the local artifact inventory checker:

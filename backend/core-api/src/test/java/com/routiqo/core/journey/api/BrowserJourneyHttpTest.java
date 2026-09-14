@@ -314,4 +314,21 @@ class BrowserJourneyHttpTest {
             assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
         }
     }
+    @Test void browserSignalRoutesAreDeniedWhenTheirDefaultOffFlagIsAbsent() throws Exception {
+        assertThat(applicationContext.getBeansOfType(
+                com.routiqo.core.routeupdate.api.BrowserSignalController.class)).isEmpty();
+        var owner = login();
+        UUID journey = UUID.randomUUID();
+        UUID command = UUID.randomUUID();
+        assertThat(send(owner, "journeys", start(journey, "trip")).statusCode()).isEqualTo(200);
+        for (String path : java.util.List.of(
+                "journeys/" + journey + "/signal-commands",
+                "journeys/" + journey + "/signals/" + command,
+                "journeys/" + journey + "/signals/" + command + "/withdraw")) {
+            var response = send(owner, path, "{}");
+            assertThat(response.statusCode()).isIn(401, 403);
+            assertThat(response.body()).isEmpty();
+            assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        }
+    }
 }

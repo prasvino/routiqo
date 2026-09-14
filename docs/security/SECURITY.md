@@ -44,6 +44,11 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   apply. API code has a read-only context boundary and cannot invoke trusted raw
   replacement. Minimal no-store output contains opaque anchors but remains
   sensitive route intent, not physical presence or publication authority.
+- ADR 0035 exposes only separately default-off private browser signal-command
+  leaves through the catalog-aware facade. Exact session/account/origin/CSRF/JSON
+  checks and separate durable issue, acceptance and withdrawal request budgets
+  precede transactional storage. Retained private replay never renews evidence;
+  an accepted receipt is not permission for public output.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.
@@ -187,8 +192,8 @@ No security or privacy control may be silently weakened to make a test pass, sim
 ## Routiqo Live implementation gate
 
 The first LIVE list and structured contribution scope is defined in
-`docs/features/live/ROUTIQO_LIVE_SPEC.md`; architecture is ADR 0022. Before protected
-endpoints or public projections, require authoritative journey admission, consent,
+`docs/features/live/ROUTIQO_LIVE_SPEC.md`; architecture is ADR 0022. Before public
+projections, require authoritative journey admission, consent,
 expiry, distributed budgets, idempotency, report/block/moderation and server-side
 privacy transformation. Never trust client-supplied route membership or infer
 physical presence from authentication. Unknown authority fails closed.

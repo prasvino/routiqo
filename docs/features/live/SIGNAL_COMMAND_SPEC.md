@@ -2,8 +2,10 @@
 
 Status: internal grant and decision policy implemented; ADR 0024 remains the
 persistence contract. Verification is recorded in BUILD_STATUS.md.
-This slice supplies pure grant state and retry decisions. It does not implement
-durable idempotency, grant issuance, quotas, authority locking or public endpoints.
+This slice supplies pure grant state and retry decisions. ADRs 0028 and 0033 later
+implement durable grants, receipts, quotas and catalog-aware authority; ADR 0035
+adds only a separately default-off private browser transport. This pure policy
+does not itself provide persistence or public publication.
 
 SignalCommandGrant binds a non-nil server command ID to one SignalAdmission and
 UNUSED or CONSUMED state. Reuse the admission's immutable issue/expiry interval;
@@ -51,11 +53,8 @@ callbacks share the account gate. PresenceConsent and LiveRouteContext still hav
 no durable authority store. A receipt repository alone therefore cannot establish
 the complete atomic acceptance boundary.
 
-Before wiring signal storage, add durable consent and route-context participants
-to the account-before-journey order compatible with deletion. Apply ADR 0025's
-remaining consent, context, grant, contribution-slot and receipt lock order with
-unique constraints for missing-row creation arbitration;
-do not introduce direct routeupdate access to other domains' repositories.
-Exercise their rollback and revocation/cleanup races against a disposable
-PostgreSQL database. Route provider calls stay outside the transaction. These
-remaining signal integration requirements are not guarantees of this pure policy.
+ADRs 0026–0028 implement durable consent, route context, grants, contribution
+slots and receipts under the account-before-journey order with database uniqueness
+for missing-row arbitration. Their rollback and revocation/cleanup races are
+covered against disposable PostgreSQL. Route provider calls remain outside the
+transaction. Those integrations do not change the guarantees of this pure policy.

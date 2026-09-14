@@ -398,8 +398,9 @@ consent/context/catalog revalidation. A single durable latest attempt prevents a
 older or failed provider request from regaining authority, including after another
 context is replaced and physically expired. Provider work holds no authority
 locks, and only opaque anchor IDs enter the 15-minute context. This still does not
-prove physical presence. Public authenticated transport, grant category
-revalidation and cohort-safe publication remain mandatory before exposure.
+prove physical presence. Public signal publication and cohort-safe projection
+remain mandatory before exposure; grant category revalidation is implemented
+under ADR 0033.
 
 ADR 0033 prevents matching opaque anchor IDs alone from being treated as provider
 provenance. Only a context bound to the current immutable catalog may issue through
@@ -416,3 +417,12 @@ cross-user disclosure, stale writes and provider amplification. Responses omit
 geometry, endpoints, actor, journey and catalog metadata; API architecture prevents
 raw context replacement. Opaque anchors still reveal private route intent to their
 owner and do not prove location or permit public Live publication.
+
+ADR 0035 adds private, default-off browser command issue, acceptance and withdrawal
+through the catalog-aware facade. Strict structured input, authenticated owner
+scope and separate durable request/storage budgets limit forgery, cross-account
+probing, replay amplification and command exhaustion. Exact retained replay and
+terminal withdrawal return only the original owner's minimal receipt and never
+refresh timestamps. Public cohort differencing, collusion, moderation, operated
+expiry cleanup and revocation delivery remain unresolved release threats, so no
+Live projection or UI is enabled.

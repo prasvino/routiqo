@@ -387,6 +387,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/signal-commands": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Issues a private short-lived command from current owned journey, consent, bound context and catalog authority. Separately default off. Thirty requests and ten successful grants per account per minute. */
+        post: operations["issuePrivateSignalCommand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{id}/signals/{commandId}": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Accepts a command once with a 15-minute private evidence lifetime and 24-hour private receipt retention, or returns an exact retained replay without renewal. Sixty requests and five new acceptances per account per minute. */
+        post: operations["acceptPrivateSignalCommand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{id}/signals/{commandId}/withdraw": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Idempotently makes a retained private receipt terminal without renewal or physical erasure. Thirty requests per account per minute. */
+        post: operations["withdrawPrivateSignalCommand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/routes/places": {
         parameters: {
             query?: never;
@@ -509,6 +582,49 @@ export interface components {
             status: "bound" | "no_route" | "no_eligible_anchors";
             context: components["schemas"]["BrowserRouteContext"] | null;
         };
+        BrowserSignalIssueRequest: {
+            anchorId: components["schemas"]["PrivateSignalUuid"];
+        };
+        BrowserSignalAcceptanceRequest: {
+            anchorId: components["schemas"]["PrivateSignalUuid"];
+            value: components["schemas"]["QuickSignalValue"];
+            contextId: components["schemas"]["PrivateSignalUuid"];
+            routeRevision: components["schemas"]["PrivateLongString"];
+            consentGeneration: components["schemas"]["PrivateLongString"];
+        };
+        BrowserSignalWithdrawRequest: Record<string, never>;
+        BrowserSignalCommandGrant: {
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            anchorId: components["schemas"]["PrivateSignalUuid"];
+            contextId: components["schemas"]["PrivateSignalUuid"];
+            routeRevision: components["schemas"]["PrivateLongString"];
+            consentGeneration: components["schemas"]["PrivateLongString"];
+            categories: ("queue" | "traffic" | "parking" | "food_queue" | "restroom")[];
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        BrowserSignalReceipt: {
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            status: "accepted" | "withdrawn" | "superseded";
+            /** Format: date-time */
+            receivedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            retainUntil: string;
+        };
+        /**
+         * Format: uuid
+         * @description Canonical lowercase non-nil UUID.
+         */
+        PrivateSignalUuid: string;
+        /** @description Canonical decimal string from zero through 9223372036854775807. */
+        PrivateLongString: string;
+        /** @enum {string} */
+        QuickSignalValue: "queue_under_5" | "queue_5_to_15" | "queue_15_to_30" | "queue_over_30" | "traffic_moving" | "traffic_slow" | "traffic_very_slow" | "traffic_stopped" | "parking_available" | "parking_filling" | "parking_full" | "food_queue_none" | "food_queue_short" | "food_queue_long" | "restroom_usable" | "restroom_busy" | "restroom_problem_reported";
         TripJournalAnnotation: {
             /** @description Plain text; UTF-16 code-unit limit enforced by server */
             title: string;
@@ -648,6 +764,10 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Canonical lowercase non-nil journey UUID. */
+        PrivateJourneyId: string;
+        /** @description Canonical lowercase non-nil private command UUID. */
+        PrivateSignalCommandId: string;
         /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
         JourneyAccount: string;
         /** @description Must exactly match the configured browser origin. */
@@ -1140,7 +1260,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NativeEmptyRequest"];
+                "application/json": components["schemas"]["BrowserSignalWithdrawRequest"];
             };
         };
         responses: {
@@ -1660,6 +1780,211 @@ export interface operations {
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
             /** @description Provider */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    issuePrivateSignalCommand: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserSignalIssueRequest"];
+            };
+        };
+        responses: {
+            /** @description Private signal command grant */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserSignalCommandGrant"];
+                };
+            };
+            /** @description Invalid canonical path identifier or exact JSON request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Current journey */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    acceptPrivateSignalCommand: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserSignalAcceptanceRequest"];
+            };
+        };
+        responses: {
+            /** @description New acceptance or exact retained private replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserSignalReceipt"];
+                };
+            };
+            /** @description Invalid canonical path identifier or exact JSON fingerprint */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    withdrawPrivateSignalCommand: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeEmptyRequest"];
+            };
+        };
+        responses: {
+            /** @description Retained terminal receipt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserSignalReceipt"];
+                };
+            };
+            /** @description Invalid canonical path identifier or nonempty JSON request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session */
             503: {
                 headers: {
                     [name: string]: unknown;

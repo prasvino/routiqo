@@ -1,7 +1,8 @@
 # Catalog-aware signal authority
 
-Status: implementation acceptance. Internal configured facade only; no public
-signal endpoint, UI, flag activation or publication.
+Status: internal configured facade implemented and tested. ADR 0035 adds a
+separately default-off private owner command transport through this facade; no UI,
+flag activation or public publication exists.
 
 ## Context provenance
 
@@ -72,7 +73,7 @@ of a version for changed locations is an operational violation. This phase check
 the configured catalog snapshot and does not implement distributed rollout or
 claim globally synchronized configuration. Current categories are rechecked even
 if an operator erroneously removes one without rotating version. Real regional
-catalog operations, authenticated public signal transport, abuse/moderation,
+catalog operations, public signal publication, abuse/moderation,
 revocation delivery and cohort publication remain gates.
 
 Create ADR0033 and update current Live/context/signal/roadmap/security/threat records.

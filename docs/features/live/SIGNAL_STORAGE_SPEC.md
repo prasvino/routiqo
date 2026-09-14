@@ -5,6 +5,10 @@ ADR 0033 adds a separately default-off catalog-aware facade over the same
 transaction service. No public API, moderation, projection, queue dispatch or
 scheduler is enabled.
 
+ADR 0035 adds a separately default-off private owner command transport through
+the catalog-aware facade. It does not expose raw receipt reads or public Live
+output and does not change these storage quotas or lifecycle rules.
+
 Implement routeupdate-owned grant and receipt persistence plus an internal service
 that composes JourneyWriteAuthority, PresenceConsentParticipant and
 LiveRouteContextParticipant. Use the existing trusted synchronous transaction,
