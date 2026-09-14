@@ -1,6 +1,8 @@
 # Authenticated internal journey route binding
 
-Status: implementation acceptance; no public binding HTTP/UI or signal issuer.
+Status: implemented internally. ADR 0034 adds a private owner-only browser binding
+and recovery transport behind a separate default-off flag; no signal endpoint,
+UI or public Live output exists.
 
 Implement a synchronous internal service accepting independently authenticated
 actor ID, owned journey ID, RouteRequest, alternative index and optional expected
@@ -86,7 +88,7 @@ Run focused then full relevant Java check/bootJar and secret/diff checks; obtain
 independent review. Leave preview port3000 and its pre-existing next-env.d.ts diff
 untouched; no frontend build, user database migration, flag activation or timer.
 
-Real regional data/catalog rollout consistency across replicas, public authenticated
-binding transport, current category validation at grant issuance, moderation,
+Real regional data/catalog rollout consistency across replicas, production
+activation, signal transport, moderation,
 revocation delivery and cohort-safe publication remain gates. Matching and binding
 do not prove physical presence; no public LIVE output is enabled by this phase.

@@ -363,6 +363,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/route-context": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Returns the authenticated owner's current private route context without renewing or creating it. Separately enabled by the default-off route binding API flag. Sixty reads per account per minute. */
+        get: operations["getPrivateJourneyRouteContext"];
+        put?: never;
+        /** @description Resolves one selected private route and atomically binds its eligible catalog anchors. Empty outcomes preserve the previous context. Ten bindings per account per minute. The same-origin proxy allows one bounded 25 second request and never retries. */
+        post: operations["bindPrivateJourneyRouteContext"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/routes/places": {
         parameters: {
             query?: never;
@@ -452,6 +476,38 @@ export interface components {
             /** @description Canonical decimal string from zero through 9223372036854775807. */
             expectedGeneration: string;
             sharing: boolean;
+        };
+        BrowserRouteContext: {
+            /** Format: uuid */
+            contextId: string;
+            /** @description Canonical decimal signed-long value encoded as a string to preserve exact JavaScript precision. */
+            revision: string;
+            /** @description Sorted opaque curated anchor identifiers. */
+            anchorIds: string[];
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        BrowserRouteContextRead: {
+            context: components["schemas"]["BrowserRouteContext"] | null;
+        };
+        BrowserRouteContextBindingRequest: {
+            /** @enum {string} */
+            mode: "driving" | "walking" | "cycling";
+            origin: components["schemas"]["RouteCoordinate"];
+            destination: components["schemas"]["RouteCoordinate"];
+            alternativeIndex: number;
+            /**
+             * Format: uuid
+             * @description Required null or canonical lowercase non-nil current context UUID.
+             */
+            expectedContextId: string | null;
+        };
+        BrowserRouteContextBindingResponse: {
+            /** @enum {string} */
+            status: "bound" | "no_route" | "no_eligible_anchors";
+            context: components["schemas"]["BrowserRouteContext"] | null;
         };
         TripJournalAnnotation: {
             /** @description Plain text; UTF-16 code-unit limit enforced by server */
@@ -1487,6 +1543,123 @@ export interface operations {
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
             /** @description Consent authority or rate store temporarily unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getPrivateJourneyRouteContext: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current context, or null when no current context exists */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserRouteContextRead"];
+                };
+            };
+            /** @description Invalid canonical journey identifier or query string */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Context authority */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bindPrivateJourneyRouteContext: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserRouteContextBindingRequest"];
+            };
+        };
+        responses: {
+            /** @description Binding outcome; only bound includes a context */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserRouteContextBindingResponse"];
+                };
+            };
+            /** @description Invalid canonical journey identifier or exact binding JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stale context expectation */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Provider */
             503: {
                 headers: {
                     [name: string]: unknown;

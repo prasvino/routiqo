@@ -20,4 +20,12 @@ class ArchitectureTest {
        .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
            .importPackages("com.routiqo.core"));
  }
+ @Test void apiLayerCannotReachTrustedRouteContextReplacement() {
+   noClasses().that().resideInAPackage("..api..").should().dependOnClassesThat()
+       .haveFullyQualifiedName("com.routiqo.core.routeupdate.application.LiveRouteContextService")
+       .orShould().dependOnClassesThat().haveFullyQualifiedName(
+           "com.routiqo.core.routeupdate.application.LiveRouteContextParticipant")
+       .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+           .importPackages("com.routiqo.core"));
+ }
 }

@@ -408,3 +408,11 @@ inside the storage transaction before any quota or receipt mutation. Raw context
 replacement clears provenance. Retained replay remains private command recovery,
 not renewed evidence or publication authority. Catalog-version reuse, rollout
 consistency, moderation and cohort-safe output remain operational release risks.
+
+ADR 0034 adds a private, default-off browser boundary for owner context recovery
+and explicit binding. Exact session/account, same-origin CSRF, strict bounded JSON,
+database peer/account quotas and post-provider consent/context rechecks limit
+cross-user disclosure, stale writes and provider amplification. Responses omit
+geometry, endpoints, actor, journey and catalog metadata; API architecture prevents
+raw context replacement. Opaque anchors still reveal private route intent to their
+owner and do not prove location or permit public Live publication.

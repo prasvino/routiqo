@@ -10,6 +10,11 @@ replacement requires and stores the resolver's non-nil immutable catalog version
 Historical and ordinary trusted replacements remain unvalidated and explicitly
 clear provenance; matching anchor IDs never manufacture it.
 
+ADR 0034 exposes a minimal private owner read/bind transport behind an independent
+default-off flag. It reads through a restricted interface and binds only through
+the provider-backed coordinator; the API cannot call raw replacement. Responses
+omit actor, journey, catalog, geometry and endpoints, and do not grant publication.
+
 Add a routeupdate-owned stored context envelope around LiveRouteContext with server
 issuedAt/expiresAt. Validate the original requested lifetime as positive and at
 most 24 hours, then floor computed expiry to PostgreSQL microsecond precision and

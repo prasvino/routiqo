@@ -1,4 +1,4 @@
-# Build status — 2026-09-13
+# Build status — 2026-09-14
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
 
@@ -22,6 +22,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; no UI, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration, scheduler or output |
+| Private route-context API | Separately default-off owner-only GET recovery and explicit POST binding through the real configured binder; strict browser guards, minimal no-store DTOs, database account quotas and post-provider authority rechecks. No signal endpoint, UI or public Live output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no HTTP ingestion, moderation, scheduler or publication |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
@@ -32,6 +33,33 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Browser route-context transport pass (ADR 0034): the separately default-off
+GET/POST leaf requires the real persistence, catalog, resolver and Valhalla binding
+composition. GET is nonmutating and read-only at the application boundary. POST
+strictly accepts endpoints plus alternative and exact current-context expectation,
+then invokes the existing binder once. Responses contain only context identity,
+decimal-string revision, sorted opaque anchor IDs and server times. The exact
+same-origin proxy uses an eight-second GET deadline and a 25-second POST deadline,
+64 KiB response cap and no retries. No signal endpoint, UI, activation or public
+Live output was added.
+
+The focused backend set passed **22 tests**: 8 new real HTTP/PostgreSQL/Valhalla
+tests, 10 journey/default-off regressions and 4 architecture tests. It covers
+owner binding/read/lost-response recovery, minimized and exact long-valued DTOs,
+no-route/no-anchor preservation, strict UTF-8/JSON/path/media/body/browser guards,
+session/rate/persistence/provider sanitization, cross-owner denial, readable Ghost
+state, expiry/completion, stale expectations, separate cross-session budgets and
+consent revocation while the provider is blocked. The exact proxy suite passed
+**8 tests**, including 25-second POST versus eight-second GET deadlines. Full core
+check and bootJar passed **310 Java tests across 45 suites**, zero failures, errors
+or skips. Contract generation/drift, formatting, workspace types and lint passed;
+all **259 TypeScript/component tests across 41 files** passed on immediate rerun
+after the unrelated Xcode dependency import first exceeded its five-second test
+timeout. Secret and diff checks passed. Root and independent review found no
+remaining source issue. Automated provider traffic used loopback fixtures and the
+database was disposable; no user data, live provider or public endpoint was used.
+
 
 Catalog-aware signal authority pass (ADR 0033): V12 adds nullable non-nil catalog
 provenance to private route contexts. Provider binding stores the actual catalog

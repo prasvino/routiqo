@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.12.0
-  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. The browser consent transport is separately default-off; no live traffic or public user presence.
+  version: 0.13.0
+  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. Browser consent and private route-context transports are separately default-off; no live traffic or public user presence.
 servers:
   - url: http://localhost:8080
 paths:
@@ -483,6 +483,60 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Consent authority or rate store temporarily unavailable. Empty response body. }
+  /api/v1/journeys/{id}/route-context:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        description: Canonical lowercase non-nil journey UUID.
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    get:
+      operationId: getPrivateJourneyRouteContext
+      security: [{ browserSession: [] }]
+      description: Returns the authenticated owner's current private route context without renewing or creating it. Separately enabled by the default-off route binding API flag. Sixty reads per account per minute.
+      responses:
+        '200':
+          description: Current context, or null when no current context exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserRouteContextRead' }
+        '400': { description: Invalid canonical journey identifier or query string }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Context authority, session store or rate store temporarily unavailable. Empty response body. }
+    post:
+      operationId: bindPrivateJourneyRouteContext
+      security: [{ browserSession: [] }]
+      description: Resolves one selected private route and atomically binds its eligible catalog anchors. Empty outcomes preserve the previous context. Ten bindings per account per minute. The same-origin proxy allows one bounded 25 second request and never retries.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserRouteContextBindingRequest' }
+      responses:
+        '200':
+          description: Binding outcome; only bound includes a context
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserRouteContextBindingResponse' }
+        '400': { description: Invalid canonical journey identifier or exact binding JSON }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: Stale context expectation, inactive consent, completed journey or binding conflict }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Provider, persistence, session or rate infrastructure unavailable. Empty response body. }
   /api/v1/routes/places:
     post:
       operationId: searchPrivateRoutePlaces
@@ -716,6 +770,61 @@ components:
           pattern: '^(0|[1-9][0-9]{0,18})$'
           description: Canonical decimal string from zero through 9223372036854775807.
         sharing: { type: boolean }
+    BrowserRouteContext:
+      type: object
+      additionalProperties: false
+      required: [contextId, revision, anchorIds, issuedAt, expiresAt]
+      properties:
+        contextId: { type: string, format: uuid }
+        revision:
+          type: string
+          minLength: 1
+          maxLength: 19
+          pattern: '^(0|[1-9][0-9]{0,18})$'
+          description: Canonical decimal signed-long value encoded as a string to preserve exact JavaScript precision.
+        anchorIds:
+          type: array
+          minItems: 1
+          maxItems: 128
+          uniqueItems: true
+          description: Sorted opaque curated anchor identifiers.
+          items: { type: string, format: uuid }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+    BrowserRouteContextRead:
+      type: object
+      additionalProperties: false
+      required: [context]
+      properties:
+        context:
+          nullable: true
+          allOf:
+            - { $ref: '#/components/schemas/BrowserRouteContext' }
+    BrowserRouteContextBindingRequest:
+      type: object
+      additionalProperties: false
+      required: [mode, origin, destination, alternativeIndex, expectedContextId]
+      properties:
+        mode: { type: string, enum: [driving, walking, cycling] }
+        origin: { $ref: '#/components/schemas/RouteCoordinate' }
+        destination: { $ref: '#/components/schemas/RouteCoordinate' }
+        alternativeIndex: { type: integer, minimum: 0, maximum: 2 }
+        expectedContextId:
+          type: string
+          format: uuid
+          nullable: true
+          pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          description: Required null or canonical lowercase non-nil current context UUID.
+    BrowserRouteContextBindingResponse:
+      type: object
+      additionalProperties: false
+      required: [status, context]
+      properties:
+        status: { type: string, enum: [bound, no_route, no_eligible_anchors] }
+        context:
+          nullable: true
+          allOf:
+            - { $ref: '#/components/schemas/BrowserRouteContext' }
     TripJournalAnnotation:
       type: object
       required: [title, notes, version, updatedAt]

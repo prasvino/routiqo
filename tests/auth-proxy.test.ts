@@ -127,6 +127,75 @@ describe('same-origin auth proxy', () => {
       );
     expect(upstream).toHaveBeenCalledTimes(2);
   });
+  it('allows only exact route-context requests and gives binding a bounded 25 second window', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const upstream = vi.fn<typeof fetch>().mockImplementation(async () =>
+      Response.json({
+        status: 'bound',
+        context: {
+          contextId: '00000000-0000-4000-8000-000000000002',
+          revision: '9223372036854775807',
+          anchorIds: ['00000000-0000-4000-8000-000000000003'],
+          issuedAt: '2026-09-14T00:00:00Z',
+          expiresAt: '2026-09-14T00:15:00Z',
+        },
+      }),
+    );
+    const id = '00000000-0000-4000-8000-000000000001';
+    const body = JSON.stringify({
+      mode: 'driving',
+      origin: [-0.02, 0],
+      destination: [0.02, 0],
+      alternativeIndex: 0,
+      expectedContextId: null,
+    });
+    const post = new Request(`${config.origin}/api/v1/journeys/${id}/route-context`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: config.origin,
+        'X-XSRF-TOKEN': 'masked',
+        'X-Routiqo-Account': id,
+      },
+      body,
+    });
+    const postResponse = await proxyBrowserJourneys(post, [id, 'route-context'], config, upstream);
+    expect(postResponse.status).toBe(200);
+    expect((await postResponse.json()).context.revision).toBe('9223372036854775807');
+    expect(upstream.mock.calls[0]?.[0]).toBe(
+      `http://127.0.0.1:8080/api/v1/journeys/${id}/route-context`,
+    );
+    expect(String(upstream.mock.calls[0]?.[1]?.body)).toBe(body);
+    expect(upstream.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+
+    const get = new Request(`${config.origin}/api/v1/journeys/${id}/route-context`, {
+      headers: { Cookie: 'routiqo_session=opaque', 'X-Routiqo-Account': id },
+    });
+    expect((await proxyBrowserJourneys(get, [id, 'route-context'], config, upstream)).status).toBe(
+      200,
+    );
+    for (const invalid of [
+      new Request(`${config.origin}/api/v1/journeys/${id}/route-context`, { method: 'PUT' }),
+      new Request(`${config.origin}/api/v1/journeys/${id}/route-context?retry=true`),
+    ])
+      expect(
+        (await proxyBrowserJourneys(invalid, [id, 'route-context'], config, upstream)).status,
+      ).toBe(invalid.method === 'PUT' ? 405 : 400);
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${id}/route-context/replace`),
+          [id, 'route-context', 'replace'],
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(404);
+    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(timeout).toHaveBeenNthCalledWith(1, 25000);
+    expect(timeout).toHaveBeenNthCalledWith(2, 8000);
+    timeout.mockRestore();
+  });
   it('fails closed for missing/invalid configuration and unsupported destinations', async () => {
     expect(readBrowserAuthConfig({})).toBeNull();
     expect(() =>

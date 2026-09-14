@@ -300,4 +300,18 @@ class BrowserJourneyHttpTest {
             assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
         }
     }
+    @Test void browserRouteContextIsDeniedWhenItsDefaultOffFlagIsAbsent() throws Exception {
+        assertThat(applicationContext.getBeansOfType(
+                com.routiqo.core.routeupdate.api.BrowserRouteContextController.class)).isEmpty();
+        var owner = login();
+        UUID journey = UUID.randomUUID();
+        assertThat(send(owner, "journeys", start(journey, "trip")).statusCode()).isEqualTo(200);
+        for (var response : java.util.List.of(
+                send(owner, "journeys/" + journey + "/route-context", null),
+                send(owner, "journeys/" + journey + "/route-context", "{}"))) {
+            assertThat(response.statusCode()).isIn(401, 403);
+            assertThat(response.body()).isEmpty();
+            assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        }
+    }
 }

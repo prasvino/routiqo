@@ -112,8 +112,16 @@ requires `ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true` and
 that follows `ROUTE_ANCHOR_RESOLUTION_SPEC.md`. The file is strict UTF-8 JSON up to
 256 KiB and every anchor must be inside the configured routing region. No catalog
 is included. Startup loads only the local file and does not contact Valhalla.
-Enabling this internal bean does not mount HTTP, bind a journey or publish Live
-data; production catalog review and live regional route quality remain required.
+Enabling this internal bean alone does not accept browser binding requests or
+publish Live data; production catalog review and live regional route quality
+remain required.
+
+The owner route-context transport is also independently disabled. Set
+`ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED=true` only with `persistence`, `web-auth`,
+`routing`, the enabled resolver and its catalog. Missing binder dependencies fail
+startup. GET is private recovery; POST calls the configured binder once. The web
+proxy permits this exact leaf only, uses a 25-second POST deadline and does not
+retry. No sample enables the flag or supplies catalog data.
 ## Open-source maps target setup
 
 Before importing regional data, use the local artifact inventory checker:

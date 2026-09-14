@@ -103,9 +103,12 @@ export async function proxyBrowserJourneys(
   const complete = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'complete';
   const journal = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'journal';
   const consent = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'consent';
-  if (!listing && !detail && !complete && !journal && !consent) return failure(404);
+  const routeContext =
+    path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'route-context';
+  if (!listing && !detail && !complete && !journal && !consent && !routeContext)
+    return failure(404);
   if (
-    !(listing || journal || consent
+    !(listing || journal || consent || routeContext
       ? ['GET', 'POST'].includes(request.method)
       : request.method === (detail ? 'GET' : 'POST'))
   )
@@ -134,6 +137,9 @@ export async function proxyBrowserJourneys(
     `journeys${listing ? '' : '/' + path.join('/')}${suffix}`,
     config,
     upstreamFetch,
+    routeContext && request.method === 'POST'
+      ? { responseLimit: 64 * 1024, timeout: 25000 }
+      : undefined,
   );
 }
 export async function proxyBrowserPlaceSearch(
@@ -167,7 +173,10 @@ async function forwardBrowserRequest(
   path: string,
   config: BrowserAuthConfig,
   upstreamFetch: typeof fetch,
-  limits = { responseLimit: 64 * 1024, timeout: 8000 },
+  limits: { responseLimit: number; timeout: number } = {
+    responseLimit: 64 * 1024,
+    timeout: 8000,
+  },
 ): Promise<Response> {
   if (
     request.headers.get('sec-fetch-site') === 'cross-site' ||

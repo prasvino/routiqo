@@ -78,6 +78,9 @@ paths remain default off; they do not prove presence or authorize publication.
 ADR 0033 uses that bound catalog provenance only for internal signal issuance and
 new-acceptance category checks. Exact retained private replay is unchanged. No
 public signal transport or Live projection is enabled.
+ADR 0034 exposes only a separately default-off private owner route-context
+read/bind leaf with minimal opaque output and the same authority rechecks. It is a
+recovery/intent boundary, not proof of location, signal permission or public Live.
 Client GPS remains untrusted. Claims remain traveller reports, not verified
 observations of physical presence. Arbitrary bounds, segments and membership
 probing are denied; no account-independent live discovery endpoint is planned.

@@ -38,6 +38,12 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   clear provenance. API packages cannot depend on the trusted low-level signal
   storage service; exact retained private replay remains independent of current
   publication eligibility.
+- ADR 0034 exposes only a separately default-off private browser context leaf.
+  Existing session/account/origin/CSRF/body controls, database peer and stable-
+  account budgets, exact owner checks and post-provider authority revalidation
+  apply. API code has a read-only context boundary and cannot invoke trusted raw
+  replacement. Minimal no-store output contains opaque anchors but remains
+  sensitive route intent, not physical presence or publication authority.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.

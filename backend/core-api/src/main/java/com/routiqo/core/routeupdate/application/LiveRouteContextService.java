@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 /** Internal storage service; actor IDs and anchor sets must come from trusted server authority. */
-public final class LiveRouteContextService {
+public final class LiveRouteContextService implements LiveRouteContextReader {
     private final JourneyWriteAuthority journeys;
     private final LiveRouteContextParticipant contexts;
     private final Supplier<UUID> newContextId;
@@ -27,7 +27,7 @@ public final class LiveRouteContextService {
         this.newContextId = Objects.requireNonNull(newContextId);
     }
 
-    public Optional<StoredLiveRouteContext> read(UUID actorId, UUID journeyId) {
+    @Override public Optional<StoredLiveRouteContext> read(UUID actorId, UUID journeyId) {
         return journeys.withOwnedJourney(actorId, journeyId, contexts::read);
     }
 
