@@ -43,3 +43,21 @@ External: real OAuth, regional catalog/providers, operator hosting/secrets and
 Android devices. Design: privacy claim against bounded collusion, independent
 evidence authority and block/withdrawal-safe public projection. Continue all
 independent prerequisites; never activate public output to bypass a gate.
+
+## Current autonomous continuation
+
+Verified restore 0cd6457 contains ADRs 0037–0039 and 351 passing backend tests.
+Continue ADR 0040 durable private block policy with independent concurrency review.
+The report-intake proposal is deliberately unimplemented: real evidence reference
+identity, revocation lock order, owner retry semantics and investigation retention
+must be decided first. Do not substitute a test authority to claim this completed.
+Public publication remains closed under ADR 0038's explicit impossibility boundary
+for the absolute deterministic non-inference claim; a useful release requires a
+reviewed measurable privacy contract, not a larger arbitrary cohort threshold.
+
+Final block slice verified: ADR0040 implemented; final core check/bootJar363 tests
+across50 suites, zero failures/errors/skips. Root and independent review approved;
+secret/diff checks clean. Stop adding nominal report persistence until the concrete
+evidence/reference/revocation/investigation contracts in its proposal are resolved.
+No public output, operator endpoint, feature activation, deployment or user database
+migration was performed. External account/provider/device tasks remain excluded.

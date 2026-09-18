@@ -204,3 +204,14 @@ do not optimize time spent, message volume or notification count.
 Required verification is owned by TESTING_STRATEGY.md; threats by THREAT_MODEL.md;
 secure engineering by SECURITY.md; review process by CODE_REVIEW.md. BUILD_STATUS.md
 continues to record only implemented and verified capabilities.
+
+## Latest private safety implementation boundary
+
+ADRs 0037–0040 implement rolling acceptance limits, per-anchor/category cooldown,
+private safety lifecycle primitives, durable contribution suspension with grant
+revision fencing, and bounded directed block persistence. These are enforceable
+private prerequisites. They do not implement public trust, report intake, operator
+authority or block-safe publication. Block decisions are current transaction
+snapshots only. The report-intake proposal remains unimplemented after independent
+review; resolve reference identity/access/revocation and investigation retention
+before coding that store. See BUILD_STATUS for the 363-test backend verification.

@@ -69,3 +69,22 @@ Tests of implementation prerequisites do not prove the unresolved public protoco
 
 External OAuth, regional data, device access and deployment remain outside this
 run. None is needed to implement and verify the above private safety foundations.
+
+## Why the remaining gate needs a changed, measurable assumption
+
+For a deterministic public output F, require that removing any one eligible
+person never changes any observable output (existence, content, freshness or
+suppression timing). This requires F(D) = F(D without that person) for each
+adjacent pair of datasets. Repeated removals connect every finite dataset to the
+empty dataset, so this absolute requirement forces a constant output. A useful
+deterministic traveller-evidence output cannot satisfy that absolute guarantee.
+This argument concerns the strong universal claim, not every practical privacy
+policy. A reviewed bounded-inference policy can make a different claim explicitly.
+
+A collusion bound alone is also insufficient unless it bounds the adversary's
+knowledge of other contributions, query composition and temporal observations.
+A future proposal must state its exact neighboring-data relation, permitted
+inference and observation transcript. If it introduces randomized output, its
+privacy budget, composition, utility and truthful treatment of uncertainty need
+separate review; do not fabricate road conditions to satisfy a statistical target.
+These are engineering/product privacy semantics, not missing credentials.

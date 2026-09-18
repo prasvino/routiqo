@@ -44,8 +44,11 @@ fingerprint is added. Publication trust remains unresolved (ADR 0038).
 ADR 0039 retains one latest contribution-restriction revision/boolean per account
 until account deletion. That monotonic state prevents old grants regaining authority
 after restoration; it contains no assessment reference, evidence body or action
-history. Report cases and block edges currently have pure lifecycle models only,
-not durable stores or permission to retain moderation evidence indefinitely.
+history. ADR 0040 implements a separate private directed-edge store: at most 100
+rows per blocker, including unblocked revision tombstones, retained until either
+account is deleted. Both account FKs cascade; no evidence or block-action history.
+Reports remain pure lifecycle models plus an unimplemented intake proposal, not
+a durable store or permission to retain moderation evidence indefinitely.
 Expiry, Ghost withdrawal, block changes and deletion must invalidate derived
 projections/caches, not only the original row. Do not retain raw location history
 or put Live evidence into journals, backups, analytics or journey outboxes.

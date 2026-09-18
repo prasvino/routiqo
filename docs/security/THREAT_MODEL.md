@@ -447,3 +447,14 @@ diagnostics. It must never delete ordering fences or reset consumed grants.
 Replica count affects aggregate database load. Backlog capacity, monitoring,
 backup retention and actual operation remain release verification requirements;
 the scheduler is not a public revocation or physical-erasure mechanism.
+
+Internal durable block policy (ADR 0040) must resist opposite-direction concurrent
+writes, last-slot capacity races, stale unblocks, account deletion while waiting,
+wrong-pair snapshots and SQL error disclosure. Database-ordered account locks and
+positive exact-CAS revisions enforce these prerequisites. The 100-edge private
+foundation bound is not an approved public blocking UX. No current API exposes
+block targets. Future block-safe delivery still needs an atomic current-authority
+check and revocation protocol; a past CLEAR result cannot authorize later output.
+Reporting remains gated by canonical evidence identity, reference authorization,
+revocation lock order and a useful bounded investigation lifecycle; see the intake
+proposal. Test-only reference providers cannot satisfy these trust boundaries.

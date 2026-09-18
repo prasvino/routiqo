@@ -1,6 +1,6 @@
 ROUTIQO — CURRENT STATUS, REMAINING WORK AND COMPLETION REQUIREMENTS
 Snapshot: 18 September 2026 (IST)
-Repository snapshot: autonomous Live safety batch following 0611499 (ADRs 0037–0039)
+Repository snapshot: autonomous Live safety batches following 0611499 (ADRs 0037–0040)
 
 CURRENT POSITION
 
@@ -24,11 +24,11 @@ Full offline navigation, broad social features and AI belong to later phases.
 | Maps and routes | MapLibre web renderer; guarded Valhalla routing and Photon search adapters; regional bounds, alternatives and manual direction steps | Provision real regional routing/search/tiles, review data quality and licensing, validate browser resources and provider behavior | Regional maps required for pilot |
 | Navigation and offline maps | Last successful web route remains in memory during connection loss | Route persistence across reload, native map integration, location guidance, bounded map downloads, eviction/deletion and on-device rerouting | Later than first LIVE list |
 | Private Live consent/context | Durable consent with revocation precedence; provider-derived route binding, catalog authority and private owner APIs | Consent/route-binding UI, reviewed real catalog, rollout configuration and end-to-end lifecycle verification | First release |
-| Quick Signals | Typed values, server grants, durable private receipts, replay protection, replacement/withdrawal, minute and rolling 20/hour quotas, 60-second slot cooldown, suspension/revision fencing and private command APIs | Evidence-independence authority, durable reporting/blocking and operator moderation, contribution UI and operational validation | First release |
+| Quick Signals | Typed values, server grants, durable private receipts, replay protection, replacement/withdrawal, minute and rolling 20/hour quotas, 60-second slot cooldown, suspension/revision fencing and private command APIs | Evidence-independence authority, durable reporting, public block targeting/delivery and operator moderation, contribution UI and operational validation | First release |
 | Live expiry cleanup | Default-off bounded job for contexts/grants/receipts/acceptance charges, isolated scheduler, failure recovery and non-overlap | Staging activation, backlog/capacity checks, failure alerts, backup/retention operations and production rollout | First release operations |
 | Public Live Moments | Product direction and privacy threat/design checkpoints documented | Approved cohort publication design, safe aggregation/projection, authenticated reads, suppression/conflict/freshness rules and adversarial tests | Critical first-release blocker |
 | Active-journey LIVE list | Specifications and private backend prerequisites | Actual list and Quick Signal controls; loading/empty/suppressed/stale/offline/error states, reauthorization and accessibility | Critical first-release blocker |
-| Safety and minimum admin | Reviewed private safety domain primitives, durable suspension and buildable admin foundation | Blocking/reporting, moderation queue/actions, operator permissions/audit, revocation propagation and safety procedures | First release |
+| Safety and minimum admin | Reviewed private safety domain primitives, durable suspension, bounded directed block store and buildable admin foundation | Blocking/reporting, moderation queue/actions, operator permissions/audit, revocation propagation and safety procedures | First release |
 | Trip journals and commute summaries | Private text journal API/editor/drafts/library/conflict recovery; local monthly commute summaries; planning backup/restore | Real authenticated/device QA; broader history completeness; media and sharing are separate future work | Verify existing features; rich extras later |
 | Android application | Expo four-tab foundation, shared planning logic, SQLite adapters, credential vault and auth response validators | Secure network adapter, Google sign-in UI, authenticated resources/sync, native maps, development build and real-device QA | Android release |
 | Production release | Architecture, security rules and local verification foundations | Hosting, secrets, domain/TLS, real dependencies, monitoring, backup restore, rollout/rollback, privacy disclosures and release QA | Critical first-release blocker |
@@ -37,7 +37,10 @@ Full offline navigation, broad social features and AI belong to later phases.
 2. WHAT IS REQUIRED TO COMPLETE THE PENDING WORK
 
 A. Resolve public Live privacy and publication design
-   Engineering can proceed without credentials or user input.
+   ADR 0038 records why threshold-only publication is unsafe. Under an absolute
+   deterministic single-person non-inference guarantee, useful output is not
+   possible. Define and independently review a measurable privacy contract.
+   This is a design gate, not a credential dependency.
    - Specify fixed geographic partitions and time windows, contribution
      eligibility, evidence independence, publication/suppression rules and
      distributed query budgets.
@@ -52,11 +55,20 @@ A. Resolve public Live privacy and publication design
 
 B. Finish abuse prevention, moderation and revocation
    Engineering can proceed alongside the privacy design.
-   - Extend existing minute limits with appropriate longer-window/category
-     controls that cannot be reset by changing journey, session or replica.
+   - DONE: rolling 20/hour actor budget and 60-second anchor/category cooldown,
+     independent ledger, cleanup, replay and concurrent-limit tests.
+   - DONE: durable private suspension and grant-revision fencing; unsuspending
+     cannot restore previously issued unused grants.
    - Define and implement evidence eligibility/anti-Sybil safeguards.
-   - Implement report/block/moderation lifecycle, minimum operator queue,
-     authorization and audit trail. Define moderation retention explicitly.
+   - Complete reporting reference authority: canonical evidence identity,
+     exact retry after revocation, shared lock order and investigation after
+     source expiry. The intake proposal is deliberately not implemented.
+   - Then implement durable reports, operator queue, permissions and atomic
+     audited actions with bounded retention. Pure case transitions exist.
+   - DONE: private directed block persistence, ordered account-pair locks,
+     bounded retained revisions and tested concurrent/deletion behavior.
+   - Connect private blocking to safe authorized public targets and delivery;
+     internal bilateral snapshots do not authorize later publication.
    - Enforce policy changes across reads, derived data and any future delivery
      channels; fail closed when authority is unavailable.
    Complete when: multi-user, concurrent, replay, abuse and revocation tests
@@ -176,7 +188,7 @@ software installation is required merely to continue the existing backend work.
 
 4. VERIFICATION AND LIMITS OF THIS SNAPSHOT
 
-- Latest completed backend validation: 351 tests across 49 suites; zero failures,
+- Latest completed backend validation: 363 tests across 50 suites; zero failures,
   errors or skips; core-api check and bootJar passed on 18 September 2026.
 - Latest recorded full TypeScript run: 260 tests across 41 files, plus contract,
   formatting, type and lint checks in the preceding signal-API phase. It was not
@@ -201,7 +213,8 @@ docs/security/THREAT_MODEL.md — security/privacy acceptance baseline
 docs/adr/0037-rolling-signal-abuse-budgets.md — implemented rolling limits
 docs/adr/0038-publication-threat-boundary-and-safety-prerequisites.md — public gate
 docs/adr/0039-durable-private-contribution-restrictions.md — implemented suspension
-docs/adr/0040-internal-durable-block-policy.md — next private block implementation
+docs/adr/0040-internal-durable-block-policy.md — implemented private block store
+docs/features/live/DURABLE_REPORT_INTAKE_PROPOSAL.md — reviewed unresolved report contracts
 
 This file consolidates the current state. Older phase notes that say a feature
 had no storage/API/scheduler describe that earlier phase, not the latest state.

@@ -220,3 +220,11 @@ network download is used by this step. Dependency upgrades require reviewing the
 script version guard and the renderer worker URL together.
 
 Provider runtime status: the opt-in routing profile selects Photon and guarded Valhalla together. Services, graph/index imports, attribution, query quality and egress/logging checks remain operational gates. A server routing engine does not provide phone-offline routing without an on-device engine and graph.
+
+Private safety migrations V14/V15 add latest contribution restrictions, captured
+grant restriction revisions and directed block edges. They do not enable public
+Live or expose an operator/block API. Test migration and rollback on disposable
+or staging data first; do not mix old writers that ignore the safety checks with
+new writers. Preserve V13's full-hour acceptance quiet-period requirement above.
+The private block capacity includes unblocked revision rows; do not manually purge
+those rows to free capacity, which would discard stale-command protection.

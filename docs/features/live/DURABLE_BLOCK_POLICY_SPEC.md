@@ -1,6 +1,6 @@
 # Durable internal block policy
 
-Status: planned next independent slice. No public block API, contributor lookup,
+Status: implemented and independently reviewed; final core check/bootJar passed 363 tests across 50 suites. No public block API, contributor lookup,
 aggregate suppression or delivery implementation is authorized by this spec.
 
 ## Scope
@@ -28,7 +28,7 @@ cascade deletion. Retain an unblocked row's revision to reject stale re-enables;
 no action history or location/evidence data is stored.
 
 Bound state growth: at most 100 directed edge rows per blocker, counting retained
-unblocked revision rows. New targets beyond the bound deny with a generic bounded
+unblocked revision rows. Both block and initial exact-unblock intents can create a retained revision row; apply the same capacity gate to every new row. New targets beyond the bound deny with a generic bounded
 capacity error; mutations of existing targets still work. Do not erase revision
 rows to free capacity and thereby revive stale commands. This conservative private
 foundation cap is not a reviewed public UX or product block limit.
@@ -37,7 +37,7 @@ Read a pair through the same ordered account authority, returning only a trusted
 internal bilateral clear/blocked decision from both directional records. Missing
 edge rows inside validated current account authority mean explicit initial states;
 unavailable storage/accounts deny, never clear. Reversed or unrelated pair states
-cannot be combined. Do not translate this into viewer-specific aggregate subtraction.
+cannot be combined. This is a snapshot valid inside that transaction, not a reusable publication or delivery capability. Future output must compose current authority and revocation in its own reviewed transaction; do not introduce check-then-publish races. Do not translate this into viewer-specific aggregate subtraction.
 
 ## Verification
 

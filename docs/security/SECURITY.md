@@ -212,3 +212,12 @@ must not be republished as new. The cohort/privacy ADR and retention decisions a
 mandatory gates before exposure/migrations, not permission to choose convenient
 unsafe defaults. Apply existing high-risk review criteria; no new model-routing
 policy is introduced here.
+
+ADR 0040's internal block authority validates and locks both current enabled
+accounts in PostgreSQL UUID order before inspecting any directed edge. Blocking
+wins over stale unblocking; unblocking needs an exact revision. Missing authority,
+wrong-account snapshots and storage failure cannot produce CLEAR. Every inserted
+edge, including initial unblock, consumes the bounded outgoing capacity; retained
+unblocked revisions cannot be deleted merely to free slots. API packages must not
+access this trusted internal mutation/participant authority. Account existence is
+not public target authorization; a pair snapshot is not a reusable delivery grant.

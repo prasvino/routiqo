@@ -38,4 +38,18 @@ class ArchitectureTest {
        .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
            .importPackages("com.routiqo.core"));
  }
+ @Test void apiLayerCannotReachTrustedBlockPolicyMutationOrPairAuthority() {
+   noClasses().that().resideInAPackage("..api..").should().dependOnClassesThat()
+       .haveFullyQualifiedName("com.routiqo.core.moderation.application.DurableBlockPolicyService")
+       .orShould().dependOnClassesThat().haveFullyQualifiedName(
+           "com.routiqo.core.moderation.application.DirectionalBlockParticipant")
+       .orShould().dependOnClassesThat().haveFullyQualifiedName(
+           "com.routiqo.core.identity.application.EnabledAccountPairAuthority")
+       .orShould().dependOnClassesThat().haveFullyQualifiedName(
+           "com.routiqo.core.identity.infrastructure.JdbcEnabledAccountPairAuthority")
+       .orShould().dependOnClassesThat().haveFullyQualifiedName(
+           "com.routiqo.core.moderation.infrastructure.JdbcDirectionalBlockParticipant")
+       .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+           .importPackages("com.routiqo.core"));
+ }
 }

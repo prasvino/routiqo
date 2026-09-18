@@ -25,7 +25,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Private route-context API | Separately default-off owner-only GET recovery and explicit POST binding through the real configured binder; strict browser guards, minimal no-store DTOs, database account quotas and post-provider authority rechecks. No UI or public Live output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
 | Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
-| Private safety foundations | Reviewed assessment, block and structured report-case domain transitions; durable contribution restrictions under the account transaction authority. Suspension denies new grants/acceptance and unsuspension cannot revive old grants. No operator API, durable report/block workflow or public trust claim |
+| Private safety foundations | Reviewed assessment, block and structured report-case domain transitions; durable contribution restrictions under the account transaction authority. Suspension denies new grants/acceptance and unsuspension cannot revive old grants. Durable private directed blocks with ordered account locks, bounded retained revisions and bilateral exclusion; no operator API, durable report workflow, public block targeting or public trust claim |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -35,6 +35,49 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Private durable blocking pass (ADR 0040): moderation-owned directed edges now use
+an identity-owned transaction locking both enabled accounts in PostgreSQL UUID
+order. Strict revision CAS, stale-block precedence, exact unblock, saturation,
+100 outgoing rows including unblocked revisions, and both deletion cascades are
+enforced. Initial unblock uses the same capacity gate as block. Unknown or wrong
+pair state denies. APIs cannot reach trusted mutations or concrete pair authority.
+A bilateral CLEAR is only a transaction snapshot, never future output permission.
+
+Final core-api check and bootJar passed **363 Java tests across 50 suites**, zero
+failures/errors/skips. Real PostgreSQL tests prove two opposite-direction writers
+wait on the lower UUID while the higher remains NOWAIT-lockable, and competing
+last-slot requests yield one success/one capacity denial. Deletion races, replay
+revisions, saturation, missing/disabled accounts, rollback/redaction and invalid
+participant snapshots pass. Root integration, independent adversarial review,
+secret scan and diff checks passed. No frontend/contracts changed or builds repeated.
+
+Reporting remains a reviewed proposal, not a durable service: canonical evidence
+identity, reference revocation/lock ordering, exact-retry disclosure and a useful
+investigation lifecycle must be resolved before intake persistence. See
+DURABLE_REPORT_INTAKE_PROPOSAL.md. Public publication remains closed under ADR 0038;
+no public targeting, directory, projection or operator endpoint was introduced.
+Only disposable databases were migrated. No activation, push or deployment.
+
+Autonomous Live safety pass (ADRs 0037–0039), restore point **0cd6457**:
+rolling 20/hour acceptance ledger, 60-second anchor/category cooldown, bounded
+cleanup, private safety domain transitions, and durable contribution suspension.
+Grants capture restriction revisions; suspend/unsuspend cannot revive old unused
+grants. Missing/wrong-account authority denies. Retained private replay/withdrawal
+remain available. Concurrency, cleanup, clock, deletion and rollback are tested.
+
+Final core-api check and bootJar passed **351 Java tests across 49 suites**, zero
+failures/errors/skips. Root integration, independent adversarial review, secret
+scan and diff checks passed. No frontend/contracts changed; prior TS validation
+remains the latest. Migrations ran only on disposable databases. V13 upgrades
+require every acceptance writer stopped for a full hour after the last old write;
+no mixed-version acceptance (see LOCAL_SETUP).
+
+Public publication remains unapproved under ADR 0038: thresholds alone fail
+collusion and withdrawal inference. Evidence-independence authority and a reviewed
+block/revocation-safe protocol remain design gates. No public projection, operator
+API or operational reporting is claimed. Internal durable blocking followed under
+ADR 0040, verified separately above. Existing flags remain default off. No push or deployment occurred.
 
 Live expiry maintenance pass (ADR 0036): added a separately default-off,
 persistence-only job calling existing cleanup interfaces once per category with
@@ -486,8 +529,8 @@ Local PostGIS, Redis and MinIO were healthy during this audit. No production ser
 1. Actual Google OAuth configuration and end-to-end testing; native credential transport. Web login/proxy, bounded renewal and recent-auth account deletion are implemented. Browser HTTP security, contracts and bounded expiry cleanup are implemented; proxy trust and rate/cleanup capacity still need deployment validation.
 2. Complete cross-device restoration and unresolved-conflict UX; verify live OAuth and authenticated browser visuals. Web foreground dispatch, bounded recent restoration and confirmed-result reconciliation are implemented; native secure transport remains pending. Authenticated journey contracts/controllers, atomic native snapshots and web IndexedDB are implemented. Local plans remain separate from server journey records.
 3. Implement the confirmed open-source migration (ADR 0021): provider contracts, MapLibre web rendering, bounded Valhalla/Photon adapters and paired runtime wiring are implemented. Provision and validate controlled regional routing/search services and tiles via Martin. Then validate native maps, bounded downloads/eviction/deletion, guidance and on-device rerouting. Regional datasets/services and Android development build/device QA are required; Mapbox credentials are no longer a target dependency. Existing web directions remain memory-only until a separate storage change.
-4. Privacy-reviewed presence, expiring rooms, blocking/moderation/reporting and realtime delivery. Existing pure policy tests do not implement these services.
-5. Reminders/push, trip journals/commute summaries, media and AI adapters, useful admin workflows.
+4. Approved public Live publication design, durable block/report workflows, operator authority/audit and projection revocation. Private consent/context/signal persistence, rolling limits and contribution suspension are implemented; they do not authorize public output. Rooms/realtime are later scope.
+5. Minimum safety/admin workflows for the pilot. Private text journals and local commute summaries are implemented; reminders/push, media and AI remain later scope.
 6. Android Studio/device setup and native SQLite/restart/accessibility/performance QA; broader web large-text/reduced-motion/storage-error QA; native backup sharing/paste/device QA.
 7. Production secrets, deployment/observability, remote CI and release verification.
 

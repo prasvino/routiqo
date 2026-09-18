@@ -26,6 +26,7 @@
 | P0 / L0.3n — verified | ADR 0037 actor rolling-hour and anchor/category cooldown budgets, independent bounded ledger and cleanup | Full core check/bootJar: 351 tests; database/race checks and independent review passed |
 | P0 / L1.0 — verified | ADR 0038 private assessment/suspension, bilateral block and structured report-case primitives | Domain tests and review; no public output, durable block/report store or operator workflow |
 | P0 / L1.1 — verified | ADR 0039 durable contribution restrictions with grant revision fencing | Mandatory current authority on new issuance/acceptance; retained private replay preserved; database/race validation and independent review passed |
+| P0 / L1.2 — verified | ADR 0040 private durable directed blocks and ordered account-pair authority | 363 tests/50 suites, core check/bootJar and independent review passed; no public block API or output revocation |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
