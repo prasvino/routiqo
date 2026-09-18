@@ -426,3 +426,11 @@ terminal withdrawal return only the original owner's minimal receipt and never
 refresh timestamps. Public cohort differencing, collusion, moderation, operated
 expiry cleanup and revocation delivery remain unresolved release threats, so no
 Live projection or UI is enabled.
+
+ADR 0036 addresses a bounded portion of T12/T13/T14/T19/T20 through default-off
+expiry maintenance: independent small batches and existing SKIP LOCKED leaf
+transactions, serialized local ticks, isolated category failures and constant-only
+diagnostics. It must never delete ordering fences or reset consumed grants.
+Replica count affects aggregate database load. Backlog capacity, monitoring,
+backup retention and actual operation remain release verification requirements;
+the scheduler is not a public revocation or physical-erasure mechanism.

@@ -22,6 +22,7 @@
 | P0 / L0.3j — catalog-aware signal authority complete, default off | ADR 0033 catalog-provenance contexts and configured facade deriving issuance permissions and rechecking new acceptance | Focused PostgreSQL/configuration/architecture tests; no public signal transport, catalog activation, moderation or Live output |
 | P0 / L0.3k — private browser route-context transport complete, default off | ADR 0034 owner-only read/bind recovery using the real configured binder, exact proxy and minimal private DTOs | Real HTTP/PostgreSQL/Valhalla, strict-input, race, quota and default-deny tests; no signal transport, UI or public Live output |
 | P0 / L0.3l — private browser signal command transport complete, default off | ADR 0035 owner-only issue/accept/withdraw through the catalog-aware facade, exact proxy and minimal private DTOs | Real HTTP/PostgreSQL/catalog/binding, replay/withdrawal, race, strict-input, quota and default-deny tests; no UI or public Live output |
+| P0 / L0.3m — implemented, default off | Bounded context/grant/receipt expiry maintenance using existing domain adapters | 5 focused tests; full 328 Java tests/check/bootJar and independent review passed; production operation remains gated |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -35,7 +36,7 @@ Durable consent, route context and internal signal storage are specified in
 `SIGNAL_STORAGE_SPEC.md`, `CONSENT_INTENT_SPEC.md`, `BROWSER_CONSENT_API_SPEC.md`,
 `ROUTE_ANCHOR_RESOLUTION_SPEC.md`, `ROUTE_BINDING_SPEC.md`,
 `CATALOG_SIGNAL_AUTHORITY_SPEC.md`, `BROWSER_ROUTE_BINDING_API_SPEC.md`,
-`BROWSER_SIGNAL_API_SPEC.md`, and ADRs 0026–0035. The private consent,
+`BROWSER_SIGNAL_API_SPEC.md`, `LIVE_EXPIRY_MAINTENANCE_SPEC.md`, and ADRs 0026–0036. The private consent,
 route-context and signal-command transports and internal anchor
 resolver are default off; these slices do not expose
 public signal publication, confidence, moderation or a publicly visible

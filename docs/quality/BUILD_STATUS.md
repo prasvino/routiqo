@@ -1,4 +1,4 @@
-# Build status — 2026-09-14
+# Build status — 2026-09-18
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
 
@@ -21,9 +21,9 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; no UI, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
-| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration, scheduler or output |
+| Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration or output; optional bounded expiry job under ADR 0036 |
 | Private route-context API | Separately default-off owner-only GET recovery and explicit POST binding through the real configured binder; strict browser guards, minimal no-store DTOs, database account quotas and post-provider authority rechecks. No UI or public Live output |
-| Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no moderation, scheduler or publication |
+| Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute actor budgets and callable expiry cleanup. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no moderation or publication; optional bounded expiry job under ADR 0036 |
 | Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
@@ -34,6 +34,26 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Live expiry maintenance pass (ADR 0036): added a separately default-off,
+persistence-only job calling existing cleanup interfaces once per category with
+100-row limits. It uses a dedicated scheduler with 60-second initial/fixed delay,
+isolates category failures with constant-only diagnostics and prevents overlapping
+local ticks. Authentication maintenance retains a separate scheduler. No SQL,
+migration, retention-duration, endpoint or public Live behavior changed.
+
+Full core-api check and bootJar passed **328 Java tests across 48 suites**, zero
+failures/errors/skips. Five new tests cover profile/flag gates, real adapter
+composition, runtime scheduler isolation, full-batch bounds, failure recovery,
+redaction and duplicate concurrent entry. Existing context persistence **19/19**
+and signal persistence **17/17** tests passed, including lock and replay/purge
+regressions. Root diff review, independent review, secret scan and diff checks
+passed. Local preview `/trips` returned HTTP 200 after restart. No frontend source
+or contracts changed, so TypeScript/UI builds were not repeated.
+
+The job remains disabled. Production activation, cleanup throughput/backlog alerts,
+backup lifecycle, public moderation/revocation and cohort-safe publication remain
+gates. The scheduler is application infrastructure, not a Codex automation timer.
 
 Private browser Quick Signal transport pass (ADR 0035): the separately default-off
 POST issue, acceptance and withdrawal leaves require real persistence, catalog,

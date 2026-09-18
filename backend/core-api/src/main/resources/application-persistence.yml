@@ -13,3 +13,6 @@ spring:
     enabled: true
     clean-disabled: true
     validate-on-migrate: true
+routiqo:
+  live:
+    expiry-maintenance-enabled: ${ROUTIQO_LIVE_EXPIRY_MAINTENANCE_ENABLED:false}

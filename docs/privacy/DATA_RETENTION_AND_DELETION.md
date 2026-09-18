@@ -20,17 +20,21 @@ privacy and account-switch/account-deletion handling. Validate renderer and HTTP
 cache behavior; local route clearing must not claim to erase resources it cannot
 remove. Keep public basemap content separate from account-specific route records.
 
-## Planned Live evidence lifecycle
+## Private Live evidence lifecycle
 
-Internal receipt primitive: QUICK_SIGNAL_RECEIPT_SPEC.md defines explicit bounded
-retention and terminal withdrawal/supersession. Withdrawal stops temporal evidence
-eligibility but retains the private immutable fingerprint until purge; it is not
-physical deletion. No database or endpoint stores these receipts yet. Production
-retention/cleanup and preventing replay after purge remain explicit storage gates.
+QUICK_SIGNAL_RECEIPT_SPEC.md defines explicit bounded retention and terminal
+withdrawal/supersession. ADR 0028 implements durable private grants and receipts;
+ADR 0035 adds a default-off owner command API with 15-minute evidence and 24-hour
+receipt retention. Withdrawal stops temporal evidence eligibility but retains the
+private immutable fingerprint until purge; it is not physical deletion. These
+private transport lifetimes do not approve public publication or moderation holds.
 
-No Live evidence is currently stored. Proposed signal/receipt/client lifetimes and
-unresolved moderation holds are owned by ROUTIQO_LIVE_SPEC.md. Finalize the storage
-ADR before migrations; do not silently adopt proposed values as production policy.
+Logical expiry is enforced independently of cleanup. ADR 0036 specifies default-off
+bounded maintenance using the existing expiry adapters. Production activation,
+backlog capacity, failure alerting and physical database/backup lifecycle remain
+operational gates. A missing receipt never resets a consumed command grant.
+Proposed public signal/client lifetimes and unresolved moderation holds remain
+owned by ROUTIQO_LIVE_SPEC.md.
 Expiry, Ghost withdrawal, block changes and deletion must invalidate derived
 projections/caches, not only the original row. Do not retain raw location history
 or put Live evidence into journals, backups, analytics or journey outboxes.

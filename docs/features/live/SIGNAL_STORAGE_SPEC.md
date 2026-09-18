@@ -3,7 +3,8 @@
 Status: implemented and tested as internal persistence under ADR 0024 and ADR 0028.
 ADR 0033 adds a separately default-off catalog-aware facade over the same
 transaction service. No public API, moderation, projection, queue dispatch or
-scheduler is enabled.
+scheduler is enabled by default. ADR 0036 specifies a separately gated bounded
+maintenance caller; its operational rollout remains pending.
 
 ADR 0035 adds a separately default-off private owner command transport through
 the catalog-aware facade. It does not expose raw receipt reads or public Live
@@ -69,7 +70,8 @@ operator tuning and moderation remain mandatory before exposure. No process-loca
 budget or permissive stub is allowed. The budget table holds no per-command history.
 
 Callable expiry maintenance is bounded to 1..100 deleted rows per call, with a
-five-second transaction/query budget and no scheduler. Grant cleanup deletes only
+five-second transaction/query budget. ADR 0036 adds an opt-in scheduler without
+changing this adapter contract. Grant cleanup deletes only
 expired grants and cannot cascade receipts. Receipt cleanup deletes only expired
 receipts and must not reset/derive UNUSED grant state; after a short receipt is
 purged while its consumed grant is live, replay still denies. Missing grants deny.

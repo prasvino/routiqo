@@ -132,6 +132,28 @@ eight-second deadline with no retries. The example remains false. Enabling this
 transport does not publish Live output or supply the required moderation,
 hourly/category abuse controls, operated purge job or regional launch evidence.
 
+## Live expiry maintenance
+
+ADR 0036 defines a separate default-off application maintenance job. With the
+`persistence` profile, `ROUTIQO_LIVE_EXPIRY_MAINTENANCE_ENABLED=true` enables
+cleanup of already-expired private Live contexts, grants and receipts. It needs
+no web-auth, routing/catalog or public Live activation. Leave it disabled until
+the target database and retention behavior have been reviewed.
+
+The fixed schedule waits 60 seconds initially and 60 seconds after each tick.
+Each category gets one batch of at most 100 rows in its own existing bounded
+transaction. Failed categories are retried on the next tick; other categories
+continue. A dedicated scheduler isolates authentication maintenance. Logs must
+contain only constant category/outcome labels, never SQL, row IDs or exceptions.
+
+Before production activation, verify expiry boundaries and retained replay in
+staging, inspect backlog growth with operator-only aggregate queries, wire failure
+alerts, and measure database load with the intended enabled replica count. A full
+batch indicates possible backlog; repeated failures require operator attention.
+Disable the flag and restart to stop future ticks. This cannot undo prior deletes.
+The code does not enable a deployment, create a Codex timer, configure alerts,
+erase backups or satisfy public Live revocation requirements.
+
 ## Open-source maps target setup
 
 Before importing regional data, use the local artifact inventory checker:

@@ -63,7 +63,8 @@ context in this slice, but current consent is always separately required for fut
 signal admission; context storage is never permission to publish.
 
 Provide a callable internal bounded expiry-maintenance operation (1..100 rows,
-indexed expiry, fixed query/time budget, no automatic scheduler in this phase).
+indexed expiry, fixed query/time budget). ADR 0036 specifies a separately
+default-off scheduler using this existing operation.
 Use FOR UPDATE SKIP LOCKED and recheck exact row identity/expiry on deletion.
 Maintenance may lock only context rows and must never acquire account/journey or
 other authority locks afterward: this leaf-only deletion is an explicit lock-order
