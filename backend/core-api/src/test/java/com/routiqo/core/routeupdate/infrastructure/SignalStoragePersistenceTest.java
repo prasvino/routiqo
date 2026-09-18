@@ -1,10 +1,15 @@
 package com.routiqo.core.routeupdate.infrastructure;
 
 import com.routiqo.core.identity.infrastructure.JdbcAccountWriteAuthority;
+import com.routiqo.core.identity.application.AccountWriteUnavailable;
+import com.routiqo.core.moderation.application.ContributionRestrictionParticipant;
+import com.routiqo.core.moderation.application.ContributionRestrictionService;
+import com.routiqo.core.moderation.domain.ContributorAssessment;
 import com.routiqo.core.identity.infrastructure.JdbcSessionStore;
 import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.domain.Journey;
 import com.routiqo.core.journey.infrastructure.JdbcJourneyStore;
+import com.routiqo.core.moderation.infrastructure.JdbcContributionRestrictionParticipant;
 import com.routiqo.core.privacy.application.PresenceConsentService;
 import com.routiqo.core.privacy.domain.PresenceConsent;
 import com.routiqo.core.privacy.infrastructure.JdbcPresenceConsentParticipant;
@@ -56,6 +61,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SignalStoragePersistenceTest {
     private static final PostgreSQLContainer DATABASE = new PostgreSQLContainer("postgres:16-alpine");
     private static final Instant START = Instant.parse("2026-09-13T09:00:00.123456Z");
+    private static final List<QuickSignalValue> VALUES = List.of(
+            QuickSignalValue.QUEUE_UNDER_5, QuickSignalValue.TRAFFIC_MOVING,
+            QuickSignalValue.PARKING_AVAILABLE, QuickSignalValue.FOOD_QUEUE_NONE,
+            QuickSignalValue.RESTROOM_USABLE);
 
     static { DATABASE.start(); }
 
@@ -111,12 +120,14 @@ class SignalStoragePersistenceTest {
                 .isEqualTo(SignalCommandGrant.State.CONSUMED);
         assertThat(storedReceipt(fixture.actor(), grant.commandId())).isEqualTo(accepted);
         assertThat(budget(fixture.actor(), "ACCEPT")).isEqualTo(1);
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(1);
 
         fixture.clock().set(START.plusSeconds(2));
         QuickSignalReceipt replay = fixture.signals().accept(fixture.actor(), grant.commandId(),
                 submission, Duration.ofNanos(1), Duration.ofNanos(1));
         assertThat(replay).isEqualTo(accepted);
         assertThat(budget(fixture.actor(), "ACCEPT")).isEqualTo(1);
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(1);
         assertConflict(() -> fixture.signals().accept(fixture.actor(), grant.commandId(),
                 fingerprint(grant, QuickSignalValue.QUEUE_OVER_30),
                 Duration.ofMinutes(1), Duration.ofMinutes(2)));
@@ -134,6 +145,7 @@ class SignalStoragePersistenceTest {
                 Duration.ofSeconds(1).plusNanos(1), Duration.ofSeconds(1)));
         assertThat(receiptCount(fixture.actor())).isZero();
         assertThat(budget(fixture.actor(), "ACCEPT")).isZero();
+        assertThat(acceptanceCount(fixture.actor())).isZero();
         assertThat(storedGrant(fixture.actor(), grant.commandId()).state())
                 .isEqualTo(SignalCommandGrant.State.UNUSED);
 
@@ -155,6 +167,7 @@ class SignalStoragePersistenceTest {
         }
         assertThat(receiptCount(fixture.actor())).isZero();
         assertThat(budget(fixture.actor(), "ACCEPT")).isZero();
+        assertThat(acceptanceCount(fixture.actor())).isZero();
         assertThat(storedGrant(fixture.actor(), grant.commandId()).state())
                 .isEqualTo(SignalCommandGrant.State.UNUSED);
     }
@@ -186,6 +199,7 @@ class SignalStoragePersistenceTest {
         }
         assertThat(receiptCount(setup.actor())).isEqualTo(1);
         assertThat(budget(setup.actor(), "ACCEPT")).isEqualTo(1);
+        assertThat(acceptanceCount(setup.actor())).isEqualTo(1);
     }
 
     @Test
@@ -193,6 +207,7 @@ class SignalStoragePersistenceTest {
         Fixture first = fixture(START, 1);
         SignalCommandGrant queue1 = issue(first, QuickSignalValue.Category.QUEUE);
         QuickSignalReceipt original = accept(first, queue1, QuickSignalValue.QUEUE_UNDER_5);
+        first.clock().set(START.plusSeconds(60));
         SignalCommandGrant queue2 = issue(first, QuickSignalValue.Category.QUEUE);
         QuickSignalReceipt replacement = accept(first, queue2, QuickSignalValue.QUEUE_OVER_30);
         assertThat(storedReceipt(first.actor(), original.signal().signalId()).state())
@@ -200,7 +215,7 @@ class SignalStoragePersistenceTest {
         assertThat(replacement.state()).isEqualTo(QuickSignalReceipt.State.ACTIVE);
 
         first.journeys().complete(first.actor(), first.journey());
-        Fixture second = fixtureForActor(first.actor(), START.plusSeconds(1),
+        Fixture second = fixtureForActor(first.actor(), START.plusSeconds(120),
                 first.anchors().getFirst());
         SignalCommandGrant queue3 = issue(second, QuickSignalValue.Category.QUEUE);
         accept(second, queue3, QuickSignalValue.QUEUE_5_TO_15);
@@ -375,14 +390,15 @@ class SignalStoragePersistenceTest {
     @Test
     void fixedMinuteBudgetsSpanAdaptersAndJourneyChangesAndRejectClockRollback() {
         Fixture fixture = fixture(START, 1);
-        for (int count = 0; count < 5; count++) {
-            SignalCommandGrant grant = issue(fixture, QuickSignalValue.Category.QUEUE);
-            accept(fixture, grant, QuickSignalValue.QUEUE_UNDER_5);
+        for (QuickSignalValue value : VALUES) {
+            SignalCommandGrant grant = issue(fixture, value.category());
+            accept(fixture, grant, value);
         }
         SignalCommandGrant sixth = issue(fixture, QuickSignalValue.Category.QUEUE);
         assertThatThrownBy(() -> accept(fixture, sixth, QuickSignalValue.QUEUE_UNDER_5))
                 .isInstanceOf(SignalStorageRateLimited.class).hasNoCause();
         assertThat(budget(fixture.actor(), "ACCEPT")).isEqualTo(5);
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(5);
 
         for (int count = 6; count < 10; count++) issue(fixture, QuickSignalValue.Category.QUEUE);
         fixture.journeys().complete(fixture.actor(), fixture.journey());
@@ -395,6 +411,333 @@ class SignalStoragePersistenceTest {
                 next.actor());
         assertDenied(() -> next.signals().issue(next.actor(), next.journey(),
                 next.anchors().getFirst(), Set.of(QuickSignalValue.Category.TRAFFIC)));
+    }
+
+    @Test
+    void cooldownUsesExactBoundaryAndSurvivesWithdrawalAcrossActorsAndCategories() {
+        Fixture first = fixture(START, 1);
+        SignalCommandGrant original = issue(first, QuickSignalValue.Category.QUEUE);
+        accept(first, original, QuickSignalValue.QUEUE_UNDER_5);
+        first.signals().withdraw(first.actor(), first.journey(), original.commandId());
+        SignalCommandGrant traffic = issue(first, QuickSignalValue.Category.TRAFFIC);
+        accept(first, traffic, QuickSignalValue.TRAFFIC_MOVING);
+        Fixture other = fixture(START, 1);
+        SignalCommandGrant independent = issue(other, QuickSignalValue.Category.QUEUE);
+        accept(other, independent, QuickSignalValue.QUEUE_UNDER_5);
+
+        first.clock().set(START.plusSeconds(60).minusNanos(1_000));
+        SignalCommandGrant retry = issue(first, QuickSignalValue.Category.QUEUE);
+        assertThatThrownBy(() -> accept(first, retry, QuickSignalValue.QUEUE_OVER_30))
+                .isInstanceOf(SignalStorageRateLimited.class).hasNoCause();
+        assertThat(acceptanceCount(first.actor())).isEqualTo(2);
+        assertThat(storedGrant(first.actor(), retry.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+        first.clock().set(START.plusSeconds(60));
+        accept(first, retry, QuickSignalValue.QUEUE_OVER_30);
+        assertThat(acceptanceCount(first.actor())).isEqualTo(3);
+    }
+
+    @Test
+    void rollingHourIsActorWideAcrossJourneyAndReusesOnlyExpiredSlot() {
+        Fixture first = fixture(START, 1, Duration.ofHours(2));
+        SignalCommandGrant recent = fillAcceptances(first, 20);
+        assertThat(acceptanceCount(first.actor())).isEqualTo(20);
+        first.clock().set(START.plusSeconds(240));
+        QuickSignalReceipt replay = first.signals().accept(first.actor(), recent.commandId(),
+                fingerprint(recent, VALUES.get(4)), Duration.ofNanos(1), Duration.ofNanos(1));
+        assertThat(replay.signal().signalId()).isEqualTo(recent.commandId());
+        assertThat(acceptanceCount(first.actor())).isEqualTo(20);
+        first.journeys().complete(first.actor(), first.journey());
+        Fixture next = fixtureForActor(first.actor(), START.plusSeconds(240),
+                first.anchors().getFirst());
+        SignalCommandGrant overflow = issue(next, QuickSignalValue.Category.QUEUE);
+        assertThatThrownBy(() -> accept(next, overflow, QuickSignalValue.QUEUE_UNDER_5))
+                .isInstanceOf(SignalStorageRateLimited.class).hasNoCause();
+        assertThat(storedGrant(next.actor(), overflow.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+        assertThat(acceptanceCount(next.actor())).isEqualTo(20);
+
+        next.clock().set(START.plusSeconds(3600).minusNanos(1_000));
+        SignalCommandGrant boundary = issue(next, QuickSignalValue.Category.TRAFFIC);
+        assertThatThrownBy(() -> accept(next, boundary, QuickSignalValue.TRAFFIC_MOVING))
+                .isInstanceOf(SignalStorageRateLimited.class).hasNoCause();
+        next.clock().set(START.plusSeconds(3600));
+        accept(next, boundary, QuickSignalValue.TRAFFIC_MOVING);
+        assertThat(acceptanceCount(next.actor())).isEqualTo(20);
+        assertThat(jdbc().queryForObject("""
+            SELECT count(*) FROM signal_actor_acceptance
+            WHERE actor_id = ? AND accepted_at = ?
+            """, Integer.class, next.actor(), Timestamp.from(START.plusSeconds(3600))))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void concurrentAdaptersCompeteForLastRollingHourAllowance() throws Exception {
+        Fixture fixture = fixture(START, 1, Duration.ofHours(2));
+        fillAcceptances(fixture, 19);
+        fixture.clock().set(START.plusSeconds(240));
+        SignalCommandGrant queue = issue(fixture, QuickSignalValue.Category.QUEUE);
+        SignalCommandGrant traffic = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        Services first = services(fixture.clock());
+        Services second = services(fixture.clock());
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            List<Future<Object>> attempts = new ArrayList<>();
+            for (var attempt : List.of(
+                    new AcceptanceAttempt(first.signals(), queue, QuickSignalValue.QUEUE_UNDER_5),
+                    new AcceptanceAttempt(second.signals(), traffic, QuickSignalValue.TRAFFIC_MOVING))) {
+                attempts.add(executor.submit(() -> {
+                    ready.countDown();
+                    go.await(5, TimeUnit.SECONDS);
+                    try {
+                        return attempt.service().accept(fixture.actor(), attempt.grant().commandId(),
+                                fingerprint(attempt.grant(), attempt.value()),
+                                Duration.ofMinutes(1), Duration.ofMinutes(2));
+                    } catch (SignalStorageRateLimited limited) {
+                        return limited;
+                    }
+                }));
+            }
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            go.countDown();
+            List<Object> results = List.of(attempts.get(0).get(10, TimeUnit.SECONDS),
+                    attempts.get(1).get(10, TimeUnit.SECONDS));
+            assertThat(results).filteredOn(QuickSignalReceipt.class::isInstance).hasSize(1);
+            assertThat(results).filteredOn(SignalStorageRateLimited.class::isInstance).hasSize(1);
+        }
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(20);
+        assertThat(receiptCount(fixture.actor())).isEqualTo(20);
+    }
+
+    @Test
+    void futureLedgerTimestampDeniesAndRollsBackAllBudgets() {
+        Fixture fixture = fixture(START, 1);
+        SignalCommandGrant first = issue(fixture, QuickSignalValue.Category.QUEUE);
+        accept(fixture, first, QuickSignalValue.QUEUE_UNDER_5);
+        jdbc().update("""
+            UPDATE signal_actor_acceptance SET accepted_at = ? WHERE actor_id = ?
+            """, Timestamp.from(START.plusSeconds(1)), fixture.actor());
+        SignalCommandGrant next = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        assertDenied(() -> accept(fixture, next, QuickSignalValue.TRAFFIC_MOVING));
+        assertThat(budget(fixture.actor(), "ACCEPT")).isEqualTo(1);
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(1);
+        assertThat(storedGrant(fixture.actor(), next.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+    }
+
+    @Test
+    void suspensionDeniesNewIssueAndAcceptanceButPreservesPrivateRecovery() {
+        Fixture fixture = fixture(START, 1);
+        SignalCommandGrant acceptedGrant = issue(fixture, QuickSignalValue.Category.QUEUE);
+        QuickSignalReceipt accepted = accept(fixture, acceptedGrant, QuickSignalValue.QUEUE_UNDER_5);
+        SignalCommandGrant oldUnused = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        ContributionRestrictionService restrictions = restrictionService();
+        assertThat(restrictions.suspend(fixture.actor(), 0).revision()).isEqualTo(1);
+        assertDenied(() -> issue(fixture, QuickSignalValue.Category.TRAFFIC));
+        assertDenied(() -> accept(fixture, oldUnused, QuickSignalValue.TRAFFIC_MOVING));
+        assertThat(fixture.signals().accept(fixture.actor(), acceptedGrant.commandId(),
+                fingerprint(acceptedGrant, QuickSignalValue.QUEUE_UNDER_5),
+                Duration.ofNanos(1), Duration.ofNanos(1))).isEqualTo(accepted);
+        assertThat(fixture.signals().withdraw(fixture.actor(), fixture.journey(),
+                acceptedGrant.commandId()).state()).isEqualTo(QuickSignalReceipt.State.WITHDRAWN);
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(1);
+        assertThat(budget(fixture.actor(), "ACCEPT")).isEqualTo(1);
+
+        assertThat(restrictions.unsuspend(fixture.actor(), 1).state())
+                .isEqualTo(ContributorAssessment.State.UNASSESSED);
+        assertDenied(() -> accept(fixture, oldUnused, QuickSignalValue.TRAFFIC_MOVING));
+        SignalCommandGrant fresh = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        assertThat(fresh.restrictionRevision()).isEqualTo(2);
+        accept(fixture, fresh, QuickSignalValue.TRAFFIC_MOVING);
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(2);
+    }
+
+    @Test
+    void restrictionRevisionIsDurableMonotonicAndCascadesWithAccount() {
+        UUID actor = account();
+        ContributionRestrictionService restrictions = restrictionService();
+        assertThat(readRestriction(actor)).isEqualTo(ContributorAssessment.initial(actor));
+        assertThatThrownBy(() -> jdbc().update("""
+            INSERT INTO live_contribution_restriction(actor_id, revision, restricted)
+            VALUES (?, 0, FALSE)
+            """, actor)).isInstanceOf(RuntimeException.class);
+        assertThat(restrictions.suspend(actor, 0).revision()).isEqualTo(1);
+        assertThat(restrictions.suspend(actor, 0).revision()).isEqualTo(2);
+        assertThat(readRestriction(actor).state()).isEqualTo(ContributorAssessment.State.SUSPENDED);
+        assertThatThrownBy(() -> restrictions.unsuspend(actor, 1))
+                .isInstanceOf(IllegalStateException.class).hasNoCause();
+        assertThat(restrictions.unsuspend(actor, 2).revision()).isEqualTo(3);
+        assertThat(readRestriction(actor).state()).isEqualTo(ContributorAssessment.State.UNASSESSED);
+        var raw = new JdbcContributionRestrictionParticipant(jdbc());
+        assertThatThrownBy(() -> new JdbcAccountWriteAuthority(jdbc(), manager())
+                .withEnabledAccount(actor, () -> {
+                    ContributorAssessment prior = raw.read(actor);
+                    raw.replace(prior, new ContributorAssessment(actor, prior.revision(),
+                            ContributorAssessment.State.SUSPENDED, null, null, null));
+                    return null;
+                })).isInstanceOf(IllegalStateException.class).hasNoCause();
+        assertThat(readRestriction(actor).revision()).isEqualTo(3);
+        assertThatThrownBy(() -> restrictions.suspend(actor, 4))
+                .isInstanceOf(IllegalStateException.class).hasNoCause();
+        assertThatThrownBy(() -> restrictions.suspend(UUID.randomUUID(), 0))
+                .isInstanceOf(SecurityException.class).hasNoCause();
+
+        jdbc().update("""
+            UPDATE live_contribution_restriction
+            SET revision = ?, restricted = TRUE WHERE actor_id = ?
+            """, Long.MAX_VALUE - 1, actor);
+        assertThat(restrictions.suspend(actor, 0).revision()).isEqualTo(Long.MAX_VALUE);
+        assertThatThrownBy(() -> restrictions.unsuspend(actor, Long.MAX_VALUE))
+                .isInstanceOf(IllegalStateException.class).hasNoCause();
+        assertThatThrownBy(() -> jdbc().update("""
+            UPDATE live_contribution_restriction SET restricted = FALSE WHERE actor_id = ?
+            """, actor)).isInstanceOf(RuntimeException.class);
+        String tokenHash = session(actor);
+        new JdbcSessionStore(jdbc(), manager()).deleteAccount(tokenHash, START.plusSeconds(1));
+        assertThat(jdbc().queryForObject("""
+            SELECT count(*) FROM live_contribution_restriction WHERE actor_id = ?
+            """, Integer.class, actor)).isZero();
+    }
+
+    @Test
+    void suspensionFailureRollsBackAndSanitizesSqlError() {
+        UUID actor = account();
+        jdbc().execute("""
+            CREATE FUNCTION restriction_test_failure() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'private restriction fixture'; END $$
+            """);
+        jdbc().execute("""
+            CREATE TRIGGER restriction_test_failure BEFORE INSERT ON live_contribution_restriction
+            FOR EACH ROW EXECUTE FUNCTION restriction_test_failure()
+            """);
+        try {
+            assertThatThrownBy(() -> restrictionService().suspend(actor, 0))
+                    .isInstanceOf(AccountWriteUnavailable.class).hasNoCause()
+                    .hasMessageNotContaining("private restriction fixture");
+        } finally {
+            jdbc().execute("DROP TRIGGER restriction_test_failure ON live_contribution_restriction");
+            jdbc().execute("DROP FUNCTION restriction_test_failure()");
+        }
+        assertThat(readRestriction(actor)).isEqualTo(ContributorAssessment.initial(actor));
+    }
+
+    @Test
+    void concurrentSuspensionCommitsBeforeAcceptanceAcrossAdapters() throws Exception {
+        Fixture fixture = fixture(START, 1);
+        SignalCommandGrant pending = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        CountDownLatch written = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ContributionRestrictionParticipant delegate = new JdbcContributionRestrictionParticipant(jdbc());
+        ContributionRestrictionParticipant pausing = new ContributionRestrictionParticipant() {
+            @Override public ContributorAssessment read(UUID actorId) {
+                return delegate.read(actorId);
+            }
+            @Override public void replace(ContributorAssessment prior, ContributorAssessment next) {
+                delegate.replace(prior, next);
+                written.countDown();
+                await(release);
+            }
+        };
+        var restrictions = new ContributionRestrictionService(
+                new JdbcAccountWriteAuthority(jdbc(), manager()), pausing);
+        Services independent = services(fixture.clock());
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> suspension = executor.submit(() -> restrictions.suspend(fixture.actor(), 0));
+            assertThat(written.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<Object> acceptance = executor.submit(() -> {
+                try {
+                    return independent.signals().accept(fixture.actor(), pending.commandId(),
+                            fingerprint(pending, QuickSignalValue.TRAFFIC_MOVING),
+                            Duration.ofMinutes(1), Duration.ofMinutes(2));
+                } catch (SignalStorageDenied denied) {
+                    return denied;
+                }
+            });
+            assertThat(waitingFor("%routiqo_account%FOR UPDATE%")).isTrue();
+            release.countDown();
+            suspension.get(5, TimeUnit.SECONDS);
+            assertThat(acceptance.get(5, TimeUnit.SECONDS)).isInstanceOf(SignalStorageDenied.class);
+        }
+        assertThat(acceptanceCount(fixture.actor())).isZero();
+        assertThat(storedGrant(fixture.actor(), pending.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+    }
+
+    @Test
+    void acceptanceSamplesTimeAfterSafetyParticipantDelay() throws Exception {
+        Fixture fixture = fixture(START, 1, Duration.ofSeconds(2));
+        SignalCommandGrant pending = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        CountDownLatch read = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ContributionRestrictionParticipant delegate = new JdbcContributionRestrictionParticipant(jdbc());
+        ContributionRestrictionParticipant pausing = new ContributionRestrictionParticipant() {
+            @Override public ContributorAssessment read(UUID actorId) {
+                ContributorAssessment snapshot = delegate.read(actorId);
+                read.countDown();
+                await(release);
+                return snapshot;
+            }
+            @Override public void replace(ContributorAssessment prior, ContributorAssessment next) {
+                delegate.replace(prior, next);
+            }
+        };
+        JdbcTemplate jdbc = jdbc();
+        var accountAuthority = new JdbcAccountWriteAuthority(jdbc, manager());
+        var journeyStore = new JdbcJourneyStore(jdbc, accountAuthority);
+        var attempts = new JdbcRouteBindingAttemptParticipant(jdbc, fixture.clock());
+        var contexts = new JdbcLiveRouteContextParticipant(jdbc, fixture.clock(), attempts);
+        var signals = new SignalStorageService(journeyStore,
+                new JdbcPresenceConsentParticipant(jdbc), contexts, pausing,
+                new JdbcSignalStorageStore(jdbc), fixture.clock());
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            Future<Object> accepting = executor.submit(() -> {
+                try {
+                    return signals.accept(fixture.actor(), pending.commandId(),
+                            fingerprint(pending, QuickSignalValue.TRAFFIC_MOVING),
+                            Duration.ofMinutes(1), Duration.ofMinutes(2));
+                } catch (SignalStorageDenied denied) {
+                    return denied;
+                }
+            });
+            assertThat(read.await(5, TimeUnit.SECONDS)).isTrue();
+            fixture.clock().set(START.plusSeconds(2));
+            release.countDown();
+            assertThat(accepting.get(5, TimeUnit.SECONDS)).isInstanceOf(SignalStorageDenied.class);
+        }
+        assertThat(acceptanceCount(fixture.actor())).isZero();
+        assertThat(storedGrant(fixture.actor(), pending.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+    }
+
+    @Test
+    void mismatchedOrMissingRestrictionSnapshotFailsClosed() {
+        Fixture fixture = fixture(START, 1);
+        SignalCommandGrant pending = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        for (ContributorAssessment snapshot : new ContributorAssessment[] {
+                null, ContributorAssessment.initial(UUID.randomUUID()) }) {
+            ContributionRestrictionParticipant invalid = new ContributionRestrictionParticipant() {
+                @Override public ContributorAssessment read(UUID actorId) { return snapshot; }
+                @Override public void replace(ContributorAssessment prior,
+                        ContributorAssessment next) { throw new AssertionError(); }
+            };
+            JdbcTemplate jdbc = jdbc();
+            var journeyStore = new JdbcJourneyStore(jdbc,
+                    new JdbcAccountWriteAuthority(jdbc, manager()));
+            var attempts = new JdbcRouteBindingAttemptParticipant(jdbc, fixture.clock());
+            var contexts = new JdbcLiveRouteContextParticipant(jdbc, fixture.clock(), attempts);
+            var signals = new SignalStorageService(journeyStore,
+                    new JdbcPresenceConsentParticipant(jdbc), contexts, invalid,
+                    new JdbcSignalStorageStore(jdbc), fixture.clock());
+            assertDenied(() -> signals.issue(fixture.actor(), fixture.journey(),
+                    fixture.anchors().getFirst(), Set.of(QuickSignalValue.Category.TRAFFIC)));
+            assertDenied(() -> signals.accept(fixture.actor(), pending.commandId(),
+                    fingerprint(pending, QuickSignalValue.TRAFFIC_MOVING),
+                    Duration.ofMinutes(1), Duration.ofMinutes(2)));
+        }
+        assertThat(storedGrant(fixture.actor(), pending.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+        assertThat(acceptanceCount(fixture.actor())).isZero();
     }
 
     @Test
@@ -423,10 +766,15 @@ class SignalStoragePersistenceTest {
         assertThat(grantExists(shortReceipt.actor(), consumed.commandId())).isTrue();
         assertThat(storedGrant(shortReceipt.actor(), consumed.commandId()).state())
                 .isEqualTo(SignalCommandGrant.State.CONSUMED);
+        assertThat(acceptanceCount(shortReceipt.actor())).isEqualTo(1);
         shortReceipt.clock().set(START.plusSeconds(2));
         assertDenied(() -> accept(shortReceipt, consumed, QuickSignalValue.TRAFFIC_MOVING));
+        SignalCommandGrant another = issue(shortReceipt, QuickSignalValue.Category.TRAFFIC);
+        assertThatThrownBy(() -> accept(shortReceipt, another, QuickSignalValue.TRAFFIC_SLOW))
+                .isInstanceOf(SignalStorageRateLimited.class).hasNoCause();
         assertThat(storedGrant(shortReceipt.actor(), consumed.commandId()).state())
                 .isEqualTo(SignalCommandGrant.State.CONSUMED);
+        assertThat(acceptanceCount(shortReceipt.actor())).isEqualTo(1);
     }
 
     @Test
@@ -468,11 +816,102 @@ class SignalStoragePersistenceTest {
         for (int limit : List.of(0, 101)) {
             assertThatThrownBy(() -> maintenance(START).purgeExpiredReceipts(limit))
                     .isInstanceOf(IllegalArgumentException.class).hasNoCause();
+            assertThatThrownBy(() -> maintenance(START).purgeExpiredAcceptances(limit))
+                    .isInstanceOf(IllegalArgumentException.class).hasNoCause();
         }
         TransactionTemplate transaction = new TransactionTemplate(manager());
         assertThatThrownBy(() -> transaction.execute(
                 status -> maintenance(START).purgeExpiredGrants(1)))
                 .isInstanceOf(IllegalStateException.class).hasNoCause();
+        assertThatThrownBy(() -> transaction.execute(
+                status -> maintenance(START).purgeExpiredAcceptances(1)))
+                .isInstanceOf(IllegalStateException.class).hasNoCause();
+    }
+
+    @Test
+    void acceptanceCleanupIsBoundedAndSkipsLockedRowsAtExactHour() throws Exception {
+        Instant cleanupStart = START.minus(Duration.ofDays(1));
+        Fixture first = fixture(cleanupStart, 1);
+        Fixture second = fixture(cleanupStart, 1);
+        accept(first, issue(first, QuickSignalValue.Category.QUEUE),
+                QuickSignalValue.QUEUE_UNDER_5);
+        accept(second, issue(second, QuickSignalValue.Category.QUEUE),
+                QuickSignalValue.QUEUE_UNDER_5);
+        assertThat(maintenance(cleanupStart.plusSeconds(3600).minusNanos(1_000))
+                .purgeExpiredAcceptances(100)).isZero();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            Future<?> holder = executor.submit(() -> holdAcceptance(first.actor(), locked, release));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(maintenance(cleanupStart.plusSeconds(3600))
+                    .purgeExpiredAcceptances(1)).isEqualTo(1);
+            assertThat(acceptanceCount(first.actor())).isEqualTo(1);
+            release.countDown();
+            holder.get(5, TimeUnit.SECONDS);
+        }
+        assertThat(maintenance(cleanupStart.plusSeconds(3600)).purgeExpiredAcceptances(100))
+                .isEqualTo(1);
+        assertThat(acceptanceCount(first.actor())).isZero();
+        assertThat(acceptanceCount(second.actor())).isZero();
+    }
+
+    @Test
+    void ledgerLockWaitSamplesTimeAfterGrantAndContextExpire() throws Exception {
+        Fixture fixture = fixture(START, 1, Duration.ofSeconds(2));
+        accept(fixture, issue(fixture, QuickSignalValue.Category.QUEUE),
+                QuickSignalValue.QUEUE_UNDER_5);
+        SignalCommandGrant pending = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> holder = executor.submit(() -> holdAcceptance(fixture.actor(), locked, release));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<Object> attempt = executor.submit(() -> {
+                try {
+                    return accept(fixture, pending, QuickSignalValue.TRAFFIC_MOVING);
+                } catch (SignalStorageDenied denied) {
+                    return denied;
+                }
+            });
+            assertThat(waitingFor("%signal_actor_acceptance%FOR UPDATE%")).isTrue();
+            fixture.clock().set(START.plusSeconds(91));
+            release.countDown();
+            holder.get(5, TimeUnit.SECONDS);
+            assertThat(attempt.get(5, TimeUnit.SECONDS)).isInstanceOf(SignalStorageDenied.class);
+        }
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(1);
+        assertThat(budget(fixture.actor(), "ACCEPT")).isEqualTo(1);
+        assertThat(storedGrant(fixture.actor(), pending.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+    }
+
+    @Test
+    void expiredSlotRemovalDuringLockWaitStillReservesOneCharge() throws Exception {
+        Fixture fixture = fixture(START, 1, Duration.ofHours(2));
+        accept(fixture, issue(fixture, QuickSignalValue.Category.QUEUE),
+                QuickSignalValue.QUEUE_UNDER_5);
+        fixture.clock().set(START.plusSeconds(3600));
+        SignalCommandGrant next = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> removal = executor.submit(() -> holdAndDeleteAcceptance(
+                    fixture.actor(), locked, release));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<QuickSignalReceipt> attempt = executor.submit(() ->
+                    accept(fixture, next, QuickSignalValue.TRAFFIC_MOVING));
+            assertThat(waitingFor("%signal_actor_acceptance%FOR UPDATE%")).isTrue();
+            release.countDown();
+            removal.get(5, TimeUnit.SECONDS);
+            assertThat(attempt.get(5, TimeUnit.SECONDS).signal().signalId())
+                    .isEqualTo(next.commandId());
+        }
+        assertThat(acceptanceCount(fixture.actor())).isEqualTo(1);
+        assertThat(jdbc().queryForObject("""
+            SELECT accepted_at FROM signal_actor_acceptance WHERE actor_id = ?
+            """, Timestamp.class, fixture.actor()).toInstant())
+                .isEqualTo(START.plusSeconds(3600));
     }
 
     @Test
@@ -485,6 +924,7 @@ class SignalStoragePersistenceTest {
         assertThat(grantCount(fixture.actor())).isZero();
         assertThat(receiptCount(fixture.actor())).isZero();
         assertThat(budget(fixture.actor(), "GRANT")).isZero();
+        assertThat(acceptanceCount(fixture.actor())).isZero();
     }
 
     @Test
@@ -541,6 +981,7 @@ class SignalStoragePersistenceTest {
         var consents = new PresenceConsentService(store, consentParticipant);
         var contexts = new LiveRouteContextService(store, contextParticipant);
         var signals = new SignalStorageService(store, consentParticipant, contextParticipant,
+                new JdbcContributionRestrictionParticipant(jdbc),
                 new JdbcSignalStorageStore(jdbc), clock);
         return new Services(journeys, consents, contexts, signals);
     }
@@ -548,6 +989,17 @@ class SignalStoragePersistenceTest {
     private SignalCommandGrant issue(Fixture fixture, QuickSignalValue.Category category) {
         return fixture.signals().issue(fixture.actor(), fixture.journey(),
                 fixture.anchors().getFirst(), Set.of(category));
+    }
+
+    private SignalCommandGrant fillAcceptances(Fixture fixture, int count) {
+        SignalCommandGrant last = null;
+        for (int index = 0; index < count; index++) {
+            fixture.clock().set(START.plusSeconds((index / 5) * 60L));
+            QuickSignalValue value = VALUES.get(index % 5);
+            last = issue(fixture, value.category());
+            accept(fixture, last, value);
+        }
+        return last;
     }
 
     private QuickSignalReceipt accept(
@@ -617,9 +1069,26 @@ class SignalStoragePersistenceTest {
             """, Integer.class, actor, action)).orElse(0);
     }
 
+    private int acceptanceCount(UUID actor) {
+        return jdbc().queryForObject("""
+            SELECT count(*) FROM signal_actor_acceptance WHERE actor_id = ?
+            """, Integer.class, actor);
+    }
+
     private JdbcSignalStorageExpiryMaintenance maintenance(Instant now) {
         return new JdbcSignalStorageExpiryMaintenance(
                 jdbc(), manager(), Clock.fixed(now, ZoneOffset.UTC));
+    }
+
+    private ContributionRestrictionService restrictionService() {
+        return new ContributionRestrictionService(
+                new JdbcAccountWriteAuthority(jdbc(), manager()),
+                new JdbcContributionRestrictionParticipant(jdbc()));
+    }
+
+    private ContributorAssessment readRestriction(UUID actor) {
+        return new JdbcAccountWriteAuthority(jdbc(), manager()).withEnabledAccount(actor,
+                () -> new JdbcContributionRestrictionParticipant(jdbc()).read(actor));
     }
 
     private void holdGrant(SignalCommandGrant grant, CountDownLatch locked, CountDownLatch release) {
@@ -630,6 +1099,30 @@ class SignalStoragePersistenceTest {
                 """, UUID.class, grant.admission().actorId(), grant.commandId());
             locked.countDown();
             await(release);
+        });
+    }
+
+    private void holdAcceptance(UUID actor, CountDownLatch locked, CountDownLatch release) {
+        new TransactionTemplate(manager()).executeWithoutResult(status -> {
+            jdbc().queryForObject("""
+                SELECT slot FROM signal_actor_acceptance
+                WHERE actor_id = ? FOR UPDATE
+                """, Integer.class, actor);
+            locked.countDown();
+            await(release);
+        });
+    }
+
+    private void holdAndDeleteAcceptance(UUID actor, CountDownLatch locked,
+            CountDownLatch release) {
+        new TransactionTemplate(manager()).executeWithoutResult(status -> {
+            jdbc().queryForObject("""
+                SELECT slot FROM signal_actor_acceptance
+                WHERE actor_id = ? FOR UPDATE
+                """, Integer.class, actor);
+            locked.countDown();
+            await(release);
+            jdbc().update("DELETE FROM signal_actor_acceptance WHERE actor_id = ?", actor);
         });
     }
 
@@ -698,6 +1191,9 @@ class SignalStoragePersistenceTest {
 
     private record Services(JourneyService journeys, PresenceConsentService consents,
             LiveRouteContextService contexts, SignalStorageService signals) {}
+
+    private record AcceptanceAttempt(SignalStorageService service, SignalCommandGrant grant,
+            QuickSignalValue value) {}
 
     private record Fixture(UUID actor, UUID journey, List<UUID> anchors,
             StoredLiveRouteContext context, MutableClock clock, JourneyService journeys,

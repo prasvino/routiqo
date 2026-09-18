@@ -2,6 +2,7 @@ package com.routiqo.core.routeupdate.infrastructure;
 
 import com.routiqo.core.identity.infrastructure.AuthInfrastructureConfiguration;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
+import com.routiqo.core.moderation.application.ContributionRestrictionParticipant;
 import com.routiqo.core.privacy.application.PresenceConsentParticipant;
 import com.routiqo.core.routeupdate.application.LiveRouteContextExpiryMaintenance;
 import com.routiqo.core.routeupdate.application.SignalStorageExpiryMaintenance;
@@ -37,6 +38,19 @@ class LiveExpiryMaintenanceConfigurationTest {
                     throw new IllegalStateException(failure);
                 }
             });
+
+    @Test
+    void signalStorageRequiresAnExplicitRestrictionParticipant() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(RouteUpdatePersistenceConfiguration.class,
+                        MissingRestrictionDependencies.class)
+                .withPropertyValues("spring.profiles.active=persistence")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasMessageContaining("ContributionRestrictionParticipant");
+                });
+    }
 
     @Test
     void requiresPersistenceAndAnExplicitEnabledFlag() {
@@ -112,6 +126,23 @@ class LiveExpiryMaintenanceConfigurationTest {
 
     @Configuration(proxyBeanMethods = false)
     static class TestDependencies {
+        @Bean JdbcTemplate jdbcTemplate() { return new JdbcTemplate(mock(DataSource.class)); }
+        @Bean PlatformTransactionManager transactionManager() {
+            return mock(PlatformTransactionManager.class);
+        }
+        @Bean JourneyWriteAuthority journeyWriteAuthority() {
+            return mock(JourneyWriteAuthority.class);
+        }
+        @Bean PresenceConsentParticipant presenceConsentParticipant() {
+            return mock(PresenceConsentParticipant.class);
+        }
+        @Bean ContributionRestrictionParticipant contributionRestrictionParticipant() {
+            return mock(ContributionRestrictionParticipant.class);
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class MissingRestrictionDependencies {
         @Bean JdbcTemplate jdbcTemplate() { return new JdbcTemplate(mock(DataSource.class)); }
         @Bean PlatformTransactionManager transactionManager() {
             return mock(PlatformTransactionManager.class);

@@ -14,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -36,7 +37,8 @@ public final class JdbcSignalStorageStore implements SignalStorageStore {
         requireTransaction();
         return jdbc.query("""
             SELECT actor_id, command_id, journey_id, context_id, route_revision, anchor_id,
-                   consent_generation, permitted_categories, issued_at, expires_at, state
+                   consent_generation, permitted_categories, issued_at, expires_at,
+                   restriction_revision, state
             FROM signal_command_grant
             WHERE actor_id = ? AND command_id = ? FOR UPDATE
             """, JdbcSignalStorageStore::mapGrant, actorId, commandId).stream().findFirst();
@@ -111,19 +113,86 @@ public final class JdbcSignalStorageStore implements SignalStorageStore {
     }
 
     @Override
+    public void lockAcceptanceLedger(UUID actorId) {
+        requireTransaction();
+        jdbc.query("""
+            SELECT slot FROM signal_actor_acceptance
+            WHERE actor_id = ? ORDER BY accepted_at, slot FOR UPDATE
+            """, (row, number) -> row.getInt("slot"), actorId);
+    }
+
+    @Override
+    public void reserveAcceptance(UUID actorId, UUID anchorId,
+            QuickSignalValue.Category category, Instant now) {
+        requireTransaction();
+        // The caller holds the actor account lock and locked these rows before sampling now.
+        // All adapters therefore inspect and reserve in one order across journeys.
+        List<Acceptance> rows = jdbc.query("""
+            SELECT slot, accepted_at, anchor_id, category
+            FROM signal_actor_acceptance WHERE actor_id = ? ORDER BY slot
+            """, (row, number) -> new Acceptance(row.getInt("slot"),
+                row.getTimestamp("accepted_at").toInstant(),
+                row.getObject("anchor_id", UUID.class),
+                QuickSignalValue.Category.valueOf(row.getString("category"))), actorId);
+        boolean[] occupied = new boolean[21];
+        Acceptance reusable = null;
+        int live = 0;
+        for (Acceptance row : rows) {
+            occupied[row.slot()] = true;
+            if (row.acceptedAt().isAfter(now)) {
+                throw new SignalStorageDenied();
+            }
+            if (Duration.between(row.acceptedAt(), now).compareTo(Duration.ofHours(1)) < 0) {
+                live++;
+                if (row.anchorId().equals(anchorId) && row.category() == category
+                        && Duration.between(row.acceptedAt(), now)
+                                .compareTo(Duration.ofSeconds(60)) < 0) {
+                    throw new SignalStorageRateLimited();
+                }
+            } else if (reusable == null || row.acceptedAt().isBefore(reusable.acceptedAt())) {
+                reusable = row;
+            }
+        }
+        if (live >= 20) {
+            throw new SignalStorageRateLimited();
+        }
+        if (reusable != null) {
+            int updated = jdbc.update("""
+                UPDATE signal_actor_acceptance
+                SET accepted_at = ?, anchor_id = ?, category = ?
+                WHERE actor_id = ? AND slot = ? AND accepted_at = ?
+                """, Timestamp.from(now), anchorId, category.name(), actorId,
+                    reusable.slot(), Timestamp.from(reusable.acceptedAt()));
+            if (updated != 1) throw new SignalStorageConflict();
+            return;
+        }
+        for (int slot = 1; slot <= 20; slot++) {
+            if (!occupied[slot]) {
+                jdbc.update("""
+                    INSERT INTO signal_actor_acceptance(actor_id, slot, accepted_at, anchor_id, category)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, actorId, slot, Timestamp.from(now), anchorId, category.name());
+                return;
+            }
+        }
+        throw new SignalStorageConflict();
+    }
+
+    @Override
     public void insertGrant(SignalCommandGrant grant) {
         requireTransaction();
         SignalAdmission admission = grant.admission();
         jdbc.update("""
             INSERT INTO signal_command_grant
                 (actor_id, command_id, journey_id, context_id, route_revision, anchor_id,
-                 consent_generation, permitted_categories, issued_at, expires_at, state)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 consent_generation, permitted_categories, issued_at, expires_at,
+                 restriction_revision, state)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, admission.actorId(), grant.commandId(), admission.journeyId(),
                 admission.contextId(), admission.routeRevision(), admission.anchorId(),
                 admission.consentGeneration(), names(admission.permittedCategories()),
                 Timestamp.from(admission.issuedAt()), Timestamp.from(admission.expiresAt()),
-                grant.state().name());
+                grant.restrictionRevision(), grant.state().name());
     }
 
     @Override
@@ -192,6 +261,7 @@ public final class JdbcSignalStorageStore implements SignalStorageStore {
                 row.getLong("route_revision"), row.getLong("consent_generation"), categories,
                 row.getTimestamp("issued_at").toInstant(), row.getTimestamp("expires_at").toInstant());
         return new SignalCommandGrant(row.getObject("command_id", UUID.class), admission,
+                row.getLong("restriction_revision"),
                 SignalCommandGrant.State.valueOf(row.getString("state")));
     }
 
@@ -223,6 +293,11 @@ public final class JdbcSignalStorageStore implements SignalStorageStore {
 
     private record Budget(Instant bucketStart, int usedCount) {
         @Override public String toString() { return "SignalBudget[private]"; }
+    }
+
+    private record Acceptance(int slot, Instant acceptedAt, UUID anchorId,
+            QuickSignalValue.Category category) {
+        @Override public String toString() { return "SignalAcceptance[private]"; }
     }
 
     @Override

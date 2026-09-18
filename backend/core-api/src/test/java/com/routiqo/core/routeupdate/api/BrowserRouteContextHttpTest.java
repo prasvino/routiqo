@@ -4,7 +4,13 @@ import com.jayway.jsonpath.JsonPath;
 import com.routiqo.core.identity.application.GoogleIdentityVerifier;
 import com.routiqo.core.identity.application.*;
 import com.routiqo.core.identity.infrastructure.*;
+import com.routiqo.core.journey.application.JourneyWriteAuthority;
+import com.routiqo.core.moderation.application.ContributionRestrictionParticipant;
 import com.routiqo.core.privacy.application.PresenceConsentService;
+import com.routiqo.core.privacy.application.PresenceConsentParticipant;
+import com.routiqo.core.routeupdate.application.LiveRouteContextParticipant;
+import com.routiqo.core.routeupdate.application.SignalStorageService;
+import com.routiqo.core.routeupdate.application.SignalStorageStore;
 import com.sun.net.httpserver.HttpServer;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
@@ -19,6 +25,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -68,6 +76,7 @@ class BrowserRouteContextHttpTest {
     private enum ProviderMode { ROUTE, FAR_ROUTE, NO_ROUTE, FAILURE, BLOCKED_ROUTE }
     private static final PostgreSQLContainer DATABASE = new PostgreSQLContainer("postgres:16-alpine");
     private static final AtomicInteger PROVIDER_CALLS = new AtomicInteger();
+    private static final AdjustableSignalClock SIGNAL_CLOCK = new AdjustableSignalClock();
     private static final AtomicReference<ProviderMode> PROVIDER_MODE =
             new AtomicReference<>(ProviderMode.ROUTE);
     private static final AtomicReference<CountDownLatch> PROVIDER_ENTERED =
@@ -147,7 +156,8 @@ class BrowserRouteContextHttpTest {
                 @Value("${ROUTIQO_AUTH_RATE_SECRET}") String secret,
                 @Qualifier("peerRateUnavailable") AtomicBoolean peerUnavailable,
                 @Qualifier("accountRateUnavailable") AtomicBoolean accountUnavailable) {
-            AuthRateGate delegate = new JdbcAuthRateGate(jdbc, secret, Clock.systemUTC());
+            AuthRateGate delegate = new JdbcAuthRateGate(jdbc, secret,
+                    Clock.fixed(Instant.parse("2026-09-18T12:00:00Z"), ZoneOffset.UTC));
             return (identity, category, limit) -> {
                 if (category.equals("other") && peerUnavailable.get()
                         || (category.startsWith("route-context-")
@@ -171,6 +181,12 @@ class BrowserRouteContextHttpTest {
                     return delegate.withEnabledAccount(actorId, work);
                 }
             };
+        }
+        @Bean @Primary SignalStorageService controlledSignals(JourneyWriteAuthority journeys,
+                PresenceConsentParticipant consents, LiveRouteContextParticipant contexts,
+                ContributionRestrictionParticipant restrictions, SignalStorageStore store) {
+            return new SignalStorageService(journeys, consents, contexts, restrictions,
+                    store, SIGNAL_CLOCK);
         }
         @Bean @Qualifier("sessionReadUnavailable") AtomicBoolean sessionReadUnavailable() {
             return new AtomicBoolean();
@@ -228,6 +244,7 @@ class BrowserRouteContextHttpTest {
     @Autowired @Qualifier("sessionReadUnavailable") AtomicBoolean sessionReadUnavailable;
 
     @BeforeEach void reset() {
+        SIGNAL_CLOCK.reset();
         jdbc.update("DELETE FROM auth_rate_bucket");
         PROVIDER_CALLS.set(0);
         PROVIDER_MODE.set(ProviderMode.ROUTE);
@@ -522,6 +539,7 @@ class BrowserRouteContextHttpTest {
         String firstBody = acceptance(anchor, "queue_under_5", bound, "1");
         String secondBody = acceptance(anchor, "queue_over_30", bound, "1");
         assertReceipt(accept(owner, journey, first, firstBody), first, "accepted");
+        SIGNAL_CLOCK.advance(Duration.ofSeconds(60));
         assertReceipt(accept(owner, journey, second, secondBody), second, "accepted");
         assertReceipt(accept(owner, journey, first, firstBody), first, "superseded");
         assertReceipt(withdraw(owner, journey, first), first, "superseded");
@@ -631,20 +649,29 @@ class BrowserRouteContextHttpTest {
         UUID journey = start(owner);
         enable(owner, journey);
         Map<String, Object> bound = bind(owner, journey);
+        SIGNAL_CLOCK.freeze();
         UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        UUID trafficAnchor = UUID.fromString("00000000-0000-4000-8000-000000000102");
         var commands = new java.util.ArrayList<String>();
         for (int i = 0; i < 10; i++) {
-            HttpResponse<String> result = issue(owner, journey, anchor);
+            HttpResponse<String> result = issue(owner, journey,
+                    i % 2 == 0 ? anchor : trafficAnchor);
             assertThat(result.statusCode()).isEqualTo(200);
             commands.add(JsonPath.read(result.body(), "$.commandId"));
         }
         assertLimited(issue(owner, journey, anchor));
-        for (int i = 0; i < 5; i++) assertThat(accept(owner, journey, commands.get(i),
-                acceptance(anchor, i % 2 == 0 ? "queue_under_5" : "queue_over_30", bound, "1"))
-                .statusCode()).isEqualTo(200);
-        assertLimited(accept(owner, journey, commands.get(5),
-                acceptance(anchor, "queue_under_5", bound, "1")));
-        assertThat(count("quick_signal_receipt", owner.account())).isEqualTo(5);
+        assertReceipt(accept(owner, journey, commands.getFirst(),
+                acceptance(anchor, "queue_under_5", bound, "1")), commands.getFirst(), "accepted");
+        // Seed four earlier actor accepts: the catalog exposes only two independent
+        // anchor/categories, so rapid synthetic replacements now meet the cooldown.
+        jdbc.update("""
+            UPDATE signal_actor_budget SET used_count = 5
+            WHERE actor_id = ? AND action = 'ACCEPT'
+            """, owner.account());
+        assertLimited(accept(owner, journey, commands.get(1),
+                acceptance(trafficAnchor, "traffic_moving", bound, "1")));
+        assertThat(count("quick_signal_receipt", owner.account())).isEqualTo(1);
+        assertThat(count("signal_actor_acceptance", owner.account())).isEqualTo(1);
     }
 
     @Test void grantAndReceiptExpiryDenyWithoutRecreatingEvidence() throws Exception {
@@ -1016,6 +1043,21 @@ class BrowserRouteContextHttpTest {
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted");
+        }
+    }
+
+    private static final class AdjustableSignalClock extends Clock {
+        private final AtomicReference<Duration> offset = new AtomicReference<>(Duration.ZERO);
+        private final AtomicReference<Instant> fixed = new AtomicReference<>();
+
+        void reset() { offset.set(Duration.ZERO); fixed.set(null); }
+        void freeze() { fixed.set(Clock.systemUTC().instant()); }
+        void advance(Duration by) { offset.updateAndGet(current -> current.plus(by)); }
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() {
+            Instant base = fixed.get();
+            return (base == null ? Clock.systemUTC().instant() : base).plus(offset.get());
         }
     }
 }

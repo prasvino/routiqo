@@ -45,6 +45,11 @@ public final class LiveExpiryMaintenanceJob {
             } catch (Exception failure) {
                 LOG.warn("Live expiry maintenance failed: receipts");
             }
+            try {
+                signals.purgeExpiredAcceptances(BATCH_SIZE);
+            } catch (Exception failure) {
+                LOG.warn("Live expiry maintenance failed: acceptances");
+            }
         } finally {
             running.set(false);
         }

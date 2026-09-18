@@ -1,0 +1,207 @@
+ROUTIQO — CURRENT STATUS, REMAINING WORK AND COMPLETION REQUIREMENTS
+Snapshot: 18 September 2026 (IST)
+Repository snapshot: autonomous Live safety batch following 0611499 (ADRs 0037–0039)
+
+CURRENT POSITION
+
+Routiqo has a working local planning preview and substantial tested backend
+foundations. It is not production-ready. An implemented API or disabled feature
+is not the same as an integrated, deployed and verified user experience.
+
+The agreed first release is an active-journey LIVE list with Live Moments and
+Quick Signals, supported by Google sign-in and a reviewed regional maps pilot.
+Full offline navigation, broad social features and AI belong to later phases.
+
+1. STATUS TABLE
+
+| Area | Done so far | Pending to finish | Release relevance |
+|------|-------------|-------------------|-------------------|
+| Engineering foundation | Monorepo, Java/TypeScript builds, domain boundaries, OpenAPI generation, automated checks, secret scanning, CI definition and Git history | Verify current release commit in remote CI; production configuration, deployment and operational checks | First release |
+| Planning web experience | Home, Explore, Trips, Profile; destination discovery, bookmarks, trip/commute drafts and scheduling | Authenticated end-to-end QA, accessibility, small screens, large text, reduced motion and storage-failure coverage | First release |
+| Google sign-in | Web login UI; browser/native auth APIs; token validation, secure sessions, renewal, logout and account deletion | Real Google OAuth configuration and end-to-end verification; native Google UI/transport integration | Web for web pilot; native for Android release |
+| Journeys and account history | Owned start/history/completion APIs, database persistence, transaction authority, web journey controls and paginated history | Broader cross-device restoration/conflict handling and live authenticated verification; native authenticated integration | First release reliability |
+| Offline journey writes | Web IndexedDB queues, foreground/reconnect dispatch, retries, reconciliation, account isolation; native SQLite primitives | Native dispatch/network integration; restart/network-flap/device tests; broader unresolved-conflict recovery | Web reliability for pilot; native work for Android |
+| Maps and routes | MapLibre web renderer; guarded Valhalla routing and Photon search adapters; regional bounds, alternatives and manual direction steps | Provision real regional routing/search/tiles, review data quality and licensing, validate browser resources and provider behavior | Regional maps required for pilot |
+| Navigation and offline maps | Last successful web route remains in memory during connection loss | Route persistence across reload, native map integration, location guidance, bounded map downloads, eviction/deletion and on-device rerouting | Later than first LIVE list |
+| Private Live consent/context | Durable consent with revocation precedence; provider-derived route binding, catalog authority and private owner APIs | Consent/route-binding UI, reviewed real catalog, rollout configuration and end-to-end lifecycle verification | First release |
+| Quick Signals | Typed values, server grants, durable private receipts, replay protection, replacement/withdrawal, minute and rolling 20/hour quotas, 60-second slot cooldown, suspension/revision fencing and private command APIs | Evidence-independence authority, durable reporting/blocking and operator moderation, contribution UI and operational validation | First release |
+| Live expiry cleanup | Default-off bounded job for contexts/grants/receipts/acceptance charges, isolated scheduler, failure recovery and non-overlap | Staging activation, backlog/capacity checks, failure alerts, backup/retention operations and production rollout | First release operations |
+| Public Live Moments | Product direction and privacy threat/design checkpoints documented | Approved cohort publication design, safe aggregation/projection, authenticated reads, suppression/conflict/freshness rules and adversarial tests | Critical first-release blocker |
+| Active-journey LIVE list | Specifications and private backend prerequisites | Actual list and Quick Signal controls; loading/empty/suppressed/stale/offline/error states, reauthorization and accessibility | Critical first-release blocker |
+| Safety and minimum admin | Reviewed private safety domain primitives, durable suspension and buildable admin foundation | Blocking/reporting, moderation queue/actions, operator permissions/audit, revocation propagation and safety procedures | First release |
+| Trip journals and commute summaries | Private text journal API/editor/drafts/library/conflict recovery; local monthly commute summaries; planning backup/restore | Real authenticated/device QA; broader history completeness; media and sharing are separate future work | Verify existing features; rich extras later |
+| Android application | Expo four-tab foundation, shared planning logic, SQLite adapters, credential vault and auth response validators | Secure network adapter, Google sign-in UI, authenticated resources/sync, native maps, development build and real-device QA | Android release |
+| Production release | Architecture, security rules and local verification foundations | Hosting, secrets, domain/TLS, real dependencies, monitoring, backup restore, rollout/rollback, privacy disclosures and release QA | Critical first-release blocker |
+| Later product expansion | Roadmap/spec direction | Map LIVE overlay, Ask Ahead, temporary rooms/realtime, Pulse, Travel Waves, reminders/push, media, AI and expanded admin workflows | After first useful LIVE release |
+
+2. WHAT IS REQUIRED TO COMPLETE THE PENDING WORK
+
+A. Resolve public Live privacy and publication design
+   Engineering can proceed without credentials or user input.
+   - Specify fixed geographic partitions and time windows, contribution
+     eligibility, evidence independence, publication/suppression rules and
+     distributed query budgets.
+   - Resolve block, withdrawal, Ghost Mode, completion and deletion behavior
+     without creating an oracle that reveals an individual's contribution.
+   - Test coordinated accounts, repeated queries, neighboring anchors, threshold
+     changes, stale caches and consent races. A minimum contributor count alone
+     is not proof of privacy.
+   - Record the decision in an ADR and complete independent privacy review.
+   Complete when: a falsifiable, reviewed policy exists and adversarial tests
+   pass. Public projections must remain closed until this gate is satisfied.
+
+B. Finish abuse prevention, moderation and revocation
+   Engineering can proceed alongside the privacy design.
+   - Extend existing minute limits with appropriate longer-window/category
+     controls that cannot be reset by changing journey, session or replica.
+   - Define and implement evidence eligibility/anti-Sybil safeguards.
+   - Implement report/block/moderation lifecycle, minimum operator queue,
+     authorization and audit trail. Define moderation retention explicitly.
+   - Enforce policy changes across reads, derived data and any future delivery
+     channels; fail closed when authority is unavailable.
+   Complete when: multi-user, concurrent, replay, abuse and revocation tests
+   pass and an operator can handle a report through a documented process.
+
+C. Build the first LIVE user experience
+   Depends on A and B for real public output.
+   - Connect explicit consent, route binding and Quick Signal actions to the
+     active owned journey. Preserve Home/Explore/Trips/Profile navigation.
+   - Implement authorized Live Moment reads and a bounded foreground refresh
+     flow, with cancellation, backoff and one request in flight.
+   - Show truthful freshness/conflict/suppression states; never invent reports,
+     report counts, live participants or verified physical presence.
+   - Keep visible offline Live rows in memory, mark stale, remove expired rows
+     and disable submission. Clear on local Ghost/account/journey transitions.
+   - Reauthorize on reconnect; never upload an old report automatically as a
+     fresh observation. Handle uncertain writes with exact explicit retries.
+   Complete when: authenticated end-to-end, offline, account-switch, expiry,
+   revocation, accessibility and small-screen acceptance pass.
+
+D. Configure and verify real Google sign-in
+   Requires account-owner configuration; implementation alone cannot supply it.
+   - Configure the Google project, OAuth client/audience, consent screen and
+     approved origins/redirects for the intended environments.
+   - Supply credentials through local/deployment secret configuration, never
+     chat, source control or public client bundles.
+   - Verify real sign-in, renewal, logout, expired sessions and recent-auth
+     account deletion through the deployed browser/proxy boundary.
+   Complete when: real accounts pass the intended login/lifecycle flow in staging.
+   Phone OTP remains deferred; Google is the agreed first method.
+
+E. Provision the open-source regional maps pilot
+   Requires reviewed data and operator-controlled infrastructure.
+   - Select the pilot region/corridor and review dataset coverage, provenance,
+     licenses, update cadence, disk capacity and import requirements.
+   - Provision controlled Valhalla, Photon and tile hosting (Martin direction),
+     including MapLibre style, sprite and glyph resources.
+   - Configure fixed service origins and conservative geographic bounds; protect
+     internal services and redact query/body logs across proxies/providers.
+   - Build a reviewed versioned anchor/category catalog for Live route binding.
+   - Test real routes, alternatives, search, attribution, outages, coverage
+     failures, network/egress behavior and regional data updates.
+   Complete when: the selected pilot works against real controlled services and
+   the catalog/endpoint-exclusion privacy review passes. Mapbox tokens are not
+   required for the selected direction. Artifact checks alone are insufficient.
+
+F. Finish journey/offline reliability and verify existing features
+   - Exercise multiple devices/accounts, delayed responses, duplicate commands,
+     network flaps, interrupted writes, unavailable storage and unresolved
+     conflicts. Preserve account retirement and exact replay semantics.
+   - Complete broader restoration without silently overwriting local pending work.
+   - Verify journal conflicts, navigation protection, older account history,
+     summary completeness disclosures and backup/restore with real sign-in.
+   Complete when: data survives the supported failure/recovery flows without
+   cross-account exposure, duplicate completion or lost acknowledged work.
+
+G. Complete native Android integration
+   Required for Android launch; can run alongside the web pilot work.
+   - Implement redirect-safe native authenticated transport, Google challenge
+     binding/UI, secure-vault coordination and logout/deletion integration.
+   - Mount authenticated journey operations and native reconnect dispatch.
+   - Integrate MapLibre in a development build and verify platform permissions.
+   - Run scripts/android-doctor.ps1 to establish CURRENT machine readiness.
+     Last recorded prerequisites included SDK API 36, Build Tools 36.0.0,
+     Platform Tools, Command-line Tools, Android JDK 17 and an emulator/device.
+     Backend uses JDK 25 separately. Do not assume earlier missing tools remain
+     missing; this report did not rerun the machine inspection.
+   - Verify SQLite/SecureStore restart, account isolation, backup behavior,
+     location denial, accessibility, performance and unreliable networks on device.
+   Complete when: a signed release candidate passes real-device QA. JavaScript
+   export or a successful compile is not device verification.
+
+H. Operate retention and prepare deployment
+   Requires an agreed hosting environment and operator access.
+   - Configure production PostgreSQL/PostGIS, required cache services, secrets,
+     networking, TLS/domain, runtime profiles and separately gated features.
+   - Validate migrations in staging, backups/restores and rollback procedures.
+   - Enable expiry maintenance only after retention/backlog tests; measure the
+     intended replica count, monitor failures and define cleanup capacity alerts.
+   - Establish redacted monitoring, health checks, incident ownership, privacy
+     disclosures, deletion/backup policies and minimum moderation operations.
+   - Run remote CI on the actual release commit; perform authenticated release,
+     load/capacity and deployment smoke tests before gradual pilot rollout.
+   Complete when: staging acceptance and operational runbooks are verified, then
+   the release is deployed and checked. Current work has not deployed production.
+
+I. Later navigation and product expansion
+   These do not block the agreed first LIVE list.
+   - Offline maps/navigation: define storage limits, download/update integrity,
+     eviction/account-deletion behavior, permission/GPS handling, guidance and
+     on-device rerouting; validate supported device/region performance.
+   - Map LIVE overlay: reuse the same authorized projection without adding a
+     finer-grained location/query surface.
+   - Ask Ahead/rooms/realtime: separate recipient-consent, anti-targeting,
+     membership-expiry, blocking, moderation and reconnect/revocation design.
+   - Push/reminders/media/AI: provider setup, permission/retention controls,
+     bounded jobs/uploads, signed media flow, fallbacks and feature-specific QA.
+   - Pulse/Travel Waves: establish useful evidence and participation first.
+   Complete when: each separately scoped feature meets its own reviewed spec;
+   these must not inflate the first-release checklist.
+
+3. RECOMMENDED EXECUTION ORDER
+
+1) In parallel: publication/privacy design (A), abuse/moderation foundations (B),
+   real OAuth setup (D) and regional maps/catalog provisioning (E).
+2) Implement the approved public projection, then integrate the LIVE list and
+   contribution experience (C). Continue journey/offline verification (F).
+3) Complete staging operations/retention and pilot acceptance (H).
+4) Launch the reviewed web pilot after all first-release gates pass. If the
+   initial launch includes Android, native integration/device QA (G) also blocks it.
+5) Expand native navigation and later product features (I) in separate phases.
+
+Engineering can continue now on design, abuse controls, moderation, native
+transport and tests. Real OAuth, live regional data/services, deployment access
+and device verification remain external/configuration-dependent work. No new
+software installation is required merely to continue the existing backend work.
+
+4. VERIFICATION AND LIMITS OF THIS SNAPSHOT
+
+- Latest completed backend validation: 351 tests across 49 suites; zero failures,
+  errors or skips; core-api check and bootJar passed on 18 September 2026.
+- Latest recorded full TypeScript run: 260 tests across 41 files, plus contract,
+  formatting, type and lint checks in the preceding signal-API phase. It was not
+  rerun for the backend-only safety changes.
+- Safety changes received independent review and secret/diff checks. Previously, preview /trips
+  returned HTTP 200 after restart; this is not authenticated browser/device QA.
+- Private Live APIs and the expiry job remain disabled by default. No public
+  LIVE projection, real provider verification or production deployment is claimed.
+- No completion percentage or calendar estimate is given: unresolved privacy
+  design, operational configuration and device scope make those misleading.
+
+5. SOURCE DOCUMENTS (PATHS RELATIVE TO D:\Pras\routiqo)
+
+docs/quality/BUILD_STATUS.md — current verified capabilities and limitations
+docs/development/BUILD_PLAN.md — execution queue, including historical phases
+docs/features/live/ROUTIQO_LIVE_SPEC.md — agreed first-release scope
+docs/features/live/COHORT_PUBLICATION_DESIGN.md — unresolved publication gate
+docs/features/live/LIVE_EXPIRY_MAINTENANCE_SPEC.md — cleanup/operational acceptance
+docs/development/LOCAL_SETUP.md — provider, OAuth and Android setup references
+docs/privacy/DATA_RETENTION_AND_DELETION.md — retention/deletion boundaries
+docs/security/THREAT_MODEL.md — security/privacy acceptance baseline
+docs/adr/0037-rolling-signal-abuse-budgets.md — implemented rolling limits
+docs/adr/0038-publication-threat-boundary-and-safety-prerequisites.md — public gate
+docs/adr/0039-durable-private-contribution-restrictions.md — implemented suspension
+docs/adr/0040-internal-durable-block-policy.md — next private block implementation
+
+This file consolidates the current state. Older phase notes that say a feature
+had no storage/API/scheduler describe that earlier phase, not the latest state.

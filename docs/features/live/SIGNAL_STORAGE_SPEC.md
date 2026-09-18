@@ -69,6 +69,12 @@ limits are not approval of public quotas: peer/request limits, anti-Sybil contro
 operator tuning and moderation remain mandatory before exposure. No process-local
 budget or permissive stub is allowed. The budget table holds no per-command history.
 
+ADR 0037 adds a separate at-most-20-slot rolling acceptance ledger per actor:
+20 new acceptances per preceding hour and a 60-second actor/anchor/category
+cooldown. Charges survive receipt purge and withdrawal, expire logically after
+one hour and are reserved atomically only for new successful acceptance. Exact
+retained replay bypasses new charges. See SIGNAL_ABUSE_BUDGET_SPEC.md.
+
 Callable expiry maintenance is bounded to 1..100 deleted rows per call, with a
 five-second transaction/query budget. ADR 0036 adds an opt-in scheduler without
 changing this adapter contract. Grant cleanup deletes only

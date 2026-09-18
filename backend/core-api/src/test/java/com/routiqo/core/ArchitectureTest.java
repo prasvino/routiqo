@@ -28,4 +28,14 @@ class ArchitectureTest {
        .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
            .importPackages("com.routiqo.core"));
  }
+ @Test void apiLayerCannotReachTrustedContributionRestrictionMutation() {
+   noClasses().that().resideInAPackage("..api..").should().dependOnClassesThat()
+       .haveFullyQualifiedName("com.routiqo.core.moderation.application.ContributionRestrictionService")
+       .orShould().dependOnClassesThat().haveFullyQualifiedName(
+           "com.routiqo.core.moderation.application.ContributionRestrictionParticipant")
+       .orShould().dependOnClassesThat().haveFullyQualifiedName(
+           "com.routiqo.core.moderation.infrastructure.JdbcContributionRestrictionParticipant")
+       .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+           .importPackages("com.routiqo.core"));
+ }
 }

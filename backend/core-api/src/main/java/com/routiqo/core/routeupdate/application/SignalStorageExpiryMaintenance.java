@@ -4,4 +4,6 @@ public interface SignalStorageExpiryMaintenance {
     int purgeExpiredGrants(int limit);
 
     int purgeExpiredReceipts(int limit);
+
+    int purgeExpiredAcceptances(int limit);
 }

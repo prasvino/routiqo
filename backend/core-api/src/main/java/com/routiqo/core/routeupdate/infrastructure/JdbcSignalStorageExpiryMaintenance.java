@@ -5,6 +5,7 @@ import com.routiqo.core.routeupdate.application.SignalStorageExpiryMaintenance;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
@@ -39,13 +40,45 @@ public final class JdbcSignalStorageExpiryMaintenance implements SignalStorageEx
         return purge("quick_signal_receipt", "command_id", "retain_until", limit);
     }
 
+    @Override
+    public int purgeExpiredAcceptances(int limit) {
+        validate(limit);
+        rejectAmbientTransaction();
+        try {
+            return transaction.execute(status -> {
+                try {
+                    Instant cutoff = clock.instant().truncatedTo(ChronoUnit.MICROS)
+                            .minus(Duration.ofHours(1));
+                    List<ExpiredAcceptance> rows = jdbc.query("""
+                        SELECT actor_id, slot, accepted_at FROM signal_actor_acceptance
+                        WHERE accepted_at <= ? ORDER BY accepted_at, actor_id, slot
+                        LIMIT ? FOR UPDATE SKIP LOCKED
+                        """, (row, number) -> new ExpiredAcceptance(
+                            row.getObject("actor_id", UUID.class), row.getInt("slot"),
+                            row.getTimestamp("accepted_at").toInstant()),
+                            Timestamp.from(cutoff), limit);
+                    int deleted = 0;
+                    for (ExpiredAcceptance row : rows) {
+                        deleted += jdbc.update("""
+                            DELETE FROM signal_actor_acceptance
+                            WHERE actor_id = ? AND slot = ? AND accepted_at = ?
+                              AND accepted_at <= ?
+                            """, row.actorId(), row.slot(), Timestamp.from(row.acceptedAt()),
+                                Timestamp.from(cutoff));
+                    }
+                    return deleted;
+                } catch (DataAccessException | TransactionException unavailable) {
+                    throw new AccountWriteUnavailable();
+                }
+            });
+        } catch (DataAccessException | TransactionException unavailable) {
+            throw new AccountWriteUnavailable();
+        }
+    }
+
     private int purge(String table, String identity, String expiry, int limit) {
-        if (limit < 1 || limit > 100) {
-            throw new IllegalArgumentException("Signal cleanup limit is invalid");
-        }
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("Signal cleanup cannot join a transaction");
-        }
+        validate(limit);
+        rejectAmbientTransaction();
         try {
             return transaction.execute(status -> {
                 try {
@@ -76,7 +109,23 @@ public final class JdbcSignalStorageExpiryMaintenance implements SignalStorageEx
         }
     }
 
+    private static void validate(int limit) {
+        if (limit < 1 || limit > 100) {
+            throw new IllegalArgumentException("Signal cleanup limit is invalid");
+        }
+    }
+
+    private static void rejectAmbientTransaction() {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Signal cleanup cannot join a transaction");
+        }
+    }
+
     private record Candidate(UUID actorId, UUID identity, Instant expiry) {
         @Override public String toString() { return "ExpiredSignalStorage[private]"; }
+    }
+
+    private record ExpiredAcceptance(UUID actorId, int slot, Instant acceptedAt) {
+        @Override public String toString() { return "ExpiredSignalAcceptance[private]"; }
     }
 }

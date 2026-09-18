@@ -1,6 +1,6 @@
 # Cohort publication design checkpoint (L0.2b)
 
-Status: design in progress, not publication approval. ADR 0023 resolves internal
+Status: safety direction recorded in ADR 0038, not publication approval. ADR 0023 resolves internal
 admission consistency only. This checkpoint records concrete remaining decisions
 instead of treating a minimum actor threshold as proof of privacy.
 
@@ -49,10 +49,20 @@ state work may proceed; public moment/API/UI exposure may not bypass it.
 
 ## Independent progress while publication is closed
 
-Implement immutable context-linked receipt transitions and then specify the
-admission-bound command envelope and transactional receipt store. In particular,
-receipt purge must not allow an old command to be accepted again: the future
-issuer should own command identity and validity rather than letting a client
-relabel an old UUID under renewed admission. No token format or issuer is approved
-by this checkpoint. Settle that storage/issuance decision before implementing a
-durable acceptance path; keep the current pure models unmounted.
+ADRs 0024–0036 now implement private command/receipt storage, authenticated owner
+transports and default-off bounded cleanup. Receipt purge cannot reset consumed
+grants. These verified prerequisites do not confer publication permission.
+
+ADR 0037 adds durable rolling write budgets. ADR 0038 records the adversarial
+conclusion: under unrestricted collusion, deterministic useful output and timely
+revocation cannot currently meet the stated individual non-association goal.
+Nine attacker-controlled contributions plus a target's tenth contribution form
+an existence oracle; Ghost/block withdrawal repeats it. Raising ten to another
+threshold or globally suppressing on every block does not resolve that conflict.
+
+Implement versioned moderation/trust state, blocking/reporting boundaries and
+revocation fences independently. Unknown trust must not default to an independent
+witness; Google subject uniqueness, account age and route relevance are not proof.
+No public API or hidden feature switch may bypass this decision. A future release
+proposal must specify its bounded-adversary assumption, measurable privacy claim,
+independence evidence and entire-output adversarial tests before approval.

@@ -39,7 +39,7 @@ class SignalCommandPolicyTest {
         var retained = receipt(RECEIVED.plusSeconds(300)).withdraw();
         var completedJourney = journey().complete(ACTOR, NOW);
         var unrelatedConsumedGrant = new SignalCommandGrant(UUID.randomUUID(), admission(UUID.randomUUID()),
-                SignalCommandGrant.State.CONSUMED);
+                0, SignalCommandGrant.State.CONSUMED);
 
         assertThat(policy.decide(ACTOR, COMMAND, submission(), retained, unrelatedConsumedGrant,
                 null, completedJourney, null, ISSUED.plusSeconds(120)))
@@ -129,10 +129,10 @@ class SignalCommandPolicyTest {
         assertDenied(null, grant(), context(), journey(), consent(), grant().admission().expiresAt());
 
         var wrongCommand = new SignalCommandGrant(UUID.randomUUID(), admission(ACTOR),
-                SignalCommandGrant.State.UNUSED);
+                0, SignalCommandGrant.State.UNUSED);
         assertDenied(null, wrongCommand, context(), journey(), consent(), NOW);
         var wrongActor = new SignalCommandGrant(COMMAND, admission(UUID.randomUUID()),
-                SignalCommandGrant.State.UNUSED);
+                0, SignalCommandGrant.State.UNUSED);
         assertDenied(null, wrongActor, context(), journey(), consent(), NOW);
     }
 
@@ -236,7 +236,8 @@ class SignalCommandPolicyTest {
     }
 
     private static SignalCommandGrant grant() {
-        return new SignalCommandGrant(COMMAND, admission(ACTOR), SignalCommandGrant.State.UNUSED);
+        return new SignalCommandGrant(COMMAND, admission(ACTOR), 0,
+                SignalCommandGrant.State.UNUSED);
     }
 
     private static SignalAdmission admission(UUID actorId) {

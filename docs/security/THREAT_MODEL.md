@@ -1,5 +1,18 @@
 # Routiqo Threat Model
 
+2026-09-18 Live design decision: ADR 0038 records that fixed windows, opaque
+anchors and a shared deterministic output do not alone resist arbitrary collusion
+or revocation differencing. Public publication remains unapproved. ADR 0037's
+rolling write budgets address resource abuse, not independent-person evidence.
+LIVE_SAFETY_FOUNDATION_SPEC.md defines private assessment/suspension, block and
+structured report transitions; pure primitives are not durable/public enforcement.
+ADR 0039 adds mandatory durable private contribution restriction checks: new
+grants capture a revision and new acceptance requires current equality, so
+suspend/unsuspend cannot revive old unused grants. Trusted internal mutation is
+not an operator permission boundary; public/admin exposure remains denied until
+independent operator authorization and audit exist. Old receipt/public projection
+invalidation and durable report/block workflows remain separate gates.
+
 This document defines Routiqo's baseline attacker model, protected assets, trust boundaries, abuse cases, and required mitigations. Update it whenever a feature, provider, data flow, permission, trust boundary, or attacker capability materially changes.
 
 This is a living engineering artifact, not a compliance checklist. Feature specifications should link to the applicable threats and add feature-specific abuse cases.

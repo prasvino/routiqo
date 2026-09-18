@@ -145,6 +145,16 @@ Each category gets one batch of at most 100 rows in its own existing bounded
 transaction. Failed categories are retried on the next tick; other categories
 continue. A dedicated scheduler isolates authentication maintenance. Logs must
 contain only constant category/outcome labels, never SQL, row IDs or exceptions.
+ADR 0037 extends the job with a fourth independent batch of at most 100 expired
+rolling acceptance-ledger rows. The one-hour logical budget is enforced even
+when maintenance is disabled; delayed cleanup never renews a charge.
+
+V13 upgrade with existing signal history requires a write cutover: stop every
+acceptance writer, wait one hour after the last pre-V13 acceptance, migrate and
+verify, then enable only the new enforcing version. Receipt data cannot fully
+backfill the rolling budget. Never mix old/new acceptance writers or roll back
+to old enforcement while writes are enabled. A truly fresh database needs no
+history drain. These are future rollout requirements, not actions performed here.
 
 Before production activation, verify expiry boundaries and retained replay in
 staging, inspect backlog growth with operator-only aggregate queries, wire failure

@@ -8,6 +8,8 @@ Decision: ADR 0036.
 Operate the existing domain-owned expiry interfaces for private Live route
 contexts, command grants and receipts. Retention rules remain ADRs 0027/0028/0035:
 logical expiry denies use immediately, while physical row removal may lag.
+ADR 0037 adds a fourth independent batch for expired rolling acceptance-ledger
+charges. Each charge logically expires one hour after acceptance.
 No HTTP endpoint, public projection, consent change, client queue, migration or
 new evidence policy is introduced. Pending binding-attempt fences and durable
 rate buckets are not cleanup targets; removing them could weaken ordering or
@@ -22,7 +24,8 @@ implementation. This application maintenance job is unrelated to Codex timers.
 
 After a 60-second initial delay, run with a 60-second delay after each completed
 tick. Each tick attempts exactly one batch of at most 100 contexts, 100 grants
-and 100 receipts, independently. Do not drain a backlog in a loop. Serialize
+and 100 receipts, plus up to 100 acceptance-ledger charges, independently.
+Do not drain a backlog in a loop. Serialize
 ticks within a process; concurrent duplicate entry must not start extra work.
 Use a dedicated bounded scheduler so maintenance does not delay authentication
 maintenance. Each existing adapter retains its own five-second transaction/query

@@ -18,7 +18,7 @@ class SignalCommandGrantTest {
 
     @Test void reusesAdmissionLifetimeAndConsumptionIsTerminalWithoutRenewal() {
         var admission = admission();
-        var unused = new SignalCommandGrant(COMMAND, admission, SignalCommandGrant.State.UNUSED);
+        var unused = new SignalCommandGrant(COMMAND, admission, 7, SignalCommandGrant.State.UNUSED);
 
         assertThat(unused.isUnusedAt(null)).isFalse();
         assertThat(unused.isUnusedAt(ISSUED.minusNanos(1))).isFalse();
@@ -30,6 +30,7 @@ class SignalCommandGrantTest {
         assertThat(consumed.state()).isEqualTo(SignalCommandGrant.State.CONSUMED);
         assertThat(consumed.commandId()).isEqualTo(COMMAND);
         assertThat(consumed.admission()).isSameAs(admission);
+        assertThat(consumed.restrictionRevision()).isEqualTo(7);
         assertThat(consumed.isUnusedAt(ISSUED)).isFalse();
         assertThat(consumed.consume()).isSameAs(consumed);
     }
@@ -39,10 +40,13 @@ class SignalCommandGrantTest {
         assertInvalid(new UUID(0, 0), admission(), SignalCommandGrant.State.UNUSED);
         assertInvalid(COMMAND, null, SignalCommandGrant.State.UNUSED);
         assertInvalid(COMMAND, admission(), null);
+        assertThatThrownBy(() -> new SignalCommandGrant(COMMAND, admission(), -1,
+                SignalCommandGrant.State.UNUSED)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test void stringRepresentationRedactsCommandAndAdmissionMetadata() {
-        var grant = new SignalCommandGrant(COMMAND, admission(), SignalCommandGrant.State.CONSUMED);
+        var grant = new SignalCommandGrant(COMMAND, admission(), 7,
+                SignalCommandGrant.State.CONSUMED);
 
         assertThat(grant.toString()).isEqualTo("SignalCommandGrant[private]")
                 .doesNotContain(COMMAND.toString(), ACTOR.toString(), JOURNEY.toString(),
@@ -56,7 +60,7 @@ class SignalCommandGrantTest {
 
     private static void assertInvalid(
             UUID commandId, SignalAdmission admission, SignalCommandGrant.State state) {
-        assertThatThrownBy(() -> new SignalCommandGrant(commandId, admission, state))
+        assertThatThrownBy(() -> new SignalCommandGrant(commandId, admission, 0, state))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid signal command grant")
                 .hasNoCause();

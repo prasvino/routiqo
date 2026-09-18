@@ -20,6 +20,13 @@ public interface SignalStorageStore {
 
     void reserveBudget(UUID actorId, BudgetAction action, Instant now, int limit);
 
+    /** Acquire the bounded ledger rows before the service samples admission time. */
+    void lockAcceptanceLedger(UUID actorId);
+
+    /** Caller must hold the actor account lock and call lockAcceptanceLedger before sampling now. */
+    void reserveAcceptance(UUID actorId, UUID anchorId,
+            QuickSignalValue.Category category, Instant now);
+
     void insertGrant(SignalCommandGrant grant);
 
     void consumeGrant(SignalCommandGrant grant);

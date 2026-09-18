@@ -22,6 +22,7 @@ class LiveExpiryMaintenanceJobTest {
         AtomicInteger contexts = new AtomicInteger();
         AtomicInteger grants = new AtomicInteger();
         AtomicInteger receipts = new AtomicInteger();
+        AtomicInteger acceptances = new AtomicInteger();
         String privateValue = "private-actor-id-and-sql";
         LiveRouteContextExpiryMaintenance contextMaintenance = limit -> {
             assertThat(limit).isEqualTo(100);
@@ -43,6 +44,13 @@ class LiveExpiryMaintenanceJobTest {
                 if (fail.get()) throw new IllegalStateException(privateValue);
                 return 100;
             }
+
+            @Override public int purgeExpiredAcceptances(int limit) {
+                assertThat(limit).isEqualTo(100);
+                acceptances.incrementAndGet();
+                if (fail.get()) throw new IllegalStateException(privateValue);
+                return 100;
+            }
         };
         LiveExpiryMaintenanceJob job = new LiveExpiryMaintenanceJob(
                 contextMaintenance, signalMaintenance);
@@ -51,9 +59,11 @@ class LiveExpiryMaintenanceJobTest {
         assertThat(contexts).hasValue(1);
         assertThat(grants).hasValue(1);
         assertThat(receipts).hasValue(1);
+        assertThat(acceptances).hasValue(1);
         assertThat(output.getAll()).contains("Live expiry maintenance failed: contexts")
                 .contains("Live expiry maintenance failed: grants")
                 .contains("Live expiry maintenance failed: receipts")
+                .contains("Live expiry maintenance failed: acceptances")
                 .doesNotContain(privateValue, "IllegalStateException");
 
         fail.set(false);
@@ -61,6 +71,7 @@ class LiveExpiryMaintenanceJobTest {
         assertThat(contexts).hasValue(2);
         assertThat(grants).hasValue(2);
         assertThat(receipts).hasValue(2);
+        assertThat(acceptances).hasValue(2);
     }
 
     @Test
@@ -70,6 +81,7 @@ class LiveExpiryMaintenanceJobTest {
         AtomicInteger contexts = new AtomicInteger();
         AtomicInteger grants = new AtomicInteger();
         AtomicInteger receipts = new AtomicInteger();
+        AtomicInteger acceptances = new AtomicInteger();
         LiveExpiryMaintenanceJob job = new LiveExpiryMaintenanceJob(limit -> {
             assertThat(limit).isEqualTo(100);
             contexts.incrementAndGet();
@@ -93,6 +105,12 @@ class LiveExpiryMaintenanceJobTest {
                 receipts.incrementAndGet();
                 return 0;
             }
+
+            @Override public int purgeExpiredAcceptances(int limit) {
+                assertThat(limit).isEqualTo(100);
+                acceptances.incrementAndGet();
+                return 0;
+            }
         });
 
         try (var executor = Executors.newSingleThreadExecutor()) {
@@ -103,16 +121,19 @@ class LiveExpiryMaintenanceJobTest {
                 assertThat(contexts).hasValue(1);
                 assertThat(grants).hasValue(0);
                 assertThat(receipts).hasValue(0);
+                assertThat(acceptances).hasValue(0);
             } finally {
                 release.countDown();
             }
             first.get(5, TimeUnit.SECONDS);
             assertThat(grants).hasValue(1);
             assertThat(receipts).hasValue(1);
+            assertThat(acceptances).hasValue(1);
             job.runOnce();
             assertThat(contexts).hasValue(2);
             assertThat(grants).hasValue(2);
             assertThat(receipts).hasValue(2);
+            assertThat(acceptances).hasValue(2);
         }
     }
 }

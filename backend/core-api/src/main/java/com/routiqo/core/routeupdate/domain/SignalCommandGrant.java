@@ -7,7 +7,8 @@ import java.util.UUID;
  * Internal server-issued command state bound to one admission. It is not a public credential, and
  * construction alone does not authorize signal acceptance.
  */
-public record SignalCommandGrant(UUID commandId, SignalAdmission admission, State state) {
+public record SignalCommandGrant(UUID commandId, SignalAdmission admission,
+        long restrictionRevision, State state) {
     private static final UUID NIL_ID = new UUID(0, 0);
 
     public enum State {
@@ -16,7 +17,8 @@ public record SignalCommandGrant(UUID commandId, SignalAdmission admission, Stat
     }
 
     public SignalCommandGrant {
-        if (commandId == null || NIL_ID.equals(commandId) || admission == null || state == null) {
+        if (commandId == null || NIL_ID.equals(commandId) || admission == null
+                || restrictionRevision < 0 || state == null) {
             throw new IllegalArgumentException("Invalid signal command grant");
         }
     }
@@ -30,7 +32,7 @@ public record SignalCommandGrant(UUID commandId, SignalAdmission admission, Stat
         if (state == State.CONSUMED) {
             return this;
         }
-        return new SignalCommandGrant(commandId, admission, State.CONSUMED);
+        return new SignalCommandGrant(commandId, admission, restrictionRevision, State.CONSUMED);
     }
 
     @Override

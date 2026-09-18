@@ -2,6 +2,8 @@ package com.routiqo.core.routeupdate.application;
 
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.journey.domain.Journey;
+import com.routiqo.core.moderation.application.ContributionRestrictionParticipant;
+import com.routiqo.core.moderation.domain.ContributorAssessment;
 import com.routiqo.core.privacy.application.PresenceConsentParticipant;
 import com.routiqo.core.privacy.domain.PresenceConsent;
 import com.routiqo.core.routeupdate.domain.QuickSignal;
@@ -29,6 +31,7 @@ public final class SignalStorageService {
     private final JourneyWriteAuthority journeys;
     private final PresenceConsentParticipant consents;
     private final LiveRouteContextParticipant contexts;
+    private final ContributionRestrictionParticipant restrictions;
     private final SignalStorageStore store;
     private final Clock clock;
     private final SignalCommandPolicy policy = new SignalCommandPolicy();
@@ -36,11 +39,13 @@ public final class SignalStorageService {
     public SignalStorageService(JourneyWriteAuthority journeys,
             PresenceConsentParticipant consents,
             LiveRouteContextParticipant contexts,
+            ContributionRestrictionParticipant restrictions,
             SignalStorageStore store,
             Clock clock) {
         this.journeys = Objects.requireNonNull(journeys);
         this.consents = Objects.requireNonNull(consents);
         this.contexts = Objects.requireNonNull(contexts);
+        this.restrictions = Objects.requireNonNull(restrictions);
         this.store = Objects.requireNonNull(store);
         this.clock = Objects.requireNonNull(clock);
     }
@@ -66,6 +71,10 @@ public final class SignalStorageService {
             PresenceConsent consent = consents.read(journey);
             StoredLiveRouteContext storedContext = contexts.read(journey).orElseThrow(
                     SignalStorageService::denied);
+            ContributorAssessment restriction = restrictionFor(actorId);
+            if (restriction.state() == ContributorAssessment.State.SUSPENDED) {
+                throw denied();
+            }
             Instant now = now();
             if (!consent.sharing() || !consent.journeyActive()
                     || !storedContext.isCurrentAt(now)
@@ -89,7 +98,8 @@ public final class SignalStorageService {
                 throw denied();
             }
             SignalCommandGrant grant = new SignalCommandGrant(
-                    UUID.randomUUID(), admission, SignalCommandGrant.State.UNUSED);
+                    UUID.randomUUID(), admission, restriction.revision(),
+                    SignalCommandGrant.State.UNUSED);
             store.reserveBudget(actorId, SignalStorageStore.BudgetAction.GRANT, now, 10);
             store.insertGrant(grant);
             return grant;
@@ -137,6 +147,12 @@ public final class SignalStorageService {
             QuickSignalValue.Category category = requiredCategory(submission);
             Optional<QuickSignalReceipt> prior = store.findActiveSlot(
                     actorId, submission.anchorId(), category);
+            store.lockAcceptanceLedger(actorId);
+            ContributorAssessment restriction = restrictionFor(actorId);
+            if (restriction.state() == ContributorAssessment.State.SUSPENDED
+                    || restriction.revision() != grant.restrictionRevision()) {
+                throw denied();
+            }
             Instant now = now();
             if (!storedContext.isCurrentAt(now)) {
                 throw denied();
@@ -169,6 +185,7 @@ public final class SignalStorageService {
                     submission.routeRevision(), retainUntil, QuickSignalReceipt.State.ACTIVE);
 
             store.reserveBudget(actorId, SignalStorageStore.BudgetAction.ACCEPT, now, 5);
+            store.reserveAcceptance(actorId, submission.anchorId(), category, now);
             prior.ifPresent(value -> store.supersede(value.supersede()));
             store.consumeGrant(grant.consume());
             store.insertReceipt(receipt);
@@ -212,6 +229,12 @@ public final class SignalStorageService {
             throw denied();
         }
         return submission.journeyId();
+    }
+
+    private ContributorAssessment restrictionFor(UUID actorId) {
+        ContributorAssessment restriction = restrictions.read(actorId);
+        if (restriction == null || !actorId.equals(restriction.actorId())) throw denied();
+        return restriction;
     }
 
     private static QuickSignalValue.Category requiredCategory(

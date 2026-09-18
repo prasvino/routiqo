@@ -35,6 +35,17 @@ backlog capacity, failure alerting and physical database/backup lifecycle remain
 operational gates. A missing receipt never resets a consumed command grant.
 Proposed public signal/client lifetimes and unresolved moderation holds remain
 owned by ROUTIQO_LIVE_SPEC.md.
+ADR 0037 specifies an independent abuse ledger bounded to 20 slots per account,
+containing acceptance times, opaque anchors and categories. Charges expire
+logically after one hour and are removed by bounded maintenance; physical cleanup
+may lag. Withdrawal, journey completion and receipt purge must not reset this
+budget. Account deletion cascades the ledger. No precise route/GPS or device
+fingerprint is added. Publication trust remains unresolved (ADR 0038).
+ADR 0039 retains one latest contribution-restriction revision/boolean per account
+until account deletion. That monotonic state prevents old grants regaining authority
+after restoration; it contains no assessment reference, evidence body or action
+history. Report cases and block edges currently have pure lifecycle models only,
+not durable stores or permission to retain moderation evidence indefinitely.
 Expiry, Ghost withdrawal, block changes and deletion must invalidate derived
 projections/caches, not only the original row. Do not retain raw location history
 or put Live evidence into journals, backups, analytics or journey outboxes.

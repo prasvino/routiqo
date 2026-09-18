@@ -84,6 +84,11 @@ recovery/intent boundary, not proof of location, signal permission or public Liv
 ADR 0035 exposes separately default-off private owner command issue, acceptance
 and withdrawal through the catalog-aware authority. Accepted receipts remain
 private recovery evidence and do not authorize a public moment.
+ADR 0038 records the unresolved collusion/withdrawal inference problem: shared
+deterministic threshold output is not publication approval. ADR 0037 specifies
+rolling write budgets, and ADR 0039 specifies private restriction authority with
+grant revision fencing. See BUILD_STATUS.md for verified implementation status;
+none of these prerequisites proves independent people or physical presence.
 Client GPS remains untrusted. Claims remain traveller reports, not verified
 observations of physical presence. Arbitrary bounds, segments and membership
 probing are denied; no account-independent live discovery endpoint is planned.
