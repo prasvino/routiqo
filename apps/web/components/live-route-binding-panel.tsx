@@ -28,6 +28,17 @@ export interface RouteBindingSelectionSnapshot {
   epoch: number;
 }
 
+export interface LiveRouteContributionAuthority {
+  accountId: string;
+  journeyId: string;
+  consentGeneration: string;
+  consentEpoch: number;
+  selectionEpoch: number;
+  contextId: string;
+  routeRevision: string;
+  expiresAt: string;
+}
+
 interface LiveRouteBindingPanelProps {
   accountId: string;
   journeyId: string;
@@ -37,6 +48,8 @@ interface LiveRouteBindingPanelProps {
   getAuthority: () => LiveConsentAuthority | null;
   selectionSnapshot: RouteBindingSelectionSnapshot;
   getSelectionSnapshot: () => RouteBindingSelectionSnapshot;
+  publishContributionAuthority: (authority: LiveRouteContributionAuthority) => void;
+  invalidateContributionAuthority: () => void;
 }
 
 interface Operation {
@@ -96,6 +109,8 @@ export function LiveRouteBindingPanel({
   getAuthority,
   selectionSnapshot,
   getSelectionSnapshot,
+  publishContributionAuthority,
+  invalidateContributionAuthority,
 }: LiveRouteBindingPanelProps) {
   const identity = `${accountId}:${journeyId}`;
   const renderedScope = scopeKey(identity, authority.epoch, selectionSnapshot.epoch);
@@ -134,13 +149,14 @@ export function LiveRouteBindingPanel({
 
   const clear = useCallback(
     (message?: string) => {
+      invalidateContributionAuthority();
       abortCurrent();
       setBusy(false);
       setObserved(null);
       setAcknowledgementExpiry(null);
       setNotice(message ? { scope: scopeRef.current, message, alert: false } : null);
     },
-    [abortCurrent],
+    [abortCurrent, invalidateContributionAuthority],
   );
 
   useEffect(() => {
@@ -221,11 +237,13 @@ export function LiveRouteBindingPanel({
   useEffect(() => {
     if (acknowledgementExpiry === null) return;
     if (acknowledgementExpiry.scope !== renderedScope) {
+      invalidateContributionAuthority();
       setAcknowledgementExpiry(null);
       return;
     }
     const remaining = acknowledgementExpiry.expiresAt - BigInt(Date.now()) * 1_000_000n;
     if (remaining <= 0n) {
+      invalidateContributionAuthority();
       setAcknowledgementExpiry(null);
       setNotice({
         scope: acknowledgementExpiry.scope,
@@ -236,6 +254,7 @@ export function LiveRouteBindingPanel({
     }
     const timer = window.setTimeout(
       () => {
+        invalidateContributionAuthority();
         setAcknowledgementExpiry(null);
         setNotice({
           scope: acknowledgementExpiry.scope,
@@ -246,7 +265,7 @@ export function LiveRouteBindingPanel({
       Number((remaining + 999_999n) / 1_000_000n),
     );
     return () => window.clearTimeout(timer);
-  }, [acknowledgementExpiry, renderedScope]);
+  }, [acknowledgementExpiry, invalidateContributionAuthority, renderedScope]);
 
   useEffect(() => {
     if (busy || !restoreFocus.current) return;
@@ -272,7 +291,7 @@ export function LiveRouteBindingPanel({
     );
   }
 
-  function begin(): Operation | null {
+  function begin(invalidateContribution = false): Operation | null {
     const currentAuthority = authorityGetter.current();
     const currentSelection = selectionGetter.current();
     if (
@@ -287,6 +306,7 @@ export function LiveRouteBindingPanel({
       document.visibilityState !== 'visible'
     )
       return null;
+    if (invalidateContribution) invalidateContributionAuthority();
     busyRef.current = true;
     setBusy(true);
     setObserved(null);
@@ -338,7 +358,7 @@ export function LiveRouteBindingPanel({
   }
 
   async function check() {
-    const run = begin();
+    const run = begin(true);
     if (!run) return;
     const runScope = scopeKey(run.identity, run.authority.epoch, run.selectionEpoch);
     setNotice({ scope: runScope, message: 'Checking private route preparation…', alert: false });
@@ -403,7 +423,7 @@ export function LiveRouteBindingPanel({
     }
     const input = copySelection(currentSelection.selection);
     const expectedContextId = observation.contextId;
-    const run = begin();
+    const run = begin(true);
     if (!run || run.selectionEpoch !== currentSelection.epoch) return;
     const runScope = scopeKey(run.identity, run.authority.epoch, run.selectionEpoch);
     restoreFocus.current = true;
@@ -433,6 +453,16 @@ export function LiveRouteBindingPanel({
           });
           return;
         }
+        publishContributionAuthority({
+          accountId: run.authority.accountId,
+          journeyId: run.authority.journeyId,
+          consentGeneration: run.authority.generation,
+          consentEpoch: run.authority.epoch,
+          selectionEpoch: run.selectionEpoch,
+          contextId: context.contextId,
+          routeRevision: context.revision,
+          expiresAt: context.expiresAt,
+        });
         setAcknowledgementExpiry({ scope: runScope, expiresAt: expiry });
         setNotice({
           scope: runScope,

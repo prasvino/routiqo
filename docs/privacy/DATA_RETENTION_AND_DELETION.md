@@ -94,3 +94,23 @@ supersession are preserved. An expired retained receipt is not renewed by stop;
 cleanup may make later retries generically unknown. A consumed grant without a
 receipt cannot be treated as proof that no past acceptance occurred. Existing
 account deletion cascades and bounded expiry rules continue to apply.
+
+The private Quick Signal browser interface keeps at most five command recovery
+records in JourneyWorkspace memory, including terminal notices. Uncertain commands
+retain only account/journey/command identity, phase and operation authority;
+confirmed receipts add minimized status/timestamps. No route labels, observation
+values, exact endpoints or fingerprints enter this collection, browser storage,
+journey outbox, journal, backup or analytics. Confirmed receipt metadata expires
+at the server retainUntil or 24 hours of local elapsed time from capture, whichever
+comes first; elapsed-time checks prevent wall-clock rollback extending that bound.
+Expiry removes metadata, not the only known stop handle, and never proves server
+deletion. Capacity blocks issuance rather than silently evicting recovery.
+
+Same-account identity refresh temporarily hides controls while preserving memory.
+Ghost, route changes and journey completion invalidate contribution choices but
+preserve known stop handles. Account change, logout and workspace departure clear
+the collection. Explicit removal requires acknowledging that it only removes
+local recovery and does not stop server work. Navigation/unload warnings are best
+effort; no cross-page or reload recovery is promised. An empty collection does
+not prove there are no outstanding server commands. See
+`../features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md` for the lifecycle contract.

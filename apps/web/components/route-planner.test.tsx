@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { RoutePlanner, type RoutePlannerLiveBinding } from './route-planner';
+import {
+  RoutePlanner,
+  type RoutePlannerContributionSource,
+  type RoutePlannerLiveBinding,
+} from './route-planner';
 vi.mock('./route-map', () => ({ RouteMap: () => <div>Map component</div> }));
 import { readBrowserLocation } from '../lib/browser-location';
 vi.mock('../lib/browser-location', async (original) => ({
@@ -273,6 +277,9 @@ it('requires explicit selection and discards estimates after endpoints change', 
 });
 
 it('copies the successful route input and selected alternative into explicit private preparation', async () => {
+  let contributionSource: RoutePlannerContributionSource | null = null;
+  const unregister = vi.fn();
+  const invalidated = vi.fn();
   vi.mocked(searchBrowserPlaces)
     .mockResolvedValueOnce(place('Starting town', 80))
     .mockResolvedValueOnce(place('Ending town', 79));
@@ -309,19 +316,25 @@ it('copies the successful route input and selected alternative into explicit pri
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     },
   });
-  const authority = {
+  let authority = {
     accountId: account,
     journeyId: '00000000-0000-4000-8000-000000000009',
     generation: '5',
     epoch: 1,
   };
-  open(account, {
+  const view = open(account, {
     journeyId: authority.journeyId,
     online: true,
     available: true,
     authority,
     getAuthority: () => authority,
+    registerContributionSource: (source) => {
+      contributionSource = source;
+      return unregister;
+    },
   });
+  expect(contributionSource).not.toBeNull();
+  const unsubscribe = contributionSource!.subscribe(invalidated);
   fireEvent.change(screen.getByLabelText('From'), { target: { value: 'Starting' } });
   fireEvent.click(screen.getByRole('button', { name: 'Find starting place' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Starting town' }));
@@ -333,8 +346,22 @@ it('copies the successful route input and selected alternative into explicit pri
 
   fireEvent.click(screen.getByRole('button', { name: 'Check route preparation' }));
   await screen.findByText(/Last checked/);
+  expect(contributionSource!.read()).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Prepare selected route' }));
   await screen.findByText(/confirmed for this request/);
+  expect(contributionSource!.read()).toEqual({
+    accountId: account,
+    journeyId: authority.journeyId,
+    consentGeneration: '5',
+    consentEpoch: 1,
+    selectionEpoch: expect.any(Number),
+    contextId: '00000000-0000-4000-8000-000000000004',
+    routeRevision: '1',
+    expiresAt: expect.any(String),
+  });
+  const returned = contributionSource!.read()!;
+  returned.contextId = 'mutated';
+  expect(contributionSource!.read()?.contextId).toBe('00000000-0000-4000-8000-000000000004');
   expect(vi.mocked(bindBrowserLiveRouteContext).mock.calls[0]?.[2]).toEqual({
     mode: 'driving',
     origin: [80, 13],
@@ -344,6 +371,8 @@ it('copies the successful route input and selected alternative into explicit pri
   });
 
   fireEvent.click(screen.getByRole('button', { name: /Route 2/ }));
+  expect(contributionSource!.read()).toBeNull();
+  expect(invalidated).toHaveBeenCalled();
   expect(screen.queryByRole('button', { name: 'Prepare selected route' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Check route preparation' }));
   await waitFor(() => expect(readBrowserLiveRouteContext).toHaveBeenCalledTimes(2));
@@ -352,6 +381,15 @@ it('copies the successful route input and selected alternative into explicit pri
   expect(vi.mocked(bindBrowserLiveRouteContext).mock.calls[1]?.[2]).toMatchObject({
     alternativeIndex: 1,
   });
+  await waitFor(() => expect(contributionSource!.read()).not.toBeNull());
+  authority = { ...authority, generation: '6', epoch: 2 };
+  expect(contributionSource!.read()).toBeNull();
+  const notificationsBeforeUnmount = invalidated.mock.calls.length;
+  view.unmount();
+  expect(contributionSource!.read()).toBeNull();
+  expect(invalidated.mock.calls.length).toBeGreaterThan(notificationsBeforeUnmount);
+  expect(unregister).toHaveBeenCalledOnce();
+  unsubscribe();
 });
 
 it('ignores late search results after the query changes', async () => {

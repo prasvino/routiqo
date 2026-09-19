@@ -2234,3 +2234,69 @@ textarea::placeholder {
   border-color: #2f6b5f;
   box-shadow: inset 3px 0 0 #2f6b5f;
 }
+
+.private-signal-fields {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+  max-width: 40rem;
+}
+.private-signal-fields label {
+  display: grid;
+  gap: 8px;
+}
+.private-signal-fields select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+.private-signal-fields .private-signal-safe {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.private-signal-safe input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.private-signals-panel .button {
+  min-height: 44px;
+  white-space: normal;
+}
+.private-signal-recovery {
+  margin-top: 24px;
+}
+.private-signal-recovery h4 {
+  margin-bottom: 8px;
+}
+.private-signal-recovery > p {
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 65ch;
+}
+.private-signal-recovery ul {
+  list-style: none;
+  padding: 0;
+}
+.private-signal-recovery li {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.private-signal-recovery li p {
+  margin: 0 0 10px;
+}
+
+.private-signals-panel > p {
+  font-size: 14px;
+}
+.private-signals-panel :is(button, input, select):focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 4px;
+}

@@ -112,7 +112,7 @@ interface InstantValue {
   nanoseconds: bigint;
 }
 
-function readInstant(value: unknown): InstantValue {
+export function readInstant(value: unknown): InstantValue {
   if (typeof value !== 'string') invalid();
   const match = instantPattern.exec(value);
   if (!match || match[0] !== value || value.startsWith('0000')) invalid();

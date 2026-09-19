@@ -1,15 +1,16 @@
-# Private Quick Signal interface — next implementation plan
+# Private Quick Signal interface — implementation contract
 
-Status: independently reviewed planning direction, 2026-09-19. No contribution
-controls are mounted. ADR 0045 supplies choices and expected-context issuance;
+Status: private browser controls implemented, 2026-09-19. Verification evidence
+and remaining release gates are recorded in BUILD_STATUS.md and
+`docs/quality/PRIVATE_QUICK_SIGNAL_UI_QA.md`. ADR 0045 supplies choices and expected-context issuance;
 ADRs 0046/0047 supply terminal command stopping. Public LIVE remains separately
 gated by publication and safety. No flag activation or synthetic catalog fallback.
 
 ## Scope and sequence
 
-Add private structured contributions to the confirmed owned journey using the
-existing browser clients. First implement and test authority/recovery state, then
-mount controls and complete rendered accessibility/lifecycle QA. Keep Home,
+Private structured contributions use the confirmed owned journey and existing
+browser clients. JourneyWorkspace owns bounded recovery and mounts the controls;
+the route planner publishes only a fresh-bind contribution authority. Keep Home,
 Explore, Trips and Profile; no new navigation destination or global session store.
 
 ## New-contribution authority

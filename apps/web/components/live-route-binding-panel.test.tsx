@@ -48,6 +48,8 @@ function deferred<T>() {
 }
 
 function setup() {
+  const publishContributionAuthority = vi.fn();
+  const invalidateContributionAuthority = vi.fn();
   let authority: LiveConsentAuthority | null = {
     accountId,
     journeyId,
@@ -72,11 +74,15 @@ function setup() {
     getAuthority: () => authority,
     selectionSnapshot: selection,
     getSelectionSnapshot: () => selection,
+    publishContributionAuthority,
+    invalidateContributionAuthority,
   });
   const view = render(<LiveRouteBindingPanel {...props()} />);
   return {
     view,
     props,
+    publishContributionAuthority,
+    invalidateContributionAuthority,
     setAuthority(value: LiveConsentAuthority | null) {
       authority = value;
     },
@@ -119,8 +125,20 @@ describe('LiveRouteBindingPanel', () => {
     const state = setup();
     fireEvent.click(screen.getByRole('button', { name: 'Check route preparation' }));
     await screen.findByText(/Last checked: no private route preparation/);
+    expect(state.publishContributionAuthority).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Prepare selected route' }));
     await screen.findByText(/confirmed for this request/);
+    expect(state.publishContributionAuthority).toHaveBeenCalledTimes(1);
+    expect(state.publishContributionAuthority).toHaveBeenCalledWith({
+      accountId,
+      journeyId,
+      consentGeneration: '9007199254740993',
+      consentEpoch: 1,
+      selectionEpoch: 1,
+      contextId,
+      routeRevision: '4',
+      expiresAt: '2026-09-19T08:10:00Z',
+    });
     expect(vi.mocked(bindBrowserLiveRouteContext).mock.calls[0]?.slice(0, 3)).toEqual([
       accountId,
       journeyId,
@@ -181,6 +199,7 @@ describe('LiveRouteBindingPanel', () => {
     await act(async () => Promise.resolve());
     expect(signal?.aborted).toBe(false);
     expect(screen.queryByText(/confirmed for this request/)).toBeNull();
+    expect(state.publishContributionAuthority).not.toHaveBeenCalled();
   });
 
   it('aborts and ignores a late read when the selected result changes', async () => {
@@ -295,7 +314,8 @@ describe('LiveRouteBindingPanel', () => {
       status: 'bound',
       context: context({ expiresAt: '2026-09-19T08:00:01Z' }),
     });
-    setup();
+    const state = setup();
+    state.invalidateContributionAuthority.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Check route preparation' }));
     await act(async () => Promise.resolve());
     fireEvent.click(screen.getByRole('button', { name: 'Prepare selected route' }));
@@ -305,6 +325,7 @@ describe('LiveRouteBindingPanel', () => {
     expect(screen.getByText(/confirmed preparation expired/)).toBeTruthy();
     expect(readBrowserLiveRouteContext).toHaveBeenCalledTimes(1);
     expect(bindBrowserLiveRouteContext).toHaveBeenCalledTimes(1);
+    expect(state.invalidateContributionAuthority).toHaveBeenCalled();
   });
 
   it.each(['no_route', 'no_eligible_anchors'] as const)(

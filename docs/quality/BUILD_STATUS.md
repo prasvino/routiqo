@@ -24,13 +24,13 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration or output; optional bounded expiry job under ADR 0036 |
 | Route-area display metadata | Optional bounded operator-curated labels in the immutable catalog; old unlabeled catalogs remain valid, malformed labels fail closed, diagnostics stay redacted and existing APIs/resolver output are unchanged |
 | Private route-area choice reader | Internal read-only owned-journey service returns only the current context's complete labeled subset after consent, restriction, catalog and exact expiry checks. Immutable minimized snapshot; ADR0045 adds separately gated owner HTTP and typed browser reads. No provider calls or grants from reads |
-| Expected-context signal issuance | Separate internal catalog-aware method requires exact context ID, route revision and consent generation under existing authority before grant/budget mutation. Legacy owner HTTP contract unchanged; ADR0045 adds a distinct guarded expected-context endpoint/client. Quick Signal controls remain pending |
+| Expected-context signal issuance | Separate internal catalog-aware method requires exact context ID, route revision and consent generation under existing authority before grant/budget mutation. Legacy owner HTTP contract remains available; ADR0045 adds the distinct guarded expected-context endpoint/client used by the private Quick Signal controls |
 | Private route preparation | Separately default-off owner-only GET recovery and explicit POST binding through the real configured binder; strict browser guards, minimal no-store DTOs, database account quotas and post-provider authority rechecks. Browser check/prepare controls use copied route choices, confirmed consent, synchronous scope invalidation and expiring private acknowledgements. No public Live output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, terminal known-command stop, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
-| Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw/stop through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
+| Private Quick Signal API | Separately default-off owner-only choice GET and expected issue/accept/withdraw/stop operations through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention or Live projection |
 | Private safety foundations | Reviewed assessment, block and structured report-case domain transitions; durable contribution restrictions under the account transaction authority. Suspension denies new grants/acceptance and unsuspension cannot revive old grants. Durable private directed blocks with ordered account locks, bounded retained revisions and bilateral exclusion; no operator API, durable report workflow, public block targeting or public trust claim |
 | Audited moderation prerequisite | Internal RESTRICT/RESTORE commands require finite action-specific database grants, ordered enabled operator/subject locks and exact revisions. Effect, minimized audit and an independent 20/hour operator debit commit atomically; bounded 30-day audit and independently default-off audit/debit maintenance. Signal ingestion is read-only; no admin authentication, seeded grants, queue or HTTP endpoint |
-| Private browser LIVE clients | Typed consent, context, choice/expected-issuance and terminal command-stop clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. Consent and route-preparation controls mounted for confirmed active journeys; no signal controls, persistence, automatic retry or public projection |
+| Private browser LIVE clients and controls | Typed consent, context, choice/expected-issuance and terminal command-stop clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. Confirmed active journeys mount consent, route preparation and deliberate private Quick Signal controls. A successful fresh bind supplies exact account/journey/consent/selection/context authority; GET alone cannot authorize contribution. The UI permits one explicit issue/accept, keeps at most five same-account recovery handles in workspace memory, supports Stop after Ghost Mode or completion, expires receipt metadata, never writes automatically or offline, and shares the navigation warning with journal protection. No browser persistence, feature activation or public projection |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -40,6 +40,34 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Latest private Quick Signal UI pass, 2026-09-19:
+
+- The active-journey panel uses only fresh-bind authority and exact displayed
+  context, revision, consent generation, catalog category and safe-interaction
+  intent. Scope, lifecycle and route-selection changes synchronously fence late
+  work; expiry is checked at each async boundary and cleared one way. Account
+  preflight protects Stop while Stop remains available after consent revocation,
+  Ghost Mode or journey completion.
+- Recovery is memory-only, same-account and capped at five handles. Uncertain
+  acceptance/Stop remains explicit; there is no automatic retry, reconnect write
+  or offline queue. Receipt metadata expires locally without claiming server
+  deletion. Navigation warning behavior coexists with the trip journal guard.
+- The latest full `pnpm check` passed **483 TypeScript tests across 52 files**,
+  generated-contract drift, formatting, type and lint checks. Focused rendered
+  lifecycle tests cover synchronous invalidation, stale identity, offline and
+  unmount uncertainty, one-shot issuance, expiry including clock rollback,
+  recovery capacity and focus preservation. The production web build passed.
+  Actual component fixtures covered desktop/narrow controls, scaled reflow,
+  journal coexistence and fragment navigation. An isolated Next.js fixture verified
+  Link/Back cancellation and confirmed SPA departure; native confirmation decisions
+  and transport/account data were simulated. Independent review approved after
+  correcting history and hash navigation. See [scoped QA and limitations](PRIVATE_QUICK_SIGNAL_UI_QA.md)
+  and [ADR 0048](../adr/0048-private-browser-signal-recovery.md).
+- Secret scan and diff checks passed. Backend code was unchanged; the prior
+  **431 Java tests/61 suites** remain the latest backend evidence, not a rerun.
+- All private LIVE endpoints and cleanup jobs remain default off. No real OAuth,
+  provider/catalog, device, public publication or deployment claim is made.
 
 Latest terminal command-stop and contract-quality pass, 2026-09-19:
 
@@ -256,10 +284,11 @@ as real LIVE activity.
    and atomic audited restriction actions now exist; add strong administrative
    authentication, controlled grant administration, queue/case scope and revocation
    propagation. Public targeting and operational operator workflows remain pending.
-3. **Actual LIVE interface.** Private consent and route-preparation controls are implemented; connect contribution controls after the recovery lifecycle plan is approved. Implement approved moment reads/list,
+3. **Actual LIVE interface.** Private consent, route preparation and private Quick
+   Signal contribution/recovery controls are implemented. Implement approved moment reads/list,
    one foreground request in flight, stale/suppressed/conflicting/offline states,
    account/journey clearing and exact explicit retry. Public output depends on the
-   first two gates; private consent controls are not a working LIVE release.
+   first two gates; private controls are not a working public LIVE release.
 4. **Journey and UI release reliability.** Broader cross-device restoration and
    unresolved conflicts; authenticated journal/history/backup QA; storage failures,
    interrupted writes, account switches, large text, reduced motion and screen
@@ -285,7 +314,8 @@ Start with the current task and load only the relevant documents:
   [publication design](../features/live/COHORT_PUBLICATION_DESIGN.md) and
   [report intake proposal](../features/live/DURABLE_REPORT_INTAKE_PROPOSAL.md).
 - [Private LIVE client contract](../features/live/BROWSER_LIVE_CLIENT_SPEC.md)
-  before UI integration, together with [the Quick Signal lifecycle checkpoint](../features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md). Existing server ADRs and default-off gates still apply.
+  and the implemented [Quick Signal lifecycle checkpoint](../features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md).
+  Existing server ADRs and default-off gates still apply.
 - [Journey transport](../features/journey/BROWSER_JOURNEY_TRANSPORT_SPEC.md),
   [journal transport](../features/journey/BROWSER_JOURNAL_TRANSPORT_SPEC.md) and
   [dispatch](../features/journey/DISPATCH_SPEC.md) before extending recovery.

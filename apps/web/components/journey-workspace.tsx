@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JourneyCommand } from '@routiqo/shared';
 import { authAvailability, browserAccount } from '../lib/browser-auth';
 import {
@@ -14,7 +14,9 @@ import {
   type BrowserJourneyPartition,
 } from '../lib/journey-storage';
 import { Modal } from './modal';
-import { RoutePlanner } from './route-planner';
+import { RoutePlanner, type RoutePlannerContributionSource } from './route-planner';
+import { PrivateSignalsPanel } from './private-signals-panel';
+import { LiveSignalRecoveryCoordinator } from '../lib/live-signal-recovery';
 import type { LiveConsentAuthority } from './live-route-binding-panel';
 import { JournalEditor } from './journal-editor';
 import { CommuteSummaries } from './commute-summaries';
@@ -25,6 +27,35 @@ import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 import { LiveConsentPanel, type LiveConsentConfirmation } from './live-consent-panel';
 
 export function JourneyWorkspace() {
+  const [signalRecovery] = useState(() => new LiveSignalRecoveryCoordinator());
+  useEffect(() => () => signalRecovery.setAccount(null), [signalRecovery]);
+  const signalListeners = useRef(new Set<() => void>());
+  const boundSource = useRef<RoutePlannerContributionSource | null>(null);
+  const signalSource = useMemo<RoutePlannerContributionSource>(
+    () => ({
+      read: () => boundSource.current?.read() ?? null,
+      subscribe: (listener) => {
+        signalListeners.current.add(listener);
+        return () => {
+          signalListeners.current.delete(listener);
+        };
+      },
+    }),
+    [],
+  );
+  const registerContributionSource = useCallback((source: RoutePlannerContributionSource) => {
+    boundSource.current = source;
+    const notify = () => signalListeners.current.forEach((listener) => listener());
+    const unsubscribe = source.subscribe(notify);
+    notify();
+    return () => {
+      unsubscribe();
+      if (boundSource.current === source) {
+        boundSource.current = null;
+        notify();
+      }
+    };
+  }, []);
   const consentEpoch = useRef(0);
   const consentAuthorityRef = useRef<LiveConsentAuthority | null>(null);
   const expectedConsentScopeRef = useRef<{ accountId: string; journeyId: string } | null>(null);
@@ -39,6 +70,7 @@ export function JourneyWorkspace() {
         ? { ...confirmation, epoch }
         : null;
     consentAuthorityRef.current = next;
+    signalListeners.current.forEach((listener) => listener());
     setConsentAuthority(next);
   }, []);
   const invalidateConsentAuthority = useCallback(() => {
@@ -74,6 +106,7 @@ export function JourneyWorkspace() {
   >('checking');
   const [identityConfirmed, setIdentityConfirmed] = useState(false);
   const [account, setAccount] = useState<string | null>(null);
+  signalRecovery.setAccount(account);
   const [partition, setPartition] = useState<BrowserJourneyPartition | null>(null);
   const [error, setError] = useState('');
   const [review, setReview] = useState('');
@@ -462,9 +495,22 @@ export function JourneyWorkspace() {
                   available: liveAvailable,
                   authority: currentConsentAuthority,
                   getAuthority: getConsentAuthority,
+                  registerContributionSource,
                 }
               : undefined
           }
+        />
+      )}
+      {account && (
+        <PrivateSignalsPanel
+          key={account}
+          coordinator={signalRecovery}
+          accountId={account}
+          journeyId={active?.id ?? null}
+          identityConfirmed={identityConfirmed}
+          online={!offline}
+          available={liveAvailable && currentConsentAuthority !== null}
+          source={signalSource}
         />
       )}
       {availability === 'ready' && account && partition && (

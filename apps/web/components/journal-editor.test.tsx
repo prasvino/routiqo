@@ -420,3 +420,91 @@ it('preserves router state and removes its clean guard when the editor closes', 
   expect(onClose).toHaveBeenCalledOnce();
   await waitFor(() => expect(historyBack).toHaveBeenCalledOnce());
 });
+
+it('preserves a private signal guard and newer router state when journal cleanup runs above it', async () => {
+  window.history.replaceState(
+    {
+      __NA: true,
+      syntheticTree: 'before-journal',
+      __routiqoPrivateSignalGuard: 'private-marker',
+    },
+    '',
+    window.location.href,
+  );
+  const view = render(<JournalEditor account={accountA} journeyId={journeyId} onClose={vi.fn()} />);
+  await screen.findByLabelText('Title');
+  fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Synthetic shared edit' } });
+  await waitFor(() => expect(window.history.state?.__routiqoJournalGuard).toBeTruthy());
+  window.history.replaceState(
+    { ...window.history.state, syntheticTree: 'after-journal' },
+    '',
+    window.location.href,
+  );
+
+  view.unmount();
+  expect(window.history.state).toEqual({
+    __NA: true,
+    syntheticTree: 'after-journal',
+    __routiqoPrivateSignalGuard: 'private-marker',
+  });
+});
+
+it('preserves a private guard pushed above the journal and does not pop it on close', async () => {
+  const onClose = vi.fn();
+  const historyBack = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+  window.history.replaceState({ __NA: true }, '', window.location.href);
+  render(<JournalEditor account={accountA} journeyId={journeyId} onClose={onClose} />);
+  await screen.findByLabelText('Title');
+  fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Synthetic stacked edit' } });
+  await waitFor(() => expect(window.history.state?.__routiqoJournalGuard).toBeTruthy());
+  window.history.pushState(
+    {
+      ...window.history.state,
+      syntheticTree: 'newest',
+      __routiqoPrivateSignalGuard: 'private-marker',
+    },
+    '',
+    window.location.href,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+  await screen.findByText('Draft saved on this device.');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }));
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(historyBack).not.toHaveBeenCalled();
+  expect(window.history.state).toEqual({
+    __NA: true,
+    syntheticTree: 'newest',
+    __routiqoPrivateSignalGuard: 'private-marker',
+  });
+});
+
+it('pairs every journal sentinel above an existing private guard with one Back cleanup', async () => {
+  const historyBack = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+  const pushState = vi.spyOn(window.history, 'pushState');
+  window.history.replaceState(
+    {
+      __NA: true,
+      syntheticTree: 'private-owner',
+      __routiqoPrivateSignalGuard: 'private-marker',
+    },
+    '',
+    window.location.href,
+  );
+
+  for (const title of ['First journal edit', 'Second journal edit']) {
+    const view = render(
+      <JournalEditor account={accountA} journeyId={journeyId} onClose={vi.fn()} />,
+    );
+    await screen.findByLabelText('Title');
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: title } });
+    await waitFor(() => expect(window.history.state?.__routiqoJournalGuard).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved on this device.');
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }));
+    view.unmount();
+  }
+
+  expect(pushState).toHaveBeenCalledTimes(2);
+  await waitFor(() => expect(historyBack).toHaveBeenCalledTimes(2));
+});

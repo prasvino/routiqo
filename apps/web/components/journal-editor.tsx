@@ -26,9 +26,17 @@ interface JournalEditorProps {
 type SaveDestination = 'draft' | 'account';
 type BusyState = SaveDestination | 'discard' | null;
 const historyGuardKey = '__routiqoJournalGuard';
+const privateSignalHistoryGuardKey = '__routiqoPrivateSignalGuard';
 interface JournalHistoryGuard {
   marker: string;
-  previousState: unknown;
+  privateGuardWasPresent: boolean;
+}
+
+function stateWithoutJournalGuard(state: unknown): unknown {
+  if (typeof state !== 'object' || state === null) return state;
+  const copy = { ...(state as Record<string, unknown>) };
+  delete copy[historyGuardKey];
+  return copy;
 }
 
 function errorMessage(failure: unknown, fallback: string) {
@@ -192,7 +200,7 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
       const guard = historyGuard.current;
       const current = window.history.state as Record<string, unknown> | null;
       if (guard && current?.[historyGuardKey] === guard.marker)
-        window.history.replaceState(guard.previousState, '', window.location.href);
+        window.history.replaceState(stateWithoutJournalGuard(current), '', window.location.href);
       historyGuard.current = null;
     };
   }, []);
@@ -205,7 +213,12 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
       typeof previousState === 'object' && previousState !== null
         ? { ...previousState, [historyGuardKey]: marker }
         : { [historyGuardKey]: marker };
-    historyGuard.current = { marker, previousState };
+    historyGuard.current = {
+      marker,
+      privateGuardWasPresent:
+        typeof (previousState as Record<string, unknown> | null)?.[privateSignalHistoryGuardKey] ===
+        'string',
+    };
     window.history.pushState(state, '', window.location.href);
   }, [dirty]);
 
@@ -219,6 +232,13 @@ function JournalEditorSession({ account, journeyId, onClose }: JournalEditorProp
     if (!guard) return;
     const current = window.history.state as Record<string, unknown> | null;
     if (current?.[historyGuardKey] !== guard.marker) return;
+    if (
+      typeof current[privateSignalHistoryGuardKey] === 'string' &&
+      !guard.privateGuardWasPresent
+    ) {
+      window.history.replaceState(stateWithoutJournalGuard(current), '', window.location.href);
+      return;
+    }
     window.setTimeout(
       () => (continueHistory ? window.history.go(-restorationSteps) : window.history.back()),
       0,

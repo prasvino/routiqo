@@ -23,8 +23,7 @@
 
 ## First release — LIVE interface
 
-- [ ] Implement the reviewed fresh-bind authority handshake, bounded same-account recovery collection, receipt-metadata expiry and explicit dismissal rules in `docs/features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md` before mounting contribution controls.
-- [ ] Connect Quick Signal actions to the active owned journey; verify the implemented private consent and route-preparation controls with real authenticated lifecycle tests.
+- [ ] Verify the private consent, route-preparation and Quick Signal controls through the real authenticated lifecycle with a reviewed catalog and provider configuration.
 - [ ] Build the active-journey LIVE list after publication and safety gates pass.
 - [ ] Add bounded foreground refresh with cancellation, backoff and one request in flight.
 - [ ] Provide loading, empty, error, suppressed, conflicting, stale and offline states with truthful source/freshness information.

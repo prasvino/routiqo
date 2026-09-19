@@ -24,10 +24,10 @@ Full offline navigation, broad social features and AI belong to later phases.
 | Maps and routes | MapLibre web renderer; guarded Valhalla routing and Photon search adapters; regional bounds, alternatives and manual direction steps | Provision real regional routing/search/tiles, review data quality and licensing, validate browser resources and provider behavior | Regional maps required for pilot |
 | Navigation and offline maps | Last successful web route remains in memory during connection loss | Route persistence across reload, native map integration, location guidance, bounded map downloads, eviction/deletion and on-device rerouting | Later than first LIVE list |
 | Private Live consent/context | Durable consent with revocation precedence; private consent and route-preparation UI, provider-derived binding, catalog authority, private owner APIs and typed browser clients | Reviewed real catalog, rollout configuration and authenticated end-to-end lifecycle verification | First release |
-| Quick Signals | Typed values, server grants, durable private receipts, replay protection, replacement/withdrawal and terminal command stop, minute and rolling 20/hour quotas, 60-second slot cooldown, suspension/revision fencing, private command APIs and typed browser clients | Evidence-independence authority, durable reporting, public block targeting/delivery and operator moderation, contribution UI and operational validation | First release |
+| Quick Signals | Typed values, server grants, durable private receipts, replay protection, replacement/withdrawal and terminal command stop, minute and rolling 20/hour quotas, 60-second slot cooldown, suspension/revision fencing, private command APIs and typed browser clients; active-journey private controls require fresh-bind exact authority, explicit safe intent and one issue/accept, with bounded memory-only recovery and Stop after Ghost Mode/completion | Evidence-independence authority, durable reporting, public block targeting/delivery and operator moderation; real authenticated/catalog/provider validation and production operation | First release |
 | Live expiry cleanup | Default-off bounded jobs for LIVE expiry and moderation audit/debit expiry, isolated authentication/cleanup schedulers, failure recovery and non-overlap | Staging activation, backlog/capacity checks, failure alerts, backup/retention operations and production rollout | First release operations |
 | Public Live Moments | Product direction and privacy threat/design checkpoints documented | Approved cohort publication design, safe aggregation/projection, authenticated reads, suppression/conflict/freshness rules and adversarial tests | Critical first-release blocker |
-| Active-journey LIVE list | Specifications and private backend prerequisites | Actual list and Quick Signal controls; loading/empty/suppressed/stale/offline/error states, reauthorization and accessibility | Critical first-release blocker |
+| Active-journey LIVE list | Specifications, private backend prerequisites and private Quick Signal controls | Actual Live Moment list; loading/empty/suppressed/stale/offline/error states, reauthorization and public-output accessibility | Critical first-release blocker |
 | Safety and minimum admin | Private safety primitives, durable suspension and directed blocks; internal finite operator permissions, exact-revision restriction commands, atomic minimized audit and deletion-resistant action limits; admin foundation | Strong admin authentication, grant administration, case/target scope, operational blocking/reporting and queue, revocation propagation and safety procedures | First release |
 | Trip journals and commute summaries | Private text journal API/editor/drafts/library/conflict recovery; bounded cancellable journal transport; local monthly commute summaries; planning backup/restore | Real authenticated/device QA; broader history completeness; media and sharing are separate future work | Verify existing features; rich extras later |
 | Android application | Expo four-tab foundation, shared planning logic, SQLite adapters, credential vault and auth response validators | Secure network adapter, Google sign-in UI, authenticated resources/sync, native maps, development build and real-device QA | Android release |
@@ -96,8 +96,16 @@ C. Build the first LIVE user experience
      (ADR 0045); no silent legacy fallback or automatic reissue.
    - DONE: terminal command stop (ADRs 0046/0047), guarded owner transport and
      explicit browser recovery client; both acceptance race orders verified.
-   - Connect Quick Signal actions to the active owned journey. Preserve
-     Home/Explore/Trips/Profile navigation and explicit grant/receipt recovery.
+   - DONE: active-journey private Quick Signal controls require a successful fresh
+     bind and exact account/journey/consent/selection/context authority, expose only
+     catalog-compatible values, require deliberate safe-interaction intent and run
+     one issue/accept operation. Same-account recovery is workspace-memory-only,
+     capped at five handles and retains explicit Stop through Ghost Mode/completion.
+     Offline, reconnect and focus events never write automatically; receipt metadata
+     expires locally, and navigation warnings coexist with the journal guard.
+   - Verify the private controls with real authentication, provider data and a
+     reviewed catalog; verify native browser confirmations and supported devices.
+     The production web build and scoped synthetic browser/Next history QA passed.
    - Implement authorized Live Moment reads and a bounded foreground refresh
      flow, with cancellation, backoff and one request in flight.
    - Show truthful freshness/conflict/suppression states; never invent reports,
@@ -208,11 +216,12 @@ software installation is required merely to continue the existing backend work.
 
 4. VERIFICATION AND LIMITS OF THIS SNAPSHOT
 
-- Latest completed backend validation: 363 tests across 50 suites; zero failures,
-  errors or skips; core-api check and bootJar passed on 18 September 2026.
-- Latest recorded full TypeScript run: 260 tests across 41 files, plus contract,
-  formatting, type and lint checks in the preceding signal-API phase. It was not
-  rerun for the backend-only safety changes.
+- Latest completed backend validation: 431 tests across 61 suites; zero failures,
+  errors or skips; core-api check and bootJar passed on 19 September 2026.
+- Latest full `pnpm check`: 483 TypeScript tests across 52 files, generated-contract
+  drift, formatting, type and lint checks passed. Production web build passed.
+  Scoped desktop/narrow/scaled component and actual Next Link/Back QA passed with
+  synthetic account/transport/confirmation decisions; see PRIVATE_QUICK_SIGNAL_UI_QA.md.
 - Safety changes received independent review and secret/diff checks. Previously, preview /trips
   returned HTTP 200 after restart; this is not authenticated browser/device QA.
 - Private Live APIs and the expiry job remain disabled by default. No public

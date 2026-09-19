@@ -83,3 +83,15 @@ A null stopped receipt has no historical meaning. Stopping an older superseded
 command does not stop its replacement. Failed or cancelled transport is not a
 confirmed stop; the caller must preserve uncertainty and use explicit recovery.
 This private boundary does not implement public revocation or publication.
+
+The mounted private browser controls require a fresh successful bind for the
+current copied route, confirmed account/journey and current consent. A context GET
+cannot authorize contribution. Choice snapshots must match the exact context,
+revision and consent generation; only server-authorized categories are offered.
+Every send requires a new stopped/passenger acknowledgment. This acknowledgment
+is an interaction safeguard, not proof of physical presence or driving safety.
+Foreground/route/consent changes cancel new work synchronously; no background,
+offline or reconnect submission occurs. Known commands remain separately available
+for explicit stopping after sharing or journey changes. Only bounded minimized
+recovery metadata survives those transitions within the workspace; route labels
+and observations do not. Local recovery expiry/removal is not public revocation.

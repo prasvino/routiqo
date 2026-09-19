@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PlaceMatch, PlaceResults, RouteMode, RouteResult } from '@routiqo/shared';
 import { readBrowserLocation, BrowserLocationError } from '../lib/browser-location';
 import { RouteResults } from './route-results';
@@ -12,17 +12,34 @@ import {
 import {
   LiveRouteBindingPanel,
   type LiveConsentAuthority,
+  type LiveRouteContributionAuthority,
   type RouteBindingSelection,
   type RouteBindingSelectionSnapshot,
 } from './live-route-binding-panel';
 
+export type RoutePlannerContributionAuthority = LiveRouteContributionAuthority;
+export interface RoutePlannerContributionSource {
+  read: () => RoutePlannerContributionAuthority | null;
+  subscribe: (listener: () => void) => () => void;
+}
+
 type Endpoint = 'origin' | 'destination';
+
+function instantNanoseconds(value: string): bigint {
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/.exec(value);
+  if (!match) return 0n;
+  const milliseconds = Date.parse(`${match[1]}Z`);
+  if (!Number.isFinite(milliseconds)) return 0n;
+  return BigInt(milliseconds) * 1_000_000n + BigInt((match[2] ?? '').padEnd(9, '0') || '0');
+}
+
 export interface RoutePlannerLiveBinding {
   journeyId: string;
   online: boolean;
   available: boolean;
   authority: LiveConsentAuthority;
   getAuthority: () => LiveConsentAuthority | null;
+  registerContributionSource?: (source: RoutePlannerContributionSource) => void | (() => void);
 }
 export function RoutePlanner({
   account,
@@ -60,16 +77,100 @@ function Planner({
   const [bindingSelection, setBindingSelection] = useState<RouteBindingSelectionSnapshot>(
     bindingSelectionRef.current,
   );
-  const updateBindingSelection = useCallback((selection: RouteBindingSelection | null) => {
-    const next = { selection, epoch: bindingSelectionRef.current.epoch + 1 };
-    bindingSelectionRef.current = next;
-    setBindingSelection(next);
+  const liveBindingRef = useRef(liveBinding);
+  const offlineRef = useRef(false);
+  const contributionAuthorityRef = useRef<{
+    value: RoutePlannerContributionAuthority;
+    expiresAtNanoseconds: bigint;
+  } | null>(null);
+  const contributionListeners = useRef(new Set<() => void>());
+  liveBindingRef.current = liveBinding;
+
+  const notifyContributionListeners = useCallback(() => {
+    for (const listener of [...contributionListeners.current]) {
+      try {
+        listener();
+      } catch {
+        // A sibling consumer cannot prevent authority invalidation for other subscribers.
+      }
+    }
   }, []);
+  const invalidateContributionAuthority = useCallback(() => {
+    contributionAuthorityRef.current = null;
+    notifyContributionListeners();
+  }, [notifyContributionListeners]);
+  const publishContributionAuthority = useCallback(
+    (authority: RoutePlannerContributionAuthority) => {
+      contributionAuthorityRef.current = {
+        value: { ...authority },
+        expiresAtNanoseconds: instantNanoseconds(authority.expiresAt),
+      };
+      notifyContributionListeners();
+    },
+    [notifyContributionListeners],
+  );
+  const readContributionAuthority = useCallback((): RoutePlannerContributionAuthority | null => {
+    const stored = contributionAuthorityRef.current;
+    const binding = liveBindingRef.current;
+    const consent = binding?.getAuthority() ?? null;
+    const invalid =
+      !stored ||
+      !binding ||
+      offlineRef.current ||
+      !binding.online ||
+      !binding.available ||
+      document.visibilityState !== 'visible' ||
+      !consent ||
+      stored.expiresAtNanoseconds <= BigInt(Date.now()) * 1_000_000n ||
+      stored.value.accountId !== account ||
+      stored.value.journeyId !== binding.journeyId ||
+      stored.value.accountId !== consent.accountId ||
+      stored.value.journeyId !== consent.journeyId ||
+      stored.value.consentGeneration !== consent.generation ||
+      stored.value.consentEpoch !== consent.epoch ||
+      stored.value.selectionEpoch !== bindingSelectionRef.current.epoch;
+    if (invalid) {
+      contributionAuthorityRef.current = null;
+      return null;
+    }
+    return { ...stored.value };
+  }, [account]);
+  const contributionSource = useMemo<RoutePlannerContributionSource>(
+    () => ({
+      read: readContributionAuthority,
+      subscribe(listener) {
+        contributionListeners.current.add(listener);
+        return () => contributionListeners.current.delete(listener);
+      },
+    }),
+    [readContributionAuthority],
+  );
+  const registerContributionSource = liveBinding?.registerContributionSource;
+  useEffect(() => {
+    const listeners = contributionListeners.current;
+    const unregister = registerContributionSource?.(contributionSource);
+    return () => {
+      invalidateContributionAuthority();
+      unregister?.();
+      listeners.clear();
+    };
+  }, [contributionSource, invalidateContributionAuthority, registerContributionSource]);
+  const updateBindingSelection = useCallback(
+    (selection: RouteBindingSelection | null) => {
+      invalidateContributionAuthority();
+      const next = { selection, epoch: bindingSelectionRef.current.epoch + 1 };
+      bindingSelectionRef.current = next;
+      setBindingSelection(next);
+    },
+    [invalidateContributionAuthority],
+  );
   const getBindingSelection = useCallback(() => bindingSelectionRef.current, []);
   useEffect(() => {
     const changed = () => {
       const disconnected = !navigator.onLine;
+      offlineRef.current = disconnected;
       setOffline(disconnected);
+      if (disconnected) invalidateContributionAuthority();
       if (disconnected && pending.current && !pendingLocalOnly.current) {
         pending.current.abort();
         pending.current = null;
@@ -85,7 +186,7 @@ function Planner({
       window.removeEventListener('online', changed);
       window.removeEventListener('offline', changed);
     };
-  }, []);
+  }, [invalidateContributionAuthority]);
   useEffect(() => () => pending.current?.abort(), []);
   function clearRequest() {
     pending.current?.abort();
@@ -427,6 +528,8 @@ function Planner({
           getAuthority={liveBinding.getAuthority}
           selectionSnapshot={bindingSelection}
           getSelectionSnapshot={getBindingSelection}
+          publishContributionAuthority={publishContributionAuthority}
+          invalidateContributionAuthority={invalidateContributionAuthority}
         />
       )}
     </details>

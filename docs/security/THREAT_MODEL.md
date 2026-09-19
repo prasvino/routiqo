@@ -579,3 +579,24 @@ A consumed grant without a receipt is not proof of no historical acceptance.
 Keep stop independent of the choice feature flag and new-submission account
 quotas. Reject active or foreign receipts in a stopped response; cancellation,
 failed responses and later cleanup remain uncertain, never a reason to reissue.
+
+The private browser contribution interface must resist stale route/consent
+closures, delayed CSRF completion, copied context acknowledgments, double clicks,
+account switches and late acceptance after Stop. Only a successful fresh bind
+publishes contribution authority; owner context reads do not. Workspace consent
+invalidation and planner selection invalidation synchronously notify pending
+issue/accept work before asynchronous continuations can post. Recheck the exact
+context/revision/consent and selection epochs at each await; issue once and accept
+at most once. A late or lost issuance cannot fabricate a recovery ID or justify
+automatic retry. Known uncertain acceptance blocks new issuance until explicit
+recovery; stopping has separate cancellation scope and rechecks account identity.
+
+Memory-only operation tickets are object-identity fenced, account scoped and
+phase checked so late acceptance cannot overwrite stopping/stopped state. Bounds
+and metadata expiry cannot silently evict the only stop handle or make absence
+look like revocation. Same-account refresh hides records; switch/logout clears
+them. Navigation protection must coexist with journal unsaved-edit protection,
+preserve router/foreign history fields and avoid accumulating duplicate entries
+or leaving a cancelled navigation unguarded. Browser unload warnings are best
+effort, not durable recovery. Component/integration tests cover these boundaries;
+none substitutes for current server authorization or public anti-Sybil policy.
