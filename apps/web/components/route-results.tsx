@@ -3,7 +3,13 @@ import { useRef, useState } from 'react';
 import type { RouteResult } from '@routiqo/shared';
 import { RouteMap } from './route-map';
 
-export function RouteResults({ result }: { result: RouteResult }) {
+export function RouteResults({
+  result,
+  onChoiceChange,
+}: {
+  result: RouteResult;
+  onChoiceChange?: (index: number) => void;
+}) {
   const [choice, setChoice] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const currentStep = useRef<HTMLDivElement>(null);
@@ -23,6 +29,7 @@ export function RouteResults({ result }: { result: RouteResult }) {
             key={index}
             onClick={() => {
               if (choice === index) return;
+              onChoiceChange?.(index);
               setChoice(index);
               setStepIndex(0);
             }}

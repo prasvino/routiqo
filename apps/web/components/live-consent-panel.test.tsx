@@ -81,7 +81,8 @@ describe('LiveConsentPanel', () => {
   });
 
   it('allows only after a confirmed off read and preserves exact generations beyond safe integers', async () => {
-    render(panel());
+    const onAuthorityChange = vi.fn();
+    render(panel({ onAuthorityChange }));
     fireEvent.click(screen.getByRole('button', { name: 'Check LIVE settings' }));
     const allow = await screen.findByRole('button', { name: 'Allow private contributions' });
     fireEvent.click(allow);
@@ -90,6 +91,31 @@ describe('LiveConsentPanel', () => {
       expectedGeneration: '9007199254740993',
       sharing: true,
     });
+    expect(onAuthorityChange).toHaveBeenLastCalledWith({
+      accountId,
+      journeyId,
+      generation: '9007199254740994',
+    });
+  });
+
+  it('withdraws published authority synchronously when an explicit stop begins', async () => {
+    const pending = deferred<LiveConsent>();
+    const onAuthorityChange = vi.fn();
+    vi.mocked(readBrowserLiveConsent).mockResolvedValueOnce(consent({ sharing: true }));
+    vi.mocked(submitBrowserLiveConsent).mockReturnValueOnce(pending.promise);
+    render(panel({ onAuthorityChange }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check LIVE settings' }));
+    await screen.findByText(/is allowed for this journey/);
+    expect(onAuthorityChange).toHaveBeenLastCalledWith({
+      accountId,
+      journeyId,
+      generation: '9007199254740993',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Stop private contributions' }));
+    expect(onAuthorityChange).toHaveBeenLastCalledWith(null);
+    pending.resolve(consent({ generation: '9007199254740994', sharing: false }));
+    await screen.findByText(/is stopped for this journey/);
+    expect(onAuthorityChange).toHaveBeenLastCalledWith(null);
   });
 
   it('never offers enable at the maximum generation', async () => {
@@ -295,18 +321,20 @@ describe('LiveConsentPanel', () => {
   });
 
   it('latches a completed response until the identity changes', async () => {
+    const onAuthorityChange = vi.fn();
     vi.mocked(readBrowserLiveConsent)
       .mockResolvedValueOnce(consent({ journeyActive: false, generation: '4' }))
-      .mockResolvedValueOnce(consent({ journeyActive: true, generation: '5' }))
+      .mockResolvedValueOnce(consent({ journeyActive: true, sharing: true, generation: '5' }))
       .mockResolvedValueOnce(
         consent({ journeyId: nextJourneyId, journeyActive: true, generation: '0' }),
       );
-    const view = render(panel());
+    const view = render(panel({ onAuthorityChange }));
     fireEvent.click(screen.getByRole('button', { name: 'Check LIVE settings' }));
     await screen.findByText(/journey is complete/);
     fireEvent.click(screen.getByRole('button', { name: 'Check LIVE settings' }));
     await waitFor(() => expect(readBrowserLiveConsent).toHaveBeenCalledTimes(2));
     expect(screen.queryByRole('button', { name: 'Allow private contributions' })).toBeNull();
+    expect(onAuthorityChange).toHaveBeenLastCalledWith(null);
 
     view.rerender(panel({ journeyId: nextJourneyId }));
     fireEvent.click(screen.getByRole('button', { name: 'Check LIVE settings' }));

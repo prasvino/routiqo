@@ -17,6 +17,13 @@ interface LiveConsentPanelProps {
   journeyId: string;
   online: boolean;
   available: boolean;
+  onAuthorityChange?: (authority: LiveConsentConfirmation | null) => void;
+}
+
+export interface LiveConsentConfirmation {
+  accountId: string;
+  journeyId: string;
+  generation: string;
 }
 
 interface ConfirmedConsent {
@@ -35,6 +42,7 @@ export function LiveConsentPanel({
   journeyId,
   online,
   available,
+  onAuthorityChange,
 }: LiveConsentPanelProps) {
   const identity = `${accountId}:${journeyId}`;
   const identityRef = useRef(identity);
@@ -53,6 +61,8 @@ export function LiveConsentPanel({
   const pendingMutation = useRef<{ identity: string; sharing: boolean } | null>(null);
   const restoreFocusFromAllow = useRef<string | null>(null);
   const stopButton = useRef<HTMLButtonElement | null>(null);
+  const authorityCallback = useRef(onAuthorityChange);
+  authorityCallback.current = onAuthorityChange;
   const [consent, setConsent] = useState<ConfirmedConsent | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,6 +83,7 @@ export function LiveConsentPanel({
         setUncertainIdentity(identityRef.current);
       }
       pendingMutation.current = null;
+      authorityCallback.current?.(null);
       abortCurrent();
       setBusy(false);
       setConsent(null);
@@ -87,7 +98,10 @@ export function LiveConsentPanel({
     uncertainRef.current = null;
     setUncertainIdentity(null);
     clear();
-    return abortCurrent;
+    return () => {
+      authorityCallback.current?.(null);
+      abortCurrent();
+    };
   }, [identity, clear, abortCurrent]);
 
   useEffect(() => {
@@ -162,6 +176,7 @@ export function LiveConsentPanel({
     )
       return null;
     busyRef.current = true;
+    authorityCallback.current?.(null);
     setBusy(true);
     const nextController = new AbortController();
     controller.current?.abort();
@@ -196,6 +211,14 @@ export function LiveConsentPanel({
     generation.current = value.generation;
     if (!value.journeyActive) completedIdentity.current = run.identity;
     setConsent({ identity: run.identity, value });
+    authorityCallback.current?.(
+      value.journeyActive &&
+        value.sharing &&
+        uncertainRef.current !== run.identity &&
+        completedIdentity.current !== run.identity
+        ? { accountId, journeyId, generation: value.generation }
+        : null,
+    );
   }
 
   function failureNotice(failure: unknown, mutation: boolean): string {

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlaceMatch, PlaceResults, RouteMode, RouteResult } from '@routiqo/shared';
 import { readBrowserLocation, BrowserLocationError } from '../lib/browser-location';
 import { RouteResults } from './route-results';
@@ -9,12 +9,37 @@ import {
   BrowserRoutingError,
   routingCoverageMessage,
 } from '../lib/browser-routing';
+import {
+  LiveRouteBindingPanel,
+  type LiveConsentAuthority,
+  type RouteBindingSelection,
+  type RouteBindingSelectionSnapshot,
+} from './live-route-binding-panel';
 
 type Endpoint = 'origin' | 'destination';
-export function RoutePlanner({ account }: { account: string }) {
-  return <Planner key={account} account={account} />;
+export interface RoutePlannerLiveBinding {
+  journeyId: string;
+  online: boolean;
+  available: boolean;
+  authority: LiveConsentAuthority;
+  getAuthority: () => LiveConsentAuthority | null;
 }
-function Planner({ account }: { account: string }) {
+export function RoutePlanner({
+  account,
+  liveBinding,
+}: {
+  account: string;
+  liveBinding?: RoutePlannerLiveBinding | undefined;
+}) {
+  return <Planner key={account} account={account} liveBinding={liveBinding} />;
+}
+function Planner({
+  account,
+  liveBinding,
+}: {
+  account: string;
+  liveBinding?: RoutePlannerLiveBinding | undefined;
+}) {
   const [query, setQuery] = useState({ origin: '', destination: '' });
   const [selected, setSelected] = useState<Partial<Record<Endpoint, PlaceMatch | undefined>>>({});
   const [matches, setMatches] = useState<Partial<Record<Endpoint, PlaceResults | undefined>>>({});
@@ -28,6 +53,19 @@ function Planner({ account }: { account: string }) {
   const [resultRevision, setResultRevision] = useState(0);
   const pending = useRef<AbortController | null>(null);
   const pendingLocalOnly = useRef(false);
+  const bindingSelectionRef = useRef<RouteBindingSelectionSnapshot>({
+    selection: null,
+    epoch: 0,
+  });
+  const [bindingSelection, setBindingSelection] = useState<RouteBindingSelectionSnapshot>(
+    bindingSelectionRef.current,
+  );
+  const updateBindingSelection = useCallback((selection: RouteBindingSelection | null) => {
+    const next = { selection, epoch: bindingSelectionRef.current.epoch + 1 };
+    bindingSelectionRef.current = next;
+    setBindingSelection(next);
+  }, []);
+  const getBindingSelection = useCallback(() => bindingSelectionRef.current, []);
   useEffect(() => {
     const changed = () => {
       const disconnected = !navigator.onLine;
@@ -54,6 +92,7 @@ function Planner({ account }: { account: string }) {
     pending.current = null;
     setBusy(false);
     setResult(null);
+    updateBindingSelection(null);
     setError('');
     setMessage('');
   }
@@ -82,6 +121,7 @@ function Planner({ account }: { account: string }) {
           (failure.status === 401 || failure.status === 403)
         ) {
           setResult(null);
+          updateBindingSelection(null);
           setSelected({});
           setMatches({});
           setQuery({ origin: '', destination: '' });
@@ -127,13 +167,27 @@ function Planner({ account }: { account: string }) {
     if (!selected.origin || !selected.destination) return;
     const input = {
       mode,
-      origin: selected.origin.coordinate,
-      destination: selected.destination.coordinate,
+      origin: [selected.origin.coordinate[0], selected.origin.coordinate[1]] as const,
+      destination: [
+        selected.destination.coordinate[0],
+        selected.destination.coordinate[1],
+      ] as const,
     };
+    updateBindingSelection(null);
     void run(async (signal) => {
       const found = await calculateBrowserRoute(account, input, signal);
       if (signal.aborted) return;
       setResult(found);
+      updateBindingSelection(
+        found.routes.length
+          ? {
+              mode: input.mode,
+              origin: [input.origin[0], input.origin[1]],
+              destination: [input.destination[0], input.destination[1]],
+              alternativeIndex: 0,
+            }
+          : null,
+      );
       setResultRevision((value) => value + 1);
       setMessage(
         found.routes.length
@@ -240,7 +294,7 @@ function Planner({ account }: { account: string }) {
                 </button>
                 <p className="route-attribution">
                   One reading for your starting point. Sent to Routiqo’s Valhalla routing service
-                  only when you calculate.
+                  when you calculate or prepare a private route.
                 </p>
               </>
             )}
@@ -352,8 +406,28 @@ function Planner({ account }: { account: string }) {
               Showing the last successful route. It has not been recalculated.
             </p>
           )}
-          <RouteResults key={resultRevision} result={result} />
+          <RouteResults
+            key={resultRevision}
+            result={result}
+            onChoiceChange={(alternativeIndex) => {
+              const selectedRoute = bindingSelectionRef.current.selection;
+              if (!selectedRoute) return;
+              updateBindingSelection({ ...selectedRoute, alternativeIndex });
+            }}
+          />
         </>
+      )}
+      {liveBinding && (
+        <LiveRouteBindingPanel
+          accountId={account}
+          journeyId={liveBinding.journeyId}
+          online={liveBinding.online && !offline}
+          available={liveBinding.available}
+          authority={liveBinding.authority}
+          getAuthority={liveBinding.getAuthority}
+          selectionSnapshot={bindingSelection}
+          getSelectionSnapshot={getBindingSelection}
+        />
       )}
     </details>
   );

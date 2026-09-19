@@ -1,6 +1,6 @@
 # Data retention and deletion
 Current implementation: catalog content plus local plans/saved destination IDs; opt-in Google account identifiers, bounded opaque sessions, server journey lifecycle records and account-bound local outbox/snapshot caches. Users can remove planning data separately from account deletion. Browser account deletion retires its local journey partition to prevent late workers recreating it; sign-out preserves queued work. Other devices retain local caches until their own storage is cleared; do not claim remote erasure of offline device data. No messages, media or public presence are stored yet.
-Temporary Photon place results and calculated routes are not persisted or backed up. Optional one-time browser location stays in the route form and is sent to Valhalla only when calculating. Do not enable permanent provider result storage without a separate reviewed decision.
+Temporary Photon place results and calculated route geometry are not persisted or backed up. Optional one-time browser location stays in the route form and is sent to Valhalla on explicit calculation or private route preparation. Do not enable permanent provider result storage without a separate reviewed decision.
 
 Explicit web map display uses MapLibre and the configured same-origin `/maps/` resources. Browser HTTP caches can retain viewed resources; earlier Mapbox versions may have left CacheStorage tiles or localStorage event metadata. Account deletion does not clear browser map caches. Map display discloses this before loading. Clear browser site data for local removal, preserving desired planning backups first. Do not claim zero browser persistence or downloaded/offline navigation from browser caches.
 Browser and native local planning storage must validate shape/version and expose storage failures. No silent cloud upload.
@@ -21,6 +21,14 @@ cache behavior; local route clearing must not claim to erase resources it cannot
 remove. Keep public basemap content separate from account-specific route records.
 
 ## Private Live evidence lifecycle
+
+Private route preparation uses the existing bounded latest-row context (ADRs
+0027/0032/0034): derived private anchor IDs and optional catalog provenance, not
+precise endpoint/geometry history. Browser observations and acknowledgements remain
+in memory only; clearing them does not delete server context. A failed, cancelled
+or empty bind is not a deletion. Logical expiry and journey completion invalidate
+the context under existing server authority; cleanup and account deletion retain
+their existing semantics. The browser integration adds no retention or backup.
 
 QUICK_SIGNAL_RECEIPT_SPEC.md defines explicit bounded retention and terminal
 withdrawal/supersession. ADR 0028 implements durable private grants and receipts;

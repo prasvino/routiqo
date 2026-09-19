@@ -70,7 +70,8 @@ const result: RouteResult = {
   ],
 };
 it('bounds manual step review and resets it when selecting an alternative', () => {
-  render(<RouteResults result={result} />);
+  const onChoiceChange = vi.fn();
+  render(<RouteResults result={result} onChoiceChange={onChoiceChange} />);
   expect(screen.getByRole('status').textContent).toContain('Head north');
   expect(
     (screen.getByRole('button', { name: 'Previous step' }) as HTMLButtonElement).disabled,
@@ -81,6 +82,7 @@ it('bounds manual step review and resets it when selecting an alternative', () =
     true,
   );
   fireEvent.click(screen.getByRole('button', { name: /Route 2/ }));
+  expect(onChoiceChange).toHaveBeenCalledWith(1);
   expect(screen.getByRole('status').textContent).toContain('Step 1 of 1');
   expect(screen.getByRole('status').textContent).toContain('Take the eastern road');
   expect(lifecycle.mount).toHaveBeenCalledOnce();

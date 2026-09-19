@@ -39,3 +39,20 @@ an existing private sharing boolean is insufficient. Stopping contribution
 preparation does not delete retained private receipts. A cancelled or failed write
 is uncertain even after a later read: the UI retains that warning until an explicit
 stop is acknowledged. See `BROWSER_LIVE_CONSENT_UI_SPEC.md` for lifecycle rules.
+
+## Private route preparation
+
+`BROWSER_ROUTE_BINDING_UI_SPEC.md` defines the private browser integration.
+Preparing a route is a separate explicit action after confirmed private consent;
+ordinary route planning does not require participation. Preparation sends the
+selected endpoints and mode to the configured routing service again and may
+resolve different geometry from the displayed estimate. It never establishes
+physical presence, public visibility or a right to contribute to a public feed.
+
+The browser keeps only a memory-scoped observation and acknowledgement. A context
+read contains no input fingerprint and cannot prove that the displayed route was
+prepared. Cancellation cannot undo a server write; a later read is not a fence
+against a delayed earlier write. Empty preparation results preserve any previous
+server context. Consent, identity, route-choice and foreground changes invalidate
+local readiness immediately; reconnect and expiry never trigger automatic traffic.
+No opaque context or anchor identifiers become public labels or location choices.

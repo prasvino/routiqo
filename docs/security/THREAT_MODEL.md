@@ -473,6 +473,18 @@ enable authority immediately. No browser persistence or automatic consent retry
 is permitted. These controls do not establish public discoverability, Ghost Mode
 or a right to repurpose private consent for future public publication.
 
+Private route preparation must not confuse a last-observed context with a binding
+to the displayed route. The context GET has no input fingerprint; an earlier lost
+POST may commit after that read. `BROWSER_ROUTE_BINDING_UI_SPEC.md` requires exact
+observed-context CAS, copied calculation inputs, explicit actions and truthful
+uncertainty/empty outcomes. Consent operation start invalidates a synchronous
+account/journey/generation epoch, so a pending Stop cannot race a stale preparation
+response into apparent readiness. Route choices have an independent synchronous
+epoch. Recheck both epochs, foreground and expiry at send and acceptance; React
+effect cleanup alone is insufficient. These UI fences do not replace the server's
+current ownership, consent, context, newest-attempt and provider checks, and do not
+establish public eligibility or physical presence.
+
 The existing journal and journey recovery clients must also resist unbounded or
 stalled responses: check streamed bytes rather than whole-text length after a
 read, and do not await cancellation indefinitely. A delayed CSRF bootstrap cannot
@@ -490,6 +502,15 @@ diagnostics. It must never delete ordering fences or reset consumed grants.
 Replica count affects aggregate database load. Backlog capacity, monitoring,
 backup retention and actual operation remain release verification requirements;
 the scheduler is not a public revocation or physical-erasure mechanism.
+
+The private routing/search browser transport must bound CSRF, headers and streamed
+responses under one deadline even when an adapter ignores abort. Capture validated
+endpoint/query inputs before awaiting CSRF; a late bootstrap cannot launch a POST
+after cancellation. Count streamed bytes, refuse redirects and unexpected success
+types/statuses, cancel unused bodies without waiting indefinitely, and redact raw
+provider/parse failures. `BROWSER_ROUTING_TRANSPORT_SPEC.md` specifies this client
+boundary; controlled provider egress and server input limits remain independently
+required. No cached route or successful estimate proves public LIVE eligibility.
 
 Moderation expiry uses the same bounded scheduling principles through a separate
 default-off flag and domain-owned audit/debit cleanup adapter. Auth maintenance

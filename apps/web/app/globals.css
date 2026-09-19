@@ -1915,20 +1915,51 @@ textarea::placeholder {
   min-height: 44px;
   white-space: normal;
 }
-.live-consent-actions .button:focus-visible {
+.live-consent-actions .button:focus-visible,
+.live-route-binding-actions .button:focus-visible {
   outline-color: var(--ink);
 }
 .live-consent-notice {
   margin-top: 14px;
 }
+.live-route-binding-panel {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.live-route-binding-panel h3 {
+  margin: 6px 0 8px;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 400;
+}
+.live-route-binding-panel .eyebrow,
+.live-route-binding-panel > p {
+  color: var(--muted);
+}
+.live-route-binding-panel > p {
+  font-size: 12px;
+}
+.live-route-binding-actions .button {
+  min-height: 44px;
+  white-space: normal;
+}
+.live-route-binding-notice {
+  margin-top: 14px;
+}
 @media (max-width: 480px) {
-  .live-consent-panel {
+  .live-consent-panel,
+  .live-route-binding-panel {
     padding: 18px 16px;
   }
-  .live-consent-actions {
+  .live-consent-actions,
+  .live-route-binding-actions {
     flex-direction: column;
   }
-  .live-consent-actions .button {
+  .live-consent-actions .button,
+  .live-route-binding-actions .button {
     width: 100%;
   }
 }

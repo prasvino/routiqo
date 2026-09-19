@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { RoutePlanner } from './route-planner';
+import { RoutePlanner, type RoutePlannerLiveBinding } from './route-planner';
 vi.mock('./route-map', () => ({ RouteMap: () => <div>Map component</div> }));
 import { readBrowserLocation } from '../lib/browser-location';
 vi.mock('../lib/browser-location', async (original) => ({
@@ -18,6 +18,12 @@ vi.mock('../lib/browser-routing', async (original) => ({
   calculateBrowserRoute: vi.fn(),
   searchBrowserPlaces: vi.fn(),
 }));
+import { bindBrowserLiveRouteContext, readBrowserLiveRouteContext } from '../lib/browser-live';
+vi.mock('../lib/browser-live', async (original) => ({
+  ...(await original<typeof import('../lib/browser-live')>()),
+  bindBrowserLiveRouteContext: vi.fn(),
+  readBrowserLiveRouteContext: vi.fn(),
+}));
 const account = '00000000-0000-4000-8000-000000000001';
 const place = (label: string, longitude: number) => ({
   provider: 'photon' as const,
@@ -29,8 +35,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.resetAllMocks();
 });
-function open(accountId = account) {
-  const view = render(<RoutePlanner account={accountId} />);
+function open(accountId = account, liveBinding?: RoutePlannerLiveBinding) {
+  const view = render(<RoutePlanner account={accountId} liveBinding={liveBinding} />);
   fireEvent.click(screen.getByText('Plan a route'));
   // jsdom does not implement the native summary toggle.
   screen.getByText('Plan a route').closest('details')!.open = true;
@@ -265,6 +271,89 @@ it('requires explicit selection and discards estimates after endpoints change', 
     (screen.getByRole('button', { name: 'Calculate route' }) as HTMLButtonElement).disabled,
   ).toBe(true);
 });
+
+it('copies the successful route input and selected alternative into explicit private preparation', async () => {
+  vi.mocked(searchBrowserPlaces)
+    .mockResolvedValueOnce(place('Starting town', 80))
+    .mockResolvedValueOnce(place('Ending town', 79));
+  vi.mocked(calculateBrowserRoute).mockResolvedValue({
+    provider: 'mapbox',
+    calculatedAt: '2026-09-19T08:00:00Z',
+    routes: [
+      {
+        distanceMetres: 1200,
+        durationSeconds: 600,
+        geometry: [
+          [80, 13],
+          [79, 13],
+        ],
+      },
+      {
+        distanceMetres: 1300,
+        durationSeconds: 650,
+        geometry: [
+          [80, 13],
+          [79.1, 13],
+        ],
+      },
+    ],
+  });
+  vi.mocked(readBrowserLiveRouteContext).mockResolvedValue({ context: null });
+  vi.mocked(bindBrowserLiveRouteContext).mockResolvedValue({
+    status: 'bound',
+    context: {
+      contextId: '00000000-0000-4000-8000-000000000004',
+      revision: '1',
+      anchorIds: [],
+      issuedAt: new Date(Date.now() - 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    },
+  });
+  const authority = {
+    accountId: account,
+    journeyId: '00000000-0000-4000-8000-000000000009',
+    generation: '5',
+    epoch: 1,
+  };
+  open(account, {
+    journeyId: authority.journeyId,
+    online: true,
+    available: true,
+    authority,
+    getAuthority: () => authority,
+  });
+  fireEvent.change(screen.getByLabelText('From'), { target: { value: 'Starting' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find starting place' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Starting town' }));
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'Ending' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find destination' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Ending town' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Calculate route' }));
+  await screen.findByText('1.2 km');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Check route preparation' }));
+  await screen.findByText(/Last checked/);
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare selected route' }));
+  await screen.findByText(/confirmed for this request/);
+  expect(vi.mocked(bindBrowserLiveRouteContext).mock.calls[0]?.[2]).toEqual({
+    mode: 'driving',
+    origin: [80, 13],
+    destination: [79, 13],
+    alternativeIndex: 0,
+    expectedContextId: null,
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: /Route 2/ }));
+  expect(screen.queryByRole('button', { name: 'Prepare selected route' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Check route preparation' }));
+  await waitFor(() => expect(readBrowserLiveRouteContext).toHaveBeenCalledTimes(2));
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare selected route' }));
+  await waitFor(() => expect(bindBrowserLiveRouteContext).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(bindBrowserLiveRouteContext).mock.calls[1]?.[2]).toMatchObject({
+    alternativeIndex: 1,
+  });
+});
+
 it('ignores late search results after the query changes', async () => {
   let resolve!: (value: ReturnType<typeof place>) => void;
   vi.mocked(searchBrowserPlaces).mockImplementation(

@@ -107,6 +107,13 @@ export default function Page() {
             saved.
           </p>
           <p>
+            Choosing “Prepare selected route” sends your selected endpoints and travel mode to
+            Routiqo’s routing service again. The fresh route may differ from the estimate shown.
+            Routiqo saves a short-lived private context of relevant route areas for your journey,
+            not the calculated route geometry. This does not publish your location or prove that you
+            are physically there. Clearing the route view does not remove that server context.
+          </p>
+          <p>
             Completed trip journals can keep a title and notes in an account-specific browser draft.
             Choosing “Save to account” sends that content to Routiqo’s server. Journals are private;
             they are not shared with other travellers or included in planning backups. Signing out

@@ -23,7 +23,7 @@ Full offline navigation, broad social features and AI belong to later phases.
 | Offline journey writes | Web IndexedDB queues, foreground/reconnect dispatch, retries, reconciliation, account isolation; native SQLite primitives | Native dispatch/network integration; restart/network-flap/device tests; broader unresolved-conflict recovery | Web reliability for pilot; native work for Android |
 | Maps and routes | MapLibre web renderer; guarded Valhalla routing and Photon search adapters; regional bounds, alternatives and manual direction steps | Provision real regional routing/search/tiles, review data quality and licensing, validate browser resources and provider behavior | Regional maps required for pilot |
 | Navigation and offline maps | Last successful web route remains in memory during connection loss | Route persistence across reload, native map integration, location guidance, bounded map downloads, eviction/deletion and on-device rerouting | Later than first LIVE list |
-| Private Live consent/context | Durable consent with revocation precedence; private consent UI, provider-derived route binding, catalog authority, private owner APIs and typed browser clients | Route-binding UI, reviewed real catalog, rollout configuration and authenticated end-to-end lifecycle verification | First release |
+| Private Live consent/context | Durable consent with revocation precedence; private consent and route-preparation UI, provider-derived binding, catalog authority, private owner APIs and typed browser clients | Authorized useful route-area labels for contribution choices, reviewed real catalog, rollout configuration and authenticated end-to-end lifecycle verification | First release |
 | Quick Signals | Typed values, server grants, durable private receipts, replay protection, replacement/withdrawal, minute and rolling 20/hour quotas, 60-second slot cooldown, suspension/revision fencing, private command APIs and typed browser clients | Evidence-independence authority, durable reporting, public block targeting/delivery and operator moderation, contribution UI and operational validation | First release |
 | Live expiry cleanup | Default-off bounded jobs for LIVE expiry and moderation audit/debit expiry, isolated authentication/cleanup schedulers, failure recovery and non-overlap | Staging activation, backlog/capacity checks, failure alerts, backup/retention operations and production rollout | First release operations |
 | Public Live Moments | Product direction and privacy threat/design checkpoints documented | Approved cohort publication design, safe aggregation/projection, authenticated reads, suppression/conflict/freshness rules and adversarial tests | Critical first-release blocker |
@@ -83,10 +83,13 @@ C. Build the first LIVE user experience
    Depends on A and B for real public output.
    - DONE: typed private browser consent/context/Quick Signal clients, strict
      runtime validation, exact revisions, bounded deadlines and cancellation.
-     These are unmounted clients, not a working LIVE interface. The browser auth
-     transport also has bounded streamed JSON and redirect refusal.
-   - Connect explicit consent, route binding and Quick Signal actions to the
-     active owned journey. Preserve Home/Explore/Trips/Profile navigation.
+     Private consent and explicit route preparation are mounted for confirmed
+     active journeys; there is no public LIVE interface. Browser auth and routing
+     transports also bound streamed JSON and refuse redirects.
+   - Define authorized useful route-area labels and category choices before
+     exposing Quick Signal controls; opaque anchor IDs are not product labels.
+   - Connect Quick Signal actions to the active owned journey. Preserve
+     Home/Explore/Trips/Profile navigation and explicit grant/receipt recovery.
    - Implement authorized Live Moment reads and a bounded foreground refresh
      flow, with cancellation, backoff and one request in flight.
    - Show truthful freshness/conflict/suppression states; never invent reports,

@@ -15,18 +15,52 @@ import {
 } from '../lib/journey-storage';
 import { Modal } from './modal';
 import { RoutePlanner } from './route-planner';
+import type { LiveConsentAuthority } from './live-route-binding-panel';
 import { JournalEditor } from './journal-editor';
 import { CommuteSummaries } from './commute-summaries';
 import { JourneyHistory } from './journey-history';
 import { listBrowserJournals } from '../lib/journal-storage';
 import { readBrowserJourney } from '../lib/browser-journeys';
 import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
-import { LiveConsentPanel } from './live-consent-panel';
+import { LiveConsentPanel, type LiveConsentConfirmation } from './live-consent-panel';
 
 export function JourneyWorkspace() {
+  const consentEpoch = useRef(0);
+  const consentAuthorityRef = useRef<LiveConsentAuthority | null>(null);
+  const expectedConsentScopeRef = useRef<{ accountId: string; journeyId: string } | null>(null);
+  const [, setConsentAuthority] = useState<LiveConsentAuthority | null>(null);
+  const updateConsentAuthority = useCallback((confirmation: LiveConsentConfirmation | null) => {
+    const epoch = ++consentEpoch.current;
+    const expected = expectedConsentScopeRef.current;
+    const next =
+      confirmation &&
+      expected?.accountId === confirmation.accountId &&
+      expected.journeyId === confirmation.journeyId
+        ? { ...confirmation, epoch }
+        : null;
+    consentAuthorityRef.current = next;
+    setConsentAuthority(next);
+  }, []);
+  const invalidateConsentAuthority = useCallback(() => {
+    expectedConsentScopeRef.current = null;
+    updateConsentAuthority(null);
+  }, [updateConsentAuthority]);
+  const getConsentAuthority = useCallback(() => {
+    const current = consentAuthorityRef.current;
+    const expected = expectedConsentScopeRef.current;
+    return current &&
+      expected?.accountId === current.accountId &&
+      expected.journeyId === current.journeyId
+      ? current
+      : null;
+  }, []);
   const [offline, setOffline] = useState(false);
   useEffect(() => {
-    const update = () => setOffline(!navigator.onLine);
+    const update = () => {
+      const disconnected = !navigator.onLine;
+      if (disconnected) invalidateConsentAuthority();
+      setOffline(disconnected);
+    };
     update();
     window.addEventListener('online', update);
     window.addEventListener('offline', update);
@@ -34,7 +68,7 @@ export function JourneyWorkspace() {
       window.removeEventListener('online', update);
       window.removeEventListener('offline', update);
     };
-  }, []);
+  }, [invalidateConsentAuthority]);
   const [availability, setAvailability] = useState<
     'checking' | 'disabled' | 'signed-out' | 'ready'
   >('checking');
@@ -72,10 +106,12 @@ export function JourneyWorkspace() {
   const visibleAccount = useRef<string | null>(null);
   const inFlight = useRef<AbortController | null>(null);
   const invalidate = useCallback(() => {
+    invalidateConsentAuthority();
     revision.current++;
     inFlight.current?.abort();
-  }, []);
+  }, [invalidateConsentAuthority]);
   const refresh = useCallback(async () => {
+    invalidateConsentAuthority();
     if (locked.current) return;
     setIdentityConfirmed(false);
     const current = ++revision.current;
@@ -110,7 +146,7 @@ export function JourneyWorkspace() {
         setError('Journey status is unavailable. Saved actions stay on this device.');
       }
     }
-  }, []);
+  }, [invalidateConsentAuthority]);
   useEffect(() => {
     void refresh();
     const focus = () => {
@@ -125,6 +161,7 @@ export function JourneyWorkspace() {
   const perform = useCallback(
     async (command?: JourneyCommand) => {
       if (!account || locked.current) return;
+      invalidateConsentAuthority();
       locked.current = true;
       setBusy(true);
       setError('');
@@ -168,11 +205,12 @@ export function JourneyWorkspace() {
         if (revision.current === current) setBusy(false);
       }
     },
-    [account],
+    [account, invalidateConsentAuthority],
   );
   const head = partition?.outbox.entries[0];
   async function restoreRecent() {
     if (!account || locked.current || !navigator.onLine) return;
+    invalidateConsentAuthority();
     locked.current = true;
     setBusy(true);
     setError('');
@@ -195,6 +233,7 @@ export function JourneyWorkspace() {
   }
   async function reviewConflict() {
     if (!account || !head || locked.current || !navigator.onLine) return;
+    invalidateConsentAuthority();
     locked.current = true;
     setBusy(true);
     setReview('');
@@ -263,6 +302,13 @@ export function JourneyWorkspace() {
   const completing = partition?.outbox.entries.some(
     (entry) => entry.command.journeyId === currentId && entry.command.action === 'complete',
   );
+  const liveAvailable =
+    identityConfirmed && !busy && partition?.outbox.entries.length === 0 && !completing;
+  expectedConsentScopeRef.current =
+    account && active && liveAvailable && !offline
+      ? { accountId: account, journeyId: active.id }
+      : null;
+  const currentConsentAuthority = getConsentAuthority();
   const status =
     head?.blocked === 'authentication'
       ? 'Sign in again to send your saved action.'
@@ -362,7 +408,8 @@ export function JourneyWorkspace() {
               accountId={account}
               journeyId={active.id}
               online={!offline}
-              available={identityConfirmed && !busy && partition?.outbox.entries.length === 0}
+              available={liveAvailable}
+              onAuthorityChange={updateConsentAuthority}
             />
           )}
           {completed.length > 0 && (
@@ -404,7 +451,22 @@ export function JourneyWorkspace() {
           </button>
         </>
       )}
-      {availability === 'ready' && account && <RoutePlanner account={account} />}
+      {availability === 'ready' && account && (
+        <RoutePlanner
+          account={account}
+          liveBinding={
+            active && currentConsentAuthority
+              ? {
+                  journeyId: active.id,
+                  online: !offline,
+                  available: liveAvailable,
+                  authority: currentConsentAuthority,
+                  getAuthority: getConsentAuthority,
+                }
+              : undefined
+          }
+        />
+      )}
       {availability === 'ready' && account && partition && (
         <CommuteSummaries key={account} snapshots={partition.snapshots} account={account} />
       )}
