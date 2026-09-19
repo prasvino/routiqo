@@ -1,6 +1,6 @@
 ROUTIQO — CURRENT STATUS, REMAINING WORK AND COMPLETION REQUIREMENTS
-Snapshot: 18 September 2026 (IST)
-Repository snapshot: autonomous Live safety batches following 0611499 (ADRs 0037–0040)
+Snapshot: 19 September 2026 (IST)
+Repository snapshot: private LIVE clients and auth transport following 5e34000
 
 CURRENT POSITION
 
@@ -76,6 +76,10 @@ B. Finish abuse prevention, moderation and revocation
 
 C. Build the first LIVE user experience
    Depends on A and B for real public output.
+   - DONE: typed private browser consent/context/Quick Signal clients, strict
+     runtime validation, exact revisions, bounded deadlines and cancellation.
+     These are unmounted clients, not a working LIVE interface. The browser auth
+     transport also has bounded streamed JSON and redirect refusal.
    - Connect explicit consent, route binding and Quick Signal actions to the
      active owned journey. Preserve Home/Explore/Trips/Profile navigation.
    - Implement authorized Live Moment reads and a bounded foreground refresh

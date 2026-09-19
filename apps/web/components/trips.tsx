@@ -59,7 +59,8 @@ export function Trips() {
                 </span>
                 <h2>
                   {plan.origin}
-                  <ArrowRight size={20} />
+                  <ArrowRight size={20} aria-hidden="true" />
+                  <span className="sr-only"> to </span>
                   {plan.destination}
                 </h2>
                 <p className="departure-status">{departureLabel(departure, now)}</p>

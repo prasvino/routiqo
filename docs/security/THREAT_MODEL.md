@@ -440,6 +440,20 @@ refresh timestamps. Public cohort differencing, collusion, moderation, operated
 expiry cleanup and revocation delivery remain unresolved release threats, so no
 Live projection or UI is enabled.
 
+Browser client transport also treats redirected, oversized, malformed and stalled
+responses as untrusted. Auth token exchange must never follow a redirect. Private
+LIVE clients snapshot validated inputs before CSRF, preserve exact long revisions
+and reject mismatched journey/anchor/command responses. A single operation deadline
+must cover CSRF, headers and body, including abort-ignoring adapters; late CSRF
+cannot launch a write. Error bodies are cancelled without reading or exposing
+their details. Retained private receipts are historical acknowledgements, never
+fresh eligibility or public evidence. Clients do not retry, persist or publish
+LIVE data automatically; future UI must cancel and discard on identity changes.
+These controls do not address malicious clients bypassing validation: all existing
+server authentication, ownership, consent, budgets and publication gates still apply.
+See BROWSER_LIVE_CLIENT_SPEC.md and BROWSER_AUTH_TRANSPORT_SPEC.md for limits and
+verification scope.
+
 ADR 0036 addresses a bounded portion of T12/T13/T14/T19/T20 through default-off
 expiry maintenance: independent small batches and existing SKIP LOCKED leaf
 transactions, serialized local ticks, isolated category failures and constant-only

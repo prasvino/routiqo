@@ -27,6 +27,7 @@
 | P0 / L1.0 — verified | ADR 0038 private assessment/suspension, bilateral block and structured report-case primitives | Domain tests and review; no public output, durable block/report store or operator workflow |
 | P0 / L1.1 — verified | ADR 0039 durable contribution restrictions with grant revision fencing | Mandatory current authority on new issuance/acceptance; retained private replay preserved; database/race validation and independent review passed |
 | P0 / L1.2 — verified | ADR 0040 private durable directed blocks and ordered account-pair authority | 363 tests/50 suites, core check/bootJar and independent review passed; no public block API or output revocation |
+| P1 / L2 prerequisite — verified | Typed private browser consent, route-context and signal clients with strict response validation, exact revisions and bounded cancellation-safe transport | 18 focused tests and independent review; full 291 TypeScript tests, web build/types/contracts pass; UI and public publication remain pending |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -58,6 +59,14 @@ owner route-context read/bind transport. ADR 0035 adds only private owner comman
 issue/accept/withdraw transport and no UI or public output.
 Existing client-selected places, route estimates or active journey ownership alone
 are not admission authority.
+
+Private browser clients now implement these owner transports under
+`BROWSER_LIVE_CLIENT_SPEC.md`. The next integration step is an explicit,
+account/journey-scoped interaction design with cancelled stale requests, truthful
+uncertain-write recovery and offline submission disabled. Public list integration
+still requires the publication and safety gates; importing the clients enables no
+network work or feature flags. The existing browser authentication transport is
+bounded under `../features/auth/BROWSER_AUTH_TRANSPORT_SPEC.md`.
 
 Cohort publication decision checkpoint: `COHORT_PUBLICATION_DESIGN.md` in the Live
 feature directory documents the remaining block/withdrawal/differencing issues.

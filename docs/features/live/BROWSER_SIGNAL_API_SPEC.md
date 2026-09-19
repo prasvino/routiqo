@@ -34,7 +34,7 @@ implicit renewal or retry client is added.
 Accept builds the exact existing fingerprint from path journey + strict body and
 calls CatalogSignalService.accept once. Server constants are 15-minute evidence
 and 24-hour receipt retention, matching ROUTIQO_LIVE_SPEC; caller cannot override.
-Existing 90-second grant/context limits remain. Response:
+Existing 90-second grant and 15-minute bound-context limits remain. Response:
 {commandId, status, receivedAt, expiresAt, retainUntil}, where status is accepted,
 withdrawn or superseded (maps private receipt lifecycle, never publication status).
 Return 200 for a new acceptance or retained exact replay. Retained replay must

@@ -773,12 +773,13 @@ textarea::placeholder {
   margin-bottom: 9px;
 }
 .days {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
   gap: 5px;
 }
 .days button {
-  flex: 1;
-  min-height: 43px;
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 10px;
@@ -787,6 +788,16 @@ textarea::placeholder {
 .days button[aria-pressed='true'] {
   background: var(--ink);
   color: white;
+}
+@media (max-width: 480px) {
+  .days {
+    grid-template-columns: repeat(4, minmax(44px, 1fr));
+  }
+}
+@media (max-width: 380px) {
+  .plan-form .form-row {
+    grid-template-columns: 1fr;
+  }
 }
 .form-error {
   font-size: 12px;

@@ -26,6 +26,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
 | Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
 | Private safety foundations | Reviewed assessment, block and structured report-case domain transitions; durable contribution restrictions under the account transaction authority. Suspension denies new grants/acceptance and unsuspension cannot revive old grants. Durable private directed blocks with ordered account locks, bounded retained revisions and bilateral exclusion; no operator API, durable report workflow, public block targeting or public trust claim |
+| Private browser LIVE clients | Typed consent, context and Quick Signal clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. No mounted controls, persistence, automatic retry or public projection |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -35,6 +36,32 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Private browser client pass (2026-09-19): consent read/intent, context read/bind,
+and signal issue/accept/withdraw clients now use generated types with strict
+runtime DTO checks. They preserve exact long revisions and nanosecond instants,
+capture request bodies before CSRF, enforce same-origin redirect refusal and
+bounded whole-operation deadlines, and handle late or uncooperative transports.
+Historical private receipts remain acknowledgements; no automatic retry, storage,
+UI mounting, flag activation or public publication was added.
+
+Browser authentication now bounds strict UTF-8 JSON to 16 KiB, refuses redirects,
+requires exact success statuses and shares one deadline across CSRF plus internal
+mutations. Failed/unneeded response bodies are cancelled without reading details.
+Independent adversarial review passed for both client boundaries after cleanup,
+newline-validation and cancellation-race corrections.
+
+Verification: **291 TypeScript tests in 42 files**, including 18 focused LIVE
+tests, passed with two workers. An initial parallel run hit two existing mobile
+dependency timeouts; both passed in a focused rerun and the complete two-worker
+run. All workspace typechecks, contract drift, lint, formatting, secret scan and
+the web production build passed. No backend changes or backend suite rerun.
+
+Trips received three small accessibility fixes: 44 px weekday targets with narrow
+wrapping, spoken “to” between route endpoints, and stacked date/time fields below
+380 px. Rendered desktop/390 px/320 px checks and focus restoration are recorded
+in TRIPS_UI_AUDIT_2026-09-19.md. Real authenticated/provider/device verification
+and broader accessibility testing remain release gates.
 
 Native identity validation hardening (2026-09-19): mobile account/session/challenge
 response validators and secure-vault reads/commits now reject the all-zero UUID.

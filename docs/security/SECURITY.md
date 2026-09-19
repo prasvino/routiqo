@@ -66,6 +66,12 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
 - Blocked, hidden, expired, or deleted information must not reappear through search, caches, exports, logs, notifications, analytics, or realtime replay.
 - Tokens, credentials, secrets, and precise location are absent from fixtures, source control, logs, analytics, error payloads, and screenshots.
 - Inputs, payloads, queries, fan-out, retries, subscriptions, uploads, and expensive operations are bounded.
+- Browser auth and private LIVE clients use fixed same-origin paths, refuse
+  redirects, bound streamed response bytes and cover the entire operation with a
+  deadline, including internal CSRF acquisition. Cancel unused bodies without
+  reading their error details. Client validation supplements server authority;
+  it cannot grant publication permission. LIVE request identities and decimal
+  revisions remain exact, and submission fingerprints are captured before awaits.
 
 Foundation environments must have no consumer-authentication bypass: protected paths are denied, and administrative surfaces reveal no records without explicit authorization.
 
