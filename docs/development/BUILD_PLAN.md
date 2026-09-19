@@ -10,7 +10,7 @@ values and explicit safe-interaction intent. Same-account recovery is memory-onl
 capped at five commands and retains Stop after Ghost Mode or journey completion.
 There are no automatic or offline writes, browser persistence, public publication
 or server feature activation. Navigation warning behavior composes with the journal
-guard. Current verification evidence and remaining production-build/history QA are
+guard. Current verification evidence and remaining authenticated/browser-device QA are
 in BUILD_STATUS.md.
 
 Latest safety work (2026-09-19): ADR 0041 adds internal action-specific operator
