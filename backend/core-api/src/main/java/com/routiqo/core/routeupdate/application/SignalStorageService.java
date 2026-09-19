@@ -12,6 +12,7 @@ import com.routiqo.core.routeupdate.domain.QuickSignalValue;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routeupdate.domain.SignalAdmission;
 import com.routiqo.core.routeupdate.domain.SignalCommandGrant;
+import com.routiqo.core.routeupdate.domain.SignalIssuanceExpectation;
 import com.routiqo.core.routeupdate.domain.StoredLiveRouteContext;
 import java.time.Clock;
 import java.time.DateTimeException;
@@ -57,11 +58,23 @@ public final class SignalStorageService {
 
     SignalCommandGrant issueFromCatalog(UUID actorId, UUID journeyId, UUID anchorId,
             RouteAnchorCatalog catalog) {
-        return issue(actorId, journeyId, anchorId, null, Objects.requireNonNull(catalog));
+        return issue(actorId, journeyId, anchorId, null, Objects.requireNonNull(catalog), null);
+    }
+
+    SignalCommandGrant issueFromCatalog(UUID actorId, UUID journeyId, UUID anchorId,
+            RouteAnchorCatalog catalog, SignalIssuanceExpectation expectation) {
+        if (expectation == null) throw denied();
+        return issue(actorId, journeyId, anchorId, null, Objects.requireNonNull(catalog), expectation);
     }
 
     private SignalCommandGrant issue(UUID actorId, UUID journeyId, UUID anchorId,
             Set<QuickSignalValue.Category> permittedCategories, RouteAnchorCatalog catalog) {
+        return issue(actorId, journeyId, anchorId, permittedCategories, catalog, null);
+    }
+
+    private SignalCommandGrant issue(UUID actorId, UUID journeyId, UUID anchorId,
+            Set<QuickSignalValue.Category> permittedCategories, RouteAnchorCatalog catalog,
+            SignalIssuanceExpectation expectation) {
         return journeys.withOwnedJourney(actorId, journeyId, journey -> {
             if (journey.status() != Journey.Status.ACTIVE || anchorId == null
                     || catalog == null && (permittedCategories == null
@@ -75,15 +88,23 @@ public final class SignalStorageService {
             if (restriction.state() == ContributorAssessment.State.SUSPENDED) {
                 throw denied();
             }
-            Instant now = now();
+            Instant observedNow = expectation == null ? now() : exactNow();
             if (!consent.sharing() || !consent.journeyActive()
-                    || !storedContext.isCurrentAt(now)
+                    || !storedContext.isCurrentAt(observedNow)
                     || !storedContext.context().anchorIds().contains(anchorId)) {
+                throw denied();
+            }
+            if (expectation != null && (!expectation.contextId().equals(
+                    storedContext.context().contextId())
+                    || expectation.routeRevision() != storedContext.context().revision()
+                    || expectation.consentGeneration() != consent.generation())) {
                 throw denied();
             }
             Set<QuickSignalValue.Category> effectiveCategories = catalog == null
                     ? permittedCategories
                     : catalogCategories(catalog, storedContext, anchorId);
+            Instant now = expectation == null
+                    ? observedNow : observedNow.truncatedTo(ChronoUnit.MICROS);
             Instant expiresAt = min(normalizedAfter(now, GRANT_LIFETIME), storedContext.expiresAt());
             if (!expiresAt.isAfter(now)) {
                 throw denied();
@@ -268,6 +289,14 @@ public final class SignalStorageService {
     private Instant now() {
         try {
             return clock.instant().truncatedTo(ChronoUnit.MICROS);
+        } catch (RuntimeException unavailable) {
+            throw denied();
+        }
+    }
+
+    private Instant exactNow() {
+        try {
+            return clock.instant();
         } catch (RuntimeException unavailable) {
             throw denied();
         }

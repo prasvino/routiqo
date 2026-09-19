@@ -23,7 +23,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; private active-journey consent UI with explicit check/allow/stop and uncertain-write fencing; no presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration or output; optional bounded expiry job under ADR 0036 |
 | Route-area display metadata | Optional bounded operator-curated labels in the immutable catalog; old unlabeled catalogs remain valid, malformed labels fail closed, diagnostics stay redacted and existing APIs/resolver output are unchanged |
-| Private route-area choice reader | Internal read-only owned-journey service returns only the current context's complete labeled subset after consent, restriction, catalog and exact expiry checks. Immutable minimized snapshot; no Spring wiring, HTTP, provider calls, grants or writes. Owner transport and exact-context issuance semantics remain pending |
+| Private route-area choice reader | Internal read-only owned-journey service returns only the current context's complete labeled subset after consent, restriction, catalog and exact expiry checks. Immutable minimized snapshot; no Spring wiring, HTTP, provider calls, grants or writes. Owner transport remains pending; expected-context issuance is a separate internal prerequisite below |
+| Expected-context signal issuance | Separate internal catalog-aware method requires exact context ID, route revision and consent generation under existing authority before grant/budget mutation. Legacy owner HTTP contract unchanged; guarded choice/issuance transport and Quick Signal controls remain pending |
 | Private route preparation | Separately default-off owner-only GET recovery and explicit POST binding through the real configured binder; strict browser guards, minimal no-store DTOs, database account quotas and post-provider authority rechecks. Browser check/prepare controls use copied route choices, confirmed consent, synchronous scope invalidation and expiring private acknowledgements. No public Live output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
 | Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
@@ -39,6 +40,21 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Latest internal expected-context issuance pass, 2026-09-19:
+
+- ADR 0044 adds a mandatory exact context/revision/consent precondition inside
+  the existing issuance transaction before grant construction or budget mutation.
+  Legacy Java/HTTP issuance and acceptance/replay/withdrawal remain unchanged.
+- **409 Java tests across 56 suites**, zero failures/errors/skips; core check
+  and bootJar passed. Thirteen targeted tests passed first; independent production
+  and final test review approved. Secret scan and diff checks passed.
+- Tests cover stale tuples with/without an existing budget, same-anchor rebind,
+  consent cycle, real replacement-winning lock race, exact nanosecond expiry,
+  one authority callback and new-path acceptance/replay/withdrawal.
+- Dedicated expected-path insertion-failure rollback and consent-winning issuance
+  race tests remain documented follow-ups before browser exposure. Existing shared
+  transaction regression evidence remains; no new HTTP contract/UI is claimed.
 
 Latest internal owner choice reader pass, 2026-09-19:
 

@@ -37,7 +37,10 @@ identity/duplicate/count/temporal/value bounds at construction.
 This is an observed owner snapshot, not a command grant, physical-presence proof,
 anti-Sybil assessment or public eligibility. A later write must use current authority.
 Existing issuance is not exact-context CAS when the anchor survives replacement;
-the coordinated issuance precondition/mismatch policy remains a required next step.
+ADR 0044 adds a separate internal expected-context issuance entry point. The
+legacy browser contract remains anchor-only. `EXACT_CONTEXT_SIGNAL_ISSUANCE_PLAN.md`
+records its implementation, evidence and remaining guarded browser contract work;
+it does not expose this reader or change the existing HTTP contract.
 The internal reader cannot be exposed directly without reviewed no-store browser
 guards, request quotas, DTO/string encoding, feature gates and lifecycle tests.
 

@@ -61,6 +61,7 @@ evidence and release gates are in BUILD_STATUS.md. No public LIVE UI is enabled.
 | P1 / L2 private route preparation — verified | Explicit context check/fresh bind from copied route choices and confirmed consent; synchronous lifecycle/scope invalidation and expiring acknowledgements | Full 365 TypeScript tests/45 files, workspace checks and web build; independent review plus scoped rendered QA; routing/search transport also bounded across CSRF/headers/streams; real-provider verification pending |
 | P1 / L2 route-area metadata — verified internal prerequisite | ADR 0042 optional validated curated labels with strict backward-compatible catalog loading and redacted diagnostics | Full 398 Java tests/54 suites, core check/bootJar and independent review; no owner choice API or output changes |
 | P1 / L2 route-area choice reader — verified internal prerequisite | ADR 0043 current owned-journey consent/context/restriction and catalog checks, exact bounded labeled subset and immutable minimized snapshot | Full 403 Java tests/55 suites, core check/bootJar and independent review; no Spring wiring, endpoint, grants or budget debits |
+| P1 / L2 expected-context issuance — verified internal prerequisite | ADR 0044 exact context/revision/consent tuple checked under current authority before grant/budget mutation; legacy HTTP unchanged | Full 409 Java tests/56 suites, core check/bootJar, 13 targeted tests and independent review; extra expected-path rollback/consent-race evidence and browser contract remain pending |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -113,11 +114,14 @@ The routing/search transport is bounded separately under
 `../features/journey/BROWSER_ROUTING_TRANSPORT_SPEC.md`.
 
 ADRs 0042/0043 provide validated labels and an internal authorized choice reader.
-The next contribution UI prerequisites are a guarded owner choice transport and
-exact displayed-context issuance semantics. Do not expose opaque anchor IDs as
+The next contribution UI prerequisites are guarded owner choice transport and
+expected-context issuance contracts. Do not expose opaque anchor IDs as
 product labels or invent a synthetic catalog fallback. Then connect explicit Quick Signal actions
 with exact grant/receipt handling. Public eligibility still requires the separate
 publication and safety decisions; route preparation is not physical-presence proof.
+`EXACT_CONTEXT_SIGNAL_ISSUANCE_PLAN.md` tracks ADR 0044's internal transaction-local
+precondition and regression evidence. It changes no current HTTP contract; new
+browser callers must use the guarded expected-context path without fallback.
 
 Cohort publication decision checkpoint: `COHORT_PUBLICATION_DESIGN.md` in the Live
 feature directory documents the remaining block/withdrawal/differencing issues.

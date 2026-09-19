@@ -532,6 +532,14 @@ wired to HTTP: future exposure still requires no-store guards, quotas and explic
 exact-context issuance semantics. Existing issue-by-anchor can use a replacement
 context containing that anchor; a prior choice snapshot cannot authorize a write.
 
+ADR 0044 defines an additional internal issuance precondition: exact context ID,
+route revision and consent generation must match current locked authority before
+grant budget reservation or insertion. The tuple is not identity, presence proof
+or evidence of a rendered choice. Keep current catalog-derived permissions and
+acceptance/replay/withdrawal checks. Legacy anchor-only HTTP remains unchanged;
+future displayed-choice callers require an explicit guarded wire contract and no
+legacy fallback, automatic reissuance or offline replay after a lost response.
+
 Moderation expiry uses the same bounded scheduling principles through a separate
 default-off flag and domain-owned audit/debit cleanup adapter. Auth maintenance
 must retain its own named scheduler even when only moderation cleanup is enabled;

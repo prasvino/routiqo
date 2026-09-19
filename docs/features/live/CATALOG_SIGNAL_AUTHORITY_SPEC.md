@@ -4,6 +4,11 @@ Status: internal configured facade implemented and tested. ADR 0035 adds a
 separately default-off private owner command transport through this facade; no UI,
 flag activation or public publication exists.
 
+ADR 0044 adds a distinct internal expected-context issuance path; its implementation
+and evidence are tracked in `EXACT_CONTEXT_SIGNAL_ISSUANCE_PLAN.md`. The existing
+anchor-only owner HTTP contract remains unchanged. Future displayed-choice callers
+must not silently fall back to issue-by-anchor when an expected tuple is stale.
+
 ## Context provenance
 
 V12 adds nullable nonnil catalog_version UUID to live_route_context. Extend the

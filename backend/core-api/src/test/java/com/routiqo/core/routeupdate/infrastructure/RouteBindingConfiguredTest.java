@@ -1,6 +1,7 @@
 package com.routiqo.core.routeupdate.infrastructure;
 
 import com.routiqo.core.journey.application.JourneyService;
+import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.journey.domain.Journey;
 import com.routiqo.core.privacy.application.PresenceConsentService;
 import com.routiqo.core.routeupdate.application.RouteBindingService;
@@ -10,10 +11,13 @@ import com.routiqo.core.routeupdate.application.SignalStorageService;
 import com.routiqo.core.routeupdate.application.SignalStorageDenied;
 import com.routiqo.core.routeupdate.application.SignalStorageConflict;
 import com.routiqo.core.routeupdate.application.LiveRouteContextService;
+import com.routiqo.core.routeupdate.application.LiveRouteContextParticipant;
 import com.routiqo.core.routeupdate.domain.QuickSignalValue;
 import com.routiqo.core.routeupdate.domain.RouteAnchor;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routeupdate.domain.RouteBindingOutcome;
+import com.routiqo.core.routeupdate.domain.SignalIssuanceExpectation;
+import com.routiqo.core.routeupdate.domain.QuickSignalReceipt;
 import com.routiqo.core.routing.domain.RouteRequest;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -21,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -108,6 +114,8 @@ class RouteBindingConfiguredTest {
     @Autowired SignalStorageService lowLevelSignals;
     @Autowired LiveRouteContextService contexts;
     @Autowired JourneyService journeys;
+    @Autowired JourneyWriteAuthority journeyAuthority;
+    @Autowired LiveRouteContextParticipant contextParticipant;
     @Autowired PresenceConsentService consents;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
@@ -147,6 +155,140 @@ class RouteBindingConfiguredTest {
                 Duration.ofMinutes(1), Duration.ofMinutes(2));
         assertThat(receipt.signal().value()).isEqualTo(QuickSignalValue.QUEUE_UNDER_5);
         assertThat(CALLS).hasValue(1);
+    }
+
+    @Test
+    void exactContextIssuanceMatchesAllVersionsBeforeGrantAndBudgetMutation() {
+        UUID actor = UUID.randomUUID();
+        UUID journey = activeJourney(actor);
+        var bound = bind(actor, journey, java.util.Optional.empty());
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000202");
+        long generation = consents.read(actor, journey).generation();
+        var expected = new SignalIssuanceExpectation(bound.context().contextId(),
+                bound.context().revision(), generation);
+
+        var grant = signals.issueExpectedContext(actor, journey, anchor, expected);
+
+        assertThat(grant.admission().contextId()).isEqualTo(expected.contextId());
+        assertThat(grant.admission().routeRevision()).isEqualTo(expected.routeRevision());
+        assertThat(grant.admission().consentGeneration()).isEqualTo(expected.consentGeneration());
+        assertThat(grant.admission().permittedCategories())
+                .containsExactly(QuickSignalValue.Category.QUEUE);
+        var exactSubmission = fingerprint(grant, QuickSignalValue.QUEUE_UNDER_5);
+        var exactReceipt = signals.accept(actor, grant.commandId(), exactSubmission,
+                Duration.ofMinutes(1), Duration.ofMinutes(2));
+        assertThat(signals.accept(actor, grant.commandId(), exactSubmission,
+                Duration.ofMinutes(1), Duration.ofMinutes(2))).isEqualTo(exactReceipt);
+        assertThat(signals.withdraw(actor, journey, grant.commandId()).state())
+                .isEqualTo(QuickSignalReceipt.State.WITHDRAWN);
+        for (SignalIssuanceExpectation wrong : List.of(
+                new SignalIssuanceExpectation(UUID.randomUUID(), expected.routeRevision(), generation),
+                new SignalIssuanceExpectation(expected.contextId(), expected.routeRevision() + 1,
+                        generation),
+                new SignalIssuanceExpectation(expected.contextId(), expected.routeRevision(),
+                        generation + 1))) {
+            assertThatThrownBy(() -> signals.issueExpectedContext(actor, journey, anchor, wrong))
+                    .isExactlyInstanceOf(SignalStorageDenied.class).hasNoCause();
+        }
+        assertThatThrownBy(() -> signals.issueExpectedContext(actor, journey, anchor, null))
+                .isExactlyInstanceOf(SignalStorageDenied.class).hasNoCause();
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM signal_command_grant WHERE actor_id = ?", Integer.class, actor))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT used_count FROM signal_actor_budget WHERE actor_id = ? AND action = 'GRANT'
+                """, Integer.class, actor)).isEqualTo(1);
+    }
+
+    @Test
+    void sameAnchorReplacementAndConsentCycleDenyThePreviouslyDisplayedTuple() {
+        UUID actor = UUID.randomUUID();
+        UUID journey = activeJourney(actor);
+        var first = bind(actor, journey, java.util.Optional.empty());
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000202");
+        long generation = consents.read(actor, journey).generation();
+        var old = new SignalIssuanceExpectation(first.context().contextId(),
+                first.context().revision(), generation);
+
+        var replacement = bind(actor, journey, Optional.of(first.context().contextId()));
+        assertThat(replacement.context().anchorIds()).contains(anchor);
+        assertThatThrownBy(() -> signals.issueExpectedContext(actor, journey, anchor, old))
+                .isExactlyInstanceOf(SignalStorageDenied.class).hasNoCause();
+
+        var currentBeforeConsentCycle = new SignalIssuanceExpectation(
+                replacement.context().contextId(), replacement.context().revision(), generation);
+        var off = consents.submitIntent(actor, journey, generation, false);
+        consents.submitIntent(actor, journey, off.generation(), true);
+        assertThatThrownBy(() -> signals.issueExpectedContext(
+                actor, journey, anchor, currentBeforeConsentCycle))
+                .isExactlyInstanceOf(SignalStorageDenied.class).hasNoCause();
+        assertNoGrantMutation(actor);
+    }
+
+    @Test
+    void committedSameAnchorReplacementWinsTheAuthorityLockRaceBeforeExpectedIssuance()
+            throws Exception {
+        UUID actor = UUID.randomUUID();
+        UUID journey = activeJourney(actor);
+        var first = bind(actor, journey, Optional.empty());
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000202");
+        UUID catalogVersion = UUID.fromString("00000000-0000-4000-8000-000000000201");
+        long generation = consents.read(actor, journey).generation();
+        var old = new SignalIssuanceExpectation(first.context().contextId(),
+                first.context().revision(), generation);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var holder = executor.submit(() -> {
+                new TransactionTemplate(transactionManager).execute(status -> {
+                    jdbc.queryForObject("SELECT id FROM routiqo_account WHERE id = ? FOR UPDATE",
+                            UUID.class, actor);
+                    locked.countDown();
+                    await(release);
+                    return null;
+                });
+                return null;
+            });
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            var replacement = executor.submit(() -> journeyAuthority.withOwnedJourney(
+                    actor, journey, owned -> contextParticipant.replaceBound(owned, Set.of(anchor),
+                            Duration.ofMinutes(5), Optional.of(first.context().contextId()),
+                            UUID.randomUUID(), catalogVersion)));
+            assertThat(waitingAccountWriters(1)).isTrue();
+            var issuance = executor.submit(
+                    () -> signals.issueExpectedContext(actor, journey, anchor, old));
+            assertThat(waitingAccountWriters(2)).isTrue();
+            release.countDown();
+            holder.get(5, TimeUnit.SECONDS);
+            replacement.get(5, TimeUnit.SECONDS);
+            assertThatThrownBy(() -> issuance.get(5, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(SignalStorageDenied.class);
+        } finally {
+            release.countDown();
+        }
+        assertNoGrantMutation(actor);
+    }
+
+    @Test
+    void issuanceExpectationValidatesExactLongValuesAndRedactsDiagnostics() {
+        UUID context = UUID.randomUUID();
+        long aboveJavascriptSafeInteger = 9_007_199_254_740_993L;
+        var maximum = new SignalIssuanceExpectation(
+                context, aboveJavascriptSafeInteger, Long.MAX_VALUE);
+        assertThat(maximum.routeRevision()).isEqualTo(aboveJavascriptSafeInteger);
+        assertThat(maximum.consentGeneration()).isEqualTo(Long.MAX_VALUE);
+        assertThat(maximum.toString()).isEqualTo("SignalIssuanceExpectation[private]")
+                .doesNotContain(context.toString(), Long.toString(aboveJavascriptSafeInteger),
+                        Long.toString(Long.MAX_VALUE));
+        for (org.assertj.core.api.ThrowableAssert.ThrowingCallable invalid
+                : List.<org.assertj.core.api.ThrowableAssert.ThrowingCallable>of(
+                () -> new SignalIssuanceExpectation(null, 0, 0),
+                () -> new SignalIssuanceExpectation(new UUID(0, 0), 0, 0),
+                () -> new SignalIssuanceExpectation(context, -1, 0),
+                () -> new SignalIssuanceExpectation(context, 0, -1))) {
+            assertThatThrownBy(invalid).isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Invalid signal issuance expectation").hasNoCause();
+        }
     }
 
     @Test
@@ -333,6 +475,16 @@ class RouteBindingConfiguredTest {
             SELECT count(*) FROM signal_actor_budget WHERE actor_id = ? AND action = 'ACCEPT'
             """, Integer.class, actor);
         assertThat(accepts).isZero();
+    }
+
+    private void assertNoGrantMutation(UUID actor) {
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM signal_command_grant WHERE actor_id = ?", Integer.class, actor))
+                .isZero();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM signal_actor_budget
+                WHERE actor_id = ? AND action = 'GRANT'
+                """, Integer.class, actor)).isZero();
     }
 
     private void assertDeniedAcceptance(CatalogSignalService selected, UUID actor,

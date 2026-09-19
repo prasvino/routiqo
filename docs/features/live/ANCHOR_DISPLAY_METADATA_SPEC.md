@@ -58,6 +58,8 @@ added. Request quotas, transport guards and contribution UI remain future work.
   anchor; it does **not** provide an exact displayed-context CAS. Before UI work,
   specify a coordinated exact-context issuance precondition or an explicit grant
   mismatch/discard policy. A read snapshot alone cannot supply that guarantee.
+  ADR 0044 now adds the internal expected-context method; the legacy HTTP path
+  remains unchanged and a guarded browser contract is still required.
 - Add explicit client lifecycle cancellation, context/grant matching, expiry,
   unknown-write recovery and no automatic contribution replay. This is a separate
   reviewed API/UI phase; no public privacy or anti-Sybil gate is relaxed.

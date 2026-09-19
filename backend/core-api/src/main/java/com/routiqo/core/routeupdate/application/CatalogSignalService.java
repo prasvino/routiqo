@@ -3,6 +3,7 @@ package com.routiqo.core.routeupdate.application;
 import com.routiqo.core.routeupdate.domain.QuickSignalReceipt;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routeupdate.domain.SignalCommandGrant;
+import com.routiqo.core.routeupdate.domain.SignalIssuanceExpectation;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
@@ -19,6 +20,13 @@ public final class CatalogSignalService {
 
     public SignalCommandGrant issue(UUID actorId, UUID journeyId, UUID anchorId) {
         return storage.issueFromCatalog(actorId, journeyId, anchorId, catalog);
+    }
+
+    /** Legacy issue uses current authority; this overload requires the exact displayed context. */
+    public SignalCommandGrant issueExpectedContext(UUID actorId, UUID journeyId, UUID anchorId,
+            SignalIssuanceExpectation expectation) {
+        if (expectation == null) throw new SignalStorageDenied();
+        return storage.issueFromCatalog(actorId, journeyId, anchorId, catalog, expectation);
     }
 
     public QuickSignalReceipt accept(UUID actorId, UUID commandId,

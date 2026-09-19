@@ -90,8 +90,10 @@ C. Build the first LIVE user experience
      old unlabeled catalogs and existing API/resolver outputs (ADR 0042).
    - DONE internally: authority-scoped read-only choice snapshots with current
      consent, restriction, provenance and expiry checks (ADR 0043); no endpoint.
-   - Add a guarded owner choice API/client and exact displayed-context issuance
-     semantics before Quick Signal controls.
+   - DONE internally: mandatory exact-context issuance precondition (ADR 0044),
+     retaining the existing anchor-only HTTP contract. No new browser caller.
+   - Add guarded choice-read and expected-context issuance contracts/clients
+     before Quick Signal controls; no silent legacy fallback or automatic reissue.
    - Connect Quick Signal actions to the active owned journey. Preserve
      Home/Explore/Trips/Profile navigation and explicit grant/receipt recovery.
    - Implement authorized Live Moment reads and a bounded foreground refresh
