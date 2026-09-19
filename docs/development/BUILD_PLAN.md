@@ -2,6 +2,13 @@
 
 ## Next priority: Routiqo Live first release
 
+Latest supporting reliability work (2026-09-19): browser auth, private LIVE,
+journal and journey transports enforce bounded streamed responses and whole-
+operation deadlines. Journal/journey mutations capture their exact inputs before
+CSRF and retain existing draft/outbox acknowledgement rules. Integrated validation
+passed 308 TypeScript tests, web production build and repository checks; current
+evidence and release gates are in BUILD_STATUS.md. No public LIVE UI is enabled.
+
 ### Execution queue
 
 | Priority | Next concrete task | Completion evidence |

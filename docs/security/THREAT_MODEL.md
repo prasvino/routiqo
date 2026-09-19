@@ -454,6 +454,16 @@ server authentication, ownership, consent, budgets and publication gates still a
 See BROWSER_LIVE_CLIENT_SPEC.md and BROWSER_AUTH_TRANSPORT_SPEC.md for limits and
 verification scope.
 
+The existing journal and journey recovery clients must also resist unbounded or
+stalled responses: check streamed bytes rather than whole-text length after a
+read, and do not await cancellation indefinitely. A delayed CSRF bootstrap cannot
+change a captured mutation or launch it after deadline. An uncertain response
+never acknowledges or discards durable work. Journal drafts retain exact mutation
+identity for explicit retry; journey transport returns transient failure to the
+existing outbox rather than inventing success. Their transport specifications are
+in `docs/features/journey/BROWSER_JOURNAL_TRANSPORT_SPEC.md` and
+`docs/features/journey/BROWSER_JOURNEY_TRANSPORT_SPEC.md`.
+
 ADR 0036 addresses a bounded portion of T12/T13/T14/T19/T20 through default-off
 expiry maintenance: independent small batches and existing SKIP LOCKED leaf
 transactions, serialized local ticks, isolated category failures and constant-only

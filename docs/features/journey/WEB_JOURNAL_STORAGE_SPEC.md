@@ -1,5 +1,10 @@
 # Browser journal drafts and confirmed snapshots
 
+Network lifecycle requirements are specified in BROWSER_JOURNAL_TRANSPORT_SPEC.md.
+A transport timeout or cancellation is an uncertain remote outcome, not permission
+to discard or rebase a draft. Only the exact acknowledgement checks below can
+clear the retained local mutation; an explicit retry reuses that mutation.
+
 ## Explicit conflict recovery
 
 Navigation recovery must not treat an intermediate history event as restoration. While dirty, intercept same-document history traversal until the editor's own marker is reached; disable the discard decision during restoration. Count traversed entries so confirmed discard preserves a multi-entry destination, while ordinary Back skips the extra editor marker. Preserve router state, create at most one marker per editor lifetime, and stop handling events on unmount/account change. Synthetic regression tests do not replace real browser navigation QA.
