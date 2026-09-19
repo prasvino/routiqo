@@ -36,7 +36,11 @@ Catalog labels/categories/locations are
 part of catalog content: changes require a fresh version and a coordinated
 consistent replica rollout. Existing version/provenance fences remain mandatory.
 
-## Next private choice boundary — planned only
+## Private choice boundary — internal reader implemented; exposure pending
+
+ADR 0043 and `PRIVATE_ANCHOR_CHOICES_SPEC.md` implement the internal read-only
+authority and minimized snapshot below. No Spring wiring or browser surface is
+added. Request quotas, transport guards and contribution UI remain future work.
 
 - Add a separate owner-scoped read operation; do not broaden ADR 0034's minimal
   route-context DTO or issue grants just to populate choices.

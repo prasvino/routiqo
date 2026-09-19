@@ -522,6 +522,16 @@ Future owner choices require current consent/context/catalog authority, bounded
 read quotas and explicit exact-context issuance semantics. A readable label is
 neither proof of physical presence nor an anti-Sybil or publication guarantee.
 
+ADR 0043's internal choice reader enters one owned-journey authority boundary,
+reads consent/context/restriction in established order and samples exact time
+after those reads. Deny foreign, expired, suspended, unprovenanced or partially
+labeled contexts as a whole. Return only the bounded current labeled subset and
+exact context/consent versions, with immutable collections and redacted diagnostics.
+It creates no grants and performs no provider or persistence writes. It is not
+wired to HTTP: future exposure still requires no-store guards, quotas and explicit
+exact-context issuance semantics. Existing issue-by-anchor can use a replacement
+context containing that anchor; a prior choice snapshot cannot authorize a write.
+
 Moderation expiry uses the same bounded scheduling principles through a separate
 default-off flag and domain-owned audit/debit cleanup adapter. Auth maintenance
 must retain its own named scheduler even when only moderation cleanup is enabled;

@@ -22,7 +22,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
 | Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; private active-journey consent UI with explicit check/allow/stop and uncertain-write fencing; no presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration or output; optional bounded expiry job under ADR 0036 |
-| Route-area display metadata | Optional bounded operator-curated labels in the immutable catalog; old unlabeled catalogs remain valid, malformed labels fail closed, diagnostics stay redacted and existing APIs/resolver output are unchanged. Owner choice reads and exact-context issuance semantics remain a separate prerequisite |
+| Route-area display metadata | Optional bounded operator-curated labels in the immutable catalog; old unlabeled catalogs remain valid, malformed labels fail closed, diagnostics stay redacted and existing APIs/resolver output are unchanged |
+| Private route-area choice reader | Internal read-only owned-journey service returns only the current context's complete labeled subset after consent, restriction, catalog and exact expiry checks. Immutable minimized snapshot; no Spring wiring, HTTP, provider calls, grants or writes. Owner transport and exact-context issuance semantics remain pending |
 | Private route preparation | Separately default-off owner-only GET recovery and explicit POST binding through the real configured binder; strict browser guards, minimal no-store DTOs, database account quotas and post-provider authority rechecks. Browser check/prepare controls use copied route choices, confirmed consent, synchronous scope invalidation and expiring private acknowledgements. No public Live output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
 | Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
@@ -38,6 +39,22 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Latest internal owner choice reader pass, 2026-09-19:
+
+- ADR 0043 composes existing account/journey authority and participant order;
+  fails closed for foreign, off, suspended, stale, unprovenanced or incompletely
+  labeled contexts. Results are bounded, immutable, canonically ordered and
+  redacted. Reads create no grants and consume no contribution budget.
+- **403 Java tests across 55 suites**, zero failures/errors/skips; core check
+  and bootJar passed. Independent design/code review approved. Strengthened
+  constructor and null-state regressions also passed in a subsequent targeted
+  five-test run; production code was unchanged after the full suite.
+- Full Instant precision prevents sub-microsecond expiry reversal. Snapshot
+  lifetime is capped at 24 hours, with the exact boundary and +1 ns tested.
+- This internal service is not wired to Spring or HTTP. A guarded default-off
+  owner transport and coordinated exact displayed-context issuance semantics
+  are still required before Quick Signal controls. No public gate is relaxed.
 
 Latest internal catalog metadata pass, 2026-09-19:
 
@@ -64,8 +81,8 @@ Latest private route UI and routing transport pass, 2026-09-19:
   streamed bytes and validation under one 18-second deadline, including abort-
   ignoring adapters. Late/error cleanup cannot hold an operation open.
 - **365 TypeScript tests across 45 files** passed. Workspace types, lint,
-  formatting, contracts, secret scan and web production build passed. No backend
-  changes; the previously verified 394 Java tests remain the backend baseline.
+  formatting, contracts, secret scan and web production build passed. That UI
+  slice made no backend changes; later backend evidence is recorded above.
 - Actual components were exercised in a labelled simulated-transport fixture:
   desktop/390/320 layouts, keyboard focus, route choice, bound/empty/conflict,
   pending Stop and offline/reconnect behavior. This is not live-provider or OAuth

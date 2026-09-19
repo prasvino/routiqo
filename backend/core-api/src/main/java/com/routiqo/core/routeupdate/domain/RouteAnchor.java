@@ -19,13 +19,14 @@ public record RouteAnchor(UUID anchorId, RouteRequest.Coordinate location,
         if (anchorId == null || NIL_ID.equals(anchorId) || location == null || categories == null
                 || categories.isEmpty() || categories.size() > Category.values().length
                 || categories.stream().anyMatch(java.util.Objects::isNull) || displayLabel == null
-                || displayLabel.isPresent() && !validLabel(displayLabel.orElseThrow())) {
+                || displayLabel.isPresent() && !validDisplayLabel(displayLabel.orElseThrow())) {
             throw new IllegalArgumentException("Invalid route anchor");
         }
         categories = Set.copyOf(categories);
     }
 
-    private static boolean validLabel(String label) {
+    static boolean validDisplayLabel(String label) {
+        if (label == null) return false;
         int count = label.codePointCount(0, label.length());
         if (count < 1 || count > 80 || label.charAt(0) == ' '
                 || label.charAt(label.length() - 1) == ' ') return false;

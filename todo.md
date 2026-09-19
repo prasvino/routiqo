@@ -23,7 +23,7 @@
 
 ## First release — LIVE interface
 
-- [ ] Implement authorized owner-facing route-area/category choice reads using the optional catalog labels; resolve exact displayed-context issuance semantics before Quick Signal controls.
+- [ ] Expose the verified internal route-area/category choice reader through a reviewed default-off owner API and browser client; resolve exact displayed-context issuance semantics before Quick Signal controls.
 - [ ] Connect Quick Signal actions to the active owned journey; verify the implemented private consent and route-preparation controls with real authenticated lifecycle tests.
 - [ ] Build the active-journey LIVE list after publication and safety gates pass.
 - [ ] Add bounded foreground refresh with cancellation, backoff and one request in flight.

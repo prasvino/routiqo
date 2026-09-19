@@ -7,7 +7,8 @@ Current browser slice (2026-09-19): private active-journey consent controls unde
 existing clients; uncertain writes remain uncertain until explicit stop succeeds.
 No automatic requests, browser persistence, public publication or server feature
 activation. Current verification evidence belongs in BUILD_STATUS.md. Route
-binding and Quick Signal controls remain the next interface prerequisites.
+preparation is now implemented under `BROWSER_ROUTE_BINDING_UI_SPEC.md`.
+Choice transport and Quick Signal controls remain the next interface prerequisites.
 
 Latest safety work (2026-09-19): ADR 0041 adds internal action-specific operator
 permissions, exact revision checks, transactional audit and deletion-resistant
@@ -59,6 +60,7 @@ evidence and release gates are in BUILD_STATUS.md. No public LIVE UI is enabled.
 | P1 / L2 consent — verified | Explicit private active-journey consent controls, uncertain-write fencing and lifecycle cancellation | 32 focused React tests; full 329 TypeScript tests/43 files, web build and independent review; scoped visual/keyboard QA; real auth and public LIVE remain gated |
 | P1 / L2 private route preparation — verified | Explicit context check/fresh bind from copied route choices and confirmed consent; synchronous lifecycle/scope invalidation and expiring acknowledgements | Full 365 TypeScript tests/45 files, workspace checks and web build; independent review plus scoped rendered QA; routing/search transport also bounded across CSRF/headers/streams; real-provider verification pending |
 | P1 / L2 route-area metadata — verified internal prerequisite | ADR 0042 optional validated curated labels with strict backward-compatible catalog loading and redacted diagnostics | Full 398 Java tests/54 suites, core check/bootJar and independent review; no owner choice API or output changes |
+| P1 / L2 route-area choice reader — verified internal prerequisite | ADR 0043 current owned-journey consent/context/restriction and catalog checks, exact bounded labeled subset and immutable minimized snapshot | Full 403 Java tests/55 suites, core check/bootJar and independent review; no Spring wiring, endpoint, grants or budget debits |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -110,9 +112,10 @@ authority and selection epochs invalidate pending work and displayed confirmatio
 The routing/search transport is bounded separately under
 `../features/journey/BROWSER_ROUTING_TRANSPORT_SPEC.md`.
 
-The next contribution UI prerequisite is useful authorized owner-facing anchor
-labels and category choices; do not expose opaque anchor IDs as product labels or
-invent a synthetic catalog fallback. Then connect explicit Quick Signal actions
+ADRs 0042/0043 provide validated labels and an internal authorized choice reader.
+The next contribution UI prerequisites are a guarded owner choice transport and
+exact displayed-context issuance semantics. Do not expose opaque anchor IDs as
+product labels or invent a synthetic catalog fallback. Then connect explicit Quick Signal actions
 with exact grant/receipt handling. Public eligibility still requires the separate
 publication and safety decisions; route preparation is not physical-presence proof.
 
