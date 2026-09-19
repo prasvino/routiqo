@@ -28,7 +28,20 @@ class RouteAnchorCatalogLoaderTest {
         assertThat(catalog.anchors().getFirst().location().longitude()).isEqualTo(80);
         assertThat(catalog.anchors().getFirst().categories())
                 .containsExactlyInAnyOrder(Category.QUEUE, Category.RESTROOM);
+        assertThat(catalog.anchors().getFirst().displayLabel()).isEmpty();
         assertThat(loader.toString()).isEqualTo("RouteAnchorCatalogLoader[private]");
+    }
+
+    @Test void loadsOptionalUnicodeDisplayMetadataWithoutNormalization() throws Exception {
+        String label = "Caf\u0065\u0301 Junction ②—₹ 🛣";
+        String labeled = "{\"id\":\"" + ID + "\",\"longitude\":80,\"latitude\":13,"
+                + "\"categories\":[\"QUEUE\"],\"displayLabel\":\"" + label + "\"}";
+
+        var anchor = loader.load(write("labeled.json", catalog(labeled))).anchors().getFirst();
+
+        assertThat(anchor.displayLabel()).contains(label);
+        assertThat(anchor.displayLabel().orElseThrow()).isEqualTo(label);
+        assertThat(anchor.toString()).doesNotContain(label, ID);
     }
 
     @Test void rejectsUnknownDuplicateMissingNullAndTrailingJsonWithoutLeakingInput() throws Exception {
@@ -41,9 +54,27 @@ class RouteAnchorCatalogLoaderTest {
                 catalog("{\"id\":\"" + ID + "\",\"longitude\":80,\"latitude\":13,"
                         + "\"categories\":[\"QUEUE\"],\"label\":\"private-marker\"}"),
                 catalog("{\"id\":\"" + ID + "\",\"id\":\"" + ID + "\",\"longitude\":80,"
-                        + "\"latitude\":13,\"categories\":[\"QUEUE\"]}"))) {
+                        + "\"latitude\":13,\"categories\":[\"QUEUE\"]}"),
+                catalog("{\"id\":\"" + ID + "\",\"longitude\":80,\"latitude\":13,"
+                        + "\"categories\":[\"QUEUE\"],\"displayLabel\":null}"),
+                catalog("{\"id\":\"" + ID + "\",\"longitude\":80,\"latitude\":13,"
+                        + "\"categories\":[\"QUEUE\"],\"displayLabel\":1}"),
+                catalog("{\"id\":\"" + ID + "\",\"longitude\":80,\"latitude\":13,"
+                        + "\"categories\":[\"QUEUE\"],\"displayLabel\":\"private-marker\","
+                        + "\"displayLabel\":\"other\"}"))) {
             assertInvalid(write("invalid-" + Math.abs(invalid.hashCode()) + ".json", invalid),
                     "private-marker", ID, VERSION);
+        }
+    }
+
+    @Test void rejectsMalformedDisplayLabelsWithoutLeakingThem() throws Exception {
+        for (String label : List.of("", " leading", "trailing ", "x".repeat(81),
+                "private\u202Elabel", "private\u00A0label", "private\uE000label")) {
+            String json = catalog("{\"id\":\"" + ID + "\",\"longitude\":80,\"latitude\":13,"
+                    + "\"categories\":[\"QUEUE\"],\"displayLabel\":\"" + label + "\"}");
+            Path path = write("invalid-label-" + Math.abs(label.hashCode()) + ".json", json);
+            if (label.isEmpty()) assertInvalid(path, ID, VERSION);
+            else assertInvalid(path, label, ID, VERSION);
         }
     }
 

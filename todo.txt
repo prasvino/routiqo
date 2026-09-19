@@ -86,8 +86,10 @@ C. Build the first LIVE user experience
      Private consent and explicit route preparation are mounted for confirmed
      active journeys; there is no public LIVE interface. Browser auth and routing
      transports also bound streamed JSON and refuse redirects.
-   - Define authorized useful route-area labels and category choices before
-     exposing Quick Signal controls; opaque anchor IDs are not product labels.
+   - DONE internally: optional validated curated route-area labels, preserving
+     old unlabeled catalogs and existing API/resolver outputs (ADR 0042).
+   - Implement authorized owner-facing route-area/category choice reads and
+     exact displayed-context issuance semantics before Quick Signal controls.
    - Connect Quick Signal actions to the active owned journey. Preserve
      Home/Explore/Trips/Profile navigation and explicit grant/receipt recovery.
    - Implement authorized Live Moment reads and a bounded foreground refresh

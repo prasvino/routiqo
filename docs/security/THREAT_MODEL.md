@@ -512,6 +512,16 @@ provider/parse failures. `BROWSER_ROUTING_TRANSPORT_SPEC.md` specifies this clie
 boundary; controlled provider egress and server input limits remain independently
 required. No cached route or successful estimate proves public LIVE eligibility.
 
+ADR 0042 permits optional operator-curated route-area display labels only inside
+the existing bounded catalog. Reject malformed/oversized/control/format text and
+retain cause-free redacted diagnostics. The category filter does not eliminate
+every invisible or confusable Unicode character: operators must review readability,
+public suitability and geographic accuracy. Treat labels as plain text, never
+instructions, HTML, links or provider queries. Existing DTOs expose no new metadata.
+Future owner choices require current consent/context/catalog authority, bounded
+read quotas and explicit exact-context issuance semantics. A readable label is
+neither proof of physical presence nor an anti-Sybil or publication guarantee.
+
 Moderation expiry uses the same bounded scheduling principles through a separate
 default-off flag and domain-owned audit/debit cleanup adapter. Auth maintenance
 must retain its own named scheduler even when only moderation cleanup is enabled;

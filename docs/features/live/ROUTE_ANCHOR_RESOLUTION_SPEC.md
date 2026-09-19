@@ -8,12 +8,16 @@ HTTP registration, bind a journey context, issue a signal grant or publish data.
 Route Update owns an immutable curated anchor catalog. Each anchor has a nonnil
 UUID, finite geographic longitude/latitude, and a nonempty closed set of Quick
 Signal categories. The catalog has a nonnil version UUID and 1..512 distinct
-anchors. No actor, traveller endpoint, route geometry, labels or membership is
-stored in this catalog. All records, results and errors redact diagnostics.
+anchors. No actor, traveller endpoint, route geometry or membership is stored in
+this catalog. ADR 0042 adds optional curated display metadata under
+`ANCHOR_DISPLAY_METADATA_SPEC.md`; it does not change resolution or API output.
+All records, results and errors redact diagnostics, including any label.
 
 Load a strict UTF-8 JSON catalog from a server-configured local file, at most
-256 KiB, with exactly version and anchors; each anchor has exactly id, longitude,
-latitude and categories. Reject unknown/duplicate/missing/null fields, trailing
+256 KiB, with exactly version and anchors; each anchor requires id, longitude,
+latitude and categories, with only the optional displayLabel field added by ADR
+0042. Explicit null labels are invalid; missing labels preserve older catalogs.
+Reject unknown/duplicate/missing/null required fields, trailing
 JSON, duplicate IDs/categories, invalid coordinates and category values, and
 oversized input with a cause-free generic configuration failure. Read with a bound,
 not readAllBytes before checking size. No request-selected file path or URL.

@@ -4,7 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
-/** Versioned operator-curated anchors. No actor, route geometry or labels are stored. */
+/** Versioned operator-curated private route metadata, never traveller-derived evidence. */
 public record RouteAnchorCatalog(UUID version, List<RouteAnchor> anchors) {
     private static final UUID NIL_ID = new UUID(0, 0);
 

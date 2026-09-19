@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import tools.jackson.core.StreamReadFeature;
@@ -57,10 +58,13 @@ public final class RouteAnchorCatalogLoader {
     }
 
     private static RouteAnchor anchor(JsonNode node) {
-        if (node == null || !node.isObject()
-                || !node.propertyNames().equals(Set.of("id", "longitude", "latitude", "categories"))) {
+        if (node == null || !node.isObject()) {
             throw invalid();
         }
+        var properties = node.propertyNames();
+        Set<String> required = Set.of("id", "longitude", "latitude", "categories");
+        Set<String> labeled = Set.of("id", "longitude", "latitude", "categories", "displayLabel");
+        if (!properties.equals(required) && !properties.equals(labeled)) throw invalid();
         UUID id = uuid(node.get("id"));
         JsonNode longitudeNode = node.get("longitude");
         JsonNode latitudeNode = node.get("latitude");
@@ -84,7 +88,14 @@ public final class RouteAnchorCatalogLoader {
             }
             if (!categories.add(category)) throw invalid();
         }
-        return new RouteAnchor(id, new RouteRequest.Coordinate(longitude, latitude), categories);
+        Optional<String> displayLabel = Optional.empty();
+        if (properties.contains("displayLabel")) {
+            JsonNode labelNode = node.get("displayLabel");
+            if (labelNode == null || !labelNode.isTextual()) throw invalid();
+            displayLabel = Optional.of(labelNode.textValue());
+        }
+        return new RouteAnchor(id, new RouteRequest.Coordinate(longitude, latitude), categories,
+                displayLabel);
     }
 
     private static UUID uuid(JsonNode node) {
