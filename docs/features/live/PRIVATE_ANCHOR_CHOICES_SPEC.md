@@ -1,7 +1,8 @@
 # Private owner route-area choice snapshot
 
 Status: implemented, tested and independently reviewed, 2026-09-19. Internal read-only application
-prerequisite only; no Spring wiring, endpoint, browser client, UI or grant mutation.
+prerequisite only. ADR0045 adds gated composition, owner HTTP and browser clients;
+the reader itself performs no grant mutation and no contribution UI is mounted.
 
 ## Authority
 

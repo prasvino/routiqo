@@ -16,6 +16,9 @@ export type LiveRouteContextRead = components['schemas']['BrowserRouteContextRea
 export type LiveRouteBinding = components['schemas']['BrowserRouteContextBindingRequest'];
 export type LiveRouteBindingResult = components['schemas']['BrowserRouteContextBindingResponse'];
 export type LiveSignalIssue = components['schemas']['BrowserSignalIssueRequest'];
+export type LiveExpectedSignalIssue = components['schemas']['BrowserExpectedSignalIssueRequest'];
+export type LiveSignalChoice = components['schemas']['BrowserSignalChoice'];
+export type LiveSignalChoiceSnapshot = components['schemas']['BrowserSignalChoiceSnapshot'];
 export type LiveSignalAcceptance = components['schemas']['BrowserSignalAcceptanceRequest'];
 export type LiveSignalGrant = components['schemas']['BrowserSignalCommandGrant'];
 export type LiveSignalReceipt = components['schemas']['BrowserSignalReceipt'];
@@ -46,11 +49,14 @@ const values = [
   'restroom_busy',
   'restroom_problem_reported',
 ] as const;
+const displayLabelPattern = /^(?: |\p{L}|\p{M}|\p{N}|\p{P}|\p{S})+$/u;
 
 type LivePath =
   | `/api/v1/journeys/${string}/consent`
   | `/api/v1/journeys/${string}/route-context`
+  | `/api/v1/journeys/${string}/signal-choices`
   | `/api/v1/journeys/${string}/signal-commands`
+  | `/api/v1/journeys/${string}/signal-commands/expected-context`
   | `/api/v1/journeys/${string}/signals/${string}`
   | `/api/v1/journeys/${string}/signals/${string}/withdraw`;
 
@@ -235,6 +241,85 @@ export function readSignalIssue(value: unknown): LiveSignalIssue {
   return { anchorId: readUuid(item.anchorId) };
 }
 
+export function readExpectedSignalIssue(value: unknown): LiveExpectedSignalIssue {
+  const item = plainRecord(value, ['anchorId', 'contextId', 'routeRevision', 'consentGeneration']);
+  return {
+    anchorId: readUuid(item.anchorId),
+    contextId: readUuid(item.contextId),
+    routeRevision: readDecimal(item.routeRevision),
+    consentGeneration: readDecimal(item.consentGeneration),
+  };
+}
+
+function readCategories(value: unknown): LiveSignalGrant['categories'] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 5) invalid();
+  const accepted = value.map((category) => {
+    if (!categories.includes(category as (typeof categories)[number])) invalid();
+    return category as LiveSignalGrant['categories'][number];
+  });
+  if (
+    new Set(accepted).size !== accepted.length ||
+    accepted.some((category, index) => index > 0 && accepted[index - 1]! >= category)
+  )
+    invalid();
+  return accepted;
+}
+
+function readDisplayLabel(value: unknown): string {
+  const codePoints = typeof value === 'string' ? Array.from(value).length : 0;
+  if (
+    typeof value !== 'string' ||
+    value.startsWith(' ') ||
+    value.endsWith(' ') ||
+    codePoints < 1 ||
+    codePoints > 80 ||
+    displayLabelPattern.exec(value)?.[0] !== value
+  )
+    invalid();
+  return value;
+}
+
+export function readSignalChoiceSnapshot(
+  value: unknown,
+  nowNanoseconds = BigInt(Date.now()) * 1_000_000n,
+): LiveSignalChoiceSnapshot {
+  const item = plainRecord(value, [
+    'contextId',
+    'routeRevision',
+    'consentGeneration',
+    'issuedAt',
+    'expiresAt',
+    'choices',
+  ]);
+  if (!Array.isArray(item.choices) || item.choices.length < 1 || item.choices.length > 128)
+    invalid();
+  const choices = item.choices.map((value): LiveSignalChoice => {
+    const choice = plainRecord(value, ['anchorId', 'displayLabel', 'categories']);
+    return {
+      anchorId: readUuid(choice.anchorId),
+      displayLabel: readDisplayLabel(choice.displayLabel),
+      categories: readCategories(choice.categories),
+    };
+  });
+  if (
+    new Set(choices.map((choice) => choice.anchorId)).size !== choices.length ||
+    choices.some((choice, index) => index > 0 && choices[index - 1]!.anchorId >= choice.anchorId)
+  )
+    invalid();
+  const issuedAt = readInstant(item.issuedAt);
+  const expiresAt = readInstant(item.expiresAt);
+  requireLifetime(issuedAt, expiresAt, 24 * 60 * 60);
+  if (issuedAt.nanoseconds > nowNanoseconds || expiresAt.nanoseconds <= nowNanoseconds) invalid();
+  return {
+    contextId: readUuid(item.contextId),
+    routeRevision: readDecimal(item.routeRevision),
+    consentGeneration: readDecimal(item.consentGeneration),
+    issuedAt: issuedAt.raw,
+    expiresAt: expiresAt.raw,
+    choices,
+  };
+}
+
 export function readSignalAcceptance(value: unknown): LiveSignalAcceptance {
   const item = plainRecord(value, [
     'anchorId',
@@ -264,19 +349,7 @@ export function readSignalGrant(value: unknown, requestedAnchor: string): LiveSi
     'issuedAt',
     'expiresAt',
   ]);
-  if (!Array.isArray(item.categories) || item.categories.length < 1 || item.categories.length > 5)
-    invalid();
-  const acceptedCategories = item.categories.map((category) => {
-    if (!categories.includes(category as (typeof categories)[number])) invalid();
-    return category as LiveSignalGrant['categories'][number];
-  });
-  if (
-    new Set(acceptedCategories).size !== acceptedCategories.length ||
-    acceptedCategories.some(
-      (category, index) => index > 0 && acceptedCategories[index - 1]! >= category,
-    )
-  )
-    invalid();
+  const acceptedCategories = readCategories(item.categories);
   const anchorId = readUuid(item.anchorId);
   if (anchorId !== requestedAnchor) invalid();
   const issuedAt = readInstant(item.issuedAt);
@@ -292,6 +365,24 @@ export function readSignalGrant(value: unknown, requestedAnchor: string): LiveSi
     issuedAt: issuedAt.raw,
     expiresAt: expiresAt.raw,
   };
+}
+
+export function readExpectedSignalGrant(
+  value: unknown,
+  expected: LiveExpectedSignalIssue,
+  nowNanoseconds = BigInt(Date.now()) * 1_000_000n,
+): LiveSignalGrant {
+  const grant = readSignalGrant(value, expected.anchorId);
+  if (
+    grant.contextId !== expected.contextId ||
+    grant.routeRevision !== expected.routeRevision ||
+    grant.consentGeneration !== expected.consentGeneration
+  )
+    invalid();
+  const issuedAt = readInstant(grant.issuedAt);
+  const expiresAt = readInstant(grant.expiresAt);
+  if (issuedAt.nanoseconds > nowNanoseconds || expiresAt.nanoseconds <= nowNanoseconds) invalid();
+  return grant;
 }
 
 export function readSignalReceipt(
@@ -491,6 +582,7 @@ export async function liveRequest<T>(options: {
   path: LivePath;
   body?: unknown;
   timeoutMilliseconds: 12000 | 30000;
+  responseLimit?: 65536 | 262144;
   signal?: AbortSignal | undefined;
   validate: (value: unknown) => T;
 }): Promise<T> {
@@ -530,7 +622,12 @@ export async function liveRequest<T>(options: {
       cancellation,
       expiresAt,
     );
-    const raw = await readJson(response, 64 * 1024, cancellation, expiresAt);
+    const raw = await readJson(
+      response,
+      options.responseLimit ?? 64 * 1024,
+      cancellation,
+      expiresAt,
+    );
     let value: T;
     try {
       value = options.validate(raw);

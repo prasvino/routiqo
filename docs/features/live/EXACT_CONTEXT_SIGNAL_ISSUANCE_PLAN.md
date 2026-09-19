@@ -103,7 +103,8 @@ winning lock race, exact nanosecond expiry, participant order, one authority
 callback, persisted timestamp precision, and expected-path acceptance/replay/
 withdrawal. Invalid tuples, long precision and redacted diagnostics are tested.
 
-The shared unchanged transaction and legacy suites retain rollback and consent
-race evidence. Dedicated expected-path grant-insertion rollback and consent-
-winning issuance race tests remain follow-ups before browser exposure; they are
-not claimed by the thirteen-test result. This is an internal prerequisite only.
+Follow-up verification under ADR0045 completed the dedicated expected-path
+consent-winning issuance race and real-budget insertion-failure rollback cases,
+including absent/existing budget rows. Full416-test backend verification passed.
+The original thirteen-test result above remains historical; the new guarded
+choice/issuance browser boundary is specified in BROWSER_SIGNAL_CHOICES_API_SPEC.

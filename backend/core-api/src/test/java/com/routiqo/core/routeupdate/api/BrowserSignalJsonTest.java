@@ -1,8 +1,13 @@
 package com.routiqo.core.routeupdate.api;
 
 import com.routiqo.core.routeupdate.domain.QuickSignalValue;
+import com.routiqo.core.routeupdate.domain.PrivateAnchorChoice;
+import com.routiqo.core.routeupdate.domain.PrivateAnchorChoiceSnapshot;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -34,6 +39,38 @@ class BrowserSignalJsonTest {
             assertThat(parsed.toString()).doesNotContain(JOURNEY.toString(), ANCHOR.toString(),
                     CONTEXT.toString(), value.name(), "9007199254740993");
         }
+    }
+
+    @Test void expectedIssuePreservesExactLongsAndMaximumChoiceResponseStaysBounded() throws Exception {
+        var issue = BrowserSignalJson.expectedIssue(request("""
+                {"anchorId":"%s","contextId":"%s",\
+                "routeRevision":"9007199254740993",\
+                "consentGeneration":"9223372036854775807"}
+                """.formatted(ANCHOR, CONTEXT)));
+        assertThat(issue.anchorId()).isEqualTo(ANCHOR);
+        assertThat(issue.expectation().contextId()).isEqualTo(CONTEXT);
+        assertThat(issue.expectation().routeRevision()).isEqualTo(9_007_199_254_740_993L);
+        assertThat(issue.expectation().consentGeneration()).isEqualTo(Long.MAX_VALUE);
+        assertThat(issue.toString()).doesNotContain(ANCHOR.toString(), CONTEXT.toString(),
+                "9007199254740993", Long.toString(Long.MAX_VALUE));
+
+        var choices = new ArrayList<PrivateAnchorChoice>();
+        String label = "🛣".repeat(80);
+        for (int index = 1; index <= 128; index++) {
+            choices.add(new PrivateAnchorChoice(new UUID(1, index), label,
+                    Set.of(QuickSignalValue.Category.values())));
+        }
+        var snapshot = new PrivateAnchorChoiceSnapshot(CONTEXT, 9_007_199_254_740_993L,
+                Long.MAX_VALUE, Instant.parse("2026-09-19T12:00:00.123456789Z"),
+                Instant.parse("2026-09-19T12:15:00.123456789Z"), choices);
+        String json = tools.jackson.databind.json.JsonMapper.builder().build()
+                .writeValueAsString(BrowserSignalChoiceController.ChoiceResponse.from(snapshot));
+        assertThat(json.getBytes(StandardCharsets.UTF_8).length).isLessThanOrEqualTo(256 * 1024);
+        var node = tools.jackson.databind.json.JsonMapper.builder().build().readTree(json);
+        assertThat(node.get("choices").size()).isEqualTo(128);
+        assertThat(node.get("choices").get(0).get("displayLabel").textValue()).isEqualTo(label);
+        assertThat(node.propertyNames()).containsExactlyInAnyOrder("contextId", "routeRevision",
+                "consentGeneration", "issuedAt", "expiresAt", "choices");
     }
 
     @Test void duplicateTrailingMalformedUtf8AndNonCanonicalScalarsFailGenerically() {

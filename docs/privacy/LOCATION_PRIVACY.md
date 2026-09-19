@@ -56,3 +56,18 @@ against a delayed earlier write. Empty preparation results preserve any previous
 server context. Consent, identity, route-choice and foreground changes invalidate
 local readiness immediately; reconnect and expiry never trigger automatic traffic.
 No opaque context or anchor identifiers become public labels or location choices.
+
+## Private contribution choices
+
+ADR 0045's separately gated owner transport returns only current authorized
+route-area labels/categories and exact context/consent versions. Labels are
+operator-curated public place names, never traveller-derived addresses. The
+snapshot still reveals private route intent to its owner and must remain no-store,
+bounded and absent from logs, analytics, backups and other-user surfaces.
+
+Reading choices does not create grants or publish information. An explicit
+expected-context issuance rechecks current authority; its tuple is not proof of
+presence or independent evidence. Cancellation or rejecting an expired response
+cannot undo a server-side issuance. Clients must not silently refresh/reissue or
+fall back to the legacy anchor-only contract. Public eligibility and disclosure
+remain governed by the separate cohort and safety gates.

@@ -123,6 +123,14 @@ startup. GET is private recovery; POST calls the configured binder once. The web
 proxy permits this exact leaf only, uses a 25-second POST deadline and does not
 retry. No sample enables the flag or supplies catalog data.
 
+Private choice reads and expected-context issuance additionally require
+`ROUTIQO_LIVE_CHOICE_API_ENABLED=true` together with the signal gate and real
+catalog/authority composition. Both new leaves deny when either gate is absent
+or false. Choice reads return only the owner's current labeled subset; they
+create no grants. Expected issuance shares the legacy issue request quota.
+No sample enables this gate. See BROWSER_SIGNAL_CHOICES_API_SPEC.md for the
+bounded contracts and deployment verification still required.
+
 The private Quick Signal command transport has a third independent gate. Set
 `ROUTIQO_LIVE_SIGNAL_API_ENABLED=true` only with the same persistence, web-auth,
 routing, resolver/catalog and route-binding configuration. Its three owner-only

@@ -18,7 +18,8 @@ public class BrowserAuthConfiguration {
             AuthRateGate rates,
             @Value("${ROUTIQO_LIVE_CONSENT_API_ENABLED:false}") boolean consentEnabled,
             @Value("${ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED:false}") boolean routeBindingEnabled,
-            @Value("${ROUTIQO_LIVE_SIGNAL_API_ENABLED:false}") boolean signalEnabled) throws Exception {
+            @Value("${ROUTIQO_LIVE_SIGNAL_API_ENABLED:false}") boolean signalEnabled,
+            @Value("${ROUTIQO_LIVE_CHOICE_API_ENABLED:false}") boolean choiceEnabled) throws Exception {
         var csrf = new CookieCsrfTokenRepository();
         csrf.setCookieName(policy.cookieName("routiqo_csrf")); csrf.setCookiePath("/");
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(policy.secureCookies()).sameSite("Strict"));
@@ -49,6 +50,12 @@ public class BrowserAuthConfiguration {
                                 "/api/v1/journeys/*/signal-commands",
                                 "/api/v1/journeys/*/signals/*",
                                 "/api/v1/journeys/*/signals/*/withdraw").permitAll();
+                    }
+                    if (signalEnabled && choiceEnabled) {
+                        a.requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/v1/journeys/*/signal-choices").permitAll();
+                        a.requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/v1/journeys/*/signal-commands/expected-context").permitAll();
                     }
                     a.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/google/challenge", "/api/v1/auth/google/exchange", "/api/v1/auth/logout", "/api/v1/auth/session/renew", "/api/v1/auth/account/delete").permitAll();
                     a.anyRequest().denyAll();

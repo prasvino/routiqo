@@ -6,13 +6,16 @@ import com.routiqo.core.routeupdate.application.RouteBindingService;
 import com.routiqo.core.routeupdate.application.LiveRouteContextParticipant;
 import com.routiqo.core.routeupdate.application.CatalogSignalService;
 import com.routiqo.core.routeupdate.application.SignalStorageService;
+import com.routiqo.core.routeupdate.application.PrivateAnchorChoiceService;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.privacy.application.PresenceConsentParticipant;
+import com.routiqo.core.moderation.application.ContributionRestrictionReader;
 import com.routiqo.core.routing.application.RouteProvider;
 import com.routiqo.core.routing.domain.RoutingRegion;
 import java.nio.file.Path;
+import java.time.Clock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -61,6 +64,17 @@ public class RouteAnchorResolutionConfiguration {
     CatalogSignalService catalogSignalService(
             SignalStorageService storage, RouteAnchorCatalog catalog) {
         return new CatalogSignalService(storage, catalog);
+    }
+
+    @Bean
+    @Profile("persistence")
+    @ConditionalOnProperty(name = {"ROUTIQO_LIVE_SIGNAL_API_ENABLED",
+            "ROUTIQO_LIVE_CHOICE_API_ENABLED"}, havingValue = "true")
+    PrivateAnchorChoiceService privateAnchorChoiceService(JourneyWriteAuthority journeys,
+            PresenceConsentParticipant consents, LiveRouteContextParticipant contexts,
+            ContributionRestrictionReader restrictions, RouteAnchorCatalog catalog) {
+        return new PrivateAnchorChoiceService(
+                journeys, consents, contexts, restrictions, catalog, Clock.systemUTC());
     }
 
     private static IllegalStateException invalid() {

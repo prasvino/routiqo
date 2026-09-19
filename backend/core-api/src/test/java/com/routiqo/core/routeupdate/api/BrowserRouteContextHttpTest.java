@@ -68,7 +68,8 @@ import static org.assertj.core.api.Assertions.assertThat;
     "ROUTIQO_ROUTING_REGION_EAST=1", "ROUTIQO_ROUTING_REGION_NORTH=1",
     "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true",
     "ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED=true",
-    "ROUTIQO_LIVE_SIGNAL_API_ENABLED=true"
+    "ROUTIQO_LIVE_SIGNAL_API_ENABLED=true",
+    "ROUTIQO_LIVE_CHOICE_API_ENABLED=true"
 })
 @ActiveProfiles({"persistence", "google-auth", "web-auth", "routing"})
 @Import(BrowserRouteContextHttpTest.TestIdentity.class)
@@ -92,8 +93,8 @@ class BrowserRouteContextHttpTest {
             CATALOG = Files.createTempFile("routiqo-browser-binding-", ".json");
             Files.writeString(CATALOG, """
                 {"version":"00000000-0000-4000-8000-000000000101","anchors":[
-                  {"id":"00000000-0000-4000-8000-000000000103","longitude":0,"latitude":0,"categories":["QUEUE"]},
-                  {"id":"00000000-0000-4000-8000-000000000102","longitude":0.0002,"latitude":0,"categories":["TRAFFIC"]}
+                  {"id":"00000000-0000-4000-8000-000000000103","longitude":0,"latitude":0,"categories":["QUEUE"],"displayLabel":"Central Junction"},
+                  {"id":"00000000-0000-4000-8000-000000000102","longitude":0.0002,"latitude":0,"categories":["TRAFFIC"],"displayLabel":"East Junction"}
                 ]}
                 """, StandardCharsets.UTF_8);
             SERVER = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -528,6 +529,161 @@ class BrowserRouteContextHttpTest {
             """, Integer.class, owner.account())).isEqualTo(1);
     }
 
+    @Test void ownerChoicesAreMinimalOrderedReadOnlyAndFeedMandatoryExpectedIssuance()
+            throws Exception {
+        assertThat(context.getBeansOfType(BrowserSignalChoiceController.class)).hasSize(1);
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        bind(owner, journey);
+        PROVIDER_CALLS.set(0);
+
+        HttpResponse<String> response = signalChoices(owner, journey);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        Map<String, Object> fields = JsonPath.read(response.body(), "$");
+        assertThat(fields.keySet()).containsOnly("contextId", "routeRevision",
+                "consentGeneration", "issuedAt", "expiresAt", "choices");
+        assertThat(JsonPath.<String>read(response.body(), "$.routeRevision")).isEqualTo("0");
+        assertThat(JsonPath.<String>read(response.body(), "$.consentGeneration")).isEqualTo("1");
+        assertThat(JsonPath.<List<String>>read(response.body(), "$.choices[*].anchorId"))
+                .containsExactly("00000000-0000-4000-8000-000000000102",
+                        "00000000-0000-4000-8000-000000000103");
+        assertThat(JsonPath.<List<String>>read(response.body(), "$.choices[*].displayLabel"))
+                .containsExactly("East Junction", "Central Junction");
+        assertThat(JsonPath.<List<String>>read(response.body(), "$.choices[0].categories"))
+                .containsExactly("traffic");
+        assertThat(response.body()).doesNotContain("actorId", "journeyId", "catalogVersion",
+                "longitude", "latitude", "geometry", "endpoints");
+        assertThat(count("signal_command_grant", owner.account())).isZero();
+        assertThat(PROVIDER_CALLS).hasValue(0);
+
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String expected = expectedIssue(anchor,
+                JsonPath.read(response.body(), "$.contextId"),
+                JsonPath.read(response.body(), "$.routeRevision"),
+                JsonPath.read(response.body(), "$.consentGeneration"));
+        HttpResponse<String> issued = postSignal(owner, expectedSignalCommands(journey), expected);
+        assertThat(issued.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<String>read(issued.body(), "$.anchorId")).isEqualTo(anchor.toString());
+        assertThat(JsonPath.<String>read(issued.body(), "$.contextId"))
+                .isEqualTo(JsonPath.read(response.body(), "$.contextId"));
+        assertThat(JsonPath.<String>read(issued.body(), "$.routeRevision")).isEqualTo("0");
+        assertThat(JsonPath.<String>read(issued.body(), "$.consentGeneration")).isEqualTo("1");
+
+        String stale = expectedIssue(anchor, JsonPath.read(response.body(), "$.contextId"),
+                "1", JsonPath.read(response.body(), "$.consentGeneration"));
+        assertEmpty(postSignal(owner, expectedSignalCommands(journey), stale), 409);
+        assertThat(count("signal_command_grant", owner.account())).isEqualTo(1);
+        assertThat(PROVIDER_CALLS).hasValue(0);
+    }
+
+    @Test void choiceAndExpectedLeavesEnforceAuthorityStrictJsonAndSeparateSharedRates()
+            throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        Browser other = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        bind(owner, journey);
+        HttpResponse<String> choices = signalChoices(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String valid = expectedIssue(anchor, JsonPath.read(choices.body(), "$.contextId"),
+                JsonPath.read(choices.body(), "$.routeRevision"),
+                JsonPath.read(choices.body(), "$.consentGeneration"));
+        int before = count("signal_command_grant", owner.account());
+        for (String invalid : List.of("{}", "null", "[]", "{",
+                valid.replace("\"anchorId\":\"" + anchor + "\"", "\"anchorId\":null"),
+                valid.replace("\"routeRevision\":\"0\"", "\"routeRevision\":0"),
+                valid.replace("\"consentGeneration\":\"1\"", "\"consentGeneration\":\"01\""),
+                valid.replace("{", "{\"anchorId\":\"" + anchor + "\","),
+                valid.substring(0, valid.length() - 1) + ",\"extra\":1}",
+                valid + "{}")) {
+            assertEmpty(postSignal(owner, expectedSignalCommands(journey), invalid), 400);
+        }
+        assertEmpty(send(owner, "POST", expectedSignalCommands(journey), valid,
+                "application/json", null, owner.account().toString(), null,
+                "http://localhost:3000"), 403);
+        assertEmpty(send(owner, "POST", expectedSignalCommands(journey), valid,
+                "application/json", owner.csrf(), owner.account().toString(), null,
+                "http://evil.example"), 403);
+        assertEmpty(send(owner, "POST", expectedSignalCommands(journey) + "?private=x", valid,
+                "application/json", owner.csrf(), owner.account().toString(), null,
+                "http://localhost:3000"), 400);
+        var deniedSuffix = send(owner, "POST", expectedSignalCommands(journey) + "/extra", valid,
+                "application/json", owner.csrf(), owner.account().toString(), null,
+                "http://localhost:3000");
+        assertThat(deniedSuffix.statusCode()).isIn(401, 403);
+        assertThat(deniedSuffix.body()).isEmpty();
+        assertThat(deniedSuffix.headers().firstValue("Cache-Control")).contains("no-store");
+        for (var charset : List.of(StandardCharsets.UTF_16LE, StandardCharsets.UTF_16BE,
+                java.nio.charset.Charset.forName("UTF-32LE"),
+                java.nio.charset.Charset.forName("UTF-32BE"))) {
+            assertEmpty(sendEncodedSignal(owner, expectedSignalCommands(journey),
+                    valid.getBytes(charset)), 400);
+        }
+        String maximumLong = expectedIssue(anchor, JsonPath.read(choices.body(), "$.contextId"),
+                Long.toString(Long.MAX_VALUE), Long.toString(Long.MAX_VALUE));
+        assertEmpty(postSignal(owner, expectedSignalCommands(journey), maximumLong), 409);
+        assertEmpty(signalChoices(other, journey), 404);
+        assertEmpty(send(owner, "GET", signalChoicesPath(journey) + "?private=x", null,
+                null, null, owner.account().toString(), null, null), 400);
+        assertThat(count("signal_command_grant", owner.account())).isEqualTo(before);
+
+        jdbc.update("DELETE FROM auth_rate_bucket");
+        for (int index = 0; index < 30; index++) {
+            assertThat(signalChoices(owner, journey).statusCode()).isEqualTo(200);
+        }
+        assertLimited(signalChoices(owner, journey));
+        assertThat(count("signal_command_grant", owner.account())).isEqualTo(before);
+
+        jdbc.update("DELETE FROM auth_rate_bucket");
+        UUID missing = UUID.randomUUID();
+        for (int index = 0; index < 15; index++) assertEmpty(issue(owner, journey, missing), 409);
+        String missingExpected = expectedIssue(missing, JsonPath.read(choices.body(), "$.contextId"),
+                JsonPath.read(choices.body(), "$.routeRevision"),
+                JsonPath.read(choices.body(), "$.consentGeneration"));
+        for (int index = 0; index < 15; index++) {
+            assertEmpty(postSignal(owner, expectedSignalCommands(journey), missingExpected), 409);
+        }
+        assertLimited(issue(owner, journey, missing));
+    }
+
+    @Test void unavailableChoiceSnapshotsAreGenericAndNeverIssueGrants() throws Exception {
+        Browser owner = login(UUID.randomUUID());
+
+        UUID offJourney = start(owner);
+        enable(owner, offJourney);
+        bind(owner, offJourney);
+        disable(owner, offJourney, 1);
+        assertEmpty(signalChoices(owner, offJourney), 409);
+        assertThat(postJourney(owner, offJourney, "complete").statusCode()).isEqualTo(200);
+
+        UUID completedJourney = start(owner);
+        enable(owner, completedJourney);
+        bind(owner, completedJourney);
+        assertThat(postJourney(owner, completedJourney, "complete").statusCode()).isEqualTo(200);
+        assertEmpty(signalChoices(owner, completedJourney), 409);
+
+        UUID unprovenancedJourney = start(owner);
+        enable(owner, unprovenancedJourney);
+        bind(owner, unprovenancedJourney);
+        jdbc.update("UPDATE live_route_context SET catalog_version = NULL WHERE actor_id = ?",
+                owner.account());
+        assertEmpty(signalChoices(owner, unprovenancedJourney), 409);
+        assertThat(postJourney(owner, unprovenancedJourney, "complete").statusCode()).isEqualTo(200);
+
+        UUID expiredJourney = start(owner);
+        enable(owner, expiredJourney);
+        bind(owner, expiredJourney);
+        jdbc.update("""
+                UPDATE live_route_context SET expires_at = now() - interval '1 microsecond'
+                WHERE actor_id = ?
+                """, owner.account());
+        assertEmpty(signalChoices(owner, expiredJourney), 409);
+        assertThat(count("signal_command_grant", owner.account())).isZero();
+    }
+
     @Test void supersededReplayAndWithdrawalPreserveTheFirstTerminalOutcome() throws Exception {
         Browser owner = login(UUID.randomUUID());
         UUID journey = start(owner);
@@ -790,6 +946,11 @@ class BrowserRouteContextHttpTest {
                 "{\"anchorId\":\"" + anchor + "\"}");
     }
 
+    private HttpResponse<String> signalChoices(Browser owner, UUID journey) throws Exception {
+        return send(owner, "GET", signalChoicesPath(journey), null, null, null,
+                owner.account().toString(), null, null);
+    }
+
     private HttpResponse<String> accept(Browser owner, UUID journey, String command,
             String body) throws Exception {
         return postSignal(owner, "journeys/" + journey + "/signals/" + command, body);
@@ -807,8 +968,35 @@ class BrowserRouteContextHttpTest {
                 owner.account().toString(), null, "http://localhost:3000");
     }
 
+    private HttpResponse<String> sendEncodedSignal(Browser owner, String path, byte[] body)
+            throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(
+                "http://localhost:" + port + "/api/v1/" + path))
+                .header("Content-Type", "application/json")
+                .header("Origin", "http://localhost:3000")
+                .header("X-XSRF-TOKEN", owner.csrf())
+                .header("X-Routiqo-Account", owner.account().toString())
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
+        return owner.client().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
     private static String signalCommands(UUID journey) {
         return "journeys/" + journey + "/signal-commands";
+    }
+
+    private static String expectedSignalCommands(UUID journey) {
+        return signalCommands(journey) + "/expected-context";
+    }
+
+    private static String signalChoicesPath(UUID journey) {
+        return "journeys/" + journey + "/signal-choices";
+    }
+
+    private static String expectedIssue(UUID anchor, String context, String revision,
+            String generation) {
+        return "{\"anchorId\":\"" + anchor + "\",\"contextId\":\"" + context
+                + "\",\"routeRevision\":\"" + revision
+                + "\",\"consentGeneration\":\"" + generation + "\"}";
     }
 
     private static String acceptance(UUID anchor, String value, Map<String, Object> context,

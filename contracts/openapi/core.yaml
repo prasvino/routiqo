@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.14.0
-  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. Browser consent, private route-context and private signal-command transports are separately default-off; no public live traffic or user presence.
+  version: 0.15.0
+  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. Browser consent, private route-context and private signal-choice and command transports are separately default-off; no public live traffic or user presence.
 servers:
   - url: http://localhost:8080
 paths:
@@ -568,6 +568,58 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Session, authority or rate infrastructure unavailable. Empty response body. }
+  /api/v1/journeys/{id}/signal-choices:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    get:
+      operationId: getPrivateSignalChoices
+      security: [{ browserSession: [] }]
+      description: Returns a bounded minimized owner snapshot for explicit private contribution choice. It issues no grant and discloses no coordinates or public state. Thirty reads per account per minute.
+      responses:
+        '200':
+          description: Current private signal choice snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserSignalChoiceSnapshot' }
+        '400': { description: Invalid canonical path identifier or query string }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: 'Current journey, consent, context, restriction, provenance or display metadata unavailable' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+  /api/v1/journeys/{id}/signal-commands/expected-context:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: issueExpectedContextPrivateSignalCommand
+      security: [{ browserSession: [] }]
+      description: Issues once only when the submitted private context and revision tuple remains current. It shares legacy issuance request and successful-grant quotas and is never automatically retried.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserExpectedSignalIssueRequest' }
+      responses:
+        '200':
+          description: Private signal command grant matching the submitted tuple
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserSignalCommandGrant' }
+        '400': { description: Invalid canonical path identifier or exact JSON request }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: Submitted context tuple or current private authority denied issuance }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
   /api/v1/journeys/{id}/signals/{commandId}:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -944,6 +996,49 @@ components:
       required: [anchorId]
       properties:
         anchorId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+    BrowserExpectedSignalIssueRequest:
+      type: object
+      additionalProperties: false
+      required: [anchorId, contextId, routeRevision, consentGeneration]
+      properties:
+        anchorId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        contextId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        routeRevision: { $ref: '#/components/schemas/PrivateLongString' }
+        consentGeneration: { $ref: '#/components/schemas/PrivateLongString' }
+    BrowserSignalChoice:
+      type: object
+      additionalProperties: false
+      required: [anchorId, displayLabel, categories]
+      properties:
+        anchorId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        displayLabel:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Plain text bounded by Unicode code points; no leading/trailing ASCII space or control, format, separator, surrogate, private-use or unassigned code points.
+        categories:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items: { type: string, enum: [queue, traffic, parking, food_queue, restroom] }
+    BrowserSignalChoiceSnapshot:
+      type: object
+      additionalProperties: false
+      required: [contextId, routeRevision, consentGeneration, issuedAt, expiresAt, choices]
+      properties:
+        contextId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        routeRevision: { $ref: '#/components/schemas/PrivateLongString' }
+        consentGeneration: { $ref: '#/components/schemas/PrivateLongString' }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        choices:
+          type: array
+          minItems: 1
+          maxItems: 128
+          uniqueItems: true
+          description: Canonical ascending UUID-string order.
+          items: { $ref: '#/components/schemas/BrowserSignalChoice' }
     BrowserSignalAcceptanceRequest:
       type: object
       additionalProperties: false

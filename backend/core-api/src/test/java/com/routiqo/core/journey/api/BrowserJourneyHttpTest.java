@@ -317,12 +317,15 @@ class BrowserJourneyHttpTest {
     @Test void browserSignalRoutesAreDeniedWhenTheirDefaultOffFlagIsAbsent() throws Exception {
         assertThat(applicationContext.getBeansOfType(
                 com.routiqo.core.routeupdate.api.BrowserSignalController.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(
+                com.routiqo.core.routeupdate.api.BrowserSignalChoiceController.class)).isEmpty();
         var owner = login();
         UUID journey = UUID.randomUUID();
         UUID command = UUID.randomUUID();
         assertThat(send(owner, "journeys", start(journey, "trip")).statusCode()).isEqualTo(200);
         for (String path : java.util.List.of(
                 "journeys/" + journey + "/signal-commands",
+                "journeys/" + journey + "/signal-commands/expected-context",
                 "journeys/" + journey + "/signals/" + command,
                 "journeys/" + journey + "/signals/" + command + "/withdraw")) {
             var response = send(owner, path, "{}");
@@ -330,5 +333,9 @@ class BrowserJourneyHttpTest {
             assertThat(response.body()).isEmpty();
             assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
         }
+        var choices = send(owner, "journeys/" + journey + "/signal-choices", null);
+        assertThat(choices.statusCode()).isIn(401, 403);
+        assertThat(choices.body()).isEmpty();
+        assertThat(choices.headers().firstValue("Cache-Control")).contains("no-store");
     }
 }

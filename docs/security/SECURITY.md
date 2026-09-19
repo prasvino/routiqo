@@ -58,6 +58,13 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   checks and separate durable issue, acceptance and withdrawal request budgets
   precede transactional storage. Retained private replay never renews evidence;
   an accepted receipt is not permission for public output.
+- ADR 0045 requires both choice and signal API flags for private owner choices
+  and exact-context issuance, with real configured authority/catalog dependencies.
+  Choice reads return a bounded complete subset and never create grants. New
+  issuance shares the legacy request quota and must compare the full expected
+  tuple under current authority; no optional-precondition or legacy fallback.
+  Clients validate freshness and exact returned identity and preserve uncertainty
+  after a lost or rejected issuance response. No public publication is enabled.
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
 - Presence is privacy-transformed server-side before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.

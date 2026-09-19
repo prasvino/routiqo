@@ -410,6 +410,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/signal-choices": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+            };
+            cookie?: never;
+        };
+        /** @description Returns a bounded minimized owner snapshot for explicit private contribution choice. It issues no grant and discloses no coordinates or public state. Thirty reads per account per minute. */
+        get: operations["getPrivateSignalChoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{id}/signal-commands/expected-context": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Issues once only when the submitted private context and revision tuple remains current. It shares legacy issuance request and successful-grant quotas and is never automatically retried. */
+        post: operations["issueExpectedContextPrivateSignalCommand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/journeys/{id}/signals/{commandId}": {
         parameters: {
             query?: never;
@@ -584,6 +630,29 @@ export interface components {
         };
         BrowserSignalIssueRequest: {
             anchorId: components["schemas"]["PrivateSignalUuid"];
+        };
+        BrowserExpectedSignalIssueRequest: {
+            anchorId: components["schemas"]["PrivateSignalUuid"];
+            contextId: components["schemas"]["PrivateSignalUuid"];
+            routeRevision: components["schemas"]["PrivateLongString"];
+            consentGeneration: components["schemas"]["PrivateLongString"];
+        };
+        BrowserSignalChoice: {
+            anchorId: components["schemas"]["PrivateSignalUuid"];
+            /** @description Plain text bounded by Unicode code points; no leading/trailing ASCII space or control, format, separator, surrogate, private-use or unassigned code points. */
+            displayLabel: string;
+            categories: ("queue" | "traffic" | "parking" | "food_queue" | "restroom")[];
+        };
+        BrowserSignalChoiceSnapshot: {
+            contextId: components["schemas"]["PrivateSignalUuid"];
+            routeRevision: components["schemas"]["PrivateLongString"];
+            consentGeneration: components["schemas"]["PrivateLongString"];
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description Canonical ascending UUID-string order. */
+            choices: components["schemas"]["BrowserSignalChoice"][];
         };
         BrowserSignalAcceptanceRequest: {
             anchorId: components["schemas"]["PrivateSignalUuid"];
@@ -1847,6 +1916,130 @@ export interface operations {
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
             /** @description Session */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getPrivateSignalChoices: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current private signal choice snapshot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserSignalChoiceSnapshot"];
+                };
+            };
+            /** @description Invalid canonical path identifier or query string */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Current journey, consent, context, restriction, provenance or display metadata unavailable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    issueExpectedContextPrivateSignalCommand: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserExpectedSignalIssueRequest"];
+            };
+        };
+        responses: {
+            /** @description Private signal command grant matching the submitted tuple */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserSignalCommandGrant"];
+                };
+            };
+            /** @description Invalid canonical path identifier or exact JSON request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Submitted context tuple or current private authority denied issuance */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;

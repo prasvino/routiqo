@@ -79,3 +79,10 @@ Memory-only rows expire locally; remote changes cannot erase previously delivere
 information from disconnected clients immediately. Clear on local account/Ghost/
 journey-end transitions and reauthorize on reconnect. Document physical deletion,
 backup retention and lawful moderation exceptions explicitly before release.
+
+ADR 0045's private choice snapshot adds no durable browser or server copy. Its
+bounded owner response is no-store and validated for current expiry; labels,
+versions and category sets remain request-scoped. Existing catalog retention,
+route-context expiry, grant lifetime, receipt retention and deletion rules remain
+unchanged. Choice reads reserve only an existing durable request-rate row;
+expected issuance shares legacy issuance budgets and adds no new grant lifetime.

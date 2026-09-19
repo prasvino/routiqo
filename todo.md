@@ -23,8 +23,7 @@
 
 ## First release — LIVE interface
 
-- [ ] Expose the internal route-area/category choice reader and expected-context issuance through reviewed default-off owner contracts and browser clients before Quick Signal controls; never fall back to legacy anchor-only issuance.
-- [ ] Add expected-context issuance-specific consent-winning lock-race and grant-insertion rollback tests before browser exposure; retain existing shared transaction/replay regression coverage.
+- [ ] Implement and verify command stopping before contribution UI cancellation: atomically consume an existing unused grant or withdraw its retained receipt, with guarded owner transport and recovery client.
 - [ ] Connect Quick Signal actions to the active owned journey; verify the implemented private consent and route-preparation controls with real authenticated lifecycle tests.
 - [ ] Build the active-journey LIVE list after publication and safety gates pass.
 - [ ] Add bounded foreground refresh with cancellation, backoff and one request in flight.

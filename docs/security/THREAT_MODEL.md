@@ -540,6 +540,16 @@ acceptance/replay/withdrawal checks. Legacy anchor-only HTTP remains unchanged;
 future displayed-choice callers require an explicit guarded wire contract and no
 legacy fallback, automatic reissuance or offline replay after a lost response.
 
+The ADR 0045 browser boundary applies both choice and signal flags at controller
+and security matchers, with required real catalog and authority composition. A
+second issuance leaf shares the existing request quota; splitting routes must
+not amplify the account budget. Choice reads have their own bounded quota and
+cannot create grants. Minimize owner DTOs, redact nested diagnostics and keep
+labels plain text. Bound choice responses separately to support the maximum
+Unicode label set without widening all LIVE responses. Enforce exact fields,
+canonical IDs/decimal strings and returned tuple/freshness checks. Rejecting a
+late grant is not rollback and must never start an automatic retry.
+
 Moderation expiry uses the same bounded scheduling principles through a separate
 default-off flag and domain-owned audit/debit cleanup adapter. Auth maintenance
 must retain its own named scheduler even when only moderation cleanup is enabled;

@@ -1,12 +1,15 @@
 import {
   BrowserLiveError,
   liveRequest,
+  readExpectedSignalGrant,
+  readExpectedSignalIssue,
   readConsent,
   readConsentIntent,
   readRouteBinding,
   readRouteBindingResult,
   readRouteContextResult,
   readSignalAcceptance,
+  readSignalChoiceSnapshot,
   readSignalGrant,
   readSignalIssue,
   readSignalReceipt,
@@ -14,11 +17,14 @@ import {
   type BrowserLiveErrorKind,
   type LiveConsent,
   type LiveConsentIntent,
+  type LiveExpectedSignalIssue,
   type LiveRouteBinding,
   type LiveRouteBindingResult,
   type LiveRouteContext,
   type LiveRouteContextRead,
   type LiveSignalAcceptance,
+  type LiveSignalChoice,
+  type LiveSignalChoiceSnapshot,
   type LiveSignalGrant,
   type LiveSignalIssue,
   type LiveSignalReceipt,
@@ -29,11 +35,14 @@ export {
   type BrowserLiveErrorKind,
   type LiveConsent,
   type LiveConsentIntent,
+  type LiveExpectedSignalIssue,
   type LiveRouteBinding,
   type LiveRouteBindingResult,
   type LiveRouteContext,
   type LiveRouteContextRead,
   type LiveSignalAcceptance,
+  type LiveSignalChoice,
+  type LiveSignalChoiceSnapshot,
   type LiveSignalGrant,
   type LiveSignalIssue,
   type LiveSignalReceipt,
@@ -124,6 +133,40 @@ export function issueBrowserLiveSignalCommand(
     timeoutMilliseconds: 12000,
     signal,
     validate: (value) => readSignalGrant(value, body.anchorId),
+  });
+}
+
+export function readBrowserLiveSignalChoices(
+  accountId: string,
+  journeyId: string,
+  signal?: AbortSignal,
+): Promise<LiveSignalChoiceSnapshot> {
+  [accountId, journeyId] = identities(accountId, journeyId);
+  return liveRequest({
+    accountId,
+    path: `/api/v1/journeys/${journeyId}/signal-choices`,
+    timeoutMilliseconds: 12000,
+    responseLimit: 262144,
+    signal,
+    validate: readSignalChoiceSnapshot,
+  });
+}
+
+export function issueBrowserLiveExpectedSignalCommand(
+  accountId: string,
+  journeyId: string,
+  input: unknown,
+  signal?: AbortSignal,
+): Promise<LiveSignalGrant> {
+  [accountId, journeyId] = identities(accountId, journeyId);
+  const body = readExpectedSignalIssue(input);
+  return liveRequest({
+    accountId,
+    path: `/api/v1/journeys/${journeyId}/signal-commands/expected-context`,
+    body,
+    timeoutMilliseconds: 12000,
+    signal,
+    validate: (value) => readExpectedSignalGrant(value, body),
   });
 }
 

@@ -14,6 +14,10 @@ OpenAPI types. These clients are prerequisites for an explicit consent/contribut
 interface; they do not authorize or enable public publication, infer presence or
 change server feature flags.
 
+ADR 0045 extends this boundary with separately gated owner choice reads and
+mandatory expected-context issuance, specified in BROWSER_SIGNAL_CHOICES_API_SPEC.
+The new issuance function never falls back to the legacy anchor-only function.
+
 Validate all input before fetching even CSRF: canonical lowercase non-nil UUIDs,
 exact object keys, booleans, closed mode/value enums, bounded coordinates, required
 nullable context expectation, integer alternative index 0..2, and exact canonical
@@ -38,7 +42,9 @@ network leg and before returning data. Aborted or timed-out operations cannot
 start a later POST after delayed CSRF resolves. Do not depend on test adapters
 honoring abort: reject at the deadline and discard late results safely.
 
-Limit each response to 64 KiB counted as streamed UTF-8 bytes (CSRF 4 KiB), reject
+Limit each response to 64 KiB counted as streamed UTF-8 bytes (CSRF 4 KiB), except
+the exact ADR 0045 choice GET, which allows256KiB for bounded escaped Unicode
+labels. Keep the12-second deadline and all other limits unchanged. Reject
 malformed UTF-8/JSON and cancel readers on failure. Do not await an uncooperative
 reader cancellation forever. A stalled body and rejected cancellation must not
 leak details or leave unhandled rejections. Require successful JSON content type
@@ -60,6 +66,13 @@ outcomes must contain null. Provider-bound context lifetimes cannot exceed 15
 minutes; signal grant lifetimes cannot exceed 90 seconds.
 Newly received expired context/grant data must never be described as usable;
 return transport data only, with no implicit eligibility claim.
+
+Choice snapshots contain only the current complete labeled subset, validated for
+canonical ordering,1..128 items,1..80-code-point label policy, closed sorted unique
+categories and exact context/consent versions. Reject nonfuture/unexpired violations
+and lifetimes over24 hours. Expected-path grants must match the captured anchor,
+context, revision and consent generation and still be current on receipt. These
+checks do not undo a server write or authorize automatic reissuance.
 
 Signal grants must match the requested anchor, use nonempty unique closed
 categories, and have ordered issued/expiry instants. Receipts must match the

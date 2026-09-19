@@ -287,6 +287,132 @@ describe('same-origin auth proxy', () => {
     expect(timeout).toHaveBeenLastCalledWith(8000);
     timeout.mockRestore();
   });
+  it('allows only exact signal-choice GET and expected-context POST with distinct response bounds', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const journey = '00000000-0000-4000-8000-000000000001';
+    const largeChoiceBody = JSON.stringify({ padding: 'x'.repeat(70 * 1024) });
+    const upstream = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url) =>
+        String(url).endsWith('/signal-choices')
+          ? new Response(largeChoiceBody, { headers: { 'Content-Type': 'application/json' } })
+          : Response.json({}),
+      );
+
+    const choiceResponse = await proxyBrowserJourneys(
+      new Request(`${config.origin}/api/v1/journeys/${journey}/signal-choices`, {
+        headers: { Cookie: 'routiqo_session=opaque', 'X-Routiqo-Account': journey },
+      }),
+      [journey, 'signal-choices'],
+      config,
+      upstream,
+    );
+    expect(choiceResponse.status).toBe(200);
+    expect(await choiceResponse.text()).toBe(largeChoiceBody);
+    expect(upstream.mock.calls[0]?.[0]).toBe(
+      `${config.upstream}/api/v1/journeys/${journey}/signal-choices`,
+    );
+
+    const expectedBody = JSON.stringify({
+      anchorId: '00000000-0000-4000-8000-000000000002',
+      contextId: '00000000-0000-4000-8000-000000000003',
+      routeRevision: '9223372036854775807',
+      consentGeneration: '9007199254740993',
+    });
+    const issueResponse = await proxyBrowserJourneys(
+      new Request(`${config.origin}/api/v1/journeys/${journey}/signal-commands/expected-context`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: config.origin,
+          'X-XSRF-TOKEN': 'masked',
+          'X-Routiqo-Account': journey,
+        },
+        body: expectedBody,
+      }),
+      [journey, 'signal-commands', 'expected-context'],
+      config,
+      upstream,
+    );
+    expect(issueResponse.status).toBe(200);
+    expect(upstream.mock.calls[1]?.[0]).toBe(
+      `${config.upstream}/api/v1/journeys/${journey}/signal-commands/expected-context`,
+    );
+    expect(String(upstream.mock.calls[1]?.[1]?.body)).toBe(expectedBody);
+    expect(timeout).toHaveBeenNthCalledWith(1, 8000);
+    expect(timeout).toHaveBeenNthCalledWith(2, 8000);
+
+    for (const [method, path, expectedStatus] of [
+      ['POST', [journey, 'signal-choices'], 405],
+      ['GET', [journey, 'signal-commands', 'expected-context'], 405],
+      ['GET', [journey, 'signal-choices', 'extra'], 404],
+      ['POST', [journey, 'signal-commands', 'expected-context', 'extra'], 404],
+    ] as const) {
+      const response = await proxyBrowserJourneys(
+        new Request(`${config.origin}/api/v1/journeys/${path.join('/')}`, {
+          method,
+          ...(method === 'POST'
+            ? { headers: { 'Content-Type': 'application/json', Origin: config.origin }, body: '{}' }
+            : {}),
+        }),
+        [...path],
+        config,
+        upstream,
+      );
+      expect(response.status).toBe(expectedStatus);
+    }
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${journey}/signal-choices?retry=true`),
+          [journey, 'signal-choices'],
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(400);
+    expect(upstream).toHaveBeenCalledTimes(2);
+    timeout.mockRestore();
+  });
+
+  it('caps expected-context proxy responses at 64 KiB and choice reads at 256 KiB', async () => {
+    const journey = '00000000-0000-4000-8000-000000000001';
+    const oversized = (size: number) =>
+      new Response(new Uint8Array(size), { headers: { 'Content-Type': 'application/json' } });
+    const upstream = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(oversized(64 * 1024 + 1))
+      .mockResolvedValueOnce(oversized(256 * 1024 + 1));
+    const post = new Request(
+      `${config.origin}/api/v1/journeys/${journey}/signal-commands/expected-context`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: config.origin },
+        body: '{}',
+      },
+    );
+    expect(
+      (
+        await proxyBrowserJourneys(
+          post,
+          [journey, 'signal-commands', 'expected-context'],
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(503);
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${journey}/signal-choices`),
+          [journey, 'signal-choices'],
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(503);
+    expect(upstream).toHaveBeenCalledTimes(2);
+  });
   it('fails closed for missing/invalid configuration and unsupported destinations', async () => {
     expect(readBrowserAuthConfig({})).toBeNull();
     expect(() =>

@@ -3,11 +3,14 @@ package com.routiqo.core.routeupdate.infrastructure;
 import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.journey.domain.Journey;
+import com.routiqo.core.moderation.application.ContributionRestrictionReader;
 import com.routiqo.core.privacy.application.PresenceConsentService;
+import com.routiqo.core.privacy.application.PresenceConsentParticipant;
 import com.routiqo.core.routeupdate.application.RouteBindingService;
 import com.routiqo.core.routeupdate.application.CatalogSignalService;
 import com.routiqo.core.routeupdate.application.SignalCommandPolicy;
 import com.routiqo.core.routeupdate.application.SignalStorageService;
+import com.routiqo.core.routeupdate.application.SignalStorageStore;
 import com.routiqo.core.routeupdate.application.SignalStorageDenied;
 import com.routiqo.core.routeupdate.application.SignalStorageConflict;
 import com.routiqo.core.routeupdate.application.LiveRouteContextService;
@@ -29,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.time.Duration;
+import java.time.Clock;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -117,6 +121,9 @@ class RouteBindingConfiguredTest {
     @Autowired JourneyWriteAuthority journeyAuthority;
     @Autowired LiveRouteContextParticipant contextParticipant;
     @Autowired PresenceConsentService consents;
+    @Autowired PresenceConsentParticipant consentParticipant;
+    @Autowired ContributionRestrictionReader restrictionReader;
+    @Autowired SignalStorageStore signalStore;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
 
@@ -267,6 +274,82 @@ class RouteBindingConfiguredTest {
             release.countDown();
         }
         assertNoGrantMutation(actor);
+    }
+
+    @Test
+    void committedConsentRevocationWinsTheAuthorityLockRaceBeforeExpectedIssuance()
+            throws Exception {
+        UUID actor = UUID.randomUUID();
+        UUID journey = activeJourney(actor);
+        var bound = bind(actor, journey, Optional.empty());
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000202");
+        long generation = consents.read(actor, journey).generation();
+        var expected = new SignalIssuanceExpectation(bound.context().contextId(),
+                bound.context().revision(), generation);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var holder = executor.submit(() -> {
+                new TransactionTemplate(transactionManager).execute(status -> {
+                    jdbc.queryForObject("SELECT id FROM routiqo_account WHERE id = ? FOR UPDATE",
+                            UUID.class, actor);
+                    locked.countDown();
+                    await(release);
+                    return null;
+                });
+                return null;
+            });
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            var revocation = executor.submit(
+                    () -> consents.submitIntent(actor, journey, generation, false));
+            assertThat(waitingAccountWriters(1)).isTrue();
+            var issuance = executor.submit(
+                    () -> signals.issueExpectedContext(actor, journey, anchor, expected));
+            assertThat(waitingAccountWriters(2)).isTrue();
+            release.countDown();
+            holder.get(5, TimeUnit.SECONDS);
+            revocation.get(5, TimeUnit.SECONDS);
+            assertThatThrownBy(() -> issuance.get(5, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(SignalStorageDenied.class);
+        } finally {
+            release.countDown();
+        }
+        assertNoGrantMutation(actor);
+    }
+
+    @Test
+    void insertionFailureRollsBackGrantBudgetForAbsentAndExistingBudgetRows() {
+        for (boolean existingBudget : List.of(false, true)) {
+            UUID actor = UUID.randomUUID();
+            UUID journey = activeJourney(actor);
+            var bound = bind(actor, journey, Optional.empty());
+            UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000202");
+            long generation = consents.read(actor, journey).generation();
+            var expected = new SignalIssuanceExpectation(bound.context().contextId(),
+                    bound.context().revision(), generation);
+            if (existingBudget) signals.issueExpectedContext(actor, journey, anchor, expected);
+            int grantsBefore = existingBudget ? 1 : 0;
+            int budgetBefore = existingBudget ? 1 : 0;
+
+            SignalStorageStore failingStore = org.mockito.Mockito.mock(
+                    SignalStorageStore.class,
+                    org.mockito.AdditionalAnswers.delegatesTo(signalStore));
+            org.mockito.Mockito.doThrow(new IllegalStateException("synthetic insert failure"))
+                    .when(failingStore).insertGrant(org.mockito.ArgumentMatchers.any());
+            var failing = new CatalogSignalService(new SignalStorageService(
+                    journeyAuthority, consentParticipant, contextParticipant, restrictionReader,
+                    failingStore, Clock.systemUTC()), catalog(
+                            UUID.fromString("00000000-0000-4000-8000-000000000201"),
+                            anchor, QuickSignalValue.Category.QUEUE));
+
+            assertThatThrownBy(() -> failing.issueExpectedContext(actor, journey, anchor, expected))
+                    .isExactlyInstanceOf(IllegalStateException.class)
+                    .hasMessage("synthetic insert failure");
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM signal_command_grant WHERE actor_id = ?",
+                    Integer.class, actor)).isEqualTo(grantsBefore);
+            assertThat(grantBudget(actor)).isEqualTo(budgetBefore);
+        }
     }
 
     @Test
@@ -485,6 +568,13 @@ class RouteBindingConfiguredTest {
                 SELECT count(*) FROM signal_actor_budget
                 WHERE actor_id = ? AND action = 'GRANT'
                 """, Integer.class, actor)).isZero();
+    }
+
+    private int grantBudget(UUID actor) {
+        return jdbc.queryForObject("""
+                SELECT coalesce(sum(used_count), 0) FROM signal_actor_budget
+                WHERE actor_id = ? AND action = 'GRANT'
+                """, Integer.class, actor);
     }
 
     private void assertDeniedAcceptance(CatalogSignalService selected, UUID actor,

@@ -107,6 +107,13 @@ export async function proxyBrowserJourneys(
     path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'route-context';
   const signalCommands =
     path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'signal-commands';
+  const signalChoices =
+    path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'signal-choices';
+  const expectedSignalCommand =
+    path.length === 3 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'signal-commands' &&
+    path[2] === 'expected-context';
   const signal =
     path.length === 3 &&
     journeyId.test(path[0] ?? '') &&
@@ -126,6 +133,8 @@ export async function proxyBrowserJourneys(
     !consent &&
     !routeContext &&
     !signalCommands &&
+    !signalChoices &&
+    !expectedSignalCommand &&
     !signal &&
     !signalWithdraw
   )
@@ -133,8 +142,9 @@ export async function proxyBrowserJourneys(
   if (
     !(listing || journal || consent || routeContext
       ? ['GET', 'POST'].includes(request.method)
-      : request.method === (detail ? 'GET' : 'POST')) ||
-    ((signalCommands || signal || signalWithdraw) && request.method !== 'POST')
+      : request.method === (detail || signalChoices ? 'GET' : 'POST')) ||
+    ((signalCommands || expectedSignalCommand || signal || signalWithdraw) &&
+      request.method !== 'POST')
   )
     return failure(405);
   const query = new URL(request.url).searchParams;
@@ -161,9 +171,11 @@ export async function proxyBrowserJourneys(
     `journeys${listing ? '' : '/' + path.join('/')}${suffix}`,
     config,
     upstreamFetch,
-    routeContext && request.method === 'POST'
-      ? { responseLimit: 64 * 1024, timeout: 25000 }
-      : undefined,
+    signalChoices
+      ? { responseLimit: 256 * 1024, timeout: 8000 }
+      : routeContext && request.method === 'POST'
+        ? { responseLimit: 64 * 1024, timeout: 25000 }
+        : undefined,
   );
 }
 export async function proxyBrowserPlaceSearch(

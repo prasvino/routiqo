@@ -2,8 +2,12 @@ package com.routiqo.core.routeupdate.api;
 
 import com.routiqo.core.routeupdate.application.SignalCommandPolicy;
 import com.routiqo.core.routeupdate.domain.QuickSignalValue;
+import com.routiqo.core.routeupdate.domain.SignalIssuanceExpectation;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -26,6 +30,16 @@ final class BrowserSignalJson {
         return id(text(node, "anchorId"));
     }
 
+    static ExpectedIssue expectedIssue(HttpServletRequest request) {
+        JsonNode node = object(request, Set.of(
+                "anchorId", "contextId", "routeRevision", "consentGeneration"));
+        UUID anchorId = id(text(node, "anchorId"));
+        var expectation = new SignalIssuanceExpectation(
+                id(text(node, "contextId")), decimal(text(node, "routeRevision")),
+                decimal(text(node, "consentGeneration")));
+        return new ExpectedIssue(anchorId, expectation);
+    }
+
     static Acceptance acceptance(UUID journeyId, HttpServletRequest request) {
         JsonNode node = object(request, Set.of("anchorId", "value", "contextId",
                 "routeRevision", "consentGeneration"));
@@ -44,7 +58,12 @@ final class BrowserSignalJson {
 
     private static JsonNode object(HttpServletRequest request, Set<String> properties) {
         try {
-            JsonNode node = MAPPER.readTree(request.getInputStream());
+            byte[] bytes = request.getInputStream().readAllBytes();
+            String json = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes)).toString();
+            JsonNode node = MAPPER.readTree(json);
             if (node == null || !node.isObject() || !node.propertyNames().equals(properties)) {
                 throw malformed();
             }
@@ -91,6 +110,10 @@ final class BrowserSignalJson {
 
     record Acceptance(SignalCommandPolicy.SubmissionFingerprint fingerprint) {
         @Override public String toString() { return "BrowserSignalAcceptance[private]"; }
+    }
+
+    record ExpectedIssue(UUID anchorId, SignalIssuanceExpectation expectation) {
+        @Override public String toString() { return "BrowserExpectedSignalIssue[private]"; }
     }
 
     private static IllegalArgumentException malformed() {
