@@ -62,3 +62,9 @@ perform no mutation and return idempotent 204 after the peer rate gate. Normal
 session/renew/delete endpoints still require active authentication. Test a lost
 renewal response: logout with the predecessor must invalidate its live successor,
 remain retryable, and leave an unrelated sign-in lineage valid.
+
+Native response validation rejects the nil UUID for both account and challenge
+identities. Canonical non-nil UUIDs remain supported without assuming one UUID
+version. The same account invariant applies to secure-vault reads and commits;
+a malformed stored identity cannot be restored or sent to a verification adapter.
+Canonical matching consumes the entire response string, including UUIDs, opaque secrets and timestamps. Trailing line terminators or whitespace remain invalid.

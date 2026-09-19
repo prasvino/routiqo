@@ -8,6 +8,8 @@ import {
 
 const currentTime = 1_800_000_000_000;
 const accountId = 'a0000000-0000-4000-8000-000000000001';
+const nonVersionedAccountId = 'a0000000-0000-0000-0000-000000000001';
+const nilAccountId = '00000000-0000-0000-0000-000000000000';
 const credential = 'A'.repeat(43);
 const genericStorageError = 'Native session storage is unavailable. Clear it and try again.';
 
@@ -86,6 +88,15 @@ describe('native session vault', () => {
     await expect(reopened.load()).resolves.toEqual(expected);
   });
 
+  it('accepts a canonical non-nil account UUID without imposing a UUID version', async () => {
+    const memory = memoryDriver();
+    const vault = createSessionVault(memory.driver, () => currentTime);
+    const expected = session({ accountId: nonVersionedAccountId });
+
+    await vault.commit(vault.beginWrite(), expected);
+    await expect(vault.load()).resolves.toEqual(expected);
+  });
+
   it('rejects malformed commit input without poisoning or consuming its ticket', async () => {
     const memory = memoryDriver();
     const vault = createSessionVault(memory.driver, () => currentTime);
@@ -94,6 +105,9 @@ describe('native session vault', () => {
     await expect(
       vault.commit(ticket, session({ accountId: accountId.toUpperCase() })),
     ).rejects.toThrow('invalid');
+    await expect(vault.commit(ticket, session({ accountId: nilAccountId }))).rejects.toThrow(
+      'invalid',
+    );
     await expect(vault.commit(ticket, session({ credential: 'short' }))).rejects.toThrow('invalid');
     await expect(vault.commit(ticket, session({ expiresAt: currentTime }))).rejects.toThrow(
       'invalid',
@@ -128,6 +142,7 @@ describe('native session vault', () => {
     ['unknown fields', JSON.stringify({ ...JSON.parse(persisted()), extra: true })],
     ['oversize data', 'x'.repeat(1025)],
     ['unrealistic future expiry', persisted(session({ expiresAt: currentTime + 900_001 }))],
+    ['nil account identity', persisted(session({ accountId: nilAccountId }))],
   ])('rejects and poisons %s loaded from storage', async (_case, raw) => {
     const memory = memoryDriver(raw);
     const vault = createSessionVault(memory.driver, () => currentTime);

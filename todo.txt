@@ -218,3 +218,8 @@ docs/features/live/DURABLE_REPORT_INTAKE_PROPOSAL.md — reviewed unresolved rep
 
 This file consolidates the current state. Older phase notes that say a feature
 had no storage/API/scheduler describe that earlier phase, not the latest state.
+
+19 September 2026 follow-up: native auth/vault now reject nil UUID identities.
+Focused protocol/vault/restoration31 tests, mobile types, lint, formatting and
+secret scan passed. This closes invalid-identity restoration; native sign-in UI,
+redirect-safe credential transport and real-device verification remain pending.

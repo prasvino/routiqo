@@ -10,7 +10,7 @@ the server before selecting a journey partition.
 Use the Expo SDK 55-compatible pinned `expo-secure-store` package. A single fixed
 key stores one version-one JSON record containing only `accountId`, `credential`
 and integer-millisecond `expiresAt`, plus `version`. Account IDs are canonical
-lowercase UUIDs; credentials match the server's 43-character URL-safe opaque format.
+lowercase, non-nil UUIDs; credentials match the server's 43-character URL-safe opaque format.
 Reject unknown fields, unsupported versions, invalid values and records over
 1,024 UTF-8 bytes. Never put credentials in SQLite, planning backups, URLs or logs.
 
@@ -62,3 +62,4 @@ Threats: T01 (credentials/session replay), T02 (account confusion), T12 (leakage
 T13 (races) and T19 (deletion). This boundary assumes one application JS runtime;
 do not share the key with another runtime or background process without a reviewed
 cross-process coordination design.
+Canonical identity/credential validation consumes exactly 36/43 characters respectively. A valid-looking value followed by a newline or other line terminator is corrupt, not a usable session; load and commit share this boundary.

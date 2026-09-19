@@ -6,6 +6,8 @@ import {
 } from '../apps/mobile/src/auth/native-auth-protocol';
 const now = Date.parse('2026-09-12T00:00:00Z');
 const accountId = '00000000-0000-4000-8000-000000000001';
+const nonVersionedAccountId = '00000000-0000-0000-0000-000000000001';
+const nilId = '00000000-0000-0000-0000-000000000000';
 const credential = 'A'.repeat(43);
 const session = { accountId, credential, expiresAt: '2026-09-12T00:15:00.000000Z' };
 const challenge = {
@@ -22,6 +24,39 @@ it('normalizes bounded credential responses for the secure session vault', () =>
   });
   expect(readNativeChallenge(challenge, now)).toEqual({ ...challenge, expiresAt: now + 300000 });
   expect(readNativeAccount({ accountId })).toEqual({ accountId });
+});
+it('accepts canonical non-nil UUIDs without imposing a UUID version', () => {
+  expect(readNativeAuthSession({ ...session, accountId: nonVersionedAccountId }, now)).toEqual({
+    accountId: nonVersionedAccountId,
+    credential,
+    expiresAt: now + 900000,
+  });
+  expect(readNativeChallenge({ ...challenge, id: nonVersionedAccountId }, now)).toEqual({
+    ...challenge,
+    id: nonVersionedAccountId,
+    expiresAt: now + 300000,
+  });
+  expect(readNativeAccount({ accountId: nonVersionedAccountId })).toEqual({
+    accountId: nonVersionedAccountId,
+  });
+});
+it('rejects nil account and challenge identities with the generic response error', () => {
+  for (const operation of [
+    () => readNativeAuthSession({ ...session, accountId: nilId }, now),
+    () => readNativeChallenge({ ...challenge, id: nilId }, now),
+    () => readNativeAccount({ accountId: nilId }),
+  ]) {
+    const failure = (() => {
+      try {
+        operation();
+      } catch (error) {
+        return error;
+      }
+      throw new Error('Expected operation to reject.');
+    })();
+    expect(failure).toEqual(new Error('Native authentication response is invalid.'));
+    expect(failure).not.toHaveProperty('cause');
+  }
 });
 it('rejects wrong shape, extra data and malformed identities or secrets without exposing input', () => {
   for (const value of [

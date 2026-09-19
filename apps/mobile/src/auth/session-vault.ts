@@ -24,7 +24,8 @@ export interface NativeSessionVault {
 
 const maximumRecordBytes = 1024;
 const maximumLifetimeMilliseconds = 15 * 60 * 1000;
-const accountIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const accountIdPattern =
+  /^(?!00000000-0000-0000-0000-000000000000$)[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
 const sessionKeys = ['accountId', 'credential', 'expiresAt'] as const;
 const persistedKeys = ['version', ...sessionKeys] as const;

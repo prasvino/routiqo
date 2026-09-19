@@ -7,6 +7,7 @@ import {
 
 const accountId = '00000000-0000-4000-8000-000000000001';
 const otherId = '00000000-0000-4000-8000-000000000002';
+const nilAccountId = '00000000-0000-0000-0000-000000000000';
 const credential = 'A'.repeat(43);
 const now = 1000000;
 const message = 'Native session could not be verified.';
@@ -73,6 +74,25 @@ it('rejects mismatched, malformed and extra-field responses with fixed errors', 
     expect(error).toEqual(new Error(message));
     expect((error as Error).cause).toBeUndefined();
   }
+});
+
+it('never sends a stored session with a nil account identity to the verifier', async () => {
+  const f = await fixture();
+  vi.mocked(f.driver.read).mockResolvedValueOnce(
+    JSON.stringify({
+      version: 1,
+      accountId: nilAccountId,
+      credential,
+      expiresAt: now + 60_000,
+    }),
+  );
+  const verify = vi.fn(async () => ({ accountId }));
+  const restorer = createNativeSessionRestorer(f.vault, { verify }, f.clock);
+
+  const error = await restorer.restore().catch((value: unknown) => value);
+  expect(error).toEqual(new Error(message));
+  expect((error as Error).cause).toBeUndefined();
+  expect(verify).not.toHaveBeenCalled();
 });
 
 it('supersedes a pending verification even when its adapter ignores abort', async () => {

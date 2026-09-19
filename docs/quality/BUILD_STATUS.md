@@ -1,4 +1,4 @@
-# Build status — 2026-09-18
+# Build status — 2026-09-19
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
 
@@ -35,6 +35,16 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Native identity validation hardening (2026-09-19): mobile account/session/challenge
+response validators and secure-vault reads/commits now reject the all-zero UUID.
+Canonical non-nil IDs remain version-agnostic. Corrupt stored identities fail closed
+before any credential reaches the restoration verifier; explicit clear still recovers
+storage. Focused protocol/vault/restoration validation passed **31 tests in 3 files**,
+mobile typecheck, targeted lint/format checks, root diff review and secret scan.
+This was a narrow client validation change: no UI, native network adapter, backend
+endpoint or device behavior changed. Prior full backend/TypeScript totals below are
+historical full runs; they were not rerun for this targeted fix.
 
 Private durable blocking pass (ADR 0040): moderation-owned directed edges now use
 an identity-owned transaction locking both enabled accounts in PostgreSQL UUID

@@ -7,7 +7,8 @@ export interface NativeChallenge {
   expiresAt: number;
 }
 
-const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const uuid =
+  /^(?!00000000-0000-0000-0000-000000000000$)[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const secret = /^[A-Za-z0-9_-]{43}$/;
 function invalid(): Error {
   return new Error('Native authentication response is invalid.');
