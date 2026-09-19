@@ -2,12 +2,17 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { validateOpenApiContract } from './validate-openapi-contract.mjs';
+
+const contract = 'contracts/openapi/core.yaml';
+await validateOpenApiContract(readFileSync(contract, 'utf8'), contract);
+
 const temporary = mkdtempSync(join(tmpdir(), 'routiqo-contract-'));
 try {
   const generated = join(temporary, 'schema.d.ts');
   const result = spawnSync(
     process.execPath,
-    ['node_modules/openapi-typescript/bin/cli.js', 'contracts/openapi/core.yaml', '-o', generated],
+    ['node_modules/openapi-typescript/bin/cli.js', contract, '-o', generated],
     { stdio: 'inherit' },
   );
   if (result.status !== 0) process.exitCode = result.status ?? 1;

@@ -456,6 +456,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/signal-commands/{commandId}/stop": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Explicitly makes a known issued private command terminal. A null receipt does not establish that no earlier acceptance occurred. Thirty requests per account per minute and no automatic retry. */
+        post: operations["stopPrivateSignalCommand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/journeys/{id}/signals/{commandId}": {
         parameters: {
             query?: never;
@@ -653,6 +678,23 @@ export interface components {
             expiresAt: string;
             /** @description Canonical ascending UUID-string order. */
             choices: components["schemas"]["BrowserSignalChoice"][];
+        };
+        BrowserSignalStopRequest: Record<string, never>;
+        BrowserSignalStopResponse: {
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            status: "stopped";
+            receipt: {
+                commandId: components["schemas"]["PrivateSignalUuid"];
+                /** @enum {string} */
+                status: "withdrawn" | "superseded";
+                /** Format: date-time */
+                receivedAt: string;
+                /** Format: date-time */
+                expiresAt: string;
+                /** Format: date-time */
+                retainUntil: string;
+            } | null;
         };
         BrowserSignalAcceptanceRequest: {
             anchorId: components["schemas"]["PrivateSignalUuid"];
@@ -962,7 +1004,7 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["JourneyResult"];
-            /** @description Invalid identifier */
+            /** @description Invalid identifier, kind or JSON */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1279,7 +1321,7 @@ export interface operations {
             403: components["responses"]["AuthForbidden"];
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
-            /** @description Sign in with Google again */
+            /** @description Sign in with Google again, then explicitly reconfirm deletion */
             428: {
                 headers: {
                     [name: string]: unknown;
@@ -1378,7 +1420,7 @@ export interface operations {
                     "application/json": components["schemas"]["NativeSession"];
                 };
             };
-            /** @description Invalid JSON */
+            /** @description Invalid JSON, non-canonical identifier or request fields */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1505,7 +1547,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Explicit confirmation */
+            /** @description Explicit confirmation, canonical account identifier and exact fields are required */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1516,7 +1558,7 @@ export interface operations {
             403: components["responses"]["NativeTransportRejected"];
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
-            /** @description Sign in with Google again */
+            /** @description Sign in with Google again, then explicitly reconfirm deletion */
             428: {
                 headers: {
                     [name: string]: unknown;
@@ -1597,7 +1639,7 @@ export interface operations {
                     "application/json": components["schemas"]["TripJournal"];
                 };
             };
-            /** @description Invalid annotation */
+            /** @description Invalid annotation, mutation identifier or version */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1613,7 +1655,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Ineligible journey */
+            /** @description Ineligible journey, stale version or conflicting mutation reuse */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1781,7 +1823,7 @@ export interface operations {
                 content?: never;
             };
             429: components["responses"]["AuthLimited"];
-            /** @description Context authority */
+            /** @description Context authority, session store or rate store temporarily unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1838,7 +1880,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Stale context expectation */
+            /** @description Stale context expectation, inactive consent, completed journey or binding conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1848,7 +1890,7 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
-            /** @description Provider */
+            /** @description Provider, persistence, session or rate infrastructure unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1905,7 +1947,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Current journey */
+            /** @description Current journey, consent, context, anchor or catalog authority denied issuance */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1915,7 +1957,7 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
-            /** @description Session */
+            /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2048,6 +2090,75 @@ export interface operations {
             };
         };
     };
+    stopPrivateSignalCommand: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserSignalStopRequest"];
+            };
+        };
+        responses: {
+            /** @description Terminal stop result with an optional retained withdrawn or superseded receipt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserSignalStopResponse"];
+                };
+            };
+            /** @description Invalid canonical path identifier or nonempty JSON request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, foreign, expired or otherwise unavailable command state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     acceptPrivateSignalCommand: {
         parameters: {
             query?: never;
@@ -2098,7 +2209,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Missing */
+            /** @description Missing, expired, denied or conflicting command/fingerprint */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2108,7 +2219,7 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
-            /** @description Session */
+            /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2167,7 +2278,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Missing */
+            /** @description Missing, foreign or expired command */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2177,7 +2288,7 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
-            /** @description Session */
+            /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;

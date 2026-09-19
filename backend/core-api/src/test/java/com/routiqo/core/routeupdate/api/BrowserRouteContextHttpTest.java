@@ -529,6 +529,90 @@ class BrowserRouteContextHttpTest {
             """, Integer.class, owner.account())).isEqualTo(1);
     }
 
+    @Test void signalStopFencesUnusedAndTerminalizesAcceptedCommandsAfterCompletion()
+            throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        enable(owner, journey);
+        Map<String, Object> bound = bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+
+        String unused = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        HttpResponse<String> unusedStop = stop(owner, journey, unused);
+        assertStopped(unusedStop, unused, null);
+        assertThat(count("quick_signal_receipt", owner.account())).isZero();
+        assertEmpty(accept(owner, journey, unused,
+                acceptance(anchor, "queue_under_5", bound, "1")), 409);
+        assertStopped(stop(owner, journey, unused), unused, null);
+
+        String acceptedCommand = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String body = acceptance(anchor, "queue_under_5", bound, "1");
+        HttpResponse<String> accepted = accept(owner, journey, acceptedCommand, body);
+        String receivedAt = JsonPath.read(accepted.body(), "$.receivedAt");
+        String expiresAt = JsonPath.read(accepted.body(), "$.expiresAt");
+        String retainUntil = JsonPath.read(accepted.body(), "$.retainUntil");
+        disable(owner, journey, 1);
+
+        HttpResponse<String> acceptedStop = stop(owner, journey, acceptedCommand);
+        assertStopped(acceptedStop, acceptedCommand, "withdrawn");
+        assertThat(JsonPath.<String>read(acceptedStop.body(), "$.receipt.receivedAt"))
+                .isEqualTo(receivedAt);
+        assertThat(JsonPath.<String>read(acceptedStop.body(), "$.receipt.expiresAt"))
+                .isEqualTo(expiresAt);
+        assertThat(JsonPath.<String>read(acceptedStop.body(), "$.receipt.retainUntil"))
+                .isEqualTo(retainUntil);
+        assertReceipt(accept(owner, journey, acceptedCommand, body),
+                acceptedCommand, "withdrawn");
+        assertThat(postJourney(owner, journey, "complete").statusCode()).isEqualTo(200);
+        assertStopped(stop(owner, journey, acceptedCommand), acceptedCommand, "withdrawn");
+    }
+
+    @Test void signalStopEnforcesStrictTransportAuthorityAndSeparateQuota() throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        Browser other = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        UUID otherJourney = start(other);
+        enable(owner, journey);
+        bind(owner, journey);
+        UUID anchor = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String command = JsonPath.read(issue(owner, journey, anchor).body(), "$.commandId");
+        String path = signalStopPath(journey, command);
+
+        accountWriteUnavailable.set(true);
+        assertEmpty(stop(owner, journey, command), 503);
+        accountWriteUnavailable.set(false);
+
+        for (String invalid : List.of("", "null", "[]", "{", "{\"x\":1}", "{}{}")) {
+            assertEmpty(postSignal(owner, path, invalid), 400);
+        }
+        assertEmpty(sendMalformedUtf8(owner, path), 400);
+        assertEmpty(send(owner, "POST", path, "{}", "text/plain", owner.csrf(),
+                owner.account().toString(), null, "http://localhost:3000"), 415);
+        assertEmpty(send(owner, "POST", path, "x".repeat(20 * 1024 + 1),
+                "application/json", owner.csrf(), owner.account().toString(), null,
+                "http://localhost:3000"), 413);
+        assertEmpty(send(owner, "POST", path, "{}", "application/json", null,
+                owner.account().toString(), null, "http://localhost:3000"), 403);
+        assertEmpty(send(owner, "POST", path, "{}", "application/json", owner.csrf(),
+                owner.account().toString(), null, "http://evil.example"), 403);
+        assertEmpty(send(owner, "POST", path, "{}", "application/json", owner.csrf(),
+                UUID.randomUUID().toString(), null, "http://localhost:3000"), 401);
+        assertEmpty(postSignal(owner, path + "?private=x", "{}"), 400);
+        var deniedSuffix = postSignal(owner, path + "/extra", "{}");
+        assertThat(deniedSuffix.statusCode()).isIn(401, 403);
+        assertThat(deniedSuffix.body()).isEmpty();
+        assertThat(deniedSuffix.headers().firstValue("Cache-Control")).contains("no-store");
+        assertEmpty(stop(other, journey, command), 404);
+        assertEmpty(stop(owner, otherJourney, command), 404);
+        assertEmpty(stop(owner, journey, UUID.randomUUID().toString()), 409);
+
+        jdbc.update("DELETE FROM auth_rate_bucket");
+        for (int i = 0; i < 30; i++) assertThat(stop(owner, journey, command).statusCode())
+                .isEqualTo(200);
+        assertLimited(stop(owner, journey, command));
+        assertThat(issue(owner, journey, anchor).statusCode()).isEqualTo(200);
+    }
+
     @Test void ownerChoicesAreMinimalOrderedReadOnlyAndFeedMandatoryExpectedIssuance()
             throws Exception {
         assertThat(context.getBeansOfType(BrowserSignalChoiceController.class)).hasSize(1);
@@ -962,6 +1046,11 @@ class BrowserRouteContextHttpTest {
                 "journeys/" + journey + "/signals/" + command + "/withdraw", "{}");
     }
 
+    private HttpResponse<String> stop(Browser owner, UUID journey, String command)
+            throws Exception {
+        return postSignal(owner, signalStopPath(journey, command), "{}");
+    }
+
     private HttpResponse<String> postSignal(Browser owner, String path, String body)
             throws Exception {
         return send(owner, "POST", path, body, "application/json", owner.csrf(),
@@ -990,6 +1079,10 @@ class BrowserRouteContextHttpTest {
 
     private static String signalChoicesPath(UUID journey) {
         return "journeys/" + journey + "/signal-choices";
+    }
+
+    private static String signalStopPath(UUID journey, String command) {
+        return "journeys/" + journey + "/signal-commands/" + command + "/stop";
     }
 
     private static String expectedIssue(UUID anchor, String context, String revision,
@@ -1037,6 +1130,28 @@ class BrowserRouteContextHttpTest {
         assertThat(JsonPath.<String>read(response.body(), "$.receivedAt")).isEqualTo(receivedAt);
         assertThat(JsonPath.<String>read(response.body(), "$.expiresAt")).isEqualTo(expiresAt);
         assertThat(JsonPath.<String>read(response.body(), "$.retainUntil")).isEqualTo(retainUntil);
+    }
+
+    private static void assertStopped(HttpResponse<String> response, String command,
+            String receiptStatus) {
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        Map<String, Object> fields = JsonPath.read(response.body(), "$");
+        assertThat(fields.keySet()).containsOnly("commandId", "status", "receipt");
+        assertThat(JsonPath.<String>read(response.body(), "$.commandId")).isEqualTo(command);
+        assertThat(JsonPath.<String>read(response.body(), "$.status")).isEqualTo("stopped");
+        if (receiptStatus == null) {
+            assertThat(JsonPath.<Object>read(response.body(), "$.receipt")).isNull();
+        } else {
+            assertThat(JsonPath.<String>read(response.body(), "$.receipt.commandId"))
+                    .isEqualTo(command);
+            assertThat(JsonPath.<String>read(response.body(), "$.receipt.status"))
+                    .isEqualTo(receiptStatus);
+            assertThat(JsonPath.<Map<String, Object>>read(response.body(), "$.receipt").keySet())
+                    .containsOnly("commandId", "status", "receivedAt", "expiresAt", "retainUntil");
+        }
+        assertThat(response.body()).doesNotContain("actorId", "journeyId", "anchorId",
+                "contextId", "value", "catalogVersion");
     }
 
     private Browser login(UUID subject) throws Exception {

@@ -10,6 +10,7 @@ import com.routiqo.core.routeupdate.application.SignalStorageDenied;
 import com.routiqo.core.routeupdate.application.SignalStorageRateLimited;
 import com.routiqo.core.routeupdate.domain.QuickSignalReceipt;
 import com.routiqo.core.routeupdate.domain.SignalCommandGrant;
+import com.routiqo.core.routeupdate.domain.SignalCommandStopResult;
 import com.routiqo.core.security.BrowserAuthPolicy;
 import com.routiqo.core.security.BrowserCookies;
 import jakarta.servlet.http.HttpServletRequest;
@@ -83,6 +84,15 @@ public final class BrowserSignalController {
         @Override public String toString() { return "BrowserSignalReceipt[private]"; }
     }
 
+    public record StopResponse(UUID commandId, String status, ReceiptResponse receipt) {
+        static StopResponse from(SignalCommandStopResult result) {
+            return new StopResponse(result.commandId(), "stopped",
+                    result.receipt().map(ReceiptResponse::from).orElse(null));
+        }
+
+        @Override public String toString() { return "BrowserSignalStop[private]"; }
+    }
+
     @PostMapping("/signal-commands") GrantResponse issue(@PathVariable String id,
             HttpServletRequest request) {
         noQuery(request);
@@ -115,6 +125,18 @@ public final class BrowserSignalController {
         BrowserSignalJson.empty(request);
         allow(actor, "signal-withdraw-request", 30);
         return ReceiptResponse.from(signals.withdraw(actor, journey, command));
+    }
+
+    @PostMapping("/signal-commands/{commandId}/stop") StopResponse stop(
+            @PathVariable String id, @PathVariable String commandId,
+            HttpServletRequest request) {
+        noQuery(request);
+        UUID actor = actor(request);
+        UUID journey = id(id);
+        UUID command = id(commandId);
+        BrowserSignalJson.empty(request);
+        allow(actor, "signal-stop-request", 30);
+        return StopResponse.from(signals.stopCommand(actor, journey, command));
     }
 
     private UUID actor(HttpServletRequest request) {

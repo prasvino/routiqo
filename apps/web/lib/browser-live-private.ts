@@ -22,6 +22,7 @@ export type LiveSignalChoiceSnapshot = components['schemas']['BrowserSignalChoic
 export type LiveSignalAcceptance = components['schemas']['BrowserSignalAcceptanceRequest'];
 export type LiveSignalGrant = components['schemas']['BrowserSignalCommandGrant'];
 export type LiveSignalReceipt = components['schemas']['BrowserSignalReceipt'];
+export type LiveSignalStopResponse = components['schemas']['BrowserSignalStopResponse'];
 
 const uuidPattern =
   /^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -57,6 +58,7 @@ type LivePath =
   | `/api/v1/journeys/${string}/signal-choices`
   | `/api/v1/journeys/${string}/signal-commands`
   | `/api/v1/journeys/${string}/signal-commands/expected-context`
+  | `/api/v1/journeys/${string}/signal-commands/${string}/stop`
   | `/api/v1/journeys/${string}/signals/${string}`
   | `/api/v1/journeys/${string}/signals/${string}/withdraw`;
 
@@ -417,6 +419,31 @@ export function readSignalReceipt(
     receivedAt: receivedAt.raw,
     expiresAt: expiresAt.raw,
     retainUntil: retainUntil.raw,
+  };
+}
+
+export function readSignalStopResponse(
+  value: unknown,
+  requestedCommand: string,
+): LiveSignalStopResponse {
+  const item = plainRecord(value, ['commandId', 'status', 'receipt']);
+  if (item.status !== 'stopped' || readUuid(item.commandId) !== requestedCommand) invalid();
+  let receipt: LiveSignalStopResponse['receipt'] = null;
+  if (item.receipt !== null) {
+    const parsed = readSignalReceipt(item.receipt, requestedCommand, true);
+    if (parsed.status !== 'withdrawn' && parsed.status !== 'superseded') invalid();
+    receipt = {
+      commandId: parsed.commandId,
+      status: parsed.status,
+      receivedAt: parsed.receivedAt,
+      expiresAt: parsed.expiresAt,
+      retainUntil: parsed.retainUntil,
+    };
+  }
+  return {
+    commandId: requestedCommand,
+    status: 'stopped',
+    receipt,
   };
 }
 

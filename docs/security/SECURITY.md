@@ -237,3 +237,19 @@ edge, including initial unblock, consumes the bounded outgoing capacity; retaine
 unblocked revisions cannot be deleted merely to free slots. API packages must not
 access this trusted internal mutation/participant authority. Account existence is
 not public target authorization; a pair snapshot is not a reusable delivery grant.
+
+## Private command stopping
+
+ADRs 0046/0047 define terminal stopping of a known issued command under current
+owner/account and journey serialization. Stop consumes an existing unused grant
+or withdraws a retained receipt in one transaction. It does not require current
+sharing, an active route context or contribution eligibility: those conditions
+must not prevent an owner from stopping earlier work. Unknown identifiers cannot
+create tombstones. A stopped command cannot newly accept; a missing receipt does
+not prove it was never accepted. Superseded commands do not affect replacements.
+
+The guarded browser leaf uses the signal flag independently of the choice flag,
+a separate durable stop-request quota and existing peer/browser guards. Never
+interpret transport cancellation or a lost stop response as confirmed stopping.
+Recovery uses an explicit exact-command stop retry, never a new grant or a replay
+of acceptance merely to manufacture a receipt. No public delivery is enabled.

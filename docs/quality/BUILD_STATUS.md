@@ -26,11 +26,11 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Private route-area choice reader | Internal read-only owned-journey service returns only the current context's complete labeled subset after consent, restriction, catalog and exact expiry checks. Immutable minimized snapshot; ADR0045 adds separately gated owner HTTP and typed browser reads. No provider calls or grants from reads |
 | Expected-context signal issuance | Separate internal catalog-aware method requires exact context ID, route revision and consent generation under existing authority before grant/budget mutation. Legacy owner HTTP contract unchanged; ADR0045 adds a distinct guarded expected-context endpoint/client. Quick Signal controls remain pending |
 | Private route preparation | Separately default-off owner-only GET recovery and explicit POST binding through the real configured binder; strict browser guards, minimal no-store DTOs, database account quotas and post-provider authority rechecks. Browser check/prepare controls use copied route choices, confirmed consent, synchronous scope invalidation and expiring private acknowledgements. No public Live output |
-| Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
-| Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
+| Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, terminal known-command stop, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
+| Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw/stop through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
 | Private safety foundations | Reviewed assessment, block and structured report-case domain transitions; durable contribution restrictions under the account transaction authority. Suspension denies new grants/acceptance and unsuspension cannot revive old grants. Durable private directed blocks with ordered account locks, bounded retained revisions and bilateral exclusion; no operator API, durable report workflow, public block targeting or public trust claim |
 | Audited moderation prerequisite | Internal RESTRICT/RESTORE commands require finite action-specific database grants, ordered enabled operator/subject locks and exact revisions. Effect, minimized audit and an independent 20/hour operator debit commit atomically; bounded 30-day audit and independently default-off audit/debit maintenance. Signal ingestion is read-only; no admin authentication, seeded grants, queue or HTTP endpoint |
-| Private browser LIVE clients | Typed consent, context and Quick Signal clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. Consent and route-preparation controls mounted for confirmed active journeys; no signal controls, persistence, automatic retry or public projection |
+| Private browser LIVE clients | Typed consent, context, choice/expected-issuance and terminal command-stop clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. Consent and route-preparation controls mounted for confirmed active journeys; no signal controls, persistence, automatic retry or public projection |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -40,6 +40,29 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Latest terminal command-stop and contract-quality pass, 2026-09-19:
+
+- ADRs 0046/0047 stop a known command under the existing owner/account transaction:
+  consume an unused grant or withdraw its retained receipt. Stop works after
+  consent/context/completion changes and is independent of the choice API flag.
+  Strict browser client/proxy/contract support adds no automatic retry or UI.
+- **431 Java tests/61 suites** and **420 TypeScript tests/48 files** passed,
+  zero failures/errors/skips. Core check/bootJar, workspace types/lint/format,
+  generated contracts, web production build and secret scan passed. Independent
+  design/source/test review approved; no flags activated.
+- The 76-test focused backend run covers both account-lock race orders, real
+  rollback/redaction, cleanup fencing, forged ownership snapshots, strict HTTP,
+  separate quota and partial flags. Choice-off security-chain testing isolates
+  the facade with a mock; all-on HTTP separately verifies real PostgreSQL state.
+- Contract validation now rejects stray Response Object fields before generation.
+  Sixteen legacy unquoted descriptions produced 21 such fields; corrected quoting
+  restores intended text. Five regression tests cover malformed/quoted fields,
+  reusable responses, valid extensions and duplicate operation IDs. This focused
+  guard complements existing tooling; it is not full OpenAPI semantic validation.
+- The next private contribution interface has a reviewed lifecycle checkpoint,
+  not mounted controls. Public publication, real OAuth/providers and device QA
+  remain separate gates. Preview `/trips` returned HTTP 200 after restart.
 
 Latest guarded choice/expected-issuance browser pass, 2026-09-19:
 
@@ -233,8 +256,7 @@ as real LIVE activity.
    and atomic audited restriction actions now exist; add strong administrative
    authentication, controlled grant administration, queue/case scope and revocation
    propagation. Public targeting and operational operator workflows remain pending.
-3. **Actual LIVE interface.** Private consent controls are implemented; connect
-   route-binding and contribution controls. Implement approved moment reads/list,
+3. **Actual LIVE interface.** Private consent and route-preparation controls are implemented; connect contribution controls after the recovery lifecycle plan is approved. Implement approved moment reads/list,
    one foreground request in flight, stale/suppressed/conflicting/offline states,
    account/journey clearing and exact explicit retry. Public output depends on the
    first two gates; private consent controls are not a working LIVE release.
@@ -263,7 +285,7 @@ Start with the current task and load only the relevant documents:
   [publication design](../features/live/COHORT_PUBLICATION_DESIGN.md) and
   [report intake proposal](../features/live/DURABLE_REPORT_INTAKE_PROPOSAL.md).
 - [Private LIVE client contract](../features/live/BROWSER_LIVE_CLIENT_SPEC.md)
-  before UI integration. Existing server ADRs and default-off gates still apply.
+  before UI integration, together with [the Quick Signal lifecycle checkpoint](../features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md). Existing server ADRs and default-off gates still apply.
 - [Journey transport](../features/journey/BROWSER_JOURNEY_TRANSPORT_SPEC.md),
   [journal transport](../features/journey/BROWSER_JOURNAL_TRANSPORT_SPEC.md) and
   [dispatch](../features/journey/DISPATCH_SPEC.md) before extending recovery.

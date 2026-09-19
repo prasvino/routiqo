@@ -6,7 +6,7 @@ Status: accepted; implementation tested and independently reviewed.
 
 ## Decision
 
-Expose the ADR0043 minimized owner choice snapshot and ADR0044 exact-context
+Expose the ADR 0043 minimized owner choice snapshot and ADR 0044 exact-context
 issuance through distinct guarded leaves under a new default-off choice flag,
 requiring the existing signal flag as well. Preserve legacy anchor-only issuance
 without optional preconditions. New clients never downgrade to the legacy path.

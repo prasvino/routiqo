@@ -13,6 +13,7 @@ import {
   readSignalGrant,
   readSignalIssue,
   readSignalReceipt,
+  readSignalStopResponse,
   readUuid,
   type BrowserLiveErrorKind,
   type LiveConsent,
@@ -28,6 +29,7 @@ import {
   type LiveSignalGrant,
   type LiveSignalIssue,
   type LiveSignalReceipt,
+  type LiveSignalStopResponse,
 } from './browser-live-private';
 
 export {
@@ -46,6 +48,7 @@ export {
   type LiveSignalGrant,
   type LiveSignalIssue,
   type LiveSignalReceipt,
+  type LiveSignalStopResponse,
 };
 
 function identities(accountId: unknown, journeyId: unknown): [string, string] {
@@ -205,5 +208,23 @@ export function withdrawBrowserLiveSignalCommand(
     timeoutMilliseconds: 12000,
     signal,
     validate: (value) => readSignalReceipt(value, commandId, true),
+  });
+}
+
+export function stopBrowserLiveSignalCommand(
+  accountId: string,
+  journeyId: string,
+  commandId: string,
+  signal?: AbortSignal,
+): Promise<LiveSignalStopResponse> {
+  [accountId, journeyId] = identities(accountId, journeyId);
+  commandId = readUuid(commandId);
+  return liveRequest({
+    accountId,
+    path: `/api/v1/journeys/${journeyId}/signal-commands/${commandId}/stop`,
+    body: {},
+    timeoutMilliseconds: 12000,
+    signal,
+    validate: (value) => readSignalStopResponse(value, commandId),
   });
 }

@@ -25,3 +25,14 @@ Review serialized API/cache/log projections for leaks. Real sign-in and reviewed
 regional context are pilot gates. Later sockets need revocation/reconnect/replay
 and multi-replica fanout tests; Ask Ahead needs anti-targeting and recipient-consent
 tests. Those future tests are not prerequisites for implementing L0 pure policies.
+
+## API contract checks
+
+`pnpm contracts:check` validates response field names before comparing generated
+TypeScript output. YAML flow descriptions containing commas must be quoted;
+otherwise YAML can silently create extra response fields while type generation
+still succeeds. The focused response-field check complements the pinned
+openapi-typescript/Redocly checks, including unique operation IDs, and is not a
+complete OpenAPI validator. Regression tests cover the malformed/quoted forms,
+reusable responses and permitted extensions. Review the parser compatibility test
+when upgrading openapi-typescript; no separate parser dependency is introduced.

@@ -114,6 +114,12 @@ export async function proxyBrowserJourneys(
     journeyId.test(path[0] ?? '') &&
     path[1] === 'signal-commands' &&
     path[2] === 'expected-context';
+  const signalCommandStop =
+    path.length === 4 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'signal-commands' &&
+    journeyId.test(path[2] ?? '') &&
+    path[3] === 'stop';
   const signal =
     path.length === 3 &&
     journeyId.test(path[0] ?? '') &&
@@ -135,6 +141,7 @@ export async function proxyBrowserJourneys(
     !signalCommands &&
     !signalChoices &&
     !expectedSignalCommand &&
+    !signalCommandStop &&
     !signal &&
     !signalWithdraw
   )
@@ -143,7 +150,7 @@ export async function proxyBrowserJourneys(
     !(listing || journal || consent || routeContext
       ? ['GET', 'POST'].includes(request.method)
       : request.method === (detail || signalChoices ? 'GET' : 'POST')) ||
-    ((signalCommands || expectedSignalCommand || signal || signalWithdraw) &&
+    ((signalCommands || expectedSignalCommand || signalCommandStop || signal || signalWithdraw) &&
       request.method !== 'POST')
   )
     return failure(405);

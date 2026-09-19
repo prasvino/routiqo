@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.15.0
-  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. Browser consent, private route-context and private signal-choice and command transports are separately default-off; no public live traffic or user presence.
+  version: 0.16.0
+  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. Browser consent, private route-context and private signal-choice, command and stop transports are separately default-off; no public live traffic or user presence.
 servers:
   - url: http://localhost:8080
 paths:
@@ -78,7 +78,7 @@ paths:
                 kind: { type: string, enum: [trip, commute] }
       responses:
         '200': { $ref: '#/components/responses/JourneyResult' }
-        '400': { description: Invalid identifier, kind or JSON }
+        '400': { description: 'Invalid identifier, kind or JSON' }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '409': { description: Journey identity/kind conflict or another active journey }
@@ -256,7 +256,7 @@ paths:
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
-        '428': { description: Sign in with Google again, then explicitly reconfirm deletion }
+        '428': { description: 'Sign in with Google again, then explicitly reconfirm deletion' }
         '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/auth/logout:
     post:
@@ -314,7 +314,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/NativeSession' }
-        '400': { description: Invalid JSON, non-canonical identifier or request fields }
+        '400': { description: 'Invalid JSON, non-canonical identifier or request fields' }
         '401': { $ref: '#/components/responses/NativeAuthRejected' }
         '403': { $ref: '#/components/responses/NativeTransportRejected' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
@@ -386,12 +386,12 @@ paths:
             schema: { $ref: '#/components/schemas/NativeDeleteAccountRequest' }
       responses:
         '204': { description: Account deleted and all session lineages revoked }
-        '400': { description: Explicit confirmation, canonical account identifier and exact fields are required }
+        '400': { description: 'Explicit confirmation, canonical account identifier and exact fields are required' }
         '401': { $ref: '#/components/responses/NativeAuthRejected' }
         '403': { $ref: '#/components/responses/NativeTransportRejected' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
-        '428': { description: Sign in with Google again, then explicitly reconfirm deletion }
+        '428': { description: 'Sign in with Google again, then explicitly reconfirm deletion' }
         '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/journeys/{id}/journal:
     parameters:
@@ -428,11 +428,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TripJournal' }
-        '400': { description: Invalid annotation, mutation identifier or version }
+        '400': { description: 'Invalid annotation, mutation identifier or version' }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: Ineligible journey, stale version or conflicting mutation reuse }
+        '409': { description: 'Ineligible journey, stale version or conflicting mutation reuse' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
@@ -509,7 +509,7 @@ paths:
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: Context authority, session store or rate store temporarily unavailable. Empty response body. }
+        '503': { description: 'Context authority, session store or rate store temporarily unavailable. Empty response body.' }
     post:
       operationId: bindPrivateJourneyRouteContext
       security: [{ browserSession: [] }]
@@ -532,11 +532,11 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: Stale context expectation, inactive consent, completed journey or binding conflict }
+        '409': { description: 'Stale context expectation, inactive consent, completed journey or binding conflict' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: Provider, persistence, session or rate infrastructure unavailable. Empty response body. }
+        '503': { description: 'Provider, persistence, session or rate infrastructure unavailable. Empty response body.' }
   /api/v1/journeys/{id}/signal-commands:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -563,11 +563,11 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: Current journey, consent, context, anchor or catalog authority denied issuance }
+        '409': { description: 'Current journey, consent, context, anchor or catalog authority denied issuance' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: Session, authority or rate infrastructure unavailable. Empty response body. }
+        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
   /api/v1/journeys/{id}/signal-choices:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -620,6 +620,38 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+  /api/v1/journeys/{id}/signal-commands/{commandId}/stop:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - $ref: '#/components/parameters/PrivateSignalCommandId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: stopPrivateSignalCommand
+      security: [{ browserSession: [] }]
+      description: Explicitly makes a known issued private command terminal. A null receipt does not establish that no earlier acceptance occurred. Thirty requests per account per minute and no automatic retry.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserSignalStopRequest' }
+      responses:
+        '200':
+          description: Terminal stop result with an optional retained withdrawn or superseded receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserSignalStopResponse' }
+        '400': { description: Invalid canonical path identifier or nonempty JSON request }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: 'Unknown, foreign, expired or otherwise unavailable command state' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
   /api/v1/journeys/{id}/signals/{commandId}:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -647,11 +679,11 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: Missing, expired, denied or conflicting command/fingerprint }
+        '409': { description: 'Missing, expired, denied or conflicting command/fingerprint' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: Session, authority or rate infrastructure unavailable. Empty response body. }
+        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
   /api/v1/journeys/{id}/signals/{commandId}/withdraw:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -679,11 +711,11 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: Missing, foreign or expired command }
+        '409': { description: 'Missing, foreign or expired command' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: Session, authority or rate infrastructure unavailable. Empty response body. }
+        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
   /api/v1/routes/places:
     post:
       operationId: searchPrivateRoutePlaces
@@ -1039,6 +1071,28 @@ components:
           uniqueItems: true
           description: Canonical ascending UUID-string order.
           items: { $ref: '#/components/schemas/BrowserSignalChoice' }
+    BrowserSignalStopRequest:
+      type: object
+      additionalProperties: false
+      maxProperties: 0
+    BrowserSignalStopResponse:
+      type: object
+      additionalProperties: false
+      required: [commandId, status, receipt]
+      properties:
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        status: { type: string, enum: [stopped] }
+        receipt:
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [commandId, status, receivedAt, expiresAt, retainUntil]
+          properties:
+            commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+            status: { type: string, enum: [withdrawn, superseded] }
+            receivedAt: { type: string, format: date-time }
+            expiresAt: { type: string, format: date-time }
+            retainUntil: { type: string, format: date-time }
     BrowserSignalAcceptanceRequest:
       type: object
       additionalProperties: false

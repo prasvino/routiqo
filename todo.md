@@ -23,7 +23,7 @@
 
 ## First release — LIVE interface
 
-- [ ] Implement and verify command stopping before contribution UI cancellation: atomically consume an existing unused grant or withdraw its retained receipt, with guarded owner transport and recovery client.
+- [ ] Implement the reviewed fresh-bind authority handshake, bounded same-account recovery collection, receipt-metadata expiry and explicit dismissal rules in `docs/features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md` before mounting contribution controls.
 - [ ] Connect Quick Signal actions to the active owned journey; verify the implemented private consent and route-preparation controls with real authenticated lifecycle tests.
 - [ ] Build the active-journey LIVE list after publication and safety gates pass.
 - [ ] Add bounded foreground refresh with cancellation, backoff and one request in flight.

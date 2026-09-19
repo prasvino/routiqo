@@ -43,8 +43,8 @@ start a later POST after delayed CSRF resolves. Do not depend on test adapters
 honoring abort: reject at the deadline and discard late results safely.
 
 Limit each response to 64 KiB counted as streamed UTF-8 bytes (CSRF 4 KiB), except
-the exact ADR 0045 choice GET, which allows256KiB for bounded escaped Unicode
-labels. Keep the12-second deadline and all other limits unchanged. Reject
+the exact ADR 0045 choice GET, which allows 256 KiB for bounded escaped Unicode
+labels. Keep the 12-second deadline and all other limits unchanged. Reject
 malformed UTF-8/JSON and cancel readers on failure. Do not await an uncooperative
 reader cancellation forever. A stalled body and rejected cancellation must not
 leak details or leave unhandled rejections. Require successful JSON content type
@@ -68,9 +68,9 @@ Newly received expired context/grant data must never be described as usable;
 return transport data only, with no implicit eligibility claim.
 
 Choice snapshots contain only the current complete labeled subset, validated for
-canonical ordering,1..128 items,1..80-code-point label policy, closed sorted unique
+canonical ordering, 1..128 items, 1..80-code-point label policy, closed sorted unique
 categories and exact context/consent versions. Reject nonfuture/unexpired violations
-and lifetimes over24 hours. Expected-path grants must match the captured anchor,
+and lifetimes over 24 hours. Expected-path grants must match the captured anchor,
 context, revision and consent generation and still be current on receipt. These
 checks do not undo a server write or authorize automatic reissuance.
 
@@ -89,7 +89,7 @@ After a lost bind response the future caller may explicitly read context, then
 make a new user-intent bind. A lost signal acceptance is recovered only by an
 explicit retry with the identical command and fingerprint. A consent failure
 must not be presented as committed Ghost Mode; future UI must read and reconcile.
-Callers cancel/discard state on account/journey changes. Responses do not prove
+Callers cancel requests and discard new-contribution authority on account/journey changes. Responses do not prove
 that the currently displayed account remains authenticated.
 
 ## Verification
@@ -105,3 +105,13 @@ unchanged; existing backend HTTP tests remain the server verification evidence.
 Snapshot and serialize validated request fields, including copied coordinate
 arrays, before the first asynchronous CSRF leg. Caller mutation during a delayed
 request cannot change the validated submission fingerprint.
+
+ADR 0047 adds explicit terminal stopping for a known issued command, including
+when no acceptance receipt was returned. Validate the exact stopped wrapper and
+matching optional withdrawn/superseded receipt. Stop remains available without
+current sharing or active context; old retained receipt times are legitimate.
+An uncertain stop may only be explicitly retried with the same identity. Do not
+replay acceptance to manufacture a receipt, automatically reissue, or describe
+transport abort as cancellation. A future UI must preserve same-account recovery
+identity across Ghost/completion/context changes while hiding old contribution
+content and disabling new acceptance; clear private state on account change.

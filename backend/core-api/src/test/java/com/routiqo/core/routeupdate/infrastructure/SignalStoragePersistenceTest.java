@@ -242,6 +242,160 @@ class SignalStoragePersistenceTest {
     }
 
     @Test
+    void stopConsumesKnownUnusedGrantWithoutReceiptBudgetOrLifetimeChanges() {
+        Fixture fixture = fixture(START, 1);
+        SignalCommandGrant grant = issue(fixture, QuickSignalValue.Category.QUEUE);
+        fixture.clock().set(START.plusSeconds(120));
+
+        var stopped = fixture.signals().stopCommand(
+                fixture.actor(), fixture.journey(), grant.commandId());
+        assertThat(stopped.commandId()).isEqualTo(grant.commandId());
+        assertThat(stopped.receipt()).isEmpty();
+        assertThat(stopped.toString()).isEqualTo("SignalCommandStopResult[private]");
+        SignalCommandGrant stored = storedGrant(fixture.actor(), grant.commandId());
+        assertThat(stored.state()).isEqualTo(SignalCommandGrant.State.CONSUMED);
+        assertThat(stored.admission().issuedAt()).isEqualTo(grant.admission().issuedAt());
+        assertThat(stored.admission().expiresAt()).isEqualTo(grant.admission().expiresAt());
+        assertThat(receiptCount(fixture.actor())).isZero();
+        assertThat(budget(fixture.actor(), "GRANT")).isEqualTo(1);
+        assertThat(budget(fixture.actor(), "ACCEPT")).isZero();
+
+        assertThat(fixture.signals().stopCommand(
+                fixture.actor(), fixture.journey(), grant.commandId())).isEqualTo(stopped);
+        assertDenied(() -> accept(fixture, grant, QuickSignalValue.QUEUE_UNDER_5));
+        assertThat(receiptCount(fixture.actor())).isZero();
+        assertThat(maintenance(START.plusSeconds(120)).purgeExpiredGrants(100)).isPositive();
+        assertThat(grantExists(fixture.actor(), grant.commandId())).isFalse();
+        assertDenied(() -> accept(fixture, grant, QuickSignalValue.QUEUE_UNDER_5));
+        assertDenied(() -> fixture.signals().stopCommand(
+                fixture.actor(), fixture.journey(), grant.commandId()));
+    }
+
+    @Test
+    void stopWithdrawsAcceptedReceiptPreservesSupersededOutcomeAndReplayIsTerminal() {
+        Fixture fixture = fixture(START, 2);
+        SignalCommandGrant first = issue(fixture, QuickSignalValue.Category.QUEUE);
+        QuickSignalReceipt accepted = accept(fixture, first, QuickSignalValue.QUEUE_UNDER_5);
+        fixture.clock().set(START.plusSeconds(1));
+        var stopped = fixture.signals().stopCommand(
+                fixture.actor(), fixture.journey(), first.commandId());
+        assertThat(stopped.receipt()).contains(accepted.withdraw());
+        assertThat(stopped.receipt().orElseThrow().retainUntil()).isEqualTo(accepted.retainUntil());
+        assertThat(fixture.signals().stopCommand(
+                fixture.actor(), fixture.journey(), first.commandId())).isEqualTo(stopped);
+        assertThat(accept(fixture, first, QuickSignalValue.QUEUE_UNDER_5))
+                .isEqualTo(accepted.withdraw());
+
+        fixture.clock().set(START.plusSeconds(61));
+        SignalCommandGrant old = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        QuickSignalReceipt original = accept(fixture, old, QuickSignalValue.TRAFFIC_MOVING);
+        fixture.clock().set(START.plusSeconds(122));
+        SignalCommandGrant replacement = issue(fixture, QuickSignalValue.Category.TRAFFIC);
+        accept(fixture, replacement, QuickSignalValue.TRAFFIC_SLOW);
+        assertThat(storedReceipt(fixture.actor(), old.commandId()).state())
+                .isEqualTo(QuickSignalReceipt.State.SUPERSEDED);
+        var superseded = fixture.signals().stopCommand(
+                fixture.actor(), fixture.journey(), old.commandId());
+        assertThat(superseded.receipt()).contains(original.supersede());
+        assertThat(storedReceipt(fixture.actor(), old.commandId()).state())
+                .isEqualTo(QuickSignalReceipt.State.SUPERSEDED);
+    }
+
+    @Test
+    void stopIgnoresCurrentEligibilityButRejectsForeignWrongMissingAndExpiredState() {
+        Fixture fixture = fixture(START, 1);
+        SignalCommandGrant grant = issue(fixture, QuickSignalValue.Category.QUEUE);
+        fixture.contexts().replace(fixture.actor(), fixture.journey(), Set.copyOf(fixture.anchors()),
+                Duration.ofHours(1), Optional.of(fixture.context().context().contextId()));
+        fixture.consents().change(fixture.actor(), fixture.journey(), 1, false);
+        restrictionService().suspend(fixture.actor(), 0);
+        fixture.journeys().complete(fixture.actor(), fixture.journey());
+        assertThat(fixture.signals().stopCommand(
+                fixture.actor(), fixture.journey(), grant.commandId()).receipt()).isEmpty();
+
+        Fixture accepted = fixture(START, 1);
+        SignalCommandGrant acceptedGrant = issue(accepted, QuickSignalValue.Category.QUEUE);
+        accept(accepted, acceptedGrant, QuickSignalValue.QUEUE_UNDER_5);
+        UUID otherActor = account();
+        assertThatThrownBy(() -> accepted.signals().stopCommand(
+                otherActor, accepted.journey(), acceptedGrant.commandId()))
+                .isInstanceOf(RuntimeException.class).hasNoCause();
+        accepted.journeys().complete(accepted.actor(), accepted.journey());
+        UUID wrongJourney = start(accepted.journeys(), accepted.actor());
+        assertDenied(() -> accepted.signals().stopCommand(
+                accepted.actor(), wrongJourney, acceptedGrant.commandId()));
+        assertDenied(() -> accepted.signals().stopCommand(
+                accepted.actor(), accepted.journey(), UUID.randomUUID()));
+        jdbc().update("""
+            UPDATE quick_signal_receipt
+            SET received_at = ?, evidence_expires_at = ?, retain_until = ?
+            WHERE actor_id = ? AND command_id = ?
+            """, Timestamp.from(START.minus(Duration.ofHours(1))),
+                Timestamp.from(START.minus(Duration.ofMinutes(45))),
+                Timestamp.from(START.plusSeconds(1)), accepted.actor(), acceptedGrant.commandId());
+        accepted.clock().set(START.plusSeconds(1));
+        assertDenied(() -> accepted.signals().stopCommand(
+                accepted.actor(), accepted.journey(), acceptedGrant.commandId()));
+        assertThat(storedReceipt(accepted.actor(), acceptedGrant.commandId()).state())
+                .isEqualTo(QuickSignalReceipt.State.ACTIVE);
+    }
+
+    @Test
+    void stopAndAcceptanceSerializeInBothAccountLockOrders() throws Exception {
+        assertStopAcceptanceOrder(true);
+        assertStopAcceptanceOrder(false);
+    }
+
+    @Test
+    void stopConsumptionAndWithdrawalRollbackAfterDatabaseFailure() {
+        Fixture grantFixture = fixture(START, 1);
+        SignalCommandGrant grant = issue(grantFixture, QuickSignalValue.Category.QUEUE);
+        jdbc().execute("""
+            CREATE FUNCTION signal_stop_grant_failure() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'private stop fixture'; END $$
+            """);
+        jdbc().execute("""
+            CREATE TRIGGER signal_stop_grant_failure AFTER UPDATE ON signal_command_grant
+            FOR EACH ROW WHEN (NEW.state = 'CONSUMED') EXECUTE FUNCTION signal_stop_grant_failure()
+            """);
+        try {
+            assertThatThrownBy(() -> grantFixture.signals().stopCommand(grantFixture.actor(),
+                    grantFixture.journey(), grant.commandId()))
+                    .isInstanceOf(AccountWriteUnavailable.class).hasNoCause()
+                    .hasMessageNotContaining("private stop fixture");
+        } finally {
+            jdbc().execute("DROP TRIGGER signal_stop_grant_failure ON signal_command_grant");
+            jdbc().execute("DROP FUNCTION signal_stop_grant_failure()");
+        }
+        assertThat(storedGrant(grantFixture.actor(), grant.commandId()).state())
+                .isEqualTo(SignalCommandGrant.State.UNUSED);
+
+        Fixture receiptFixture = fixture(START, 1);
+        SignalCommandGrant accepted = issue(receiptFixture, QuickSignalValue.Category.QUEUE);
+        accept(receiptFixture, accepted, QuickSignalValue.QUEUE_UNDER_5);
+        jdbc().execute("""
+            CREATE FUNCTION signal_stop_receipt_failure() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'private stop fixture'; END $$
+            """);
+        jdbc().execute("""
+            CREATE TRIGGER signal_stop_receipt_failure AFTER UPDATE ON quick_signal_receipt
+            FOR EACH ROW WHEN (NEW.state = 'WITHDRAWN')
+            EXECUTE FUNCTION signal_stop_receipt_failure()
+            """);
+        try {
+            assertThatThrownBy(() -> receiptFixture.signals().stopCommand(receiptFixture.actor(),
+                    receiptFixture.journey(), accepted.commandId()))
+                    .isInstanceOf(AccountWriteUnavailable.class).hasNoCause()
+                    .hasMessageNotContaining("private stop fixture");
+        } finally {
+            jdbc().execute("DROP TRIGGER signal_stop_receipt_failure ON quick_signal_receipt");
+            jdbc().execute("DROP FUNCTION signal_stop_receipt_failure()");
+        }
+        assertThat(storedReceipt(receiptFixture.actor(), accepted.commandId()).state())
+                .isEqualTo(QuickSignalReceipt.State.ACTIVE);
+    }
+
+    @Test
     void currentConsentContextAndCompletionDenyNewAcceptanceButNotRetainedReplay() {
         Fixture ghost = fixture(START, 1);
         SignalCommandGrant ghostGrant = issue(ghost, QuickSignalValue.Category.QUEUE);
@@ -1013,6 +1167,57 @@ class SignalStoragePersistenceTest {
                 evidence, retention);
     }
 
+    private void assertStopAcceptanceOrder(boolean stopFirst) throws Exception {
+        Fixture fixture = fixture(START, 1);
+        SignalCommandGrant grant = issue(fixture, QuickSignalValue.Category.QUEUE);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(3)) {
+            Future<?> holder = executor.submit(() -> new TransactionTemplate(manager())
+                    .executeWithoutResult(status -> {
+                        jdbc().queryForObject(
+                                "SELECT id FROM routiqo_account WHERE id = ? FOR UPDATE",
+                                UUID.class, fixture.actor());
+                        locked.countDown();
+                        await(release);
+                    }));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            java.util.concurrent.Callable<Object> stopping = () -> fixture.signals().stopCommand(
+                    fixture.actor(), fixture.journey(), grant.commandId());
+            java.util.concurrent.Callable<Object> accepting = () -> {
+                try {
+                    return accept(fixture, grant, QuickSignalValue.QUEUE_UNDER_5);
+                } catch (SignalStorageDenied denied) {
+                    return denied;
+                }
+            };
+            Future<Object> first = executor.submit(stopFirst ? stopping : accepting);
+            assertThat(waitingAccountWriters(1)).isTrue();
+            Future<Object> second = executor.submit(stopFirst ? accepting : stopping);
+            assertThat(waitingAccountWriters(2)).isTrue();
+            release.countDown();
+            holder.get(5, TimeUnit.SECONDS);
+            Object firstResult = first.get(10, TimeUnit.SECONDS);
+            Object secondResult = second.get(10, TimeUnit.SECONDS);
+            if (stopFirst) {
+                assertThat(firstResult).isInstanceOf(
+                        com.routiqo.core.routeupdate.domain.SignalCommandStopResult.class);
+                assertThat(secondResult).isInstanceOf(SignalStorageDenied.class);
+                assertThat(receiptCount(fixture.actor())).isZero();
+            } else {
+                assertThat(firstResult).isInstanceOf(QuickSignalReceipt.class);
+                assertThat(secondResult).isInstanceOf(
+                        com.routiqo.core.routeupdate.domain.SignalCommandStopResult.class);
+                assertThat(((com.routiqo.core.routeupdate.domain.SignalCommandStopResult)
+                        secondResult).receipt()).isPresent().get()
+                        .extracting(QuickSignalReceipt::state)
+                        .isEqualTo(QuickSignalReceipt.State.WITHDRAWN);
+                assertThat(storedReceipt(fixture.actor(), grant.commandId()).state())
+                        .isEqualTo(QuickSignalReceipt.State.WITHDRAWN);
+            }
+        }
+    }
+
     private static SignalCommandPolicy.SubmissionFingerprint fingerprint(
             SignalCommandGrant grant, QuickSignalValue value) {
         var admission = grant.admission();
@@ -1136,6 +1341,21 @@ class SignalStoragePersistenceTest {
                   AND activity.query LIKE ?)
                 """, Boolean.class, pattern);
             if (Boolean.TRUE.equals(waiting)) return true;
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
+    private boolean waitingAccountWriters(int expected) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            Integer waiting = jdbc().queryForObject("""
+                SELECT count(*) FROM pg_stat_activity activity
+                WHERE activity.datname = current_database()
+                  AND cardinality(pg_blocking_pids(activity.pid)) > 0
+                  AND activity.query LIKE '%routiqo_account%FOR UPDATE%'
+                """, Integer.class);
+            if (waiting != null && waiting >= expected) return true;
             Thread.sleep(20);
         }
         return false;

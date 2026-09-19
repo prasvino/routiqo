@@ -20,7 +20,8 @@ import static org.assertj.core.api.Assertions.*;
     "ROUTIQO_WEB_ORIGIN=http://localhost:3000", "ROUTIQO_AUTH_SECURE_COOKIES=false",
     "ROUTIQO_VALHALLA_ORIGIN=http://127.0.0.1:18002", "ROUTIQO_PHOTON_ORIGIN=http://127.0.0.1:12322",
     "ROUTIQO_ROUTING_REGION_WEST=78", "ROUTIQO_ROUTING_REGION_SOUTH=11",
-    "ROUTIQO_ROUTING_REGION_EAST=81", "ROUTIQO_ROUTING_REGION_NORTH=14"
+    "ROUTIQO_ROUTING_REGION_EAST=81", "ROUTIQO_ROUTING_REGION_NORTH=14",
+    "ROUTIQO_LIVE_CHOICE_API_ENABLED=true"
 })
 @ActiveProfiles({"persistence", "google-auth", "web-auth", "routing"})
 @Import(BrowserJourneyHttpTest.TestIdentity.class)
@@ -324,8 +325,9 @@ class BrowserJourneyHttpTest {
         UUID command = UUID.randomUUID();
         assertThat(send(owner, "journeys", start(journey, "trip")).statusCode()).isEqualTo(200);
         for (String path : java.util.List.of(
-                "journeys/" + journey + "/signal-commands",
-                "journeys/" + journey + "/signal-commands/expected-context",
+                 "journeys/" + journey + "/signal-commands",
+                 "journeys/" + journey + "/signal-commands/expected-context",
+                 "journeys/" + journey + "/signal-commands/" + command + "/stop",
                 "journeys/" + journey + "/signals/" + command,
                 "journeys/" + journey + "/signals/" + command + "/withdraw")) {
             var response = send(owner, path, "{}");

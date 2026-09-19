@@ -527,9 +527,7 @@ reads consent/context/restriction in established order and samples exact time
 after those reads. Deny foreign, expired, suspended, unprovenanced or partially
 labeled contexts as a whole. Return only the bounded current labeled subset and
 exact context/consent versions, with immutable collections and redacted diagnostics.
-It creates no grants and performs no provider or persistence writes. It is not
-wired to HTTP: future exposure still requires no-store guards, quotas and explicit
-exact-context issuance semantics. Existing issue-by-anchor can use a replacement
+It creates no grants and performs no provider or persistence writes. ADR 0045 wires this reader to HTTP with no-store guards, quotas and explicit exact-context issuance semantics. Existing issue-by-anchor can use a replacement
 context containing that anchor; a prior choice snapshot cannot authorize a write.
 
 ADR 0044 defines an additional internal issuance precondition: exact context ID,
@@ -537,8 +535,7 @@ route revision and consent generation must match current locked authority before
 grant budget reservation or insertion. The tuple is not identity, presence proof
 or evidence of a rendered choice. Keep current catalog-derived permissions and
 acceptance/replay/withdrawal checks. Legacy anchor-only HTTP remains unchanged;
-future displayed-choice callers require an explicit guarded wire contract and no
-legacy fallback, automatic reissuance or offline replay after a lost response.
+Displayed-choice callers use the ADR 0045 guarded wire contract with no legacy fallback, automatic reissuance or offline replay after a lost response.
 
 The ADR 0045 browser boundary applies both choice and signal flags at controller
 and security matchers, with required real catalog and authority composition. A
@@ -570,3 +567,15 @@ check and revocation protocol; a past CLEAR result cannot authorize later output
 Reporting remains gated by canonical evidence identity, reference authorization,
 revocation lock order and a useful bounded investigation lifecycle; see the intake
 proposal. Test-only reference providers cannot satisfy these trust boundaries.
+
+ADR 0046/0047 command stopping addresses delayed acceptance after a client abort:
+serialize receipt withdrawal or existing-grant consumption with acceptance using
+the same owned-journey/account authority. Require matching actor, journey and
+command on both storage results; reject future/expired receipts before mutation.
+Do not require current consent, context, catalog eligibility or unsuspended
+contributor status for revocation. Test both lock orders and rollback after real
+writes. No unknown-command tombstones, budget refunds or retention extension.
+A consumed grant without a receipt is not proof of no historical acceptance.
+Keep stop independent of the choice feature flag and new-submission account
+quotas. Reject active or foreign receipts in a stopped response; cancellation,
+failed responses and later cleanup remain uncertain, never a reason to reissue.

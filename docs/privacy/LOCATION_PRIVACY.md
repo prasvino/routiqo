@@ -71,3 +71,15 @@ presence or independent evidence. Cancellation or rejecting an expired response
 cannot undo a server-side issuance. Clients must not silently refresh/reissue or
 fall back to the legacy anchor-only contract. Public eligibility and disclosure
 remain governed by the separate cohort and safety gates.
+
+## Stopping a private command
+
+ADRs 0046/0047 allow an owner to stop a known issued command even after sharing
+is disabled, the route changes, contribution eligibility is revoked or the
+journey ends. The server atomically consumes the unused grant or withdraws its
+retained receipt. This prevents future new acceptance of that command, without
+asserting that it was never accepted or deleting retained private history.
+A null stopped receipt has no historical meaning. Stopping an older superseded
+command does not stop its replacement. Failed or cancelled transport is not a
+confirmed stop; the caller must preserve uncertainty and use explicit recovery.
+This private boundary does not implement public revocation or publication.

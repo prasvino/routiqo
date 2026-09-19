@@ -48,6 +48,7 @@ public class BrowserAuthConfiguration {
                     if (signalEnabled) {
                         a.requestMatchers(org.springframework.http.HttpMethod.POST,
                                 "/api/v1/journeys/*/signal-commands",
+                                "/api/v1/journeys/*/signal-commands/*/stop",
                                 "/api/v1/journeys/*/signals/*",
                                 "/api/v1/journeys/*/signals/*/withdraw").permitAll();
                     }

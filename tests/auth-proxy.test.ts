@@ -196,7 +196,7 @@ describe('same-origin auth proxy', () => {
     expect(timeout).toHaveBeenNthCalledWith(2, 8000);
     timeout.mockRestore();
   });
-  it('allows only the three exact POST signal leaves with standard bounds', async () => {
+  it('allows only the existing exact POST signal leaves with standard bounds', async () => {
     const timeout = vi.spyOn(AbortSignal, 'timeout');
     const upstream = vi.fn<typeof fetch>().mockImplementation(async () =>
       Response.json({
@@ -222,6 +222,7 @@ describe('same-origin auth proxy', () => {
         },
       ],
       [[journey, 'signals', command, 'withdraw'], {}],
+      [[journey, 'signal-commands', command, 'stop'], {}],
     ];
     for (const [path, payload] of cases) {
       const body = JSON.stringify(payload);
@@ -247,6 +248,7 @@ describe('same-origin auth proxy', () => {
       [journey, 'signal-commands', command],
       [journey, 'signals'],
       [journey, 'signals', command, 'withdraw', 'extra'],
+      [journey, 'signal-commands', command, 'stop', 'extra'],
     ])
       expect(
         (
@@ -282,9 +284,90 @@ describe('same-origin auth proxy', () => {
         )
       ).status,
     ).toBe(400);
-    expect(upstream).toHaveBeenCalledTimes(3);
-    expect(timeout).toHaveBeenCalledTimes(3);
+    expect(upstream).toHaveBeenCalledTimes(4);
+    expect(timeout).toHaveBeenCalledTimes(4);
     expect(timeout).toHaveBeenLastCalledWith(8000);
+    timeout.mockRestore();
+  });
+  it('allows only exact POST for command stop with query denial and the standard response bound', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const journey = '00000000-0000-4000-8000-000000000001';
+    const command = '00000000-0000-4000-8000-000000000002';
+    const response = { commandId: command, status: 'stopped', receipt: null };
+    const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json(response));
+    const path = [journey, 'signal-commands', command, 'stop'];
+    const request = new Request(`${config.origin}/api/v1/journeys/${path.join('/')}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: config.origin,
+        'X-XSRF-TOKEN': 'masked',
+        'X-Routiqo-Account': journey,
+      },
+      body: '{}',
+    });
+    const result = await proxyBrowserJourneys(request, path, config, upstream);
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual(response);
+    expect(upstream.mock.calls[0]?.[0]).toBe(
+      `${config.upstream}/api/v1/journeys/${path.join('/')}`,
+    );
+    expect(String(upstream.mock.calls[0]?.[1]?.body)).toBe('{}');
+    expect(timeout).toHaveBeenCalledWith(8000);
+
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${path.join('/')}`),
+          path,
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(405);
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${path.join('/')}?retry=true`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Origin: config.origin },
+            body: '{}',
+          }),
+          path,
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${path.join('/')}/extra`),
+          [...path, 'extra'],
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(404);
+    expect(upstream).toHaveBeenCalledOnce();
+
+    upstream.mockResolvedValueOnce(
+      new Response(new Uint8Array(64 * 1024 + 1), {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const oversized = await proxyBrowserJourneys(
+      new Request(`${config.origin}/api/v1/journeys/${path.join('/')}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: config.origin },
+        body: '{}',
+      }),
+      path,
+      config,
+      upstream,
+    );
+    expect(oversized.status).toBe(503);
+    expect(upstream).toHaveBeenCalledTimes(2);
     timeout.mockRestore();
   });
   it('allows only exact signal-choice GET and expected-context POST with distinct response bounds', async () => {

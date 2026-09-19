@@ -12,6 +12,7 @@ import com.routiqo.core.routeupdate.domain.QuickSignalValue;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routeupdate.domain.SignalAdmission;
 import com.routiqo.core.routeupdate.domain.SignalCommandGrant;
+import com.routiqo.core.routeupdate.domain.SignalCommandStopResult;
 import com.routiqo.core.routeupdate.domain.SignalIssuanceExpectation;
 import com.routiqo.core.routeupdate.domain.StoredLiveRouteContext;
 import java.time.Clock;
@@ -26,6 +27,7 @@ import java.util.UUID;
 
 /** Internal transaction service. Identifiers and anchors are trusted server inputs, never public authority. */
 public final class SignalStorageService {
+    private static final UUID NIL_ID = new UUID(0, 0);
     private static final Duration GRANT_LIFETIME = Duration.ofSeconds(90);
     private static final Duration MAX_EVIDENCE_LIFETIME = Duration.ofMinutes(15);
     private static final Duration MAX_RETENTION = Duration.ofHours(24);
@@ -228,21 +230,57 @@ public final class SignalStorageService {
     }
 
     public QuickSignalReceipt withdraw(UUID actorId, UUID journeyId, UUID commandId) {
+        requireId(actorId);
+        requireId(journeyId);
+        requireId(commandId);
         return journeys.withOwnedJourney(actorId, journeyId, journey -> {
             QuickSignalReceipt receipt = store.findReceipt(actorId, commandId).orElseThrow(
                     SignalStorageService::denied);
             Instant now = now();
-            if (!receipt.signal().journeyId().equals(journey.id())
-                    || now.isBefore(receipt.signal().receivedAt())
-                    || !receipt.isRetainedAt(now)) {
+            return withdrawOwnedReceipt(actorId, journey.id(), commandId, receipt, now);
+        });
+    }
+
+    public SignalCommandStopResult stopCommand(
+            UUID actorId, UUID journeyId, UUID commandId) {
+        requireId(actorId);
+        requireId(journeyId);
+        requireId(commandId);
+        return journeys.withOwnedJourney(actorId, journeyId, journey -> {
+            Optional<QuickSignalReceipt> receipt = store.findReceipt(actorId, commandId);
+            if (receipt.isPresent()) {
+                QuickSignalReceipt terminal = withdrawOwnedReceipt(actorId, journey.id(),
+                        commandId, receipt.get(), now());
+                return new SignalCommandStopResult(commandId, Optional.of(terminal));
+            }
+            SignalCommandGrant grant = store.findGrant(actorId, commandId).orElseThrow(
+                    SignalStorageService::denied);
+            if (!actorId.equals(grant.admission().actorId())
+                    || !journey.id().equals(grant.admission().journeyId())
+                    || !commandId.equals(grant.commandId())) {
                 throw denied();
             }
-            QuickSignalReceipt withdrawn = receipt.withdraw();
-            if (withdrawn != receipt) {
-                store.withdraw(withdrawn);
+            if (grant.state() == SignalCommandGrant.State.UNUSED) {
+                store.consumeGrant(grant.consume());
             }
-            return withdrawn;
+            return new SignalCommandStopResult(commandId, Optional.empty());
         });
+    }
+
+    private QuickSignalReceipt withdrawOwnedReceipt(UUID actorId, UUID journeyId,
+            UUID commandId, QuickSignalReceipt receipt, Instant now) {
+        if (!actorId.equals(receipt.signal().actorId())
+                || !journeyId.equals(receipt.signal().journeyId())
+                || !commandId.equals(receipt.signal().signalId())
+                || now.isBefore(receipt.signal().receivedAt())
+                || !receipt.isRetainedAt(now)) {
+            throw denied();
+        }
+        QuickSignalReceipt withdrawn = receipt.withdraw();
+        if (withdrawn != receipt) {
+            store.withdraw(withdrawn);
+        }
+        return withdrawn;
     }
 
     private static UUID requiredJourney(SignalCommandPolicy.SubmissionFingerprint submission) {
@@ -250,6 +288,10 @@ public final class SignalStorageService {
             throw denied();
         }
         return submission.journeyId();
+    }
+
+    private static void requireId(UUID id) {
+        if (id == null || NIL_ID.equals(id)) throw denied();
     }
 
     private ContributorAssessment restrictionFor(UUID actorId) {

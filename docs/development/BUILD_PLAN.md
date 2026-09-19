@@ -8,7 +8,7 @@ existing clients; uncertain writes remain uncertain until explicit stop succeeds
 No automatic requests, browser persistence, public publication or server feature
 activation. Current verification evidence belongs in BUILD_STATUS.md. Route
 preparation is now implemented under `BROWSER_ROUTE_BINDING_UI_SPEC.md`.
-Choice transport and Quick Signal controls remain the next interface prerequisites.
+Choice transport and mandatory expected-context issuance are verified under ADR 0045. Terminal command-stop recovery under ADRs 0046/0047 is verified; Quick Signal controls follow the reviewed lifecycle checkpoint.
 
 Latest safety work (2026-09-19): ADR 0041 adds internal action-specific operator
 permissions, exact revision checks, transactional audit and deletion-resistant
@@ -62,7 +62,8 @@ evidence and release gates are in BUILD_STATUS.md. No public LIVE UI is enabled.
 | P1 / L2 route-area metadata — verified internal prerequisite | ADR 0042 optional validated curated labels with strict backward-compatible catalog loading and redacted diagnostics | Full 398 Java tests/54 suites, core check/bootJar and independent review; no owner choice API or output changes |
 | P1 / L2 route-area choice reader — verified internal prerequisite | ADR 0043 current owned-journey consent/context/restriction and catalog checks, exact bounded labeled subset and immutable minimized snapshot | Full 403 Java tests/55 suites, core check/bootJar and independent review; no Spring wiring, endpoint, grants or budget debits |
 | P1 / L2 expected-context issuance — verified internal prerequisite | ADR 0044 exact context/revision/consent tuple checked under current authority before grant/budget mutation; legacy HTTP unchanged | Full 409 Java tests/56 suites, core check/bootJar, 13 targeted tests and independent review; extra expected-path rollback/consent-race evidence and browser contract remain pending |
-| P1 / L2 choice browser boundary — verified, default off | ADR0045 owner choice GET and explicit expected-context POST, strict browser clients/proxy, shared issuance quota and bounded Unicode responses | Full416 Java/57 suites,400 TS/46 files, core/web builds, workspace checks and independent review; ADR0044 race/rollback gaps closed; no UI/public output |
+| P1 / L2 choice browser boundary — verified, default off | ADR 0045 owner choice GET and explicit expected-context POST, strict browser clients/proxy, shared issuance quota and bounded Unicode responses | Full 416 Java/57 suites, 400 TS/46 files, core/web builds, workspace checks and independent review; ADR 0044 race/rollback gaps closed; no UI/public output |
+| P1 / L2 terminal signal stop — verified, default off | ADRs 0046/0047 consume a known grant or withdraw its retained receipt under one owner transaction; strict browser stop client and separate request quota | 76 focused backend tests and full 431 Java/61 suites, core check/bootJar, 420 TS/48 files and web build; independent review; no UI/public output |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -115,14 +116,16 @@ The routing/search transport is bounded separately under
 `../features/journey/BROWSER_ROUTING_TRANSPORT_SPEC.md`.
 
 ADRs 0042/0043 provide validated labels and an internal authorized choice reader.
-The next contribution UI prerequisites are guarded owner choice transport and
-expected-context issuance contracts. Do not expose opaque anchor IDs as
+ADR 0045 adds guarded owner choice transport and expected-context issuance. Do not expose opaque anchor IDs as
 product labels or invent a synthetic catalog fallback. Then connect explicit Quick Signal actions
 with exact grant/receipt handling. Public eligibility still requires the separate
 publication and safety decisions; route preparation is not physical-presence proof.
 `EXACT_CONTEXT_SIGNAL_ISSUANCE_PLAN.md` tracks ADR 0044's internal transaction-local
-precondition and regression evidence. It changes no current HTTP contract; new
+precondition and regression evidence. The internal precondition now has a guarded browser contract; new
 browser callers must use the guarded expected-context path without fallback.
+`BROWSER_QUICK_SIGNAL_UI_PLAN.md` records the reviewed lifecycle checkpoint:
+fresh-bind route authority, workspace-scoped recovery, bounded commands and
+metadata expiry, explicit dismissal and separate cancellation scopes precede mounted controls.
 
 Cohort publication decision checkpoint: `COHORT_PUBLICATION_DESIGN.md` in the Live
 feature directory documents the remaining block/withdrawal/differencing issues.

@@ -3,6 +3,7 @@ package com.routiqo.core.routeupdate.application;
 import com.routiqo.core.routeupdate.domain.QuickSignalReceipt;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routeupdate.domain.SignalCommandGrant;
+import com.routiqo.core.routeupdate.domain.SignalCommandStopResult;
 import com.routiqo.core.routeupdate.domain.SignalIssuanceExpectation;
 import java.time.Duration;
 import java.util.Objects;
@@ -38,6 +39,10 @@ public final class CatalogSignalService {
 
     public QuickSignalReceipt withdraw(UUID actorId, UUID journeyId, UUID commandId) {
         return storage.withdraw(actorId, journeyId, commandId);
+    }
+
+    public SignalCommandStopResult stopCommand(UUID actorId, UUID journeyId, UUID commandId) {
+        return storage.stopCommand(actorId, journeyId, commandId);
     }
 
     @Override public String toString() { return "CatalogSignalService[private]"; }

@@ -86,3 +86,11 @@ versions and category sets remain request-scoped. Existing catalog retention,
 route-context expiry, grant lifetime, receipt retention and deletion rules remain
 unchanged. Choice reads reserve only an existing durable request-rate row;
 expected issuance shares legacy issuance budgets and adds no new grant lifetime.
+
+ADRs 0046/0047 reuse existing consumed grants and terminal receipts for command
+stopping. No extra tombstone, receipt, evidence copy, budget refund or new
+retention interval is created. Original receipt/grant timestamps and terminal
+supersession are preserved. An expired retained receipt is not renewed by stop;
+cleanup may make later retries generically unknown. A consumed grant without a
+receipt cannot be treated as proof that no past acceptance occurred. Existing
+account deletion cascades and bounded expiry rules continue to apply.

@@ -56,7 +56,7 @@ Pass authenticated actor, path journey and validated expectation to
 pre-read choices to supply missing expected values. Return the existing minimal
 grant DTO. Mismatch is generic bodyless409 with no current tuple disclosed.
 
-Share the EXISTING `signal-issue-request`30/minute account budget with legacy
+Share the EXISTING `signal-issue-request` 30/minute account budget with legacy
 issuance so the extra route cannot double request allowance. Successful grants
 also retain the same transactional storage budget; no new contribution quota.
 Lost issuance is non-idempotent and must not cause automatic retry.
@@ -67,25 +67,25 @@ Reuse session cookies, exact single X-Routiqo-Account, Origin/Fetch-Site, POST
 CSRF/JSON/20KiB guards and no-store on successes and failures. No bearer fallback.
 Strict method/path allowlists on backend and proxy; reject queries/extra suffixes.
 Private read requires session/account; POST additionally requires existing CSRF.
-Use existing bodyless400/401/403/404/409/413/415/429/503 meanings, Retry-After60
+Use existing bodyless400/401/403/404/409/413/415/429/503 meanings, Retry-After 60
 for rate limits, and redacted session/rate/authority infrastructure failures.
 
 The proxy allows only exact new method/path combinations. Choice responses have
-a bounded256KiB cap (128 potentially escaped Unicode labels); other LIVE limits
+a bounded 256 KiB cap (128 potentially escaped Unicode labels); other LIVE limits
 remain unchanged. Preserve timeout/redirect/no-store/account forwarding behavior.
 No public configuration data, new cookies, unbounded buffer or external request.
 
 ## Client boundary
 
 Generate OpenAPI types. Add explicit read and expected-issuance functions using
-existing bounded LIVE transport, one12-second deadline covering CSRF/headers/
-stream/validation, cancellation and redacted errors. Apply the256KiB response cap
-only to the choice GET, retaining64KiB elsewhere. Copy/validate inputs before
+existing bounded LIVE transport, one 12-second deadline covering CSRF/headers/
+stream/validation, cancellation and redacted errors. Apply the 256 KiB response cap
+only to the choice GET, retaining 64 KiB elsewhere. Copy/validate inputs before
 any await; do not store snapshots or automatically fetch, retry, refresh or queue.
 
 Validate exact object fields, IDs, string-long precision, unique canonical
 choice/category order, 1..128 choices, label policy, valid nonfuture/unexpired
-snapshot times and24-hour lifetime at receipt. Match returned grants to captured
+snapshot times and 24-hour lifetime at receipt. Match returned grants to captured
 anchor AND expected context/revision/generation; do not accept a newer tuple as
 equivalent. Existing grant category/lifetime checks remain. Require expected-path grants
 to be nonfuture and unexpired at client validation time as well as <=90 seconds
@@ -95,7 +95,7 @@ is a later reviewed slice.
 
 ## Required evidence
 
-Complete ADR0044's expected-path consent-winning race and insertion-failure
+Complete ADR 0044's expected-path consent-winning race and insertion-failure
 rollback tests before exposure. Use real HTTP/PostgreSQL/current authority for
 the new controller: synthetic Google verifier/loopback provider allowed only at
 external test boundaries. Test default/absent/partial flags, real composition,
@@ -112,11 +112,11 @@ No live OAuth/provider/production/device verification is claimed by test fixture
 
 ## Verified evidence
 
-Full Java check/bootJar:416 tests/57 suites, zero failures/errors/skips. Full
-workspace check:400 TypeScript tests/46 files, types/lint/format/contracts passed;
+Full Java check/bootJar: 416 tests/57 suites, zero failures/errors/skips. Full
+workspace check: 400 TypeScript tests/46 files, types/lint/format/contracts passed;
 web production build and secret scan passed. Independent backend/client/contract
 review approved after strict UTF-8 decoding and quoted YAML descriptions were
-corrected.54 targeted backend and62 targeted client/proxy tests passed first.
+corrected. 54 targeted backend and 62 targeted client/proxy tests passed first.
 
 Maximum Unicode coverage combines actual DTO/Jackson serialization and escaped
 client/proxy response tests, not a largest-catalog HTTP fixture. Existing reader
