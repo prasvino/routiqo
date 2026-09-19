@@ -1,6 +1,6 @@
 ROUTIQO — CURRENT STATUS, REMAINING WORK AND COMPLETION REQUIREMENTS
 Snapshot: 19 September 2026 (IST)
-Repository snapshot: internal audited moderation following the browser transport work in 5813a7c
+Repository snapshot: private journey consent controls following audited moderation in 312e599
 
 CURRENT POSITION
 
@@ -23,9 +23,9 @@ Full offline navigation, broad social features and AI belong to later phases.
 | Offline journey writes | Web IndexedDB queues, foreground/reconnect dispatch, retries, reconciliation, account isolation; native SQLite primitives | Native dispatch/network integration; restart/network-flap/device tests; broader unresolved-conflict recovery | Web reliability for pilot; native work for Android |
 | Maps and routes | MapLibre web renderer; guarded Valhalla routing and Photon search adapters; regional bounds, alternatives and manual direction steps | Provision real regional routing/search/tiles, review data quality and licensing, validate browser resources and provider behavior | Regional maps required for pilot |
 | Navigation and offline maps | Last successful web route remains in memory during connection loss | Route persistence across reload, native map integration, location guidance, bounded map downloads, eviction/deletion and on-device rerouting | Later than first LIVE list |
-| Private Live consent/context | Durable consent with revocation precedence; provider-derived route binding, catalog authority, private owner APIs and typed browser clients | Consent/route-binding UI, reviewed real catalog, rollout configuration and end-to-end lifecycle verification | First release |
+| Private Live consent/context | Durable consent with revocation precedence; private consent UI, provider-derived route binding, catalog authority, private owner APIs and typed browser clients | Route-binding UI, reviewed real catalog, rollout configuration and authenticated end-to-end lifecycle verification | First release |
 | Quick Signals | Typed values, server grants, durable private receipts, replay protection, replacement/withdrawal, minute and rolling 20/hour quotas, 60-second slot cooldown, suspension/revision fencing, private command APIs and typed browser clients | Evidence-independence authority, durable reporting, public block targeting/delivery and operator moderation, contribution UI and operational validation | First release |
-| Live expiry cleanup | Default-off bounded job for contexts/grants/receipts/acceptance charges, isolated scheduler, failure recovery and non-overlap | Staging activation, backlog/capacity checks, failure alerts, backup/retention operations and production rollout | First release operations |
+| Live expiry cleanup | Default-off bounded jobs for LIVE expiry and moderation audit/debit expiry, isolated authentication/cleanup schedulers, failure recovery and non-overlap | Staging activation, backlog/capacity checks, failure alerts, backup/retention operations and production rollout | First release operations |
 | Public Live Moments | Product direction and privacy threat/design checkpoints documented | Approved cohort publication design, safe aggregation/projection, authenticated reads, suppression/conflict/freshness rules and adversarial tests | Critical first-release blocker |
 | Active-journey LIVE list | Specifications and private backend prerequisites | Actual list and Quick Signal controls; loading/empty/suppressed/stale/offline/error states, reauthorization and accessibility | Critical first-release blocker |
 | Safety and minimum admin | Private safety primitives, durable suspension and directed blocks; internal finite operator permissions, exact-revision restriction commands, atomic minimized audit and deletion-resistant action limits; admin foundation | Strong admin authentication, grant administration, case/target scope, operational blocking/reporting and queue, revocation propagation and safety procedures | First release |

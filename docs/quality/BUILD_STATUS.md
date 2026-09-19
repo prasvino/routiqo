@@ -20,14 +20,14 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion invokes consent then route-context participants atomically; signal acceptance composes both current authorities |
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
-| Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; no UI, presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
+| Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; private active-journey consent UI with explicit check/allow/stop and uncertain-write fencing; no presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration or output; optional bounded expiry job under ADR 0036 |
 | Private route-context API | Separately default-off owner-only GET recovery and explicit POST binding through the real configured binder; strict browser guards, minimal no-store DTOs, database account quotas and post-provider authority rechecks. No UI or public Live output |
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
 | Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
 | Private safety foundations | Reviewed assessment, block and structured report-case domain transitions; durable contribution restrictions under the account transaction authority. Suspension denies new grants/acceptance and unsuspension cannot revive old grants. Durable private directed blocks with ordered account locks, bounded retained revisions and bilateral exclusion; no operator API, durable report workflow, public block targeting or public trust claim |
-| Audited moderation prerequisite | Internal RESTRICT/RESTORE commands require finite action-specific database grants, ordered enabled operator/subject locks and exact revisions. Effect, minimized audit and an independent 20/hour operator debit commit atomically; bounded 30-day audit and callable cleanup. Signal ingestion is read-only; no admin authentication, seeded grants, queue or HTTP endpoint |
-| Private browser LIVE clients | Typed consent, context and Quick Signal clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. No mounted controls, persistence, automatic retry or public projection |
+| Audited moderation prerequisite | Internal RESTRICT/RESTORE commands require finite action-specific database grants, ordered enabled operator/subject locks and exact revisions. Effect, minimized audit and an independent 20/hour operator debit commit atomically; bounded 30-day audit and independently default-off audit/debit maintenance. Signal ingestion is read-only; no admin authentication, seeded grants, queue or HTTP endpoint |
+| Private browser LIVE clients | Typed consent, context and Quick Signal clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. Consent controls mounted for confirmed active journeys; no route/signal controls, persistence, automatic retry or public projection |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -37,6 +37,32 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Latest moderation maintenance pass, 2026-09-19:
+
+- Separate default-off audit/debit scheduler reuses existing domain cleanup;
+  100 rows/category/tick, 60-second initial/fixed delays, isolated failures and
+  no overlap or drain loop. Authentication has an independent named scheduler.
+- **394 Java tests across 54 suites**, zero failures/errors/skips; core check and
+  bootJar passed. Final strengthened job tests also passed separately after this
+  run, covering full batches, next-tick recovery and redacted logging.
+- Configuration tests exercise web/native authentication with moderation only,
+  all three schedulers, absent/false flags, missing persistence and missing cleanup
+  authority. Independent review approved design, production code and final tests.
+- No database schema or retention policy changed; no maintenance flag activated.
+  Staging backlog/alerts/capacity, backup retention and operator rollout remain.
+
+Latest private consent UI pass, 2026-09-19:
+
+- Explicit private check/allow/stop controls mounted only for confirmed active
+  journeys; no automatic requests, browser persistence or backend activation.
+- **329 TypeScript tests across 43 files** passed, including 32 focused consent
+  and workspace tests. Workspace types, lint, formatting, contracts and secret
+  scan passed. Web production build passed.
+- Independent review approved after strengthening foreground result acceptance.
+  Desktop/390 px/320 px fixture rendering, 44 px targets, keyboard focus and
+  check/allow/stop/offline states verified. This was simulated transport UI QA,
+  not real OAuth/end-to-end proof. See [QA evidence](PRIVATE_CONSENT_UI_QA.md).
 
 Latest moderation pass, 2026-09-19:
 
@@ -127,11 +153,11 @@ as real LIVE activity.
    and atomic audited restriction actions now exist; add strong administrative
    authentication, controlled grant administration, queue/case scope and revocation
    propagation. Public targeting and operational operator workflows remain pending.
-3. **Actual LIVE interface.** Connect the private clients to explicit consent,
+3. **Actual LIVE interface.** Private consent controls are implemented; connect
    route-binding and contribution controls. Implement approved moment reads/list,
    one foreground request in flight, stale/suppressed/conflicting/offline states,
    account/journey clearing and exact explicit retry. Public output depends on the
-   first two gates; the new clients alone are not a working LIVE release.
+   first two gates; private consent controls are not a working LIVE release.
 4. **Journey and UI release reliability.** Broader cross-device restoration and
    unresolved conflicts; authenticated journal/history/backup QA; storage failures,
    interrupted writes, account switches, large text, reduced motion and screen

@@ -464,6 +464,15 @@ server authentication, ownership, consent, budgets and publication gates still a
 See BROWSER_LIVE_CLIENT_SPEC.md and BROWSER_AUTH_TRANSPORT_SPEC.md for limits and
 verification scope.
 
+The private active-journey consent panel adds a UI authority boundary described in
+`BROWSER_LIVE_CONSENT_UI_SPEC.md`. A lost enable response may still commit after a
+later read returns off. Reads therefore cannot resolve uncertain mutation state;
+only an acknowledged explicit stop fences older enables. Account re-verification,
+journey completion, offline/hidden transitions and stale responses must remove
+enable authority immediately. No browser persistence or automatic consent retry
+is permitted. These controls do not establish public discoverability, Ghost Mode
+or a right to repurpose private consent for future public publication.
+
 The existing journal and journey recovery clients must also resist unbounded or
 stalled responses: check streamed bytes rather than whole-text length after a
 read, and do not await cancellation indefinitely. A delayed CSRF bootstrap cannot
@@ -481,6 +490,16 @@ diagnostics. It must never delete ordering fences or reset consumed grants.
 Replica count affects aggregate database load. Backlog capacity, monitoring,
 backup retention and actual operation remain release verification requirements;
 the scheduler is not a public revocation or physical-erasure mechanism.
+
+Moderation expiry uses the same bounded scheduling principles through a separate
+default-off flag and domain-owned audit/debit cleanup adapter. Auth maintenance
+must retain its own named scheduler even when only moderation cleanup is enabled;
+an exhausted or stalled cleanup category cannot share its execution thread.
+Cleanup preserves unexpired receipts, restrictions, permissions, blocks and
+current action debits. Test profile/flag combinations and real scheduler thread
+selection, not just bean names. Existing audit expiry limits retained request
+deduplication; deletion never permits replay of an old exact revision. Full-batch
+results are not proof the backlog is empty, and per-replica bounds are not global.
 
 Internal durable block policy (ADR 0040) must resist opposite-direction concurrent
 writes, last-slot capacity races, stale unblocks, account deletion while waiting,

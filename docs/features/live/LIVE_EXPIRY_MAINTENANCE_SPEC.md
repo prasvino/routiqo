@@ -33,6 +33,11 @@ budget, server-clock expiry cutoff checked in SQL and leaf-only
 `FOR UPDATE SKIP LOCKED` locks.
 Do not wrap the tick in a transaction or acquire account/journey authority locks.
 
+Authentication's named scheduler is owned by identity configuration under the
+persistence plus web-auth/native-auth profiles, independently of this flag.
+Moderation expiry has a separate flag and scheduler under
+`MODERATION_EXPIRY_MAINTENANCE_SPEC.md`; enabling this LIVE job does not activate it.
+
 Multiple replicas may run the job: row locking and exact expiry/identity rechecks
 provide correctness. Per-replica batch limits are not a global throughput limit;
 deployment must size the enabled replica count and database pool deliberately.

@@ -27,6 +27,33 @@ const empty = () => ({
   outbox: { version: 1 as const, accountId, entries: [] },
   snapshots: { version: 1 as const, accountId, journeys: [] },
 });
+const activeJourneyId = '00000000-0000-4000-8000-000000000009';
+const active = () => ({
+  ...empty(),
+  snapshots: {
+    version: 1 as const,
+    accountId,
+    journeys: [
+      {
+        id: activeJourneyId,
+        kind: 'trip' as const,
+        status: 'active' as const,
+        startedAt: '2026-09-19T06:00:00.000000Z',
+        completedAt: null,
+      },
+    ],
+  },
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((accept, decline) => {
+    resolve = accept;
+    reject = decline;
+  });
+  return { promise, resolve, reject };
+}
 it('shows a confirmed completion and allows a new journey', async () => {
   vi.mocked(readBrowserJourneyPartition).mockResolvedValue({
     ...empty(),
@@ -269,4 +296,72 @@ it('restores confirmed history through the account-bound service and keeps failu
   fireEvent.click(screen.getByRole('button', { name: 'Restore recent journeys' }));
   await screen.findByText('Recent journeys could not be restored. Saved work is unchanged.');
   expect(dispatchBrowserJourneyBatch).not.toHaveBeenCalled();
+});
+
+it('mounts private LIVE consent only for a confirmed active journey without an outbox action', async () => {
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(active());
+  render(<JourneyWorkspace />);
+  expect(await screen.findByRole('heading', { name: 'Contribution settings' })).toBeTruthy();
+  expect(screen.getByText(/Public LIVE is unavailable/)).toBeTruthy();
+});
+
+it('suppresses private LIVE consent while the active journey has pending or blocked work', async () => {
+  const base = active();
+  const pending = {
+    ...base,
+    outbox: {
+      ...base.outbox,
+      entries: [
+        {
+          command: { action: 'complete' as const, journeyId: activeJourneyId },
+          attempts: 1,
+          nextAttemptAt: Date.now() + 60_000,
+          blocked: 'conflict' as const,
+          lease: null,
+        },
+      ],
+    },
+  };
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(pending);
+  render(<JourneyWorkspace />);
+  await screen.findByRole('button', { name: 'Check server status' });
+  expect(screen.queryByRole('heading', { name: 'Contribution settings' })).toBeNull();
+});
+
+it('hides known LIVE controls during delayed same-account identity re-verification', async () => {
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(active());
+  render(<JourneyWorkspace />);
+  await screen.findByRole('heading', { name: 'Contribution settings' });
+  const identity = deferred<{ accountId: string } | null>();
+  vi.mocked(browserAccount).mockReturnValueOnce(identity.promise);
+  fireEvent.focus(window);
+  await waitFor(() =>
+    expect(screen.queryByRole('heading', { name: 'Contribution settings' })).toBeNull(),
+  );
+  identity.resolve({ accountId });
+  expect(await screen.findByRole('heading', { name: 'Contribution settings' })).toBeTruthy();
+});
+
+it('keeps LIVE controls suppressed after same-account re-verification fails', async () => {
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(active());
+  render(<JourneyWorkspace />);
+  await screen.findByRole('heading', { name: 'Contribution settings' });
+  vi.mocked(browserAccount).mockRejectedValueOnce(new Error('Authentication unavailable'));
+  fireEvent.focus(window);
+  await screen.findByText('Journey status is unavailable. Saved actions stay on this device.');
+  expect(screen.queryByRole('heading', { name: 'Contribution settings' })).toBeNull();
+});
+
+it('suppresses private LIVE controls while a parent journey operation is busy', async () => {
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(active());
+  const restore = deferred<Awaited<ReturnType<typeof restoreRecentBrowserJourneyHistory>>>();
+  vi.mocked(restoreRecentBrowserJourneyHistory).mockReturnValueOnce(restore.promise);
+  render(<JourneyWorkspace />);
+  await screen.findByRole('heading', { name: 'Contribution settings' });
+  fireEvent.click(screen.getByRole('button', { name: 'Restore recent journeys' }));
+  await waitFor(() =>
+    expect(screen.queryByRole('heading', { name: 'Contribution settings' })).toBeNull(),
+  );
+  restore.resolve({ partition: active(), recentCount: 1 });
+  expect(await screen.findByRole('heading', { name: 'Contribution settings' })).toBeTruthy();
 });

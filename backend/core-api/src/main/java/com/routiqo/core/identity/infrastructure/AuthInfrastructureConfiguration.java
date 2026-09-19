@@ -8,11 +8,20 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("persistence & (web-auth | native-auth)")
 @EnableScheduling
 public class AuthInfrastructureConfiguration {
+    @Bean("taskScheduler")
+    ThreadPoolTaskScheduler authMaintenanceTaskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("auth-maintenance-");
+        return scheduler;
+    }
+
     @Bean Clock authRateClock() { return Clock.systemUTC(); }
 
     @Bean AuthRateGate authRateGate(JdbcTemplate jdbc,

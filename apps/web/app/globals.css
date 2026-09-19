@@ -1891,6 +1891,47 @@ textarea::placeholder {
   margin-top: 16px;
   font-size: 13px;
 }
+.live-consent-panel {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.live-consent-panel h3 {
+  margin: 6px 0 8px;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 400;
+}
+.live-consent-panel .eyebrow {
+  color: var(--muted);
+}
+.live-consent-panel > p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.live-consent-actions .button {
+  min-height: 44px;
+  white-space: normal;
+}
+.live-consent-actions .button:focus-visible {
+  outline-color: var(--ink);
+}
+.live-consent-notice {
+  margin-top: 14px;
+}
+@media (max-width: 480px) {
+  .live-consent-panel {
+    padding: 18px 16px;
+  }
+  .live-consent-actions {
+    flex-direction: column;
+  }
+  .live-consent-actions .button {
+    width: 100%;
+  }
+}
 .journey-kind {
   display: grid;
   gap: 8px;

@@ -76,7 +76,9 @@ fresh post-lock time. Missing authority is denial, not an empty permissive state
   SKIP LOCKED, maximum 500 per call, its own short transaction and no account-lock
   acquisition. Expired debit slots also support bounded leaf-only cleanup, which
   must lock each candidate and recheck its captured time before deleting it.
-  No timer or scheduled activation is added. Debit slots are bounded and reused;
+  The optional scheduler is specified separately in
+  `MODERATION_EXPIRY_MAINTENANCE_SPEC.md` and remains disabled by default.
+  Debit slots are bounded and reused;
   they do not depend on cleanup to enforce the budget.
 
 The audit is atomic database evidence of a command, not tamper-proof storage or

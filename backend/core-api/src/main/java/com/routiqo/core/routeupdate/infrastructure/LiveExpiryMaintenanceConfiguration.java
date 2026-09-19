@@ -22,16 +22,6 @@ public class LiveExpiryMaintenanceConfiguration {
         return scheduler;
     }
 
-    // Keep unqualified auth maintenance on its own scheduler when both jobs are active.
-    @Bean("taskScheduler")
-    @Profile("web-auth | native-auth")
-    ThreadPoolTaskScheduler defaultTaskScheduler() {
-        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(1);
-        scheduler.setThreadNamePrefix("auth-maintenance-");
-        return scheduler;
-    }
-
     @Bean
     LiveExpiryMaintenanceJob liveExpiryMaintenanceJob(
             LiveRouteContextExpiryMaintenance contexts, SignalStorageExpiryMaintenance signals) {

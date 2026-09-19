@@ -2,12 +2,24 @@
 
 ## Next priority: Routiqo Live first release
 
+Current browser slice (2026-09-19): private active-journey consent controls under
+`BROWSER_LIVE_CONSENT_UI_SPEC.md`. Explicit checks and one-shot allow/stop use the
+existing clients; uncertain writes remain uncertain until explicit stop succeeds.
+No automatic requests, browser persistence, public publication or server feature
+activation. Current verification evidence belongs in BUILD_STATUS.md. Route
+binding and Quick Signal controls remain the next interface prerequisites.
+
 Latest safety work (2026-09-19): ADR 0041 adds internal action-specific operator
 permissions, exact revision checks, transactional audit and deletion-resistant
 operator action debits. The unaudited production mutation service is removed;
 signal ingestion consumes read-only restriction state. Focused PostgreSQL tests
 and independent review pass; final integration evidence is in BUILD_STATUS.md.
 No grant is seeded and no administrative or public surface is enabled.
+
+The follow-on moderation maintenance slice reuses its audit/debit cleanup adapter
+behind an independent default-off flag and dedicated scheduler. Authentication
+maintenance owns its scheduler irrespective of cleanup flags. No retention horizon
+or database schema changes; staging activation and operations remain pending.
 
 Latest supporting reliability work (2026-09-19): browser auth, private LIVE,
 journal and journey transports enforce bounded streamed responses and whole-
@@ -42,7 +54,9 @@ evidence and release gates are in BUILD_STATUS.md. No public LIVE UI is enabled.
 | P0 / L1.1 — verified | ADR 0039 durable contribution restrictions with grant revision fencing | Mandatory current authority on new issuance/acceptance; retained private replay preserved; database/race validation and independent review passed |
 | P0 / L1.2 — verified | ADR 0040 private durable directed blocks and ordered account-pair authority | 363 tests/50 suites, core check/bootJar and independent review passed; no public block API or output revocation |
 | P0 / L1.3 — internal prerequisite verified | ADR 0041 scoped finite operator grants and atomic audited contribution restriction commands | 16 focused PostgreSQL tests, three value-object tests, architecture gates and independent review; full core check/bootJar: 386 tests/52 suites; strong admin authentication, grant administration and case workflows remain pending |
+| P0 / L1.3 maintenance — verified, default off | Independent bounded moderation audit/debit expiry job; isolated auth/LIVE/moderation schedulers | 8 job/config tests including profile combinations and real scheduler thread selection; full core check/bootJar: 394 tests/54 suites; final strengthened job tests passed; staging operation pending |
 | P1 / L2 prerequisite — verified | Typed private browser consent, route-context and signal clients with strict response validation, exact revisions and bounded cancellation-safe transport | 18 focused tests and independent review; full 291 TypeScript tests, web build/types/contracts pass; UI and public publication remain pending |
+| P1 / L2 consent — verified | Explicit private active-journey consent controls, uncertain-write fencing and lifecycle cancellation | 32 focused React tests; full 329 TypeScript tests/43 files, web build and independent review; scoped visual/keyboard QA; real auth and public LIVE remain gated |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |
 | Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
@@ -77,11 +91,22 @@ are not admission authority.
 
 Private browser clients now implement these owner transports under
 `BROWSER_LIVE_CLIENT_SPEC.md`. The next integration step is an explicit,
-account/journey-scoped interaction design with cancelled stale requests, truthful
-uncertain-write recovery and offline submission disabled. Public list integration
+account/journey-scoped route and contribution interaction with cancelled stale
+requests, truthful uncertain-write recovery and offline submission disabled.
+The private consent panel implements the first part of this boundary. Public list integration
 still requires the publication and safety gates; importing the clients enables no
 network work or feature flags. The existing browser authentication transport is
 bounded under `../features/auth/BROWSER_AUTH_TRANSPORT_SPEC.md`.
+
+For the next route-binding UI slice, capture the exact endpoint/mode/alternative
+input associated with the displayed calculation rather than mutable form state.
+Binding performs a fresh server calculation: an alternative index is not proof
+that the same geometry is still selected. Disclose that distinction instead of
+claiming an exact displayed-route attachment. Require explicit context recovery
+before an exact-context bind, with no automatic refresh/retry of expectations.
+A recovered context is private preparation, not evidence of physical presence or
+public eligibility. Resolve useful owner-facing anchor labels before exposing
+opaque anchor IDs as contribution choices; no synthetic catalog fallback.
 
 Cohort publication decision checkpoint: `COHORT_PUBLICATION_DESIGN.md` in the Live
 feature directory documents the remaining block/withdrawal/differencing issues.

@@ -228,3 +228,13 @@ or staging data first; do not mix old writers that ignore the safety checks with
 new writers. Preserve V13's full-hour acceptance quiet-period requirement above.
 The private block capacity includes unblocked revision rows; do not manually purge
 those rows to free capacity, which would discard stale-command protection.
+
+Moderation audit/debit cleanup is independently opt-in through
+`ROUTIQO_MODERATION_EXPIRY_MAINTENANCE_ENABLED=false` under persistence. Leave it
+off unless operating a reviewed environment. It runs one bounded batch per
+category every 60 seconds after an initial 60-second delay; it never removes
+permissions, current restrictions or blocks. Its scheduler is separate from
+LIVE expiry and authentication maintenance. Enabling LIVE expiry does not enable
+moderation expiry. See `MODERATION_EXPIRY_MAINTENANCE_SPEC.md` for retention,
+failure isolation, staging validation and rollback limits. No local setting was
+activated by implementation.

@@ -96,6 +96,17 @@ export default function Page() {
             device where you delete it. Planning drafts remain separate.
           </p>
           <p>
+            When private LIVE settings are available, your contribution choice for an active journey
+            is saved on Routiqo’s server. Allowing private contributions does not publish your
+            location or make you discoverable. Public LIVE is not available.
+          </p>
+          <p>
+            An interrupted setting change may still have reached the server. A later check does not
+            cancel that request. To stop contributions, choose “Stop private contributions” and wait
+            for confirmation. Stopping does not delete private contributions or receipts already
+            saved.
+          </p>
+          <p>
             Completed trip journals can keep a title and notes in an account-specific browser draft.
             Choosing “Save to account” sends that content to Routiqo’s server. Journals are private;
             they are not shared with other travellers or included in planning backups. Signing out

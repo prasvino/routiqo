@@ -29,3 +29,13 @@ submissions; use reviewed suppression rather than exposing count differences.
 Moment existence/freshness can also reveal people, so minimum cohorts, fixed
 partitions/windows and repeated-query controls require adversarial validation.
 No automatic nearby/location discovery is authorized by this plan.
+
+## Private journey contribution choice
+
+The active-journey consent controls concern private contribution preparation only.
+They neither publish a location nor make the account discoverable. Future public
+participation requires a separately reviewed purpose, disclosure and authorization;
+an existing private sharing boolean is insufficient. Stopping contribution
+preparation does not delete retained private receipts. A cancelled or failed write
+is uncertain even after a later read: the UI retains that warning until an explicit
+stop is acknowledged. See `BROWSER_LIVE_CONSENT_UI_SPEC.md` for lifecycle rules.

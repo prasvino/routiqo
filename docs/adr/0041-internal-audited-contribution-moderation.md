@@ -48,6 +48,8 @@ source evidence, free text or moderation hold. The period is an internal
 engineering bound, not an approved legal or operational evidence-retention policy.
 Either account deletion removes identifying audit records. Receipts expire
 logically; physical cleanup is bounded and separately callable, not scheduled here.
+The subsequent [moderation maintenance specification](../features/live/MODERATION_EXPIRY_MAINTENANCE_SPEC.md)
+adds an independently default-off scheduler without changing these retention rules.
 
 Limit retained receipts to 1,000 per operator without evicting fresh receipts.
 Keep a separate, at-most-20-slot operator-only debit ledger for the rolling hour.

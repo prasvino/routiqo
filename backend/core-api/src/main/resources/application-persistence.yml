@@ -16,3 +16,5 @@ spring:
 routiqo:
   live:
     expiry-maintenance-enabled: ${ROUTIQO_LIVE_EXPIRY_MAINTENANCE_ENABLED:false}
+  moderation:
+    expiry-maintenance-enabled: ${ROUTIQO_MODERATION_EXPIRY_MAINTENANCE_ENABLED:false}

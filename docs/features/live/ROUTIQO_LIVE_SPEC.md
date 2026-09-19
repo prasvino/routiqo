@@ -9,6 +9,11 @@ user-supplied ROUTIQO_LIVE_PRODUCT_PLAN.md; examples in that input are illustrat
 not evidence of activity or authorization to enable services. Only BUILD_STATUS.md
 records verified implementation; internal primitives are not a working LIVE list.
 
+The first mounted browser prerequisite is limited to private journey consent
+controls (`BROWSER_LIVE_CONSENT_UI_SPEC.md`). It does not enable public LIVE,
+contribution submission, discoverable presence or global Ghost Mode. Private
+permission cannot be reused as authorization for an unapproved public purpose.
+
 ## Product and ownership
 
 Routiqo Live helps travellers understand recent situations relevant to their

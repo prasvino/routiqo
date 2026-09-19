@@ -21,6 +21,7 @@ import { JourneyHistory } from './journey-history';
 import { listBrowserJournals } from '../lib/journal-storage';
 import { readBrowserJourney } from '../lib/browser-journeys';
 import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
+import { LiveConsentPanel } from './live-consent-panel';
 
 export function JourneyWorkspace() {
   const [offline, setOffline] = useState(false);
@@ -37,6 +38,7 @@ export function JourneyWorkspace() {
   const [availability, setAvailability] = useState<
     'checking' | 'disabled' | 'signed-out' | 'ready'
   >('checking');
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
   const [account, setAccount] = useState<string | null>(null);
   const [partition, setPartition] = useState<BrowserJourneyPartition | null>(null);
   const [error, setError] = useState('');
@@ -75,6 +77,7 @@ export function JourneyWorkspace() {
   }, []);
   const refresh = useCallback(async () => {
     if (locked.current) return;
+    setIdentityConfirmed(false);
     const current = ++revision.current;
     try {
       const config = await authAvailability();
@@ -99,10 +102,13 @@ export function JourneyWorkspace() {
       setAccount(identity?.accountId ?? null);
       setPartition(saved);
       setAvailability(!config.enabled ? 'disabled' : identity ? 'ready' : 'signed-out');
+      setIdentityConfirmed(true);
       setError('');
     } catch {
-      if (revision.current === current)
+      if (revision.current === current) {
+        setIdentityConfirmed(false);
         setError('Journey status is unavailable. Saved actions stay on this device.');
+      }
     }
   }, []);
   useEffect(() => {
@@ -350,6 +356,15 @@ export function JourneyWorkspace() {
             Journey controls send type and start/finish records. Planning notes and places stay on
             this device; trip journal notes are saved separately when you choose.
           </p>
+          {account && active && (
+            <LiveConsentPanel
+              key={`${account}:${active.id}`}
+              accountId={account}
+              journeyId={active.id}
+              online={!offline}
+              available={identityConfirmed && !busy && partition?.outbox.entries.length === 0}
+            />
+          )}
           {completed.length > 0 && (
             <div className="journey-history">
               <h3>Recently completed</h3>

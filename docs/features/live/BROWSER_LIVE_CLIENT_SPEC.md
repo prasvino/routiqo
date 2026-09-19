@@ -1,7 +1,9 @@
 # Private browser LIVE clients
 
 Status: implemented and independently reviewed, 2026-09-19; private clients only,
-no public projection or UI activation. Verification is recorded in BUILD_STATUS.md.
+no public projection or server flag activation. Private consent UI integration is
+specified separately in BROWSER_LIVE_CONSENT_UI_SPEC.md. Verification is recorded
+in BUILD_STATUS.md.
 
 ## Scope
 
