@@ -1,7 +1,7 @@
 package com.routiqo.core.routeupdate.infrastructure;
 
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
-import com.routiqo.core.moderation.application.ContributionRestrictionParticipant;
+import com.routiqo.core.moderation.application.ContributionRestrictionReader;
 import com.routiqo.core.routeupdate.application.LiveRouteContextExpiryMaintenance;
 import com.routiqo.core.routeupdate.application.LiveRouteContextParticipant;
 import com.routiqo.core.routeupdate.application.LiveRouteContextService;
@@ -50,7 +50,7 @@ public class RouteUpdatePersistenceConfiguration {
     @Bean
     SignalStorageService signalStorageService(JourneyWriteAuthority journeys,
             PresenceConsentParticipant consents, LiveRouteContextParticipant contexts,
-            ContributionRestrictionParticipant restrictions, SignalStorageStore store) {
+            ContributionRestrictionReader restrictions, SignalStorageStore store) {
         return new SignalStorageService(journeys, consents, contexts, restrictions,
                 store, Clock.systemUTC());
     }

@@ -13,6 +13,16 @@ not an operator permission boundary; public/admin exposure remains denied until
 independent operator authorization and audit exist. Old receipt/public projection
 invalidation and durable report/block workflows remain separate gates.
 
+ADR 0040 now implements private durable blocks; public target authorization remains
+pending. ADR 0041 adds an internal audited restriction command boundary for
+T02/T03/T12/T13/T14/T15/T18/T19/T20: action-specific finite database grants, ordered
+enabled account locks, current post-lock expiry checks, exact revisions, minimized
+atomic receipts and a separate operator-only rolling debit ledger. Target deletion
+must not erase operator charges. No operator authentication, grant administration,
+public/admin endpoint, evidence hold or tamper-proof audit is claimed. A compromised
+permitted operator can act across enabled targets within its action scope and quota;
+case assignment, stronger auth, supervision and operational alerts remain required.
+
 This document defines Routiqo's baseline attacker model, protected assets, trust boundaries, abuse cases, and required mitigations. Update it whenever a feature, provider, data flow, permission, trust boundary, or attacker capability materially changes.
 
 This is a living engineering artifact, not a compliance checklist. Feature specifications should link to the applicable threats and add feature-specific abuse cases.

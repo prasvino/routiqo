@@ -2,6 +2,13 @@
 
 ## Next priority: Routiqo Live first release
 
+Latest safety work (2026-09-19): ADR 0041 adds internal action-specific operator
+permissions, exact revision checks, transactional audit and deletion-resistant
+operator action debits. The unaudited production mutation service is removed;
+signal ingestion consumes read-only restriction state. Focused PostgreSQL tests
+and independent review pass; final integration evidence is in BUILD_STATUS.md.
+No grant is seeded and no administrative or public surface is enabled.
+
 Latest supporting reliability work (2026-09-19): browser auth, private LIVE,
 journal and journey transports enforce bounded streamed responses and whole-
 operation deadlines. Journal/journey mutations capture their exact inputs before
@@ -34,6 +41,7 @@ evidence and release gates are in BUILD_STATUS.md. No public LIVE UI is enabled.
 | P0 / L1.0 — verified | ADR 0038 private assessment/suspension, bilateral block and structured report-case primitives | Domain tests and review; no public output, durable block/report store or operator workflow |
 | P0 / L1.1 — verified | ADR 0039 durable contribution restrictions with grant revision fencing | Mandatory current authority on new issuance/acceptance; retained private replay preserved; database/race validation and independent review passed |
 | P0 / L1.2 — verified | ADR 0040 private durable directed blocks and ordered account-pair authority | 363 tests/50 suites, core check/bootJar and independent review passed; no public block API or output revocation |
+| P0 / L1.3 — internal prerequisite verified | ADR 0041 scoped finite operator grants and atomic audited contribution restriction commands | 16 focused PostgreSQL tests, three value-object tests, architecture gates and independent review; full core check/bootJar: 386 tests/52 suites; strong admin authentication, grant administration and case workflows remain pending |
 | P1 / L2 prerequisite — verified | Typed private browser consent, route-context and signal clients with strict response validation, exact revisions and bounded cancellation-safe transport | 18 focused tests and independent review; full 291 TypeScript tests, web build/types/contracts pass; UI and public publication remain pending |
 | P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
 | P1 / L2 | Privacy-reviewed moment projection and journey LIVE list with Quick Signals | Pilot data, real login and complete UI/privacy/offline acceptance |

@@ -26,6 +26,7 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Quick Signal storage | Internal PostgreSQL server-issued grants, retained private receipts, partial-unique actor/anchor/category contribution slots, atomic acceptance/withdrawal, fixed-minute plus rolling 20/hour actor budgets, 60-second anchor/category cooldown and bounded expiry cleanup. Mandatory durable suspension and grant-revision fencing protect new writes. A default-off catalog-aware facade derives issuance categories and rechecks current provenance/category for new acceptance; no operator workflow or publication; optional bounded expiry job under ADR 0036 |
 | Private Quick Signal API | Separately default-off owner-only POST issue/accept/withdraw through the catalog-aware facade; strict browser guards, minimal no-store string-safe DTOs and separate database request quotas. Fixed private evidence/receipt lifetimes do not approve public retention; no UI or Live projection |
 | Private safety foundations | Reviewed assessment, block and structured report-case domain transitions; durable contribution restrictions under the account transaction authority. Suspension denies new grants/acceptance and unsuspension cannot revive old grants. Durable private directed blocks with ordered account locks, bounded retained revisions and bilateral exclusion; no operator API, durable report workflow, public block targeting or public trust claim |
+| Audited moderation prerequisite | Internal RESTRICT/RESTORE commands require finite action-specific database grants, ordered enabled operator/subject locks and exact revisions. Effect, minimized audit and an independent 20/hour operator debit commit atomically; bounded 30-day audit and callable cleanup. Signal ingestion is read-only; no admin authentication, seeded grants, queue or HTTP endpoint |
 | Private browser LIVE clients | Typed consent, context and Quick Signal clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. No mounted controls, persistence, automatic retry or public projection |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
@@ -37,7 +38,27 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 ## Verification
 
-Latest integrated client pass, 2026-09-19:
+Latest moderation pass, 2026-09-19:
+
+- 16 focused real-PostgreSQL moderation tests and three command/receipt tests passed,
+  including concurrent operators,
+  grant revocation and post-lock expiry, action/deletion serialization, rollback,
+  replay horizons, saturation, capacity, quotas and bounded debit cleanup. A real
+  cleanup/writer lock race verifies that an expired slot can be deleted before a
+  waiting writer creates a fresh charge, which survives subsequent cleanup.
+- Architecture checks and independent adversarial code review passed. Guards cover
+  both ordinary calls and method references to interface/concrete mutation paths.
+- Full core check and bootJar passed: **386 Java tests across 52 suites**, no
+  failures, errors or skipped tests. Secret scan passed. Artifact inspection
+  confirmed the production JAR excludes the unaudited test-only helper.
+- Operator deletion cascades and exact 720-hour audit retention across a London
+  daylight-saving transition are tested. Negative bytecode fixtures verify the
+  architecture guard detects forbidden direct calls and method references.
+- ADR 0041 replaces the unaudited production helper with the audited boundary;
+  the old helper exists only in test setup. Grant administration, strong operator
+  authentication and operational reporting remain unfinished.
+
+Previous integrated client pass, 2026-09-19:
 
 | Check | Result |
 |---|---|
@@ -53,7 +74,7 @@ The first parallel test run encountered two existing mobile dependency timeouts.
 Both passed in a focused rerun, and complete runs with two workers passed before
 and after the final changes. No test timeout was increased or assertion removed.
 
-The current pass implemented:
+The previous client pass implemented:
 
 - Private browser consent, route-context and Quick Signal clients using generated
   types and strict runtime DTO validation. Exact long revisions and nanosecond
@@ -78,10 +99,14 @@ covered redirects, malformed streams, stalled headers/body, shared CSRF deadline
 late failures, cancellation that never settles, timer-starving empty chunks,
 caller mutation during awaits, retained receipts and generic errors.
 
-Latest backend evidence remains the prior **363 Java tests across 50 suites**,
-core-api check and bootJar, with real disposable PostgreSQL concurrency tests and
-independent review. This client-only run did not change backend code or rerun that
-suite. Historical phase evidence is preserved in the
+The initial integrated run caught a stale configuration-test expectation for the
+old read/write interface. It was corrected to require the read-only interface,
+preserving the missing-authority startup failure assertion; the complete rerun
+passed. A final cleanup-test adjustment removes dependence on other test accounts'
+expired rows while retaining the future-debit protection assertion.
+The final complete run includes that correction and the added cleanup/writer race.
+This backend-only phase did not rerun the unchanged frontend checks above.
+Historical phase evidence is preserved in the
 [verification archive](BUILD_STATUS_HISTORY_2026-09-19.md).
 
 No public LIVE publishing, feature activation, real OAuth/provider/device QA,
@@ -98,9 +123,10 @@ as real LIVE activity.
    engineering/design gate, not merely a missing credential.
 2. **Reporting, moderation and safe delivery.** Resolve canonical evidence
    references, current authorization/lock ordering and useful investigation
-   retention before durable report intake. Add scoped operator permissions,
-   auditable actions and revocation propagation. Durable private blocks and
-   suspension already exist; public targeting/operator workflows do not.
+   retention before durable report intake. Internal scoped operator permissions
+   and atomic audited restriction actions now exist; add strong administrative
+   authentication, controlled grant administration, queue/case scope and revocation
+   propagation. Public targeting and operational operator workflows remain pending.
 3. **Actual LIVE interface.** Connect the private clients to explicit consent,
    route-binding and contribution controls. Implement approved moment reads/list,
    one foreground request in flight, stale/suppressed/conflicting/offline states,

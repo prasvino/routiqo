@@ -49,6 +49,20 @@ rows per blocker, including unblocked revision tombstones, retained until either
 account is deleted. Both account FKs cascade; no evidence or block-action history.
 Reports remain pure lifecycle models plus an unimplemented intake proposal, not
 a durable store or permission to retain moderation evidence indefinitely.
+
+ADR 0041 introduces only minimized internal moderation command audit: opaque
+operator/subject/request IDs, closed action/reason, restriction revisions/result
+and server timestamps, with fixed 30-day logical expiry and bounded physical
+cleanup. Either account deletion cascades identifying receipts. At most 1,000
+physical receipts per operator are retained; full capacity denies new work rather
+than discarding fresh audit. This internal engineering bound is not an approved
+operational or legal evidence-retention policy. No source evidence is copied.
+Separate operator-only action debit slots (at most 20) enforce a rolling hour and
+are reusable or eligible for bounded cleanup after expiry; they contain no subject
+and survive subject deletion. Logical expiry does not claim physical erasure.
+Operator deletion cascades them. Finite action-specific operator grants last at
+most 24 hours; stored expired grants are inert and may remain until replacement
+or operator deletion. No account-owner role is provisioned by migrations.
 Expiry, Ghost withdrawal, block changes and deletion must invalidate derived
 projections/caches, not only the original row. Do not retain raw location history
 or put Live evidence into journals, backups, analytics or journey outboxes.

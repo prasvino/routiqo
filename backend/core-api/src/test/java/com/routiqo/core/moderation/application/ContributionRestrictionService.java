@@ -5,7 +5,7 @@ import com.routiqo.core.moderation.domain.ContributorAssessment;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Trusted internal mutation boundary. No API or operator authentication is provided here. */
+/** Test-only setup helper for legacy signal persistence scenarios. */
 public final class ContributionRestrictionService {
     private final AccountWriteAuthority accounts;
     private final ContributionRestrictionParticipant participant;

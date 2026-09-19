@@ -1,6 +1,6 @@
 ROUTIQO — CURRENT STATUS, REMAINING WORK AND COMPLETION REQUIREMENTS
 Snapshot: 19 September 2026 (IST)
-Repository snapshot: private LIVE clients and bounded browser transports following 98640a6
+Repository snapshot: internal audited moderation following the browser transport work in 5813a7c
 
 CURRENT POSITION
 
@@ -28,7 +28,7 @@ Full offline navigation, broad social features and AI belong to later phases.
 | Live expiry cleanup | Default-off bounded job for contexts/grants/receipts/acceptance charges, isolated scheduler, failure recovery and non-overlap | Staging activation, backlog/capacity checks, failure alerts, backup/retention operations and production rollout | First release operations |
 | Public Live Moments | Product direction and privacy threat/design checkpoints documented | Approved cohort publication design, safe aggregation/projection, authenticated reads, suppression/conflict/freshness rules and adversarial tests | Critical first-release blocker |
 | Active-journey LIVE list | Specifications and private backend prerequisites | Actual list and Quick Signal controls; loading/empty/suppressed/stale/offline/error states, reauthorization and accessibility | Critical first-release blocker |
-| Safety and minimum admin | Reviewed private safety domain primitives, durable suspension, bounded directed block store and buildable admin foundation | Blocking/reporting, moderation queue/actions, operator permissions/audit, revocation propagation and safety procedures | First release |
+| Safety and minimum admin | Private safety primitives, durable suspension and directed blocks; internal finite operator permissions, exact-revision restriction commands, atomic minimized audit and deletion-resistant action limits; admin foundation | Strong admin authentication, grant administration, case/target scope, operational blocking/reporting and queue, revocation propagation and safety procedures | First release |
 | Trip journals and commute summaries | Private text journal API/editor/drafts/library/conflict recovery; bounded cancellable journal transport; local monthly commute summaries; planning backup/restore | Real authenticated/device QA; broader history completeness; media and sharing are separate future work | Verify existing features; rich extras later |
 | Android application | Expo four-tab foundation, shared planning logic, SQLite adapters, credential vault and auth response validators | Secure network adapter, Google sign-in UI, authenticated resources/sync, native maps, development build and real-device QA | Android release |
 | Production release | Architecture, security rules and local verification foundations | Hosting, secrets, domain/TLS, real dependencies, monitoring, backup restore, rollout/rollback, privacy disclosures and release QA | Critical first-release blocker |
@@ -63,8 +63,13 @@ B. Finish abuse prevention, moderation and revocation
    - Complete reporting reference authority: canonical evidence identity,
      exact retry after revocation, shared lock order and investigation after
      source expiry. The intake proposal is deliberately not implemented.
-   - Then implement durable reports, operator queue, permissions and atomic
-     audited actions with bounded retention. Pure case transitions exist.
+   - DONE internally: finite RESTRICT/RESTORE database permissions and atomic
+     restriction/audit/debit commands with bounded retention (ADR 0041).
+     No operator identity is authenticated or permission seeded by this slice.
+   - Add strong admin authentication, controlled grant administration and
+     case/target scope. Then connect durable reports and the operator queue.
+   - Establish operator alerts, supervision, appeals and approved audit/backup
+     retention; activate and verify bounded moderation cleanup in staging.
    - DONE: private directed block persistence, ordered account-pair locks,
      bounded retained revisions and tested concurrent/deletion behavior.
    - Connect private blocking to safe authorized public targets and delivery;

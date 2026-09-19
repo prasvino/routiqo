@@ -2,7 +2,7 @@ package com.routiqo.core.routeupdate.application;
 
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.journey.domain.Journey;
-import com.routiqo.core.moderation.application.ContributionRestrictionParticipant;
+import com.routiqo.core.moderation.application.ContributionRestrictionReader;
 import com.routiqo.core.moderation.domain.ContributorAssessment;
 import com.routiqo.core.privacy.application.PresenceConsentParticipant;
 import com.routiqo.core.privacy.domain.PresenceConsent;
@@ -31,7 +31,7 @@ public final class SignalStorageService {
     private final JourneyWriteAuthority journeys;
     private final PresenceConsentParticipant consents;
     private final LiveRouteContextParticipant contexts;
-    private final ContributionRestrictionParticipant restrictions;
+    private final ContributionRestrictionReader restrictions;
     private final SignalStorageStore store;
     private final Clock clock;
     private final SignalCommandPolicy policy = new SignalCommandPolicy();
@@ -39,7 +39,7 @@ public final class SignalStorageService {
     public SignalStorageService(JourneyWriteAuthority journeys,
             PresenceConsentParticipant consents,
             LiveRouteContextParticipant contexts,
-            ContributionRestrictionParticipant restrictions,
+            ContributionRestrictionReader restrictions,
             SignalStorageStore store,
             Clock clock) {
         this.journeys = Objects.requireNonNull(journeys);

@@ -6,9 +6,11 @@ This slice persists contribution suspension only; assessments remain pure values
 ## Bounded scope
 
 Persist the UNASSESSED/SUSPENDED subset of ContributorAssessment in moderation-owned
-latest state per account. Reuse AccountWriteAuthority for mutations and a trusted
-transaction participant for reads inside JourneyWriteAuthority. No new public
-or admin endpoint, user-role model, evidence publication or blanket account ban.
+latest state per account. ADR 0041 replaces the original trusted mutation service
+with an internal audited command under ordered operator/subject account authority,
+finite action permissions and exact revision checks. Signal enforcement uses a
+read-only participant inside JourneyWriteAuthority. No new public or admin endpoint,
+consumer role elevation, evidence publication or blanket account ban.
 Private retained receipt recovery and withdrawal remain available during suspension.
 
 Unknown assessment is not independent evidence. An unsuspended UNASSESSED actor
@@ -39,11 +41,14 @@ Stored revisions are strictly positive; only row absence represents revision zer
 The latest revision is retained until account deletion; no per-action history,
 precise location, report content or assessment metadata enters this table.
 
-Mutation methods are trusted internal application interfaces, like existing raw
-consent/context participants. They cannot be called from API packages. Operator
-authentication, least-privilege authorization, durable decision audit and report
-reference authorization are prerequisites to a future operational moderation
-endpoint. Tests of this internal service do not establish an operator workflow.
+ADR 0041 supersedes the original unaudited mutation service with scoped database
+permissions and atomic minimized audit. Mutation remains internal and forbidden
+to API packages; the signal service sees only read authority. The pure domain's
+stale-priority suspension transition remains useful for private lifecycle policy,
+but an operator command must match the exact revision for either action. Operator
+authentication, grant administration, target/case scope and report-reference
+authorization remain prerequisites to an operational moderation endpoint. Tests
+of the internal command boundary do not establish that workflow.
 
 ## Acceptance
 
@@ -55,6 +60,6 @@ independent-adapter suspension-versus-acceptance race, post-lock time, missing
 account, account-deletion cascade and redacted failures. Application/domain
 architecture tests must prevent API bypass of trusted moderation mutation.
 
-Do not implement durable report or block stores under this slice: those require
-separate bounded retention, authorized target references and cross-account lock
-order design. Leave public publication disabled and document the remaining gates.
+ADR 0040 separately implements private durable blocks; public targeting and safe
+delivery remain pending. Durable report intake still requires reviewed reference
+authority and investigation retention. Leave public publication disabled.

@@ -2,7 +2,7 @@ package com.routiqo.core.routeupdate.infrastructure;
 
 import com.routiqo.core.identity.infrastructure.AuthInfrastructureConfiguration;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
-import com.routiqo.core.moderation.application.ContributionRestrictionParticipant;
+import com.routiqo.core.moderation.application.ContributionRestrictionReader;
 import com.routiqo.core.privacy.application.PresenceConsentParticipant;
 import com.routiqo.core.routeupdate.application.LiveRouteContextExpiryMaintenance;
 import com.routiqo.core.routeupdate.application.SignalStorageExpiryMaintenance;
@@ -40,7 +40,7 @@ class LiveExpiryMaintenanceConfigurationTest {
             });
 
     @Test
-    void signalStorageRequiresAnExplicitRestrictionParticipant() {
+    void signalStorageRequiresAnExplicitRestrictionReader() {
         new ApplicationContextRunner()
                 .withUserConfiguration(RouteUpdatePersistenceConfiguration.class,
                         MissingRestrictionDependencies.class)
@@ -48,7 +48,7 @@ class LiveExpiryMaintenanceConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
-                            .hasMessageContaining("ContributionRestrictionParticipant");
+                            .hasMessageContaining("ContributionRestrictionReader");
                 });
     }
 
@@ -136,8 +136,8 @@ class LiveExpiryMaintenanceConfigurationTest {
         @Bean PresenceConsentParticipant presenceConsentParticipant() {
             return mock(PresenceConsentParticipant.class);
         }
-        @Bean ContributionRestrictionParticipant contributionRestrictionParticipant() {
-            return mock(ContributionRestrictionParticipant.class);
+        @Bean ContributionRestrictionReader contributionRestrictionReader() {
+            return mock(ContributionRestrictionReader.class);
         }
     }
 
