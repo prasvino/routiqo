@@ -53,3 +53,8 @@ secrets/
 # Agent recovery state is local to this machine/task.
 docs/development/WORK_CHECKPOINT.md
 map-data/
+
+# Impeccable project-local executable and machine/session state
+.agents/skills/impeccable/scripts/bin/
+.impeccable/config.local.json
+.impeccable/hook.cache.json
