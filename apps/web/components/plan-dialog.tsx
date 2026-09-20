@@ -1,5 +1,5 @@
 'use client';
-import { useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, BriefcaseBusiness, Compass, ShieldCheck } from 'lucide-react';
 import {
   dayLabels,
@@ -20,11 +20,19 @@ export function PlanDialog({
   plan?: JourneyPlan;
 }) {
   const { savePlan, ready } = usePlanning();
+  const weekdayErrorId = useId();
+  const firstDayRef = useRef<HTMLButtonElement>(null);
   const [kind, setKind] = useState<JourneyKind>(plan?.kind ?? 'trip');
   const [days, setDays] = useState<number[]>(plan?.days ?? [1, 2, 3, 4, 5]);
+  const [weekdayError, setWeekdayError] = useState('');
   const [error, setError] = useState('');
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (kind === 'commute' && days.length === 0) {
+      setWeekdayError('Choose at least one day for this commute.');
+      firstDayRef.current?.focus();
+      return;
+    }
     const data = new FormData(event.currentTarget);
     try {
       savePlan({
@@ -47,7 +55,14 @@ export function PlanDialog({
     <Modal title={plan ? 'Edit your journey' : 'Where are you heading?'} onClose={onClose}>
       <p className="modal-intro">A familiar road or somewhere new. Start with a plan.</p>
       <div className="segmented" aria-label="Journey type">
-        <button type="button" aria-pressed={kind === 'trip'} onClick={() => setKind('trip')}>
+        <button
+          type="button"
+          aria-pressed={kind === 'trip'}
+          onClick={() => {
+            setKind('trip');
+            setWeekdayError('');
+          }}
+        >
           <Compass size={19} /> Trip / travel
         </button>
         <button type="button" aria-pressed={kind === 'commute'} onClick={() => setKind('commute')}>
@@ -94,26 +109,38 @@ export function PlanDialog({
           </label>
         </div>
         {kind === 'commute' && (
-          <fieldset className="days-field">
+          <fieldset
+            className="days-field"
+            aria-describedby={weekdayError ? weekdayErrorId : undefined}
+            aria-invalid={weekdayError ? true : undefined}
+          >
             <legend>Repeat on</legend>
             <div className="days">
               {dayLabels.map((day, index) => (
                 <button
                   type="button"
                   key={day}
+                  ref={index === 0 ? firstDayRef : undefined}
                   aria-pressed={days.includes(index)}
                   onClick={() =>
-                    setDays((current) =>
-                      current.includes(index)
+                    setDays((current) => {
+                      const next = current.includes(index)
                         ? current.filter((item) => item !== index)
-                        : [...current, index].sort(),
-                    )
+                        : [...current, index].sort();
+                      if (next.length > 0) setWeekdayError('');
+                      return next;
+                    })
                   }
                 >
                   {day}
                 </button>
               ))}
             </div>
+            {weekdayError && (
+              <p id={weekdayErrorId} className="form-error" role="alert">
+                {weekdayError}
+              </p>
+            )}
           </fieldset>
         )}
         <label>

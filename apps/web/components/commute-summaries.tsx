@@ -12,11 +12,34 @@ export function CommuteSummaries({
 }) {
   const [zone, setZone] = useState<string | null>(null);
   useEffect(() => {
-    try {
-      setZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-    } catch {
-      setZone('');
+    function refreshZone() {
+      try {
+        const next = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        setZone((current) => (current === next ? current : next));
+      } catch {
+        setZone('');
+      }
     }
+    refreshZone();
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        refreshZone();
+      }
+    }
+
+    function onFocus() {
+      if (document.visibilityState === 'visible') {
+        refreshZone();
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
   const result = useMemo(() => {
     if (zone === null) return null;

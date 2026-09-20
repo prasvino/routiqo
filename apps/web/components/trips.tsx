@@ -24,6 +24,10 @@ export function Trips() {
   const [edit, setEdit] = useState<JourneyPlan | 'new' | null>(null);
   const [remove, setRemove] = useState<JourneyPlan | null>(null);
   const [error, setError] = useState('');
+  function closeRemove() {
+    setRemove(null);
+    setError('');
+  }
   return (
     <div className="page">
       <section className="page-heading">
@@ -93,7 +97,10 @@ export function Trips() {
                 <button
                   className="icon-button"
                   aria-label={'Remove plan to ' + plan.destination}
-                  onClick={() => setRemove(plan)}
+                  onClick={() => {
+                    setError('');
+                    setRemove(plan);
+                  }}
                 >
                   <Trash2 size={18} />
                 </button>
@@ -130,13 +137,7 @@ export function Trips() {
         <PlanDialog {...(edit === 'new' ? {} : { plan: edit })} onClose={() => setEdit(null)} />
       )}
       {remove && (
-        <Modal
-          title="Remove this plan?"
-          onClose={() => {
-            setRemove(null);
-            setError('');
-          }}
-        >
+        <Modal title="Remove this plan?" onClose={closeRemove}>
           <p className="modal-intro">
             {remove.origin} → {remove.destination} will be removed from this device.
           </p>
@@ -146,7 +147,7 @@ export function Trips() {
             </p>
           )}
           <div className="detail-actions">
-            <button className="button secondary" onClick={() => setRemove(null)}>
+            <button className="button secondary" onClick={closeRemove}>
               Keep plan
             </button>
             <button
@@ -154,7 +155,7 @@ export function Trips() {
               onClick={() => {
                 try {
                   removePlan(remove.id);
-                  setRemove(null);
+                  closeRemove();
                 } catch (e) {
                   setError(e instanceof Error ? e.message : 'Could not remove plan.');
                 }
