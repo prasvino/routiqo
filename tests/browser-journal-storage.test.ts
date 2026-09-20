@@ -335,6 +335,99 @@ describe('browser IndexedDB journal partitions', () => {
     await expect(readBrowserJournal(account, journeyId)).rejects.toThrow('exceed');
   });
 
+  it('rolls back acknowledgement and preserves drafts after an asynchronous abort', async () => {
+    const secondJourneyId = id(2);
+    await cacheBrowserTripJournal(account, journal());
+    await saveBrowserJournalDraft(account, draft(), null);
+    await cacheBrowserTripJournal(account, journal(secondJourneyId, 0, '', '', 2));
+    await saveBrowserJournalDraft(
+      account,
+      draft(secondJourneyId, secondMutation, 0, 'Second title', 'Second notes'),
+      null,
+    );
+    await cacheBrowserTripJournal(otherAccount, journal(id(3)));
+    await saveBrowserJournalDraft(otherAccount, draft(id(3), id(4)), null);
+
+    const preAbortTarget = await readBrowserJournal(account, journeyId);
+    const preAbortA = await listBrowserJournals(account);
+    const preAbortB = await listBrowserJournals(otherAccount);
+    expect(preAbortA).toHaveLength(2);
+    expect(preAbortB).toHaveLength(1);
+
+    const local = preAbortTarget.draft!;
+    const validResponse = journal(journeyId, 1, local.title, local.notes);
+
+    const originalPut = IDBObjectStore.prototype.put;
+    let putSuccessCount = 0;
+    let abortTriggered = 0;
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value: unknown,
+      key?: IDBValidKey,
+    ) {
+      const request = originalPut.call(this, value, key);
+      if (
+        this.transaction?.db.name === 'routiqo-journal-v1' &&
+        this.name === 'accounts' &&
+        key === account &&
+        abortTriggered === 0
+      ) {
+        request.addEventListener('success', () => {
+          putSuccessCount++;
+          if (abortTriggered === 0) {
+            abortTriggered++;
+            request.transaction?.abort();
+          }
+        });
+      }
+      return request;
+    });
+
+    try {
+      await expect(
+        acknowledgeBrowserJournalDraft(account, journeyId, firstMutation, validResponse),
+      ).rejects.toThrow('Journal changes could not be saved.');
+      expect(putSuccessCount).toBe(1);
+      expect(abortTriggered).toBe(1);
+    } finally {
+      putSpy.mockRestore();
+    }
+
+    expect(await readBrowserJournal(account, journeyId)).toEqual(preAbortTarget);
+    expect(await listBrowserJournals(account)).toEqual(preAbortA);
+    expect(await listBrowserJournals(otherAccount)).toEqual(preAbortB);
+
+    expect(
+      await acknowledgeBrowserJournalDraft(account, journeyId, firstMutation, validResponse),
+    ).toBe(true);
+    const postRetryTarget = await readBrowserJournal(account, journeyId);
+    expect(postRetryTarget.draft).toBeNull();
+    expect(postRetryTarget.journal).toEqual({
+      journey: preAbortTarget.journal!.journey,
+      annotation: {
+        ...validResponse.annotation,
+        updatedAt: '2026-08-01T14:00:00.000000Z',
+      },
+    });
+
+    const postRetryA = await listBrowserJournals(account);
+    expect(postRetryA).toHaveLength(2);
+    expect(postRetryA.find((item) => item.journal?.journey.id === journeyId)).toEqual(
+      postRetryTarget,
+    );
+    expect(postRetryA.find((item) => item.journal?.journey.id === secondJourneyId)).toEqual(
+      preAbortA.find((item) => item.journal?.journey.id === secondJourneyId),
+    );
+    expect(await listBrowserJournals(otherAccount)).toEqual(preAbortB);
+
+    expect(
+      await acknowledgeBrowserJournalDraft(account, journeyId, firstMutation, validResponse),
+    ).toBe(false);
+    expect(await readBrowserJournal(account, journeyId)).toEqual(postRetryTarget);
+    expect(await listBrowserJournals(account)).toEqual(postRetryA);
+    expect(await listBrowserJournals(otherAccount)).toEqual(preAbortB);
+  });
+
   it('uses a deletion marker that prevents late resurrection and preserves other accounts', async () => {
     await cacheBrowserTripJournal(account, journal());
     await cacheBrowserTripJournal(otherAccount, journal());
