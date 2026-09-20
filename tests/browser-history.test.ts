@@ -169,4 +169,188 @@ describe('browser journey history', () => {
       controller.abort();
     }
   });
+
+  it('discards unused non-OK response bodies for 401 and 503 without reading', async () => {
+    for (const status of [401, 503] as const) {
+      const cancelSpy = vi.fn();
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('Synthetic error response'));
+        },
+        cancel(reason) {
+          cancelSpy(reason);
+        },
+      });
+      const getReaderSpy = vi.spyOn(stream, 'getReader');
+
+      const fetcher = vi.fn(
+        async () =>
+          new Response(stream, {
+            status,
+            headers: { 'Content-Type': 'text/plain' },
+          }),
+      );
+      vi.stubGlobal('fetch', fetcher);
+
+      try {
+        await expect(readBrowserJourneyPage(account)).rejects.toMatchObject({
+          status,
+        });
+
+        expect(getReaderSpy).not.toHaveBeenCalled();
+        expect(cancelSpy).toHaveBeenCalledOnce();
+        expect(stream.locked).toBe(false);
+        expect(fetcher).toHaveBeenCalledOnce();
+      } finally {
+        getReaderSpy.mockRestore();
+      }
+    }
+  });
+
+  it('handles null body, rejected cancellation, and stalled cancellation on non-OK responses', async () => {
+    // Null body
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 401 })),
+    );
+    await expect(readBrowserJourneyPage(account)).rejects.toMatchObject({ status: 401 });
+
+    // Rejected cancellation
+    const rejectingStream = new ReadableStream<Uint8Array>({
+      cancel() {
+        return Promise.reject(new Error('Downstream socket error'));
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(rejectingStream, { status: 503 })),
+    );
+    await expect(readBrowserJourneyPage(account)).rejects.toMatchObject({ status: 503 });
+
+    // Never-settling cancellation promise settles independently
+    let cancelCalled = false;
+    const stalledStream = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelCalled = true;
+        return new Promise(() => {});
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(stalledStream, { status: 401 })),
+    );
+    await expect(readBrowserJourneyPage(account)).rejects.toMatchObject({ status: 401 });
+    expect(cancelCalled).toBe(true);
+  });
+
+  it('settles caller abort and releases reader lock even if reader cancellation never settles', async () => {
+    let cancelCalled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelCalled = true;
+        return new Promise(() => {});
+      },
+    });
+
+    const fetcher = vi.fn(
+      async () =>
+        new Response(stream, {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+
+    const controller = new AbortController();
+    const pagePromise = readBrowserJourneyPage(account, null, controller.signal);
+    const outcome = pagePromise.then(
+      () => ({ status: 'fulfilled' as const }),
+      (reason: unknown) => ({ status: 'rejected' as const, reason }),
+    );
+
+    try {
+      await vi.waitFor(() => expect(stream.locked).toBe(true), { timeout: 1000 });
+
+      controller.abort();
+      await expect(outcome).resolves.toMatchObject({
+        status: 'rejected',
+        reason: { name: 'AbortError' },
+      });
+
+      expect(cancelCalled).toBe(true);
+      expect(stream.locked).toBe(false);
+    } finally {
+      controller.abort();
+    }
+  });
+
+  it('settles oversized response limit failure while cleanup is still pending', async () => {
+    let resolveCleanup!: () => void;
+    const cleanup = new Promise<void>((resolve) => {
+      resolveCleanup = resolve;
+    });
+    const cancelSpy = vi.fn(() => cleanup);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(32 * 1024 + 1));
+      },
+      cancel: cancelSpy,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(stream)),
+    );
+    const settled = vi.fn();
+    const outcome = readBrowserJourneyPage(account).then(
+      () => settled({ status: 'fulfilled' }),
+      (reason: unknown) => settled({ status: 'rejected', reason }),
+    );
+
+    try {
+      // Cleanup remains unresolved throughout these assertions.
+      await vi.waitFor(() => expect(settled).toHaveBeenCalledOnce(), { timeout: 1000 });
+      expect(settled).toHaveBeenCalledWith({
+        status: 'rejected',
+        reason: expect.objectContaining({ message: 'Journey history exceeds its limit.' }),
+      });
+      expect(cancelSpy).toHaveBeenCalledOnce();
+      expect(stream.locked).toBe(false);
+    } finally {
+      resolveCleanup();
+      await outcome;
+    }
+  });
+
+  it('preserves oversized response limit failure when cleanup rejects', async () => {
+    const chunk = new Uint8Array(16 * 1024);
+    let cancelCalled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(ctrl) {
+        ctrl.enqueue(chunk);
+        ctrl.enqueue(chunk);
+        ctrl.enqueue(chunk);
+      },
+      cancel() {
+        cancelCalled = true;
+        return Promise.reject(new Error('Failed cleanup sink'));
+      },
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(stream, {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ),
+    );
+
+    await expect(readBrowserJourneyPage(account)).rejects.toThrow(
+      'Journey history exceeds its limit.',
+    );
+    expect(cancelCalled).toBe(true);
+    expect(stream.locked).toBe(false);
+  });
 });

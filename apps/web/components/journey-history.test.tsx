@@ -231,4 +231,110 @@ describe('JourneyHistory', () => {
     expect(screen.queryByText(commuteId)).toBeNull();
     expect(screen.queryByText(activeCommuteId)).toBeNull();
   });
+
+  it('allows explicit refresh from an empty first page and displays newly completed journeys', async () => {
+    vi.mocked(readBrowserJourneyPage)
+      .mockResolvedValueOnce({ journeys: [], next: null })
+      .mockResolvedValueOnce({
+        journeys: [journey(tripId, 'trip', 'completed', '2026-09-12T09:00:00.000000Z')],
+        next: null,
+      });
+
+    render(<JourneyHistory account={firstAccount} onOpenJournal={vi.fn()} />);
+    openHistory();
+    fireEvent.click(screen.getByRole('button', { name: 'Load account history' }));
+
+    expect(await screen.findByText('No journeys are saved in your account history.')).toBeTruthy();
+
+    // Latest journeys button is available on empty page
+    const refreshBtn = screen.getByRole('button', { name: 'Latest journeys' });
+    expect(refreshBtn).toBeTruthy();
+
+    fireEvent.click(refreshBtn);
+
+    expect(await screen.findByText('Trip · Completed')).toBeTruthy();
+    expect(readBrowserJourneyPage).toHaveBeenCalledTimes(2);
+    expect(readBrowserJourneyPage).toHaveBeenNthCalledWith(
+      2,
+      firstAccount,
+      null,
+      expect.anything(),
+    );
+  });
+
+  it('disables refresh button while busy and does not auto-fetch on rerender', async () => {
+    const initialPage = {
+      journeys: [journey(tripId, 'trip', 'completed', '2026-09-10T09:00:00.000000Z')],
+      next: null,
+    };
+    const pendingRefresh = deferred<JourneyHistoryPage>();
+
+    vi.mocked(readBrowserJourneyPage)
+      .mockResolvedValueOnce(initialPage)
+      .mockReturnValueOnce(pendingRefresh.promise);
+
+    const view = render(<JourneyHistory account={firstAccount} onOpenJournal={vi.fn()} />);
+    openHistory();
+    fireEvent.click(screen.getByRole('button', { name: 'Load account history' }));
+    expect(await screen.findByText('Trip · Completed')).toBeTruthy();
+
+    // Click refresh
+    const refreshBtn = screen.getByRole('button', { name: 'Latest journeys' }) as HTMLButtonElement;
+    fireEvent.click(refreshBtn);
+
+    // Busy state disables refresh button
+    expect(refreshBtn.disabled).toBe(true);
+    expect(screen.getByRole('status').textContent).toContain('Loading account history');
+
+    // Resolve deferred
+    await act(async () => {
+      pendingRefresh.resolve({
+        journeys: [journey(commuteId, 'commute', 'completed', '2026-09-12T09:00:00.000000Z')],
+        next: null,
+      });
+    });
+
+    expect(await screen.findByText('Commute · Completed')).toBeTruthy();
+    expect(refreshBtn.disabled).toBe(false);
+    expect(readBrowserJourneyPage).toHaveBeenCalledTimes(2);
+
+    // Rerender does not auto-fetch
+    view.rerender(<JourneyHistory account={firstAccount} onOpenJournal={vi.fn()} />);
+    expect(readBrowserJourneyPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves existing page on transient refresh failure and allows explicit retry', async () => {
+    const initialPage = {
+      journeys: [journey(tripId, 'trip', 'completed', '2026-09-10T09:00:00.000000Z')],
+      next: null,
+    };
+    const updatedPage = {
+      journeys: [journey(commuteId, 'commute', 'completed', '2026-09-12T09:00:00.000000Z')],
+      next: null,
+    };
+
+    vi.mocked(readBrowserJourneyPage)
+      .mockResolvedValueOnce(initialPage)
+      .mockRejectedValueOnce(new Error('Transient network error'))
+      .mockResolvedValueOnce(updatedPage);
+
+    render(<JourneyHistory account={firstAccount} onOpenJournal={vi.fn()} />);
+    openHistory();
+    fireEvent.click(screen.getByRole('button', { name: 'Load account history' }));
+    expect(await screen.findByText('Trip · Completed')).toBeTruthy();
+
+    // Trigger refresh that fails
+    fireEvent.click(screen.getByRole('button', { name: 'Latest journeys' }));
+
+    // Alert shown, old page preserved
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByText('Trip · Completed')).toBeTruthy();
+
+    // Retry explicit action
+    fireEvent.click(screen.getByRole('button', { name: 'Retry account history' }));
+    expect(await screen.findByText('Commute · Completed')).toBeTruthy();
+    expect(screen.queryByText('Trip · Completed')).toBeNull();
+    expect(readBrowserJourneyPage).toHaveBeenCalledTimes(3);
+    expect(readBrowserJourneyPage).toHaveBeenLastCalledWith(firstAccount, null, expect.anything());
+  });
 });

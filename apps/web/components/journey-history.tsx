@@ -181,25 +181,26 @@ function AccountJourneyHistory({ account, onOpenJournal }: JourneyHistoryProps) 
       )}
       {displayed !== null && (
         <p>
-          {displayed.cursor !== null && (
-            <button
-              className="button secondary"
-              type="button"
-              disabled={busy}
-              onClick={() => void load(null)}
-            >
-              Latest journeys
-            </button>
-          )}{' '}
+          <button
+            className="button secondary"
+            type="button"
+            disabled={busy}
+            onClick={() => void load(null)}
+          >
+            Latest journeys
+          </button>
           {displayed.page.next !== null && (
-            <button
-              className="button secondary"
-              type="button"
-              disabled={busy}
-              onClick={() => void load(displayed.page.next)}
-            >
-              Earlier journeys
-            </button>
+            <>
+              {' '}
+              <button
+                className="button secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => void load(displayed.page.next)}
+              >
+                Earlier journeys
+              </button>
+            </>
           )}
         </p>
       )}

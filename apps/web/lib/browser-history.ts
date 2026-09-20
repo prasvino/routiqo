@@ -69,6 +69,31 @@ function readChunk(
   });
 }
 
+function cancelBody(body: ReadableStream<Uint8Array> | null): void {
+  if (!body) return;
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // Cleanup is best effort and must never extend a transport operation.
+  }
+}
+
+function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): void {
+  const release = () => {
+    try {
+      reader.releaseLock();
+    } catch {
+      // A pending read may retain its lock until its underlying source settles.
+    }
+  };
+  try {
+    void reader.cancel().then(release, release);
+  } catch {
+    // A hostile stream cannot be allowed to change the redacted result.
+  }
+  release();
+}
+
 async function readBoundedJson(response: Response, signal: AbortSignal): Promise<unknown> {
   if (!response.body) throw new Error('Journey history response has no body.');
   const reader = response.body.getReader();
@@ -87,8 +112,7 @@ async function readBoundedJson(response: Response, signal: AbortSignal): Promise
     signal.throwIfAborted();
     return JSON.parse(raw) as unknown;
   } finally {
-    await reader.cancel().catch(() => undefined);
-    reader.releaseLock();
+    cancelReader(reader);
   }
 }
 
@@ -146,6 +170,9 @@ export async function readBrowserJourneyPage(
     headers: { 'X-Routiqo-Account': accountId },
     signal: cancellation,
   });
-  if (!response.ok) throw new BrowserAuthError(response.status);
+  if (!response.ok) {
+    cancelBody(response.body);
+    throw new BrowserAuthError(response.status);
+  }
   return readPage(await readBoundedJson(response, cancellation), validatedCursor);
 }
