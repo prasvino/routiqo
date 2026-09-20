@@ -1,9 +1,10 @@
-'use client';
+import { useState } from 'react';
 import Image from 'next/image';
 import { ArrowRight, Bookmark, MapPin } from 'lucide-react';
 import type { Destination } from '@routiqo/shared';
 import { Modal } from './modal';
 import { usePlanning } from './planning-provider';
+
 export function DestinationDialog({
   place,
   onClose,
@@ -14,6 +15,7 @@ export function DestinationDialog({
   onPlan: () => void;
 }) {
   const { state, saveDestination, ready } = usePlanning();
+  const [error, setError] = useState('');
   const saved = state.saved.includes(place.id);
   return (
     <Modal title={place.name} onClose={onClose} wide>
@@ -36,6 +38,11 @@ export function DestinationDialog({
           Inspiration for your plan. Check access, opening hours, road and weather conditions before
           travel. Photography is illustrative.
         </p>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
         <div className="detail-actions">
           <button className="button primary" onClick={onPlan}>
             Plan a journey
@@ -45,10 +52,15 @@ export function DestinationDialog({
             className="button secondary"
             disabled={!ready}
             onClick={() => {
+              setError('');
               try {
                 saveDestination(place.id);
-              } catch {
-                /* error shown in provider */
+              } catch (cause) {
+                setError(
+                  cause instanceof Error
+                    ? cause.message
+                    : 'This place could not be saved on this device. Try again.',
+                );
               }
             }}
           >

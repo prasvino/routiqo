@@ -38,6 +38,7 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
         setError('');
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Local storage is unavailable.');
+        setMessage('');
       } finally {
         setReady(true);
       }
@@ -60,6 +61,7 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
       const detail =
         e instanceof Error ? e.message : 'Your changes could not be saved on this device.';
       setError(detail);
+      setMessage('');
       throw new Error(detail);
     }
   }
@@ -101,6 +103,7 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
             return true;
           } catch {
             setError('Your browser could not clear local data.');
+            setMessage('');
             return false;
           }
         },

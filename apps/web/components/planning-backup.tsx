@@ -49,20 +49,28 @@ export function PlanningBackupControls() {
     }
   }
   function download() {
+    let url: string | undefined;
+    let anchor: HTMLAnchorElement | undefined;
+    let initiated = false;
     try {
       const content = exportBackup();
-      const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
-      const anchor = document.createElement('a');
+      url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
+      anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `routiqo-plans-${localDate()}.json`;
       document.body.appendChild(anchor);
       anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      initiated = true;
+      window.setTimeout(() => URL.revokeObjectURL(url!), 60000);
       close();
       setNotice('Backup download requested. Check your browser downloads.');
     } catch (cause) {
+      if (url && !initiated) {
+        URL.revokeObjectURL(url);
+      }
       setError(cause instanceof Error ? cause.message : 'Backup could not be created.');
+    } finally {
+      anchor?.remove();
     }
   }
   let preview: ReturnType<typeof mergePlanningBackup> | null = null;

@@ -35,7 +35,7 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
         )}
       </div>
       <div className="filter-row">
-        <div className="filters" aria-label="Destination categories">
+        <div className="filters" role="group" aria-label="Destination categories">
           {categories.map((item) => (
             <button key={item} aria-pressed={category === item} onClick={() => setCategory(item)}>
               {item}
