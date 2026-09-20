@@ -239,6 +239,77 @@ describe('browser IndexedDB journey partitions', () => {
     put.mockRestore();
     expect(await readBrowserJourneyPartition(account)).toEqual(original);
   });
+  it('rolls back acknowledgement and preserves partitions after an asynchronous abort', async () => {
+    const priorCompleted = {
+      id: '00000000-0000-4000-8000-000000000099',
+      kind: 'trip' as const,
+      status: 'completed' as const,
+      startedAt: '2026-09-01T10:00:00Z',
+      completedAt: '2026-09-01T11:00:00Z',
+    };
+    await mergeBrowserJourneyHistory(account, [priorCompleted]);
+    await pending(account);
+    await pending(other);
+
+    const preAbortA = await readBrowserJourneyPartition(account);
+    const preAbortB = await readBrowserJourneyPartition(other);
+    expect(preAbortA.outbox.entries).toHaveLength(1);
+    expect(preAbortA.snapshots.journeys).toHaveLength(1);
+    expect(preAbortB.outbox.entries).toHaveLength(1);
+
+    const originalPut = IDBObjectStore.prototype.put;
+    let putSuccessCount = 0;
+    let abortTriggered = 0;
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value: unknown,
+      key?: IDBValidKey,
+    ) {
+      const request = originalPut.call(this, value, key);
+      if (this.name === 'accounts' && key === account && abortTriggered === 0) {
+        request.addEventListener('success', () => {
+          putSuccessCount++;
+          if (abortTriggered === 0) {
+            abortTriggered++;
+            request.transaction?.abort();
+          }
+        });
+      }
+      return request;
+    });
+
+    try {
+      await expect(acknowledgeBrowserJourney(account, lease, response, 1)).rejects.toThrow(
+        'Journey changes could not be saved.',
+      );
+      expect(putSuccessCount).toBe(1);
+      expect(abortTriggered).toBe(1);
+    } finally {
+      putSpy.mockRestore();
+    }
+
+    const postAbortA = await readBrowserJourneyPartition(account);
+    const postAbortB = await readBrowserJourneyPartition(other);
+    expect(postAbortA).toEqual(preAbortA);
+    expect(postAbortB).toEqual(preAbortB);
+
+    expect(await acknowledgeBrowserJourney(account, lease, response, 1)).toBe(true);
+    const postRetryA = await readBrowserJourneyPartition(account);
+    expect(postRetryA.outbox.entries).toHaveLength(0);
+    expect(postRetryA.snapshots.journeys).toHaveLength(2);
+    expect(postRetryA.snapshots.journeys[0]).toEqual({
+      ...response,
+      startedAt: '2026-09-08T12:00:00.000000Z',
+    });
+    expect(postRetryA.snapshots.journeys[1]).toEqual(preAbortA.snapshots.journeys[0]);
+
+    const postRetryB = await readBrowserJourneyPartition(other);
+    expect(postRetryB).toEqual(preAbortB);
+
+    expect(await acknowledgeBrowserJourney(account, lease, response, 2)).toBe(false);
+    expect(await readBrowserJourneyPartition(account)).toEqual(postRetryA);
+    expect(await readBrowserJourneyPartition(other)).toEqual(preAbortB);
+  });
   it('clears only the explicitly deleted partition and ignores late workers', async () => {
     await pending();
     await pending(other);
