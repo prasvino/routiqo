@@ -62,6 +62,106 @@ describe('browser IndexedDB journey partitions', () => {
     ).rejects.toThrow();
     expect(await readBrowserJourneyPartition(account)).toEqual(restored);
   });
+  it('does not regress a confirmed completion when an older history read reports it active', async () => {
+    await mergeBrowserJourneyHistory(account, [response]);
+    await queueBrowserJourneyAction(account, { action: 'complete', journeyId: id }, 0);
+    const pending = (await readBrowserJourneyPartition(account)).outbox;
+    await mergeBrowserJourneyHistory(account, [
+      { ...response, status: 'completed', completedAt: '2026-09-08T13:00:00Z' },
+    ]);
+
+    const restored = await mergeBrowserJourneyHistory(account, [response]);
+
+    expect(restored.outbox).toEqual(pending);
+    expect(restored.snapshots.journeys[0]).toEqual({
+      ...response,
+      status: 'completed',
+      startedAt: '2026-09-08T12:00:00.000000Z',
+      completedAt: '2026-09-08T13:00:00.000000Z',
+    });
+  });
+  it('rejects duplicate history identities and conflicting completed observations atomically', async () => {
+    await mergeBrowserJourneyHistory(account, [
+      { ...response, status: 'completed', completedAt: '2026-09-08T13:00:00Z' },
+    ]);
+    const before = await readBrowserJourneyPartition(account);
+
+    await expect(mergeBrowserJourneyHistory(account, [response, response])).rejects.toThrow(
+      'Duplicate journey history',
+    );
+    await expect(
+      mergeBrowserJourneyHistory(account, [
+        { ...response, status: 'completed', completedAt: '2026-09-08T14:00:00Z' },
+      ]),
+    ).rejects.toThrow('conflicts with the saved lifecycle');
+    await expect(
+      mergeBrowserJourneyHistory(account, [{ ...response, kind: 'commute' }]),
+    ).rejects.toThrow('conflicts with the saved lifecycle');
+    await expect(
+      mergeBrowserJourneyHistory(account, [
+        { ...response, startedAt: '2026-09-08T12:00:00.000001Z' },
+      ]),
+    ).rejects.toThrow('conflicts with the saved lifecycle');
+    await expect(
+      mergeBrowserJourneyHistory(account, [
+        {
+          ...response,
+          id: other,
+          status: 'completed',
+          completedAt: '2026-09-08T13:00:00Z',
+        },
+        { ...response, startedAt: '2026-09-08T12:00:00.000001Z' },
+      ]),
+    ).rejects.toThrow('conflicts with the saved lifecycle');
+    expect(await readBrowserJourneyPartition(account)).toEqual(before);
+  });
+  it('copies validated history before waiting for browser storage', async () => {
+    const mutable = { ...response };
+    const merging = mergeBrowserJourneyHistory(account, [mutable]);
+    mutable.kind = 'commute';
+    mutable.startedAt = '2026-09-09T12:00:00Z';
+
+    const restored = await merging;
+
+    expect(restored.snapshots.journeys[0]).toEqual({
+      ...response,
+      startedAt: '2026-09-08T12:00:00.000000Z',
+    });
+  });
+  it('does not resurrect a pruned completed record from a later stale item in the same page', async () => {
+    const history = Array.from({ length: 100 }, (_, index) => {
+      const startedAt = new Date(Date.UTC(2026, 0, 1, 0, index)).toISOString();
+      const completedAt = new Date(Date.UTC(2026, 0, 1, 1, index)).toISOString();
+      return {
+        id: `00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`,
+        kind: 'trip' as const,
+        status: 'completed' as const,
+        startedAt,
+        completedAt,
+      };
+    });
+    for (let index = 0; index < history.length; index += 20)
+      await mergeBrowserJourneyHistory(account, history.slice(index, index + 20));
+    const before = await readBrowserJourneyPartition(account);
+    const oldest = history[0]!;
+    const incoming = {
+      id: '00000000-0000-4000-8000-000000000999',
+      kind: 'trip' as const,
+      status: 'completed' as const,
+      startedAt: '2026-02-01T00:00:00Z',
+      completedAt: '2026-02-01T01:00:00Z',
+    };
+
+    const restored = await mergeBrowserJourneyHistory(account, [
+      incoming,
+      { ...oldest, status: 'active', completedAt: null },
+    ]);
+
+    expect(restored.outbox).toEqual(before.outbox);
+    expect(restored.snapshots.journeys).toHaveLength(100);
+    expect(restored.snapshots.journeys.some((journey) => journey.id === oldest.id)).toBe(false);
+    expect(restored.snapshots.journeys.some((journey) => journey.status === 'active')).toBe(false);
+  });
   it('atomically reconciles only confirmed blocked work and preserves following commands', async () => {
     const command = { action: 'start' as const, kind: 'trip' as const, journeyId: id };
     await queueBrowserJourneyAction(account, command, 0);

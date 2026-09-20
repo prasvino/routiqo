@@ -196,17 +196,37 @@ export function retireBrowserJourneyPartition(account: string): Promise<void> {
   );
 }
 
-export function mergeBrowserJourneyHistory(
+export async function mergeBrowserJourneyHistory(
   account: string,
   responses: unknown[],
 ): Promise<BrowserJourneyPartition> {
   // One bounded page plus an older cached active journey resolved by owner-bound detail.
   if (responses.length > 21) throw new Error('Too many journeys to restore at once.');
+  // Validate and copy network-owned values before IndexedDB opens. A delayed caller must not be
+  // able to mutate a response while the storage transaction is waiting to start.
+  const journeys = responses.map(readServerJourney);
+  if (new Set(journeys.map((journey) => journey.id)).size !== journeys.length)
+    throw new Error('Duplicate journey history.');
   return transaction(account, (value) => {
     const partition = read(value, account);
     let snapshots = partition.snapshots;
-    for (const input of responses) {
-      const journey = readServerJourney(input);
+    for (const journey of journeys) {
+      // Compare against the state at transaction start. An earlier item in this bounded merge can
+      // prune an old completed record at the cache limit, but a later stale observation must not
+      // recreate that same record as active.
+      const current = partition.snapshots.journeys.find((item) => item.id === journey.id);
+      if (
+        current &&
+        (current.kind !== journey.kind ||
+          current.startedAt !== journey.startedAt ||
+          (current.status === 'completed' &&
+            journey.status === 'completed' &&
+            current.completedAt !== journey.completedAt))
+      )
+        throw new Error('Server history conflicts with the saved lifecycle.');
+      // History reads may have started before a local dispatch acknowledgement. Never let that
+      // older observation regress an already confirmed completion.
+      if (current?.status === 'completed' && journey.status === 'active') continue;
       snapshots = recordJourneyResult(
         snapshots,
         { action: 'start', kind: journey.kind, journeyId: journey.id },

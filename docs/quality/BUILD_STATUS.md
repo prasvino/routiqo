@@ -1,4 +1,4 @@
-# Build status — 2026-09-19
+# Build status — 2026-09-20
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
 
@@ -40,6 +40,26 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+Latest delayed journey history restoration pass, 2026-09-20:
+
+- History-only merging preserves an already confirmed completion when a delayed
+  active observation has matching ID, kind and canonical microsecond start time.
+  Immutable conflicts and inconsistent completion times still abort the entire
+  transaction. Command acknowledgement retains its strict result validation.
+- Incoming batches are copied/validated before asynchronous storage, duplicate
+  IDs are rejected, and comparisons use the original transaction snapshot so
+  bounded-cache pruning cannot resurrect an old active journey. Current outbox
+  contents, account isolation and retired-account protection remain unchanged.
+- All **488 TypeScript tests / 52 files** passed with `vitest run --maxWorkers=2`.
+  The initial default-concurrency run had 487 passes and one existing Xcode
+  dependency-import test timeout; the bounded-concurrency rerun passed without
+  changing timeouts or assertions. `pnpm check` contract, formatting, type and
+  lint stages passed. Secret scanning and diff checks passed; root source review
+  corrected the cache-pruning edge. Focused verification passed 31 tests.
+- No UI, backend endpoint, feature flag or persistence schema changed. Web build,
+  backend tests and actual browser/device QA were not rerun for this storage-only
+  slice; earlier evidence below remains historical.
 
 Latest private Quick Signal UI pass, 2026-09-19:
 

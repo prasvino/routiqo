@@ -600,3 +600,12 @@ preserve router/foreign history fields and avoid accumulating duplicate entries
 or leaving a cancelled navigation unguarded. Browser unload warnings are best
 effort, not durable recovery. Component/integration tests cover these boundaries;
 none substitutes for current server authorization or public anti-Sybil policy.
+
+Journey history restoration (2026-09-20) addresses T13 delayed-response ordering
+without treating a history read as a write acknowledgement. A previously confirmed
+completed snapshot dominates a delayed active observation only when immutable ID,
+kind and canonical start time match. Conflicting completion times or immutable
+identity still abort the entire transaction. The input batch is normalized before
+asynchronous storage access; duplicate IDs are rejected. Current pending commands,
+account isolation, the one-active invariant and deletion retirement remain enforced.
+This does not establish current authentication or complete cross-device history.

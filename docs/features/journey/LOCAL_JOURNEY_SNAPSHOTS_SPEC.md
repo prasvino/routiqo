@@ -11,3 +11,32 @@ Tests: response validation and monotonic merge, capacity/pruning, exact microsec
 Native deletion additionally retains a permanent account-ID-only retirement marker in the same transaction as both deletions. Queue updates check it before running caller callbacks; late acknowledgements return false. Ordinary sign-out must not retire a partition. See `NATIVE_PARTITION_RETIREMENT_SPEC.md` for lifetime, rollback and initialization requirements.
 
 Web recent restoration additionally checks a cached active journey that is absent from the most recent 20 server records. Fetch its owner-bound detail before committing any restoration. Missing/unavailable detail fails without changing saved work; absence from a page must never imply completion. Merge the recent page and at most one separately confirmed old journey atomically (maximum 21 records), preserving pending commands and the one-active invariant. Concurrent deletion still rejects writes through the retirement marker. This resolves an old active snapshot completed on another device without requiring the user to page through all newer journeys.
+
+## Delayed history restoration — 2026-09-20
+
+Recent history is a server observation, not a lifecycle command acknowledgement.
+A response can have been read before another tab records completion. During the
+atomic history merge, retain an already completed snapshot when a delayed active
+observation has the exact same journey ID, kind and canonical microsecond start
+time. Do not regress the snapshot or reject the entire otherwise valid page solely
+because that older observation arrived late. This exception applies only to history
+merging; command acknowledgement still requires the strict validated result.
+
+Normalize and copy the full bounded response batch before awaiting storage. Reject
+duplicate IDs, malformed records, changed kind/start and differing non-null
+completion times. The transaction must preserve the complete current outbox and
+one-active invariant; any conflict rolls back the entire history merge. Retirement
+continues to reject late writes. No absent record proves completion, no retained
+command is acknowledged by a history read, and no cross-device cache completeness
+is claimed.
+
+Acceptance: a delayed page arriving after another tab records completion preserves
+that terminal snapshot and pending commands while restoring other valid records.
+Cover immutable conflicts, completion-time conflicts, duplicate IDs, caller input
+mutation across async storage opening, rollback, retirement and account isolation.
+
+Compare incoming records with the original transaction snapshot, including records
+pruned while processing earlier items in the same batch. Otherwise a full cache
+could prune an old completion and reinsert its delayed active observation. Normal
+bounded-cache pruning may still remove old completed history; it must never turn
+that removal into permission to resurrect an active journey.

@@ -69,6 +69,32 @@ it('avoids a duplicate detail lookup when the active record is already on the re
   expect((await restoreRecentBrowserJourneyHistory(account)).recentCount).toBe(1);
   expect(fetcher).toHaveBeenCalledOnce();
 });
+it('preserves a concurrent completion when a delayed recent page still reports it active', async () => {
+  await mergeBrowserJourneyHistory(account, [old]);
+  await queueBrowserJourneyAction(account, { action: 'complete', journeyId: old.id }, 0);
+  const pending = (await readBrowserJourneyPartition(account)).outbox;
+  let release!: (response: Response) => void;
+  const delayed = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => delayed),
+  );
+
+  const restoration = restoreRecentBrowserJourneyHistory(account);
+  await mergeBrowserJourneyHistory(account, [
+    { ...old, status: 'completed', completedAt: '2026-09-08T13:00:00Z' },
+  ]);
+  release(Response.json({ journeys: [recent[1], old] }));
+
+  const restored = await restoration;
+  expect(restored.partition.outbox).toEqual(pending);
+  expect(restored.partition.snapshots.journeys).toMatchObject([
+    { id: recent[1]!.id, status: 'completed' },
+    { id: old.id, status: 'completed', completedAt: '2026-09-08T13:00:00.000000Z' },
+  ]);
+});
 it('rejects restoration if account deletion happens during the detail lookup', async () => {
   await mergeBrowserJourneyHistory(account, [old]);
   vi.stubGlobal(
