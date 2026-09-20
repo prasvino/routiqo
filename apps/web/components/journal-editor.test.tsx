@@ -508,3 +508,90 @@ it('pairs every journal sentinel above an existing private guard with one Back c
   expect(pushState).toHaveBeenCalledTimes(2);
   await waitFor(() => expect(historyBack).toHaveBeenCalledTimes(2));
 });
+
+it('warns and retains unsent draft state when local acknowledgement returns false', async () => {
+  const serverJournal = journal('Synthetic submitted title', 'Synthetic submitted notes', 1);
+  vi.mocked(saveBrowserTripJournal).mockResolvedValueOnce(serverJournal);
+  vi.mocked(acknowledgeBrowserJournalDraft).mockResolvedValueOnce(false);
+
+  await open(accountA);
+  fireEvent.change(screen.getByLabelText('Title'), {
+    target: { value: 'Synthetic submitted title' },
+  });
+  fireEvent.change(screen.getByLabelText('Notes'), {
+    target: { value: 'Synthetic submitted notes' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save to account' }));
+
+  await screen.findByText(
+    'Saved to your account, but a newer device draft was found. Reopen the journal before sending again.',
+  );
+
+  expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+    'Synthetic submitted title',
+  );
+  expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe(
+    'Synthetic submitted notes',
+  );
+  expect(screen.queryByText('Saved to your account.')).toBeNull();
+  expect(screen.getByText('Draft saved on this device')).toBeTruthy();
+
+  const savedDraft = vi.mocked(saveBrowserJournalDraft).mock.calls[0]![1];
+  expect(saveBrowserTripJournal).toHaveBeenCalledOnce();
+  expect(acknowledgeBrowserJournalDraft).toHaveBeenCalledTimes(1);
+  expect(acknowledgeBrowserJournalDraft).toHaveBeenCalledWith(
+    accountA,
+    journeyId,
+    savedDraft.mutationId,
+    serverJournal,
+  );
+  expect(saveBrowserJournalDraft).toHaveBeenCalledOnce();
+  expect(discardBrowserJournalDraft).not.toHaveBeenCalled();
+});
+
+it('opens with retained draft and saves locally when online account refresh fails', async () => {
+  const confirmedJournal = journal('Synthetic cached title', 'Synthetic cached notes', 1);
+  const initialDraft: BrowserJournalDraft = {
+    journeyId,
+    title: 'Synthetic draft title',
+    notes: 'Synthetic draft notes',
+    expectedVersion: 1,
+    mutationId: '00000000-0000-4000-8000-000000000099',
+  };
+
+  vi.mocked(readBrowserJournal).mockResolvedValueOnce({
+    journal: confirmedJournal,
+    draft: initialDraft,
+  });
+  vi.mocked(readBrowserTripJournal).mockRejectedValueOnce(new BrowserJournalError(503));
+
+  render(<JournalEditor account={accountA} journeyId={journeyId} onClose={vi.fn()} />);
+
+  await screen.findByText(
+    'Showing the version saved on this device. Account refresh is unavailable.',
+  );
+  expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Synthetic draft title');
+  expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe(
+    'Synthetic draft notes',
+  );
+  expect(screen.queryByRole('heading', { name: 'Trip journal unavailable' })).toBeNull();
+
+  fireEvent.change(screen.getByLabelText('Title'), {
+    target: { value: 'Synthetic edited draft title' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+  await screen.findByText('Draft saved on this device.');
+  expect(saveBrowserJournalDraft).toHaveBeenCalledWith(
+    accountA,
+    expect.objectContaining({
+      journeyId,
+      title: 'Synthetic edited draft title',
+      notes: 'Synthetic draft notes',
+      expectedVersion: 1,
+    }),
+    initialDraft.mutationId,
+  );
+  expect(saveBrowserTripJournal).not.toHaveBeenCalled();
+  expect(readBrowserTripJournal).toHaveBeenCalledOnce();
+});

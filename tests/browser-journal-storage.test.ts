@@ -125,6 +125,34 @@ async function putRaw(key: string, value: unknown): Promise<void> {
   });
 }
 
+async function getRaw(key: string): Promise<unknown> {
+  return new Promise<unknown>((resolve, reject) => {
+    const request = indexedDB.open('routiqo-journal-v1', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('accounts', 'readonly');
+      const getReq = tx.objectStore('accounts').get(key);
+      let result: unknown;
+      getReq.onsuccess = () => {
+        result = getReq.result;
+      };
+      tx.oncomplete = () => {
+        db.close();
+        resolve(result);
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+      tx.onabort = () => {
+        db.close();
+        reject(tx.error);
+      };
+    };
+  });
+}
+
 beforeEach(() => vi.stubGlobal('indexedDB', new IDBFactory()));
 afterEach(() => {
   vi.restoreAllMocks();
@@ -300,6 +328,63 @@ describe('browser IndexedDB journal partitions', () => {
     expect(await readBrowserJournal(account, id(21))).toEqual({ draft: null, journal: null });
   });
 
+  it('evicts the oldest unprotected snapshot at capacity while preserving protected drafts and other accounts', async () => {
+    for (let index = 1; index <= 20; index++) {
+      await cacheBrowserTripJournal(account, journal(id(index), 0, '', '', index));
+    }
+
+    const day1Draft = draft(id(1), id(101), 0, 'Day 1 Draft Title', 'Day 1 Draft Notes');
+    await saveBrowserJournalDraft(account, day1Draft, null);
+    const day5Draft = draft(id(5), id(105), 0, 'Day 5 Draft Title', 'Day 5 Draft Notes');
+    await saveBrowserJournalDraft(account, day5Draft, null);
+
+    const otherConfirmed = await cacheBrowserTripJournal(
+      otherAccount,
+      journal(id(50), 0, '', '', 10),
+    );
+    const otherDraft = draft(id(50), id(150), 0, 'Account B Draft Title', 'Account B Draft Notes');
+    await saveBrowserJournalDraft(otherAccount, otherDraft, null);
+
+    const day21Journal = journal(id(21), 0, '', '', 21);
+    const cachedDay21 = await cacheBrowserTripJournal(account, day21Journal);
+
+    const listA = await listBrowserJournals(account);
+    expect(listA).toHaveLength(20);
+
+    // Oldest unprotected snapshot (Day 2) must be evicted
+    expect(await readBrowserJournal(account, id(2))).toEqual({ draft: null, journal: null });
+    expect(listA.some((item) => item.journal?.journey.id === id(2))).toBe(false);
+
+    // Protected snapshot Day 1 and its draft must remain intact
+    const readDay1 = await readBrowserJournal(account, id(1));
+    expect(readDay1.draft).toEqual(day1Draft);
+    expect(readDay1.journal?.journey.id).toBe(id(1));
+
+    // Protected snapshot Day 5 and its draft must remain intact
+    const readDay5 = await readBrowserJournal(account, id(5));
+    expect(readDay5.draft).toEqual(day5Draft);
+    expect(readDay5.journal?.journey.id).toBe(id(5));
+
+    // New snapshot Day 21 must be present
+    const readDay21 = await readBrowserJournal(account, id(21));
+    expect(readDay21.journal).toEqual(cachedDay21);
+    expect(readDay21.draft).toBeNull();
+
+    // All remaining snapshots 3..20 (excluding 2) are present
+    for (let index = 3; index <= 20; index++) {
+      expect((await readBrowserJournal(account, id(index))).journal).not.toBeNull();
+    }
+
+    // Account B must remain completely untouched
+    expect(await readBrowserJournal(otherAccount, id(50))).toEqual({
+      draft: otherDraft,
+      journal: otherConfirmed,
+    });
+    expect(await listBrowserJournals(otherAccount)).toEqual([
+      { journal: otherConfirmed, draft: otherDraft },
+    ]);
+  });
+
   it('rolls back a storage failure without losing the current draft', async () => {
     await cacheBrowserTripJournal(account, journal());
     await saveBrowserJournalDraft(account, draft(), null);
@@ -334,6 +419,64 @@ describe('browser IndexedDB journal partitions', () => {
     });
     await expect(readBrowserJournal(account, journeyId)).rejects.toThrow('exceed');
   });
+
+  it.each([
+    {
+      name: 'duplicate journal IDs',
+      payload: {
+        version: 1,
+        accountId: account,
+        drafts: [draft(id(1), id(101))],
+        journals: [journal(id(1), 0, '', '', 1), journal(id(1), 0, '', '', 2)],
+      },
+    },
+    {
+      name: 'duplicate draft journey IDs',
+      payload: {
+        version: 1,
+        accountId: account,
+        drafts: [draft(id(1), id(101)), draft(id(1), id(102))],
+        journals: [journal(id(1), 0, '', '', 1)],
+      },
+    },
+    {
+      name: 'orphan draft referencing missing journal',
+      payload: {
+        version: 1,
+        accountId: account,
+        drafts: [draft(id(99), id(199))],
+        journals: [journal(id(1), 0, '', '', 1)],
+      },
+    },
+  ])(
+    'fails closed and preserves raw record without repair when partition has $name',
+    async ({ payload }) => {
+      const otherConfirmed = await cacheBrowserTripJournal(
+        otherAccount,
+        journal(id(50), 0, '', '', 10),
+      );
+      const otherSavedDraft = draft(id(50), id(150), 0, 'Draft B Title', 'Draft B Notes');
+      await saveBrowserJournalDraft(otherAccount, otherSavedDraft, null);
+
+      await putRaw(account, payload);
+
+      await expect(readBrowserJournal(account, id(1))).rejects.toThrow('cannot be read');
+      await expect(listBrowserJournals(account)).rejects.toThrow('cannot be read');
+      await expect(
+        cacheBrowserTripJournal(account, journal(id(10), 0, '', '', 10)),
+      ).rejects.toThrow('cannot be read');
+
+      expect(await getRaw(account)).toEqual(payload);
+
+      expect(await readBrowserJournal(otherAccount, id(50))).toEqual({
+        draft: otherSavedDraft,
+        journal: otherConfirmed,
+      });
+      expect(await listBrowserJournals(otherAccount)).toEqual([
+        { draft: otherSavedDraft, journal: otherConfirmed },
+      ]);
+    },
+  );
 
   it('rolls back acknowledgement and preserves drafts after an asynchronous abort', async () => {
     const secondJourneyId = id(2);

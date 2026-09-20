@@ -100,6 +100,65 @@ describe('browser journey delivery', () => {
     );
     await expect(readBrowserJourney(account, id)).rejects.toThrow('does not match');
   });
+
+  it('discards a nonempty 404 response body without reading or leaking private content', async () => {
+    const cancelSpy = vi.fn();
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"private":"secret-journey-content"}'));
+      },
+      cancel(reason) {
+        cancelSpy(reason);
+      },
+    });
+    const getReaderSpy = vi.spyOn(body, 'getReader');
+
+    const fetcher = vi.fn(
+      async () =>
+        new Response(body, {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+
+    const result = await readBrowserJourney(account, id);
+    expect(result).toBeNull();
+    expect(cancelSpy).toHaveBeenCalledOnce();
+    expect(getReaderSpy).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it('returns null on 404 even when stream cancellation cleanup rejects', async () => {
+    const privateCleanupError = new Error('private-stream-cleanup-failure');
+    const cancelSpy = vi.fn(() => Promise.reject(privateCleanupError));
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"private":"secret-journey-content"}'));
+      },
+      cancel: cancelSpy,
+    });
+    const getReaderSpy = vi.spyOn(body, 'getReader');
+
+    const fetcher = vi.fn(
+      async () =>
+        new Response(body, {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+
+    const result = await readBrowserJourney(account, id);
+    expect(result).toBeNull();
+    expect(cancelSpy).toHaveBeenCalledOnce();
+    expect(getReaderSpy).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledOnce();
+    await Promise.resolve();
+  });
+
   it('binds the account partition and sends a stable retry identity', async () => {
     const fetcher = respond(
       Response.json({

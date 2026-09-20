@@ -265,6 +265,47 @@ it('handles synchronous caller cancellation and discards the late response', asy
   expect(cancel).toHaveBeenCalledOnce();
 });
 
+it('disposes a late journal response after caller cancellation during header resolution', async () => {
+  let resolveFetch!: (response: Response) => void;
+  const fetchPromise = new Promise<Response>((resolve) => {
+    resolveFetch = resolve;
+  });
+  const fetcher = vi.fn().mockImplementation(() => fetchPromise);
+  vi.stubGlobal('fetch', fetcher);
+
+  const controller = new AbortController();
+  const readPromise = readBrowserTripJournal(account, id, controller.signal);
+  const rejection = expect(readPromise).rejects.toMatchObject({
+    name: 'AbortError',
+    message: 'Journal request cancelled.',
+  });
+
+  expect(fetcher).toHaveBeenCalledOnce();
+  const capturedSignal = (fetcher.mock.calls[0]?.[1] as RequestInit).signal;
+
+  controller.abort();
+  await rejection;
+  expect(capturedSignal?.aborted).toBe(true);
+
+  const cancelSpy = vi.fn(() => new Promise<void>(() => undefined));
+  const getReaderSpy = vi.fn();
+  const body = new ReadableStream<Uint8Array>({
+    cancel: cancelSpy,
+  });
+  const lateResponse = new Response(body, {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+  vi.spyOn(body, 'getReader').mockImplementation(getReaderSpy);
+
+  resolveFetch(lateResponse);
+  for (let flush = 0; flush < 8; flush++) await Promise.resolve();
+
+  expect(cancelSpy).toHaveBeenCalledOnce();
+  expect(getReaderSpy).not.toHaveBeenCalled();
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
 it('does not POST after caller cancellation while CSRF finishes independently', async () => {
   let resolveCsrf!: (response: Response) => void;
   const fetcher = vi.fn().mockImplementation(

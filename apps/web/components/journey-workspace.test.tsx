@@ -365,3 +365,90 @@ it('suppresses private LIVE controls while a parent journey operation is busy', 
   restore.resolve({ partition: active(), recentCount: 1 });
   expect(await screen.findByRole('heading', { name: 'Contribution settings' })).toBeTruthy();
 });
+
+it('ignores a delayed journal library result after switching accounts', async () => {
+  const accountA = accountId;
+  const accountB = '00000000-0000-4000-8000-000000000002';
+  const journeyA = '00000000-0000-4000-8000-000000000011';
+  const journeyB = '00000000-0000-4000-8000-000000000022';
+
+  const deferredA = deferred<Awaited<ReturnType<typeof listBrowserJournals>>>();
+  const deferredB = deferred<Awaited<ReturnType<typeof listBrowserJournals>>>();
+
+  vi.mocked(browserAccount).mockResolvedValue({ accountId: accountA });
+  vi.mocked(readBrowserJourneyPartition).mockImplementation(async (acc) => ({
+    outbox: { version: 1 as const, accountId: acc, entries: [] },
+    snapshots: { version: 1 as const, accountId: acc, journeys: [] },
+  }));
+  vi.mocked(listBrowserJournals).mockImplementation((acc) => {
+    if (acc === accountA) return deferredA.promise;
+    if (acc === accountB) return deferredB.promise;
+    return Promise.resolve([]);
+  });
+
+  render(<JourneyWorkspace />);
+
+  await waitFor(() => expect(listBrowserJournals).toHaveBeenCalledWith(accountA));
+
+  vi.mocked(browserAccount).mockResolvedValue({ accountId: accountB });
+  fireEvent.focus(window);
+
+  await waitFor(() => expect(listBrowserJournals).toHaveBeenCalledWith(accountB));
+
+  deferredB.resolve([
+    {
+      journal: {
+        journey: {
+          id: journeyB,
+          kind: 'trip' as const,
+          status: 'completed' as const,
+          startedAt: '2026-08-02T12:00:00Z',
+          completedAt: '2026-08-02T13:00:00Z',
+        },
+        annotation: {
+          title: 'Account B Synthetic Title',
+          notes: '',
+          version: 1,
+          updatedAt: '2026-08-02T14:00:00Z',
+        },
+      },
+      draft: null,
+    },
+  ]);
+
+  fireEvent.click(await screen.findByText('Journals saved on this device'));
+  await screen.findByRole('button', { name: 'Account B Synthetic Title' });
+
+  deferredA.resolve([
+    {
+      journal: {
+        journey: {
+          id: journeyA,
+          kind: 'trip' as const,
+          status: 'completed' as const,
+          startedAt: '2026-08-01T12:00:00Z',
+          completedAt: '2026-08-01T13:00:00Z',
+        },
+        annotation: {
+          title: 'Account A Synthetic Title',
+          notes: '',
+          version: 1,
+          updatedAt: '2026-08-01T14:00:00Z',
+        },
+      },
+      draft: null,
+    },
+  ]);
+
+  await waitFor(() => {
+    expect(screen.queryByText('Account A Synthetic Title')).toBeNull();
+  });
+  expect(screen.getByRole('button', { name: 'Account B Synthetic Title' })).toBeTruthy();
+  expect(screen.getAllByRole('button', { name: /Synthetic Title/ })).toHaveLength(1);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Account B Synthetic Title' }));
+  expect(screen.getByTestId('trip-journal').textContent).toBe(`${accountB}:${journeyB}`);
+
+  expect(listBrowserJournals).toHaveBeenCalledWith(accountA);
+  expect(listBrowserJournals).toHaveBeenCalledWith(accountB);
+});

@@ -127,4 +127,46 @@ describe('browser journey history', () => {
     });
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it('cancels and releases a stalled response stream when the caller aborts during read', async () => {
+    const cancelSpy = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({
+      cancel(reason) {
+        cancelSpy(reason);
+      },
+    });
+
+    const fetcher = vi.fn(
+      async () =>
+        new Response(stream, {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+
+    const controller = new AbortController();
+    const pagePromise = readBrowserJourneyPage(account, null, controller.signal);
+    // Observe rejection immediately, including when the readiness assertion fails.
+    const outcome = pagePromise.then(
+      () => ({ status: 'fulfilled' as const }),
+      (reason: unknown) => ({ status: 'rejected' as const, reason }),
+    );
+
+    try {
+      await vi.waitFor(() => expect(stream.locked).toBe(true), { timeout: 1000 });
+
+      controller.abort();
+      await expect(outcome).resolves.toMatchObject({
+        status: 'rejected',
+        reason: { name: 'AbortError' },
+      });
+
+      expect(cancelSpy).toHaveBeenCalledOnce();
+      expect(stream.locked).toBe(false);
+      expect(fetcher).toHaveBeenCalledOnce();
+    } finally {
+      controller.abort();
+    }
+  });
 });
