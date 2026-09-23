@@ -120,6 +120,124 @@ async function api<T>(path: string, method: 'GET' | 'POST' = 'GET', body?: objec
   }
 }
 
+export type GrantPermission = 'traffic_review' | 'traffic_suppress';
+export type GrantReason =
+  'OPERATOR_TRIAL' | 'COVERAGE_CHANGE' | 'SECURITY_RESPONSE' | 'ERROR_CORRECTION';
+export type GrantAction = 'issue' | 'revoke';
+export interface GrantRecord {
+  permission: GrantPermission;
+  expiresAt: string;
+}
+export interface TargetGrants {
+  targetId: string;
+  grants: GrantRecord[];
+}
+export interface PendingGrantMutation {
+  accountId: string;
+  targetId: string;
+  action: GrantAction;
+  permission: GrantPermission;
+  reason: GrantReason;
+  durationMinutes?: number;
+  requestId: string;
+}
+export interface GrantMutationResult {
+  targetId: string;
+  permission: GrantPermission;
+  expiresAt: string | null;
+  requestId: string;
+  replayed: boolean;
+}
+
+const grantPermissions = new Set<unknown>(['traffic_review', 'traffic_suppress']);
+const grantUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const validExpiry = (value: unknown) =>
+  typeof value === 'string' && value.length <= 40 && Number.isFinite(Date.parse(value));
+
+export function exactTargetId(value: string): string | null {
+  const trimmed = value.trim().toLowerCase();
+  return grantUuid.test(trimmed) ? trimmed : null;
+}
+
+export async function grantCapability(): Promise<boolean> {
+  const value = await api<unknown>('traffic-grants/me');
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    typeof (value as { canManageGrants?: unknown }).canManageGrants !== 'boolean'
+  )
+    throw new AdminApiError(503);
+  return (value as { canManageGrants: boolean }).canManageGrants;
+}
+
+export function parseTargetGrants(value: unknown, targetId: string): TargetGrants {
+  if (!value || typeof value !== 'object') throw new AdminApiError(503);
+  const data = value as Record<string, unknown>;
+  if (data.targetId !== targetId || !Array.isArray(data.grants) || data.grants.length > 2)
+    throw new AdminApiError(503);
+  const seen = new Set<GrantPermission>();
+  const grants = data.grants.map((raw): GrantRecord => {
+    if (!raw || typeof raw !== 'object') throw new AdminApiError(503);
+    const record = raw as Record<string, unknown>;
+    if (!grantPermissions.has(record.permission) || !validExpiry(record.expiresAt))
+      throw new AdminApiError(503);
+    const permission = record.permission as GrantPermission;
+    if (seen.has(permission)) throw new AdminApiError(503);
+    seen.add(permission);
+    return { permission, expiresAt: record.expiresAt as string };
+  });
+  return { targetId, grants };
+}
+
+export async function readTargetGrants(targetId: string): Promise<TargetGrants> {
+  if (!exactTargetId(targetId) || exactTargetId(targetId) !== targetId)
+    throw new AdminApiError(400);
+  return parseTargetGrants(await api<unknown>(`traffic-grants/${targetId}`), targetId);
+}
+
+export async function mutateGrant(pending: PendingGrantMutation): Promise<GrantMutationResult> {
+  if (
+    exactTargetId(pending.targetId) !== pending.targetId ||
+    !grantUuid.test(pending.requestId) ||
+    !grantPermissions.has(pending.permission) ||
+    !['OPERATOR_TRIAL', 'COVERAGE_CHANGE', 'SECURITY_RESPONSE', 'ERROR_CORRECTION'].includes(
+      pending.reason,
+    ) ||
+    (pending.action === 'issue' &&
+      (!Number.isInteger(pending.durationMinutes) ||
+        (pending.durationMinutes ?? 0) < 15 ||
+        (pending.durationMinutes ?? 0) > 240))
+  )
+    throw new AdminApiError(400);
+  const csrf = await adminCsrf();
+  const body =
+    pending.action === 'issue'
+      ? {
+          requestId: pending.requestId,
+          permission: pending.permission,
+          durationMinutes: pending.durationMinutes,
+          reason: pending.reason,
+        }
+      : { requestId: pending.requestId, permission: pending.permission, reason: pending.reason };
+  const value = await api<unknown>(
+    `traffic-grants/${pending.targetId}/${pending.action}`,
+    'POST',
+    body,
+    csrf,
+  );
+  if (!value || typeof value !== 'object') throw new AdminApiError(503);
+  const result = value as Record<string, unknown>;
+  if (
+    result.targetId !== pending.targetId ||
+    result.permission !== pending.permission ||
+    result.requestId !== pending.requestId ||
+    typeof result.replayed !== 'boolean' ||
+    (pending.action === 'issue' ? !validExpiry(result.expiresAt) : result.expiresAt !== null)
+  )
+    throw new AdminApiError(503);
+  return result as unknown as GrantMutationResult;
+}
+
 export async function adminCsrf() {
   const result = await api<{ token: string }>('auth/csrf');
   if (!result || typeof result.token !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(result.token))

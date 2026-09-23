@@ -5,12 +5,30 @@ const config: AdminProxyConfig = {
   origin: 'http://localhost:3001',
   upstream: 'http://127.0.0.1:8080',
   googleClientId: 'admin-test.apps.googleusercontent.com',
+  grantAdminEnabled: false,
 };
 const url = 'http://localhost:3001/api/admin';
 
 describe('admin proxy boundary', () => {
   it('stays disabled without explicit flag and rejects unsafe origins', async () => {
     expect(readAdminProxyConfig({ ROUTIQO_V3_ADMIN_ENABLED: 'false' })).toBeNull();
+    expect(
+      readAdminProxyConfig({
+        ROUTIQO_V3_ADMIN_ENABLED: 'true',
+        ROUTIQO_ADMIN_ORIGIN: config.origin,
+        ROUTIQO_ADMIN_API_ORIGIN: config.upstream,
+        ROUTIQO_ADMIN_GOOGLE_CLIENT_ID: config.googleClientId,
+      })?.grantAdminEnabled,
+    ).toBe(false);
+    expect(
+      readAdminProxyConfig({
+        ROUTIQO_V3_ADMIN_ENABLED: 'true',
+        ROUTIQO_V3_GRANT_ADMIN_ENABLED: 'true',
+        ROUTIQO_ADMIN_ORIGIN: config.origin,
+        ROUTIQO_ADMIN_API_ORIGIN: config.upstream,
+        ROUTIQO_ADMIN_GOOGLE_CLIENT_ID: config.googleClientId,
+      })?.grantAdminEnabled,
+    ).toBe(true);
     expect(() =>
       readAdminProxyConfig({
         ROUTIQO_V3_ADMIN_ENABLED: 'true',
@@ -129,5 +147,82 @@ describe('admin proxy boundary', () => {
     );
     expect(result.status).toBe(502);
     expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('strictly gates exact-target grant routes behind the independent flag', async () => {
+    const target = '10000000-0000-4000-8000-000000000001';
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response('{"canManageGrants":true}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const request = new Request(`${url}/traffic-grants/me`);
+    expect(
+      (await proxyAdminRequest(request, ['traffic-grants', 'me'], config, fetcher)).status,
+    ).toBe(404);
+    const enabled = { ...config, grantAdminEnabled: true };
+    expect(
+      (await proxyAdminRequest(request, ['traffic-grants', 'me'], enabled, fetcher)).status,
+    ).toBe(200);
+    expect(
+      (
+        await proxyAdminRequest(
+          new Request(`${url}/traffic-grants/${target}`),
+          ['traffic-grants', target],
+          enabled,
+          fetcher,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await proxyAdminRequest(
+          new Request(`${url}/traffic-grants/bad`),
+          ['traffic-grants', 'bad'],
+          enabled,
+          fetcher,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await proxyAdminRequest(
+          new Request(`${url}/traffic-grants/${target}?expand=account`),
+          ['traffic-grants', target],
+          enabled,
+          fetcher,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await proxyAdminRequest(
+          new Request(`${url}/traffic-grants`),
+          ['traffic-grants'],
+          enabled,
+          fetcher,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await proxyAdminRequest(
+          new Request(`${url}/traffic-grants/${target}/issue`, {
+            method: 'POST',
+            headers: {
+              Origin: 'https://other.test',
+              'Content-Type': 'application/json',
+              'X-XSRF-TOKEN': 'token',
+            },
+            body: '{}',
+          }),
+          ['traffic-grants', target, 'issue'],
+          enabled,
+          fetcher,
+        )
+      ).status,
+    ).toBe(403);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });

@@ -185,9 +185,12 @@ requires independent authentication and a finite `traffic_review` or
 
 The separately flagged V3 moderator implementation and its isolated staging
 preflight are documented in [the moderator runbook](V3_MODERATOR_STAGING_RUNBOOK.md).
-Until that workflow is verified with real admin OAuth, MFA policy, finite grants
-and operators, do not treat a local moderator UI or automated test as completed
-staging moderation.
+ADR 0057 adds an independently disabled `ROUTIQO_V3_GRANT_ADMIN_ENABLED` admin
+boundary and `ROUTIQO_V3_GRANT_ADMIN_MAINTENANCE_ENABLED` cleanup; see the
+[grant administration runbook](V3_OPERATOR_GRANTS_STAGING_RUNBOOK.md). Neither
+flag seeds its out-of-band administrator trust root. Until both workflows are
+verified with real admin OAuth, MFA policy, finite grants and named operators,
+do not treat a local UI or automated test as completed staging moderation.
 
 Rollback closes the web, backend V3 API and publisher flags together, while
 maintenance continues; preserve

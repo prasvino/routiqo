@@ -901,6 +901,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/traffic-grants/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Separate default-off V3 grant administration capability for the current admin session. */
+        get: operations["readAdminTrafficGrantCapability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/traffic-grants/{targetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Exact enabled target UUID only; no lookup or directory. Unknown, disabled and administrator targets are indistinguishable. */
+        get: operations["readAdminTrafficGrants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/traffic-grants/{targetId}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Issues a finite V3 moderator grant. An active grant must be explicitly revoked before issuing another. */
+        post: operations["issueAdminTrafficGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/traffic-grants/{targetId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Removes one current V3 moderator grant. The next permission check observes revocation. */
+        post: operations["revokeAdminTrafficGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1278,6 +1346,48 @@ export interface components {
         AdminTrafficDecisionResponseV3: {
             /** @enum {string} */
             status: "dismissed" | "suppressed";
+        };
+        AdminTrafficGrantCapabilityV3: {
+            canManageGrants: boolean;
+        };
+        AdminTrafficGrantReviewV3: {
+            /** Format: uuid */
+            targetId: string;
+            grants: components["schemas"]["AdminTrafficGrantV3"][];
+        };
+        AdminTrafficGrantV3: {
+            /** @enum {string} */
+            permission: "traffic_review" | "traffic_suppress";
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        AdminTrafficGrantIssueV3: {
+            /** Format: uuid */
+            requestId: string;
+            /** @enum {string} */
+            permission: "traffic_review" | "traffic_suppress";
+            reason: components["schemas"]["AdminTrafficGrantReasonV3"];
+            durationMinutes: number;
+        };
+        AdminTrafficGrantRevokeV3: {
+            /** Format: uuid */
+            requestId: string;
+            /** @enum {string} */
+            permission: "traffic_review" | "traffic_suppress";
+            reason: components["schemas"]["AdminTrafficGrantReasonV3"];
+        };
+        /** @enum {string} */
+        AdminTrafficGrantReasonV3: "OPERATOR_TRIAL" | "COVERAGE_CHANGE" | "SECURITY_RESPONSE" | "ERROR_CORRECTION";
+        AdminTrafficGrantReceiptV3: {
+            /** Format: uuid */
+            targetId: string;
+            /** @enum {string} */
+            permission: "traffic_review" | "traffic_suppress";
+            /** Format: date-time */
+            expiresAt: string | null;
+            /** Format: uuid */
+            requestId: string;
+            replayed: boolean;
         };
         Destination: {
             id: string;
@@ -3606,6 +3716,161 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    readAdminTrafficGrantCapability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current finite grant-administrator authority */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrafficGrantCapabilityV3"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+        };
+    };
+    readAdminTrafficGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                targetId: components["schemas"]["PrivateSignalUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current V3 grants */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrafficGrantReviewV3"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description Current grant-administrator authority unavailable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Target unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    issueAdminTrafficGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                targetId: components["schemas"]["PrivateSignalUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTrafficGrantIssueV3"];
+            };
+        };
+        responses: {
+            /** @description Committed grant or exact retained replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrafficGrantReceiptV3"];
+                };
+            };
+            /** @description Current grant-administrator authority unavailable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Target unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Active grant or conflicting request UUID */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    revokeAdminTrafficGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                targetId: components["schemas"]["PrivateSignalUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTrafficGrantRevokeV3"];
+            };
+        };
+        responses: {
+            /** @description Committed revocation or exact retained replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrafficGrantReceiptV3"];
+                };
+            };
+            /** @description Current grant-administrator authority unavailable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Target unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No active grant or conflicting request UUID */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
         };
     };
 }

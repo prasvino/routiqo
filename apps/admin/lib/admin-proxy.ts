@@ -2,6 +2,7 @@ export interface AdminProxyConfig {
   origin: string;
   upstream: string;
   googleClientId: string;
+  grantAdminEnabled: boolean;
 }
 
 const localHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -40,14 +41,36 @@ export function readAdminProxyConfig(
   if (!origin || !upstream || !googleClientId) throw new Error('Incomplete admin configuration');
   if (!/^[A-Za-z0-9-]{1,200}\.apps\.googleusercontent\.com$/.test(googleClientId))
     throw new Error('Invalid admin Google client');
-  return { origin: exactOrigin(origin), upstream: exactOrigin(upstream), googleClientId };
+  return {
+    origin: exactOrigin(origin),
+    upstream: exactOrigin(upstream),
+    googleClientId,
+    grantAdminEnabled: env.ROUTIQO_V3_GRANT_ADMIN_ENABLED === 'true',
+  };
 }
 
 function failure(status: number): Response {
   return new Response(null, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-function route(path: string[], search: URLSearchParams, method: string): string | null {
+function route(
+  path: string[],
+  search: URLSearchParams,
+  method: string,
+  grantAdminEnabled: boolean,
+): string | null {
+  if (grantAdminEnabled && path[0] === 'traffic-grants' && !search.size) {
+    if (path.length === 2 && path[1] === 'me' && method === 'GET') return 'traffic-grants/me';
+    if (path.length === 2 && uuid.test(path[1] ?? '') && method === 'GET')
+      return `traffic-grants/${path[1]}`;
+    if (
+      path.length === 3 &&
+      uuid.test(path[1] ?? '') &&
+      (path[2] === 'issue' || path[2] === 'revoke') &&
+      method === 'POST'
+    )
+      return `traffic-grants/${path[1]}/${path[2]}`;
+  }
   if (path.length === 2 && path[0] === 'auth') {
     const action = path[1];
     if (
@@ -158,7 +181,7 @@ export async function proxyAdminRequest(
   if (!config) return failure(404);
   const url = new URL(request.url);
   if (url.origin !== config.origin) return failure(403);
-  const suffix = route(path, url.searchParams, request.method);
+  const suffix = route(path, url.searchParams, request.method, config.grantAdminEnabled);
   if (!suffix) return failure(404);
   if (
     request.headers.get('sec-fetch-site') === 'cross-site' ||

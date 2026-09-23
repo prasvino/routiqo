@@ -56,7 +56,7 @@ class AdminTrafficHttpTest {
                     (token, nonce) -> {
                         if (!token.equals(nonce)) throw new SecurityException("Invalid test credential");
                         return new GoogleIdentityVerifier.Identity("google", "admin-http-subject");
-                    }, java.time.Clock.systemUTC());
+                    });
         }
     }
     @Value("${local.server.port}") int port;
@@ -82,6 +82,7 @@ class AdminTrafficHttpTest {
     }
     @Test void adminOriginCsrfGrantAndSessionAreSeparate() throws Exception {
         String csrf = csrf();
+        assertThat(call("GET", "traffic-grants/me", "", null, null).statusCode()).isEqualTo(401);
         assertThat(call("POST", "auth/google/challenge", "{}", null, "http://localhost:3001").statusCode())
                 .isEqualTo(403);
         assertThat(call("POST", "auth/google/challenge", "{}", csrf, "http://localhost:3000").statusCode())

@@ -5,6 +5,7 @@ import com.routiqo.core.routeupdate.domain.RouteAnchor;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routing.domain.RouteRequest;
 import com.routiqo.core.moderation.infrastructure.JdbcTrafficReview;
+import com.routiqo.core.moderation.infrastructure.JdbcTrafficGrantAdmin;
 import com.routiqo.core.moderation.infrastructure.AdminSessionService;
 import com.routiqo.core.identity.application.GoogleIdentityVerifier;
 import java.sql.Timestamp;
@@ -168,7 +169,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_suppress', ?, ?)
                 """, operator, Timestamp.from(WINDOW.plusSeconds(280)),
-                Timestamp.from(WINDOW.plusSeconds(600)));
+                Timestamp.from(Instant.now().plusSeconds(600)));
         reviewer.decide(operator, request, ref, "SUPPRESS", "INACCURATE", () -> {});
         reviewer.decide(operator, request, ref, "SUPPRESS", "INACCURATE", () -> {});
         assertThat(store.read(owners.getFirst().actor(), owners.getFirst().journey()).moments())
@@ -177,6 +178,145 @@ class JdbcCommunityTrafficV3IntegrationTest {
                 String.class, Timestamp.from(WINDOW))).isEqualTo("PUBLISHED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_suppression_audit_v3",
                 Integer.class)).isEqualTo(1);
+    }
+
+    private record GrantRace(UUID ref, UUID moderator, UUID administrator,
+            JdbcTrafficReview reviewer, JdbcTrafficGrantAdmin grants) {}
+
+    private GrantRace grantRace() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        var owner = owners.getFirst();
+        UUID ref = store(WINDOW.plusSeconds(302)).read(owner.actor(), owner.journey()).moments().getFirst().ref();
+        store(WINDOW.plusSeconds(302)).report(owner.actor(), owner.journey(), ref, UUID.randomUUID(), "SPAM");
+        UUID moderator = UUID.randomUUID(), administrator = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", moderator, "grant-race-mod-" + moderator);
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", administrator, "grant-race-admin-" + administrator);
+        Instant databaseNow = Instant.now();
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_review', ?, ?), (?, 'traffic_grant_admin', ?, ?)
+                """, moderator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(databaseNow.plusSeconds(600)),
+                administrator, Timestamp.from(databaseNow.minusSeconds(10)), Timestamp.from(databaseNow.plusSeconds(600)));
+        Clock now = Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC);
+        return new GrantRace(ref, moderator, administrator,
+                new JdbcTrafficReview(jdbc, manager, now), new JdbcTrafficGrantAdmin(jdbc, manager));
+    }
+
+    @Test void revokeFirstPreventsModeratorDecisionCommit() throws Exception {
+        GrantRace race = grantRace();
+        var locked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var checks = new java.util.concurrent.atomic.AtomicInteger();
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var revoke = pool.submit(() -> race.grants().change(race.administrator(), race.moderator(), UUID.randomUUID(),
+                    "traffic_review", "REVOKE", "SECURITY_RESPONSE", null, () -> {
+                        if (checks.incrementAndGet() == 2) { locked.countDown(); awaitGrantRace(release); }
+                    }));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            var decision = pool.submit(() -> {
+                try {
+                    race.reviewer().decide(race.moderator(), UUID.randomUUID(), race.ref(), "DISMISS", "SPAM",
+                            () -> jdbc.query("SELECT id FROM routiqo_account WHERE id = ? FOR SHARE",
+                                    (rs, n) -> rs.getObject(1, UUID.class), race.moderator()));
+                    return "committed";
+                } catch (JdbcTrafficReview.Missing missing) { return "denied"; }
+            });
+            assertThat(decision.isDone()).isFalse();
+            release.countDown();
+            revoke.get(10, TimeUnit.SECONDS);
+            assertThat(decision.get(10, TimeUnit.SECONDS)).isEqualTo("denied");
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_review_action_audit_v3 WHERE ref = ?",
+                Integer.class, race.ref())).isZero();
+    }
+
+    @Test void moderatorDecisionFirstCompletesBeforeRevocation() throws Exception {
+        GrantRace race = grantRace();
+        var checked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var decision = pool.submit(() -> race.reviewer().decide(race.moderator(), UUID.randomUUID(),
+                    race.ref(), "DISMISS", "SPAM", () -> {
+                        jdbc.query("SELECT id FROM routiqo_account WHERE id = ? FOR SHARE",
+                                (rs, n) -> rs.getObject(1, UUID.class), race.moderator());
+                        if (first.compareAndSet(true, false)) { checked.countDown(); awaitGrantRace(release); }
+                    }));
+            assertThat(checked.await(5, TimeUnit.SECONDS)).isTrue();
+            var revoke = pool.submit(() -> race.grants().change(race.administrator(), race.moderator(), UUID.randomUUID(),
+                    "traffic_review", "REVOKE", "SECURITY_RESPONSE", null, () -> {}));
+            assertThat(revoke.isDone()).isFalse();
+            release.countDown();
+            decision.get(10, TimeUnit.SECONDS);
+            assertThat(revoke.get(10, TimeUnit.SECONDS).expiresAt()).isNull();
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_review_action_audit_v3 WHERE ref = ?",
+                Integer.class, race.ref())).isEqualTo(1);
+    }
+
+    @Test void moderatorQueueAndGrantRevocationUseAccountBeforeGrantOrder() throws Exception {
+        GrantRace race = grantRace();
+        var checked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var queue = pool.submit(() -> race.reviewer().queue(race.moderator(), null, 20, () -> {
+                jdbc.query("SELECT id FROM routiqo_account WHERE id = ? FOR SHARE",
+                        (rs, n) -> rs.getObject(1, UUID.class), race.moderator());
+                if (first.compareAndSet(true, false)) { checked.countDown(); awaitGrantRace(release); }
+            }));
+            assertThat(checked.await(5, TimeUnit.SECONDS)).isTrue();
+            var revoke = pool.submit(() -> race.grants().change(race.administrator(), race.moderator(), UUID.randomUUID(),
+                    "traffic_review", "REVOKE", "SECURITY_RESPONSE", null, () -> {}));
+            assertThat(revoke.isDone()).isFalse();
+            release.countDown();
+            assertThat(queue.get(10, TimeUnit.SECONDS).items()).hasSize(1);
+            assertThat(revoke.get(10, TimeUnit.SECONDS).expiresAt()).isNull();
+        }
+    }
+
+    @Test void moderatorGrantExpiryUsesDatabaseTimeDespiteSkewedProjectionClock() {
+        GrantRace race = grantRace(); // Reviewer clock is fixed at the old projection window.
+        assertThat(race.reviewer().queue(race.moderator(), null, 20, () -> {}).items()).hasSize(1);
+        jdbc.update("""
+                UPDATE moderation_operator_grant SET issued_at = ?, expires_at = ?
+                WHERE operator_id = ? AND permission = 'traffic_review'
+                """, Timestamp.from(Instant.now().minusSeconds(120)),
+                Timestamp.from(Instant.now().minusSeconds(1)), race.moderator());
+        assertThatThrownBy(() -> race.reviewer().queue(race.moderator(), null, 20, () -> {}))
+                .isInstanceOf(JdbcTrafficReview.Missing.class);
+    }
+
+    @Test void queueAfterAcquiredRevocationIsDeniedWithoutDeadlock() throws Exception {
+        GrantRace race = grantRace();
+        var locked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var checks = new java.util.concurrent.atomic.AtomicInteger();
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var revoke = pool.submit(() -> race.grants().change(race.administrator(), race.moderator(), UUID.randomUUID(),
+                    "traffic_review", "REVOKE", "SECURITY_RESPONSE", null, () -> {
+                        if (checks.incrementAndGet() == 2) { locked.countDown(); awaitGrantRace(release); }
+                    }));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            var queue = pool.submit(() -> {
+                try {
+                    race.reviewer().queue(race.moderator(), null, 20,
+                            () -> jdbc.query("SELECT id FROM routiqo_account WHERE id = ? FOR SHARE",
+                                    (rs, n) -> rs.getObject(1, UUID.class), race.moderator()));
+                    return "served";
+                } catch (JdbcTrafficReview.Missing missing) { return "denied"; }
+            });
+            assertThat(queue.isDone()).isFalse();
+            release.countDown();
+            revoke.get(10, TimeUnit.SECONDS);
+            assertThat(queue.get(10, TimeUnit.SECONDS)).isEqualTo("denied");
+        }
+    }
+
+    private static void awaitGrantRace(CountDownLatch latch) {
+        try { if (!latch.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Release timed out"); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
     }
 
     @Test void dismissalReopensOnNewReportAndConflictingRetryFails() {
@@ -189,7 +329,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_review', ?, ?)
-                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(Instant.now().plusSeconds(600)));
         store(WINDOW.plusSeconds(302)).report(first.actor(), first.journey(), ref, UUID.randomUUID(), "SPAM");
         var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
         assertThat(reviewer.queue(operator, null, 20, () -> {}).items()).hasSize(1);
@@ -225,7 +365,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_suppress', ?, ?)
-                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(1200)));
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(Instant.now().plusSeconds(600)));
         var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(901), ZoneOffset.UTC));
         assertThat(reviewer.queue(operator, null, 20, () -> {}).items().getFirst().evidenceStatus())
                 .isEqualTo("EVIDENCE_UNAVAILABLE");
@@ -240,8 +380,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
         UUID operator = UUID.randomUUID();
         String subject = "admin-subject-" + operator;
         var admin = new AdminSessionService(jdbc, manager,
-                (token, nonce) -> new GoogleIdentityVerifier.Identity("google", subject),
-                Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
+                (token, nonce) -> new GoogleIdentityVerifier.Identity("google", subject));
         var challenge = admin.begin();
         assertThatThrownBy(() -> admin.exchange(challenge.id(), challenge.binding(), "verified-token"))
                 .isInstanceOf(SecurityException.class);
@@ -253,7 +392,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_review', ?, ?)
-                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(Instant.now().plusSeconds(600)));
         var session = admin.exchange(challenge.id(), challenge.binding(), "verified-token");
         assertThat(session.accountId()).isEqualTo(operator);
         assertThat(admin.authenticate(session.credential()).accountId()).isEqualTo(operator);
@@ -302,7 +441,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_review', ?, ?)
-                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(Instant.now().plusSeconds(600)));
         var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(304), ZoneOffset.UTC));
         assertThatThrownBy(() -> reviewer.queue(operator, null, 51, () -> {}))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -333,7 +472,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_suppress', ?, ?)
-                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(Instant.now().plusSeconds(600)));
         // Existing unique audit deliberately forces the insert after UPDATE to fail.
         jdbc.update("""
                 INSERT INTO community_traffic_suppression_audit_v3
@@ -361,7 +500,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_suppress', ?, ?)
-                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(Instant.now().plusSeconds(600)));
         var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
         var ready = new CountDownLatch(2);
         var start = new CountDownLatch(1);
@@ -393,7 +532,7 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_suppress', ?, ?)
-                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(Instant.now().plusSeconds(600)));
         var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
         var deleted = new CountDownLatch(1);
         var release = new CountDownLatch(1);
@@ -432,12 +571,9 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_review', ?, ?)
-                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(1800)));
-        var instant = new java.util.concurrent.atomic.AtomicReference<>(WINDOW.plusSeconds(303));
-        Clock clock = org.mockito.Mockito.mock(Clock.class);
-        org.mockito.Mockito.when(clock.instant()).thenAnswer(invocation -> instant.get());
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(Instant.now().plusSeconds(600)));
         var admin = new AdminSessionService(jdbc, manager,
-                (token, nonce) -> new GoogleIdentityVerifier.Identity("google", subject), clock);
+                (token, nonce) -> new GoogleIdentityVerifier.Identity("google", subject));
         var challenge = admin.begin();
         var session = admin.exchange(challenge.id(), challenge.binding(), "verified-token");
         var locked = new CountDownLatch(1);
@@ -447,6 +583,8 @@ class JdbcCommunityTrafficV3IntegrationTest {
                     .executeWithoutResult(status -> {
                         jdbc.query("SELECT token_hash FROM admin_auth_session WHERE account_id = ? FOR UPDATE",
                                 (rs, n) -> rs.getString(1), operator);
+                        jdbc.update("UPDATE admin_auth_session SET expires_at = ? WHERE account_id = ?",
+                                Timestamp.from(Instant.now().minusSeconds(1)), operator);
                         locked.countDown();
                         try { if (!release.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Release timed out"); }
                         catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
@@ -458,7 +596,6 @@ class JdbcCommunityTrafficV3IntegrationTest {
             });
             Thread.sleep(100);
             assertThat(check.isDone()).isFalse();
-            instant.set(session.expiresAt().plusSeconds(1));
             release.countDown();
             holder.get(10, TimeUnit.SECONDS);
             assertThat(check.get(10, TimeUnit.SECONDS)).isEqualTo("expired");

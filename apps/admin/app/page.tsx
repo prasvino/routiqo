@@ -18,5 +18,10 @@ export default function Page() {
         <p>V3 moderator access is disabled or staging configuration is incomplete.</p>
       </main>
     );
-  return <ModeratorWorkspace clientId={config.googleClientId} />;
+  return (
+    <ModeratorWorkspace
+      clientId={config.googleClientId}
+      grantAdminEnabled={config.grantAdminEnabled}
+    />
+  );
 }

@@ -4,13 +4,13 @@ Status: implemented for isolated staging evaluation under [ADR 0056](../adr/0056
 
 ## Prerequisites
 
-Use a separate HTTPS admin origin and Google OAuth client audience from the consumer site. The Google project owner must authorize that origin and enforce the reviewed operator MFA policy. The operator must already have an enabled Routiqo account under the same Google subject; admin sign-in never creates one. Configure the backend `persistence`, `web-auth` and `google-auth` profiles and apply migrations through V25 to the verified isolated staging database. Keep consumer and admin sessions on different origins and cookie namespaces.
+Use a separate HTTPS admin origin and Google OAuth client audience from the consumer site. The Google project owner must authorize that origin and enforce the reviewed operator MFA policy. The operator must already have an enabled Routiqo account under the same Google subject; admin sign-in never creates one. Configure the backend `persistence`, `web-auth` and `google-auth` profiles and apply migrations through V26 to the verified isolated staging database. Keep consumer and admin sessions on different origins and cookie namespaces.
 
 The backend requires `ROUTIQO_V3_ADMIN_ENABLED=true`, `ROUTIQO_ADMIN_ORIGIN` and `ROUTIQO_ADMIN_GOOGLE_CLIENT_ID`. The admin Next.js process separately requires those three values plus `ROUTIQO_ADMIN_API_ORIGIN`, a fixed backend origin. Review these values before enabling; `.env.example` files keep the flag false. The V3 consumer API, publisher, maintenance and web flags remain independent as described in [local setup](LOCAL_SETUP.md#v3-community-traffic-staging-evaluation-adr-0055). No flag is changed by this runbook.
 
 ## Finite operator grants
 
-A trusted grant administrator uses operator-only database access. Resolve the intended Google subject to the already-enabled account through a private operator procedure, then record its UUID. In one transaction, lock that account before writing its grant rows, matching ADR 0041's account-before-grant order. Issue `traffic_review` for queue reads/dismissal and `traffic_suppress` only to operators authorized for takedown. Each grant has an issued time and expiry no more than 24 hours later. Do not seed a grant in source code, a migration or application startup. Revoke with the same account lock order. Log the administrator, reason and expiry in the approved operational audit channel without copying tokens or report contents.
+The [grant administration runbook](V3_OPERATOR_GRANTS_STAGING_RUNBOOK.md) covers the separately flagged V3 grant console, its out-of-band `traffic_grant_admin` trust root, issue/revoke checks and audit. Issue `traffic_review` for queue reads/dismissal and `traffic_suppress` only to operators authorized for takedown. No grant is seeded in source code, a migration or application startup. Real OAuth/MFA, named operators and supervised grant operation remain staging prerequisites.
 
 ## Trial checks
 

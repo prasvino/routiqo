@@ -36,6 +36,7 @@ public final class JdbcTrafficReview {
         if (limit < 1 || limit > 50) throw new IllegalArgumentException("Invalid page size");
         Cursor cursor = decode(rawCursor);
         return transaction.execute(status -> {
+            sessionRecheck.run();
             Instant now = clock.instant();
             grant(operator, false, now);
             List<Row> rows = jdbc.query("""
@@ -185,11 +186,11 @@ public final class JdbcTrafficReview {
                 FOR UPDATE OF g
                 """.formatted(suppress ? "'traffic_suppress'" : "'traffic_review', 'traffic_suppress'"),
                 (rs, n) -> new Instant[]{rs.getTimestamp(1).toInstant(), rs.getTimestamp(2).toInstant()}, operator);
-        Instant now = clock.instant();
+        Instant now = databaseNow();
         if (rows.stream().noneMatch(row -> !row[0].isAfter(now) && row[1].isAfter(now))) throw new Missing();
     }
     private void grantAvailable(UUID operator, boolean suppress) {
-        Instant now = clock.instant();
+        Instant now = databaseNow();
         var rows = jdbc.query("""
                 SELECT TRUE FROM moderation_operator_grant g
                 JOIN routiqo_account a ON a.id = g.operator_id AND a.enabled = TRUE
@@ -199,6 +200,7 @@ public final class JdbcTrafficReview {
                 (rs, n) -> true, operator, Timestamp.from(now), Timestamp.from(now));
         if (rows.isEmpty()) throw new Missing();
     }
+    private Instant databaseNow() { return jdbc.queryForObject("SELECT clock_timestamp()", Timestamp.class).toInstant(); }
     private static String encode(Row row) {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(
                 (row.latest() + "|" + row.ref()).getBytes(StandardCharsets.US_ASCII));

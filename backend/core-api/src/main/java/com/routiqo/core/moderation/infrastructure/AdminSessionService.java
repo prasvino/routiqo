@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -19,16 +18,14 @@ public final class AdminSessionService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final GoogleIdentityVerifier verifier;
-    private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
     public AdminSessionService(JdbcTemplate jdbc, PlatformTransactionManager manager,
-            GoogleIdentityVerifier verifier, Clock clock) {
+            GoogleIdentityVerifier verifier) {
         this.jdbc = jdbc;
         this.transaction = new TransactionTemplate(manager);
         this.transaction.setTimeout(5);
         this.verifier = verifier;
-        this.clock = clock;
     }
 
     public record Challenge(UUID id, String nonce, String binding, Instant expiresAt) {
@@ -39,7 +36,7 @@ public final class AdminSessionService {
     }
 
     public Challenge begin() {
-        Instant now = clock.instant();
+        Instant now = databaseNow();
         var challenge = new Challenge(UUID.randomUUID(), secret(), secret(), now.plusSeconds(300));
         jdbc.update("INSERT INTO admin_login_challenge (id, nonce, binding_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
                 challenge.id(), challenge.nonce(), hash(challenge.binding()), Timestamp.from(now), Timestamp.from(challenge.expiresAt()));
@@ -49,7 +46,7 @@ public final class AdminSessionService {
     public Session exchange(UUID id, String binding, String idToken) {
         if (id == null || idToken == null || idToken.isBlank() || idToken.length() > 16384) throw denied();
         String bindingHash = hash(binding);
-        Instant now = clock.instant();
+        Instant now = databaseNow();
         var nonce = jdbc.query("""
                 SELECT nonce FROM admin_login_challenge WHERE id = ? AND binding_hash = ?
                   AND consumed_at IS NULL AND created_at <= ? AND expires_at > ?
@@ -58,18 +55,21 @@ public final class AdminSessionService {
         var identity = verifier.verify(idToken, nonce.getFirst()); // Network verification outside transaction.
         if (!"google".equals(identity.provider())) throw denied();
         String credential = secret();
-        Instant expires = clock.instant().plusSeconds(900);
-        UUID account = transaction.execute(status -> {
-            Instant at = clock.instant();
+        return transaction.execute(status -> {
             var locked = jdbc.query("""
-                    SELECT nonce FROM admin_login_challenge WHERE id = ? AND binding_hash = ?
-                      AND consumed_at IS NULL AND created_at <= ? AND expires_at > ? FOR UPDATE
-                    """, (row, n) -> row.getString(1), id, bindingHash, Timestamp.from(at), Timestamp.from(at));
-            if (locked.isEmpty() || !locked.getFirst().equals(nonce.getFirst())) throw denied();
+                    SELECT nonce, created_at, expires_at FROM admin_login_challenge
+                    WHERE id = ? AND binding_hash = ? AND consumed_at IS NULL FOR UPDATE
+                    """, (row, n) -> new Object[]{row.getString(1), row.getTimestamp(2).toInstant(),
+                            row.getTimestamp(3).toInstant()}, id, bindingHash);
+            Instant at = databaseNow();
+            Instant expires = at.plusSeconds(900);
+            if (locked.isEmpty() || !locked.getFirst()[0].equals(nonce.getFirst())
+                    || ((Instant) locked.getFirst()[1]).isAfter(at)
+                    || !((Instant) locked.getFirst()[2]).isAfter(at)) throw denied();
             var ids = jdbc.query("""
                     SELECT a.id FROM routiqo_account a JOIN moderation_operator_grant g ON g.operator_id = a.id
                     WHERE a.google_subject = ? AND a.enabled = TRUE
-                      AND g.permission IN ('traffic_review', 'traffic_suppress')
+                      AND g.permission IN ('traffic_review', 'traffic_suppress', 'traffic_grant_admin')
                       AND g.issued_at <= ? AND g.expires_at > ?
                     LIMIT 1
                     """, (row, n) -> row.getObject(1, UUID.class), identity.subject(), Timestamp.from(at), Timestamp.from(at));
@@ -77,19 +77,18 @@ public final class AdminSessionService {
             jdbc.update("UPDATE admin_login_challenge SET consumed_at = ? WHERE id = ?", Timestamp.from(at), id);
             jdbc.update("INSERT INTO admin_auth_session (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
                     hash(credential), ids.getFirst(), Timestamp.from(at), Timestamp.from(expires));
-            return ids.getFirst();
+            return new Session(ids.getFirst(), credential, expires);
         });
-        return new Session(account, credential, expires);
     }
 
     public Session authenticate(String credential) {
-        Instant now = clock.instant();
+        Instant now = databaseNow();
         var rows = jdbc.query("""
                 SELECT s.account_id, s.expires_at FROM admin_auth_session s
                 JOIN routiqo_account a ON a.id = s.account_id AND a.enabled = TRUE
                 JOIN moderation_operator_grant g ON g.operator_id = a.id
                 WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.created_at <= ? AND s.expires_at > ?
-                  AND g.permission IN ('traffic_review', 'traffic_suppress')
+                  AND g.permission IN ('traffic_review', 'traffic_suppress', 'traffic_grant_admin')
                   AND g.issued_at <= ? AND g.expires_at > ?
                 LIMIT 1
                 """, (row, n) -> new Session(row.getObject(1, UUID.class), null, row.getTimestamp(2).toInstant()),
@@ -100,7 +99,7 @@ public final class AdminSessionService {
 
     public void revoke(String credential) {
         jdbc.update("UPDATE admin_auth_session SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL",
-                Timestamp.from(clock.instant()), hash(credential));
+                Timestamp.from(databaseNow()), hash(credential));
     }
 
     /** Called inside the action transaction after its projection lock; blocks concurrent revocation. */
@@ -113,7 +112,7 @@ public final class AdminSessionService {
                 """, (rs, n) -> new Instant[]{rs.getTimestamp(1).toInstant(), rs.getTimestamp(2).toInstant(),
                         rs.getTimestamp(3) == null ? null : rs.getTimestamp(3).toInstant()}, hash(credential), account);
         if (rows.isEmpty()) throw denied();
-        Instant now = clock.instant();
+        Instant now = databaseNow();
         Instant[] session = rows.getFirst();
         if (session[2] != null || session[0].isAfter(now) || !session[1].isAfter(now)) throw denied();
     }
@@ -122,6 +121,7 @@ public final class AdminSessionService {
         byte[] value = new byte[32]; random.nextBytes(value);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
     }
+    private Instant databaseNow() { return jdbc.queryForObject("SELECT clock_timestamp()", Timestamp.class).toInstant(); }
     private static String hash(String value) {
         if (value == null || !value.matches("[A-Za-z0-9_-]{43}")) throw denied();
         try {

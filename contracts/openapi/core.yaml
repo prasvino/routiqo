@@ -1133,6 +1133,55 @@ paths:
         '200': { description: Canonical projection suppressed atomically with audit, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionResponseV3' } } } }
         '404': { description: No current investigable open group or grant }
         '409': { description: Conflicting request identity replay }
+  /api/v1/admin/traffic-grants/me:
+    get:
+      operationId: readAdminTrafficGrantCapability
+      description: Separate default-off V3 grant administration capability for the current admin session.
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Current finite grant-administrator authority, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantCapabilityV3' } } } }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+  /api/v1/admin/traffic-grants/{targetId}:
+    get:
+      operationId: readAdminTrafficGrants
+      description: Exact enabled target UUID only; no lookup or directory. Unknown, disabled and administrator targets are indistinguishable.
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: targetId, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
+      responses:
+        '200': { description: Current V3 grants, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantReviewV3' } } } }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: Current grant-administrator authority unavailable }
+        '404': { description: Target unavailable }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/traffic-grants/{targetId}/issue:
+    post:
+      operationId: issueAdminTrafficGrant
+      description: Issues a finite V3 moderator grant. An active grant must be explicitly revoked before issuing another.
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: targetId, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantIssueV3' } } } }
+      responses:
+        '200': { description: Committed grant or exact retained replay, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantReceiptV3' } } } }
+        '403': { description: Current grant-administrator authority unavailable }
+        '404': { description: Target unavailable }
+        '409': { description: Active grant or conflicting request UUID }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/traffic-grants/{targetId}/revoke:
+    post:
+      operationId: revokeAdminTrafficGrant
+      description: Removes one current V3 moderator grant. The next permission check observes revocation.
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: targetId, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantRevokeV3' } } } }
+      responses:
+        '200': { description: Committed revocation or exact retained replay, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantReceiptV3' } } } }
+        '403': { description: Current grant-administrator authority unavailable }
+        '404': { description: Target unavailable }
+        '409': { description: No active grant or conflicting request UUID }
+        '429': { $ref: '#/components/responses/AuthLimited' }
 components:
   securitySchemes:
     adminSession:
@@ -1745,6 +1794,59 @@ components:
       required: [status]
       properties:
         status: { type: string, enum: [dismissed, suppressed] }
+    AdminTrafficGrantCapabilityV3:
+      type: object
+      additionalProperties: false
+      required: [canManageGrants]
+      properties:
+        canManageGrants: { type: boolean }
+    AdminTrafficGrantReviewV3:
+      type: object
+      additionalProperties: false
+      required: [targetId, grants]
+      properties:
+        targetId: { type: string, format: uuid }
+        grants:
+          type: array
+          maxItems: 2
+          items: { $ref: '#/components/schemas/AdminTrafficGrantV3' }
+    AdminTrafficGrantV3:
+      type: object
+      additionalProperties: false
+      required: [permission, expiresAt]
+      properties:
+        permission: { type: string, enum: [traffic_review, traffic_suppress] }
+        expiresAt: { type: string, format: date-time }
+    AdminTrafficGrantIssueV3:
+      type: object
+      additionalProperties: false
+      required: [requestId, permission, reason, durationMinutes]
+      properties:
+        requestId: { type: string, format: uuid }
+        permission: { type: string, enum: [traffic_review, traffic_suppress] }
+        reason: { $ref: '#/components/schemas/AdminTrafficGrantReasonV3' }
+        durationMinutes: { type: integer, minimum: 15, maximum: 240 }
+    AdminTrafficGrantRevokeV3:
+      type: object
+      additionalProperties: false
+      required: [requestId, permission, reason]
+      properties:
+        requestId: { type: string, format: uuid }
+        permission: { type: string, enum: [traffic_review, traffic_suppress] }
+        reason: { $ref: '#/components/schemas/AdminTrafficGrantReasonV3' }
+    AdminTrafficGrantReasonV3:
+      type: string
+      enum: [OPERATOR_TRIAL, COVERAGE_CHANGE, SECURITY_RESPONSE, ERROR_CORRECTION]
+    AdminTrafficGrantReceiptV3:
+      type: object
+      additionalProperties: false
+      required: [targetId, permission, expiresAt, requestId, replayed]
+      properties:
+        targetId: { type: string, format: uuid }
+        permission: { type: string, enum: [traffic_review, traffic_suppress] }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        requestId: { type: string, format: uuid }
+        replayed: { type: boolean }
     Destination:
       type: object
       additionalProperties: false

@@ -11,7 +11,8 @@ body {
   font-family: Arial, sans-serif;
 }
 button,
-select {
+select,
+input {
   font: inherit;
 }
 button {
@@ -283,6 +284,99 @@ p {
 .pagination {
   padding-top: var(--space-xl);
 }
+.grant-panel {
+  margin-bottom: var(--space-xxl);
+  padding: var(--space-xl);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 32px #173e3814;
+}
+.grant-heading {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-lg);
+}
+.grant-heading h2 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(25px, 3vw, 34px);
+  margin-bottom: var(--space-sm);
+}
+.grant-heading p,
+.grant-current p,
+.grant-rule,
+.grant-lookup .subtle {
+  color: var(--muted);
+}
+.grant-lookup label,
+.grant-fields label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: var(--space-sm);
+}
+.grant-lookup-line {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-sm);
+}
+.grant-lookup-line input {
+  flex: 1;
+  min-width: 0;
+}
+.grant-lookup input,
+.grant-fields select {
+  min-height: var(--touch);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+.grant-lookup .subtle {
+  margin: var(--space-sm) 0 0;
+  font-size: 14px;
+}
+.grant-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: var(--space-xxl);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--line);
+}
+.grant-current ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.grant-current li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.grant-current li span {
+  color: var(--muted);
+}
+.grant-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.grant-fields select {
+  width: 100%;
+  margin-bottom: var(--space-md);
+}
+.grant-rule {
+  margin-top: var(--space-sm);
+}
+.grant-success {
+  color: var(--accent);
+  margin: var(--space-lg) 0 0;
+}
+.grant-access {
+  margin: var(--space-lg) 0;
+}
 .disabled-workspace {
   max-width: 620px;
   margin: 12vh auto;
@@ -313,6 +407,27 @@ p {
   }
   .decision-form {
     margin-top: var(--space-lg);
+  }
+  .grant-content {
+    display: block;
+  }
+  .grant-form {
+    margin-top: var(--space-xl);
+  }
+  .grant-panel {
+    padding: var(--space-lg);
+  }
+}
+@media (max-width: 420px) {
+  .grant-lookup-line {
+    display: block;
+  }
+  .grant-lookup-line input,
+  .grant-lookup-line button {
+    width: 100%;
+  }
+  .grant-lookup-line button {
+    margin-top: var(--space-sm);
   }
 }
 @media (prefers-reduced-motion: reduce) {
