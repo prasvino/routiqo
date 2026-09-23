@@ -24,10 +24,25 @@ The first release displays situations through a journey LIVE list, not live peop
 Canonical scope and gates: ROUTIQO_LIVE_SPEC.md and PRESENCE_SPEC.md. No counts,
 member lists or precise traveller markers. Route admission establishes relevance,
 not physical presence. Read access must not implicitly publish presence. Ghost
-withdrawal invalidates existing evidence for future projections as well as future
-submissions; use reviewed suppression rather than exposing count differences.
-Moment existence/freshness can also reveal people, so minimum cohorts, fixed
-partitions/windows and repeated-query controls require adversarial validation.
+withdrawal stops new private/public contributions and removes discoverable
+individual presence. The selected but unapproved ADR 0054 direction would retain
+an input already frozen by a separate, explicit, irreversible Share; later Ghost
+withdrawal cannot change public aggregate bytes. This exception requires truthful
+disclosure, bounded retention and independent protocol review before activation.
+Current private evidence remains withdrawable under its own contract.
+Moment existence/freshness can also reveal people, so the proposed one-person
+pilot budget, randomized release, fixed partitions/windows and repeated-query
+controls require adversarial validation. A minimum cohort is not established.
+ADR 0055 proposes a separate consented community traffic summary using a
+committed publication snapshot and account-level thresholds. It would allow
+participation inference from collusion, repeated windows, timing or outside
+knowledge; a snapshot and hidden names do not provide person-level privacy.
+Under that proposal, a Stop/Ghost/deletion committed before the snapshot excludes
+pending input, while one committed afterward may be too late for the summary.
+The owner authorized V3 implementation and staging evaluation, not production
+acceptance of this disclosure or retention policy. Product/privacy review and
+an explicit production decision remain required. No V18 or V22 record authorizes
+V3 participation.
 No automatic nearby/location discovery is authorized by this plan.
 
 ## Private journey contribution choice

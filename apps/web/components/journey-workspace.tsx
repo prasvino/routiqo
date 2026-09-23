@@ -18,6 +18,8 @@ import { RoutePlanner, type RoutePlannerContributionSource } from './route-plann
 import { PrivateSignalsPanel } from './private-signals-panel';
 import { PublicIntentRecoveryPanel } from './public-intent-recovery-panel';
 import { ProviderLiveAlerts } from './provider-live-alerts';
+import { CommunityTrafficPanel } from './community-traffic-panel';
+import { CommunityShareRecoveryPanel } from './community-share-recovery-panel';
 import { LiveSignalRecoveryCoordinator } from '../lib/live-signal-recovery';
 import type { LiveConsentAuthority } from './live-route-binding-panel';
 import { JournalEditor } from './journal-editor';
@@ -449,6 +451,15 @@ export function JourneyWorkspace() {
                 journeyId={active.id}
                 online={!offline}
               />
+              {process.env.NEXT_PUBLIC_ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED === 'true' && (
+                <CommunityTrafficPanel
+                  key={`community:${account}:${active.id}`}
+                  accountId={account}
+                  journeyId={active.id}
+                  online={!offline}
+                  available={liveAvailable && currentConsentAuthority !== null}
+                />
+              )}
               <LiveConsentPanel
                 key={`${account}:${active.id}`}
                 accountId={account}
@@ -533,6 +544,17 @@ export function JourneyWorkspace() {
             publicIntentRecovery?.accountId === account &&
             publicIntentRecovery.ready
           }
+          communityTrafficV3Enabled={
+            process.env.NEXT_PUBLIC_ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED === 'true'
+          }
+        />
+      )}
+      {account && process.env.NEXT_PUBLIC_ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED === 'true' && (
+        <CommunityShareRecoveryPanel
+          key={`community-recovery:${account}`}
+          accountId={account}
+          online={!offline}
+          identityConfirmed={identityConfirmed}
         />
       )}
       {account && process.env.NEXT_PUBLIC_ROUTIQO_PUBLIC_SIGNAL_INTENT_UI_ENABLED === 'true' && (

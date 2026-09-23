@@ -933,6 +933,128 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Routing provider unavailable }
+  /api/v1/journeys/{id}/signals/{commandId}/community-share:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - $ref: '#/components/parameters/PrivateSignalCommandId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: submitCommunityTrafficShareV3
+      security: [{ browserSession: [] }]
+      description: Fresh per-report V3 opt-in of one accepted private traffic signal. A candidate is accepted for consideration, never guaranteed publication. Separate default-off production flag; prior public intents are not consent.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommunityTrafficShareRequestV3' }
+      responses:
+        '200':
+          description: Existing exact owner-bound request or newly committed candidate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommunityTrafficShareResponseV3' }
+        '400': { description: Invalid exact request or identifiers }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Signal or journey unavailable to this owner }
+        '409': { description: 'Ineligible authority, account/window conflict or changed exact retry' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Authority or database unavailable; result may require owner recovery }
+  /api/v1/journeys/{id}/signals/{commandId}/community-share/stop:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - $ref: '#/components/parameters/PrivateSignalCommandId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: stopCommunityTrafficShareV3
+      security: [{ browserSession: [] }]
+      description: Stops future V3 consideration. A summary already being prepared may include this report; published aggregates are not recomputed.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserSignalStopRequest' }
+      responses:
+        '200':
+          description: Future consideration stopped
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommunityTrafficStopResponseV3' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: No owner-visible share handle }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Outcome uncertain; retry the same Stop }
+  /api/v1/community-shares:
+    get:
+      operationId: recoverOwnCommunityTrafficSharesV3
+      security: [{ browserSession: [] }]
+      description: Bounded owner-only V3 recovery handles across journeys and devices; no V18/V22 records.
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      responses:
+        '200':
+          description: Recent own candidate handles
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommunityTrafficShareRecoveryV3' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Recovery unavailable; do not resubmit a different request automatically }
+  /api/v1/journeys/{id}/community-traffic:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    get:
+      operationId: readRelevantCommunityTrafficV3
+      security: [{ browserSession: [] }]
+      description: Bounded canonical committed and unexpired V3 rows relevant to server-derived current active journey context. No arbitrary anchor, coordinates, counts or participant data.
+      responses:
+        '200':
+          description: Current canonical community summary rows; empty never implies clear roads
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommunityTrafficReadV3' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey unavailable or inactive }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Reader unavailable; do not serve stale cached rows }
+  /api/v1/journeys/{id}/community-traffic/{ref}/reports:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - { name: ref, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: reportVisibleCommunityTrafficV3
+      security: [{ browserSession: [] }]
+      description: Bounded report of one authorized visible canonical moment. Report does not automatically suppress the row.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommunityTrafficReportRequestV3' }
+      responses:
+        '202':
+          description: Report received for moderation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommunityTrafficReportResponseV3' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Moment not visible to this journey; no existence disclosure }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Intake unavailable }
 components:
   securitySchemes:
     browserSession:
@@ -1213,6 +1335,82 @@ components:
       type: object
       additionalProperties: false
       maxProperties: 0
+    CommunityTrafficShareRequestV3:
+      type: object
+      additionalProperties: false
+      required: [requestId, purpose]
+      properties:
+        requestId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        purpose: { type: string, enum: [community-traffic-v3] }
+    CommunityTrafficShareResponseV3:
+      type: object
+      additionalProperties: false
+      required: [candidateId, commandId, status, acceptedAt, windowEndsAt]
+      properties:
+        candidateId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        status: { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing, expired] }
+        acceptedAt: { type: string, format: date-time }
+        windowEndsAt: { type: string, format: date-time }
+    CommunityTrafficStopResponseV3:
+      type: object
+      additionalProperties: false
+      required: [commandId, status]
+      properties:
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        status: { type: string, enum: [stopped_for_future_sharing] }
+    CommunityTrafficShareHandleV3:
+      type: object
+      additionalProperties: false
+      required: [candidateId, journeyId, commandId, requestId, status, acceptedAt, windowEndsAt]
+      properties:
+        candidateId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        journeyId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        requestId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        status: { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing] }
+        acceptedAt: { type: string, format: date-time }
+        windowEndsAt: { type: string, format: date-time }
+    CommunityTrafficShareRecoveryV3:
+      type: array
+      maxItems: 100
+      items: { $ref: '#/components/schemas/CommunityTrafficShareHandleV3' }
+    CommunityTrafficReadV3:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, serverTime, moments]
+      properties:
+        schemaVersion: { type: integer, enum: [3] }
+        serverTime: { type: string, format: date-time, description: Server time captured after the reader query; clients use it for conservative expiry deadlines. }
+        moments:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/CommunityTrafficMomentV3' }
+    CommunityTrafficMomentV3:
+      type: object
+      additionalProperties: false
+      required: [ref, areaLabel, trafficValue, observationPeriod, expiresAt, source, schemaVersion]
+      properties:
+        ref: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        areaLabel: { type: string, minLength: 1, maxLength: 80 }
+        trafficValue: { type: string, enum: [traffic_moving, traffic_slow, traffic_very_slow, traffic_stopped] }
+        observationPeriod: { type: string, minLength: 1, maxLength: 40 }
+        expiresAt: { type: string, format: date-time }
+        source: { type: string, enum: [community] }
+        schemaVersion: { type: integer, enum: [3] }
+    CommunityTrafficReportRequestV3:
+      type: object
+      additionalProperties: false
+      required: [reason, clientRequestId]
+      properties:
+        reason: { type: string, enum: [INACCURATE, UNSAFE, SPAM] }
+        clientRequestId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+    CommunityTrafficReportResponseV3:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, enum: [received] }
     BrowserPublicSignalShareRequest:
       type: object
       additionalProperties: false

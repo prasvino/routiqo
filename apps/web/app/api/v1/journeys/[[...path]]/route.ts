@@ -9,6 +9,7 @@ async function handle(request: Request, context: { params: Promise<{ path?: stri
       readBrowserAuthConfig(process.env),
       fetch,
       process.env.ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED === 'true',
+      process.env.ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED === 'true',
     );
   } catch {
     return new Response(null, { status: 503, headers: { 'Cache-Control': 'no-store' } });

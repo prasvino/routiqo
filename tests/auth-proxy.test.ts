@@ -3,6 +3,7 @@ import {
   proxyBrowserAuth,
   proxyBrowserJourneys,
   proxyBrowserPublicIntents,
+  proxyBrowserCommunityShares,
   readBrowserAuthConfig,
 } from '../apps/web/lib/auth-proxy';
 const config = {
@@ -638,6 +639,73 @@ describe('same-origin auth proxy', () => {
     );
     expect(huge.status).toBe(503);
     expect(await huge.text()).toBe('');
+  });
+});
+
+describe('V3 community traffic proxy', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const command = '00000000-0000-4000-8000-000000000002';
+  const ref = '00000000-0000-4000-8000-000000000003';
+  it('keeps every V3 route closed by default and forwards only flagged exact shapes', async () => {
+    const upstream = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ status: 'received' }, { status: 202 }));
+    const sharePath = [id, 'signals', command, 'community-share'];
+    const readPath = [id, 'community-traffic'];
+    const reportPath = [id, 'community-traffic', ref, 'reports'];
+    const post = (path: string[]) =>
+      new Request(`${config.origin}/api/v1/journeys/${path.join('/')}`, {
+        method: 'POST',
+        headers: { Origin: config.origin, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+    const get = (path: string[]) =>
+      new Request(`${config.origin}/api/v1/journeys/${path.join('/')}`);
+    for (const [path, request] of [
+      [sharePath, post(sharePath)],
+      [readPath, get(readPath)],
+      [reportPath, post(reportPath)],
+    ] as const)
+      expect((await proxyBrowserJourneys(request, path, config, upstream)).status).toBe(404);
+    expect(
+      (await proxyBrowserJourneys(post(sharePath), sharePath, config, upstream, false, true))
+        .status,
+    ).toBe(202);
+    expect(
+      (await proxyBrowserJourneys(get(readPath), readPath, config, upstream, false, true)).status,
+    ).toBe(202);
+    expect(
+      (await proxyBrowserJourneys(post(reportPath), reportPath, config, upstream, false, true))
+        .status,
+    ).toBe(202);
+    expect(
+      (await proxyBrowserJourneys(get(reportPath), reportPath, config, upstream, false, true))
+        .status,
+    ).toBe(405);
+    expect(
+      (
+        await proxyBrowserJourneys(
+          get([id, 'community-traffic', 'bad', 'reports']),
+          [id, 'community-traffic', 'bad', 'reports'],
+          config,
+          upstream,
+          false,
+          true,
+        )
+      ).status,
+    ).toBe(404);
+    expect(upstream).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps recovery closed by default and rejects caller query enumeration', async () => {
+    const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json([]));
+    const make = (query = '') => new Request(`${config.origin}/api/v1/community-shares${query}`);
+    expect((await proxyBrowserCommunityShares(make(), config, upstream)).status).toBe(404);
+    expect(
+      (await proxyBrowserCommunityShares(make('?journeyId=x'), config, upstream, true)).status,
+    ).toBe(400);
+    expect((await proxyBrowserCommunityShares(make(), config, upstream, true)).status).toBe(200);
+    expect(upstream.mock.calls[0]?.[0]).toBe(`${config.upstream}/api/v1/community-shares`);
   });
 });
 

@@ -140,6 +140,57 @@ eight-second deadline with no retries. The example remains false. Enabling this
 transport does not publish Live output or supply the required moderation,
 hourly/category abuse controls, operated purge job or regional launch evidence.
 
+## V3 community traffic staging evaluation (ADR 0055)
+
+V3 implementation is authorized for staging evaluation; production activation
+and acceptance of its different privacy terms are **not approved**. The V3 path
+uses fresh `community-traffic-v3` Share requests for existing private traffic
+receipts. It never imports V18 public intent or V22 frozen Share records. Read
+[the V3 contract](../features/live/COMMUNITY_TRAFFIC_SUMMARY_SPEC.md) and
+[production decision checklist](../validation/V3_PRODUCTION_DECISION_CHECKLIST.md)
+before an evaluation with real accounts. The synthetic utility run is
+`node scripts/v3-community-utility.mjs` from the repository root; its results
+are not a measurement of Routiqo users or roads.
+
+For an isolated staging deployment, provision the existing `persistence`,
+`google-auth`, `web-auth` and `routing` profiles with the reviewed regional
+services, exact origin, OAuth client, database and operator-curated labeled
+anchor catalog above. Enable the private consent, route binding, choice and
+signal APIs as required for an actual owned traffic receipt. Only in that
+isolated environment set backend `ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED=true`
+and, after verifying the target database and catalog, independently set
+`ROUTIQO_COMMUNITY_TRAFFIC_V3_PUBLISHER_ENABLED=true`. Set web server
+`ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED=true` and build the web client with
+`NEXT_PUBLIC_ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED=true`. All V3 examples in
+`.env.example` remain false. Independently enable
+`ROUTIQO_COMMUNITY_TRAFFIC_V3_MAINTENANCE_ENABLED=true` for bounded cleanup;
+keep maintenance running for the retention period after Share/read/publisher
+rollback. The publisher job and browser proxy do not infer
+activation from the client flag. The V3 read/report and Share/Stop/recovery
+routes require the browser session, exact account header, and POST CSRF/origin;
+the canonical reader also requires an active owned journey and current server
+route relevance.
+
+Keep the regional catalog version stable during one evaluation window; a new
+version creates a distinct decision namespace. Check candidate and terminal
+decision counts through operator-only database access, never a public
+contributor/count endpoint. Verify the window-close snapshot behavior with
+Share and Stop from separate sessions, observe a canonical traffic row or
+truthful empty state, report a visible row, and confirm expiry without relying
+on cleanup timing. The automated PostgreSQL/HTTP and browser component tests
+provide repeatable evidence when OAuth or regional credentials are absent.
+There is no public moderator HTTP route: audited suppression currently requires
+a separately authenticated internal operator boundary and finite
+`traffic_suppress` grant. Do not expose the internal store method directly.
+
+Rollback closes the web, backend V3 API and publisher flags together, while
+maintenance continues; preserve
+committed decisions and suppression audit for the reviewed retention period.
+Restore/failover validation must confirm that expiry and suppression still stop
+serving, and terminal decisions are never redrawn. Production flags remain off
+until the checklist records an explicit owner privacy-contract decision and
+product/privacy/security approvals.
+
 ## Live expiry maintenance
 
 ADR 0036 defines a separate default-off application maintenance job. With the

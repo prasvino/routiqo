@@ -23,6 +23,7 @@ import type {
 } from './route-planner';
 import { Modal } from './modal';
 import { PublicSignalIntentControl } from './public-signal-intent-control';
+import { CommunityShareControl } from './community-share-control';
 
 interface Props {
   coordinator: LiveSignalRecoveryCoordinator;
@@ -34,6 +35,7 @@ interface Props {
   source: RoutePlannerContributionSource | null;
   publicIntentControls?: boolean;
   publicIntentShareEnabled?: boolean;
+  communityTrafficV3Enabled?: boolean;
 }
 interface ChoiceState {
   authority: RoutePlannerContributionAuthority;
@@ -102,6 +104,7 @@ export function PrivateSignalsPanel(props: Props) {
   const [busy, setBusy] = useState(false);
   const [, refresh] = useState(0);
   const [forget, setForget] = useState<{ journeyId: string; commandId: string } | null>(null);
+  const trafficReceipts = useRef(new Set<string>());
   const redraw = useCallback(() => {
     if (mounted.current) refresh((n) => n + 1);
   }, []);
@@ -336,6 +339,7 @@ export function PrivateSignalsPanel(props: Props) {
         return;
       }
       coordinator.confirmAcceptance(run.ticket, receipt);
+      if (input.value.startsWith('traffic_')) trafficReceipts.current.add(grant.commandId);
       restoreFocus.current = panel.current?.contains(document.activeElement) ?? false;
       setChoice(null);
       setValue('');
@@ -546,6 +550,25 @@ export function PrivateSignalsPanel(props: Props) {
                     }
                   />
                 )}
+                {props.communityTrafficV3Enabled &&
+                  record.receipt?.status === 'accepted' &&
+                  trafficReceipts.current.has(record.commandId) && (
+                    <CommunityShareControl
+                      key={`v3:${record.accountId}:${record.journeyId}:${record.commandId}`}
+                      accountId={props.accountId}
+                      journeyId={record.journeyId}
+                      commandId={record.commandId}
+                      receiptExpiresAt={record.receipt.expiresAt}
+                      identityConfirmed={props.identityConfirmed}
+                      online={props.online}
+                      activeJourney={
+                        props.available &&
+                        props.journeyId === record.journeyId &&
+                        record.phase === 'accepted' &&
+                        !!activeAuthority
+                      }
+                    />
+                  )}
                 <div className="detail-actions live-consent-actions">
                   {record.phase !== 'stopped' && (
                     <button

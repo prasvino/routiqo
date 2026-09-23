@@ -655,6 +655,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/signals/{commandId}/community-share": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Fresh per-report V3 opt-in of one accepted private traffic signal. A candidate is accepted for consideration, never guaranteed publication. Separate default-off production flag; prior public intents are not consent. */
+        post: operations["submitCommunityTrafficShareV3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{id}/signals/{commandId}/community-share/stop": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Stops future V3 consideration. A summary already being prepared may include this report; published aggregates are not recomputed. */
+        post: operations["stopCommunityTrafficShareV3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community-shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Bounded owner-only V3 recovery handles across journeys and devices; no V18/V22 records. */
+        get: operations["recoverOwnCommunityTrafficSharesV3"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{id}/community-traffic": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+            };
+            cookie?: never;
+        };
+        /** @description Bounded canonical committed and unexpired V3 rows relevant to server-derived current active journey context. No arbitrary anchor, coordinates, counts or participant data. */
+        get: operations["readRelevantCommunityTrafficV3"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{id}/community-traffic/{ref}/reports": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                ref: components["schemas"]["PrivateSignalUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Bounded report of one authorized visible canonical moment. Report does not automatically suppress the row. */
+        post: operations["reportVisibleCommunityTrafficV3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -793,6 +907,71 @@ export interface components {
             choices: components["schemas"]["BrowserSignalChoice"][];
         };
         BrowserSignalStopRequest: Record<string, never>;
+        CommunityTrafficShareRequestV3: {
+            requestId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            purpose: "community-traffic-v3";
+        };
+        CommunityTrafficShareResponseV3: {
+            candidateId: components["schemas"]["PrivateSignalUuid"];
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            status: "accepted_for_consideration" | "stopped_for_future_sharing" | "expired";
+            /** Format: date-time */
+            acceptedAt: string;
+            /** Format: date-time */
+            windowEndsAt: string;
+        };
+        CommunityTrafficStopResponseV3: {
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            status: "stopped_for_future_sharing";
+        };
+        CommunityTrafficShareHandleV3: {
+            candidateId: components["schemas"]["PrivateSignalUuid"];
+            journeyId: components["schemas"]["PrivateSignalUuid"];
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            requestId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            status: "accepted_for_consideration" | "stopped_for_future_sharing";
+            /** Format: date-time */
+            acceptedAt: string;
+            /** Format: date-time */
+            windowEndsAt: string;
+        };
+        CommunityTrafficShareRecoveryV3: components["schemas"]["CommunityTrafficShareHandleV3"][];
+        CommunityTrafficReadV3: {
+            /** @enum {integer} */
+            schemaVersion: 3;
+            /**
+             * Format: date-time
+             * @description Server time captured after the reader query; clients use it for conservative expiry deadlines.
+             */
+            serverTime: string;
+            moments: components["schemas"]["CommunityTrafficMomentV3"][];
+        };
+        CommunityTrafficMomentV3: {
+            ref: components["schemas"]["PrivateSignalUuid"];
+            areaLabel: string;
+            /** @enum {string} */
+            trafficValue: "traffic_moving" | "traffic_slow" | "traffic_very_slow" | "traffic_stopped";
+            observationPeriod: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @enum {string} */
+            source: "community";
+            /** @enum {integer} */
+            schemaVersion: 3;
+        };
+        CommunityTrafficReportRequestV3: {
+            /** @enum {string} */
+            reason: "INACCURATE" | "UNSAFE" | "SPAM";
+            clientRequestId: components["schemas"]["PrivateSignalUuid"];
+        };
+        CommunityTrafficReportResponseV3: {
+            /** @enum {string} */
+            status: "received";
+        };
         BrowserPublicSignalShareRequest: {
             requestId: components["schemas"]["PrivateSignalUuid"];
             /** @enum {string} */
@@ -2791,6 +2970,254 @@ export interface operations {
             };
             429: components["responses"]["AuthLimited"];
             /** @description Routing provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    submitCommunityTrafficShareV3: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunityTrafficShareRequestV3"];
+            };
+        };
+        responses: {
+            /** @description Existing exact owner-bound request or newly committed candidate */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunityTrafficShareResponseV3"];
+                };
+            };
+            /** @description Invalid exact request or identifiers */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Signal or journey unavailable to this owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ineligible authority, account/window conflict or changed exact retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Authority or database unavailable; result may require owner recovery */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stopCommunityTrafficShareV3: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserSignalStopRequest"];
+            };
+        };
+        responses: {
+            /** @description Future consideration stopped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunityTrafficStopResponseV3"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description No owner-visible share handle */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Outcome uncertain; retry the same Stop */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    recoverOwnCommunityTrafficSharesV3: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent own candidate handles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunityTrafficShareRecoveryV3"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Recovery unavailable; do not resubmit a different request automatically */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readRelevantCommunityTrafficV3: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current canonical community summary rows; empty never implies clear roads */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunityTrafficReadV3"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey unavailable or inactive */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Reader unavailable; do not serve stale cached rows */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reportVisibleCommunityTrafficV3: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                ref: components["schemas"]["PrivateSignalUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunityTrafficReportRequestV3"];
+            };
+        };
+        responses: {
+            /** @description Report received for moderation */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunityTrafficReportResponseV3"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Moment not visible to this journey; no existence disclosure */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Intake unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

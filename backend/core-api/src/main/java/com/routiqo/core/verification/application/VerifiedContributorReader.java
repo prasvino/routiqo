@@ -8,5 +8,8 @@ import java.util.UUID;
 public interface VerifiedContributorReader {
     Optional<VerifiedContributor> current(UUID accountId, Instant now);
 
+    /** Within owned-journey write authority, hold the verification row through commit. */
+    Optional<VerifiedContributor> currentForFrozenShare(UUID accountId, Instant now);
+
     record VerifiedContributor(UUID personRef, long revision, Instant expiresAt) {}
 }

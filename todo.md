@@ -4,9 +4,15 @@
 
 Detailed traveller-derived public LIVE release ledger: [`docs/validation/PUBLIC_LIVE_PENDING.md`](docs/validation/PUBLIC_LIVE_PENDING.md). Keep validation evidence there as each gate closes.
 
+ADR 0055's community traffic summary is authorized for V3 implementation and staging evaluation behind a disabled production flag. Its different privacy contract is not accepted for production; prior person-level research is paused and preserved, and no traveller publication is enabled in production.
+
 - [x] Implement private dual-review verified-person authority and an explicit per-receipt public-purpose intent ledger; neither is a public LIVE release.
 - [x] Add default-off purpose-specific share/Stop transport, account-wide retained Stop recovery, private candidate evaluation and bounded cleanup foundations; no traveller moment is public.
-- [ ] Replace the rejected ADR 0051 fixed-window candidate with a transcript-level privacy protocol that resolves known revocation/Ghost/completion inference, then obtain independent adversarial approval before any traveller output.
+- [ ] Independently approve a complete transcript-level privacy protocol before traveller output. ADR 0054 now proposes irreversible explicit Share as the input boundary, avoiding the rejected ADR 0051/0052 revocation and delayed-cutoff rules; product consent, deletion retention, implementation timing and whole-transcript review are still open.
+- [x] Authorize end-to-end V3 community-summary implementation and staging evaluation behind a disabled production flag; pause and preserve the person-level research code/docs.
+- [x] Implement V3 candidate/debit, Share/Stop/recovery, snapshot publisher, canonical reader/report, internal audited suppression, cleanup, contracts and active-journey web controls. [Staging evidence](docs/validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) records PostgreSQL, browser-fixture and full build checks; production flags remain off.
+- [ ] Finish authenticated regional staging, independently authenticated moderator access, real density/accuracy and output-age measurements, restore/failover/device QA and retention/backup operations before considering V3 production activation.
+- [ ] Decide explicitly whether to accept ADR 0055's different privacy contract for production. Review residual participation inference, publication-snapshot withdrawal, audited suppression, block semantics, retention, real density/accuracy and exact user disclosure before activation. The proposed 12/10/80% rule is not a privacy guarantee; V18/V22 data cannot supply V3 consent.
 - [x] Choose the policy after ADR 0052's rejected immutable-window follow-up: user selected a measurable person-level guarantee. ADR 0053 is a proposed whole-pilot DP design; its isolated sampler and disconnected V21 person claim need full protocol integration and review. No public reader or flag is authorized.
 - [ ] Build independently authenticated operator case/grant provisioning, document-review operations, maintenance scheduling and retention review for verified contributors.
 

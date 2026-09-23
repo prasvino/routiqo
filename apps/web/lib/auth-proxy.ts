@@ -97,6 +97,7 @@ export async function proxyBrowserJourneys(
   config: BrowserAuthConfig | null,
   upstreamFetch: typeof fetch = fetch,
   publicIntentApiEnabled = false,
+  communityTrafficV3Enabled = false,
 ): Promise<Response> {
   if (!config) return failure(503);
   const listing = path.length === 0;
@@ -147,7 +148,33 @@ export async function proxyBrowserJourneys(
     journeyId.test(path[2] ?? '') &&
     path[3] === 'public-intent' &&
     path[4] === 'stop';
+  const communityShare =
+    path.length === 4 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'signals' &&
+    journeyId.test(path[2] ?? '') &&
+    path[3] === 'community-share';
+  const communityStop =
+    path.length === 5 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'signals' &&
+    journeyId.test(path[2] ?? '') &&
+    path[3] === 'community-share' &&
+    path[4] === 'stop';
+  const communityTraffic =
+    path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'community-traffic';
+  const communityReport =
+    path.length === 4 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'community-traffic' &&
+    journeyId.test(path[2] ?? '') &&
+    path[3] === 'reports';
   if ((publicIntent || publicIntentStop) && !publicIntentApiEnabled) return failure(404);
+  if (
+    (communityShare || communityStop || communityTraffic || communityReport) &&
+    !communityTrafficV3Enabled
+  )
+    return failure(404);
   if (
     !listing &&
     !detail &&
@@ -163,20 +190,28 @@ export async function proxyBrowserJourneys(
     !signal &&
     !signalWithdraw &&
     !publicIntent &&
-    !publicIntentStop
+    !publicIntentStop &&
+    !communityShare &&
+    !communityStop &&
+    !communityTraffic &&
+    !communityReport
   )
     return failure(404);
   if (
     !(listing || journal || consent || routeContext
       ? ['GET', 'POST'].includes(request.method)
-      : request.method === (detail || signalChoices || providerAlerts ? 'GET' : 'POST')) ||
+      : request.method ===
+        (detail || signalChoices || providerAlerts || communityTraffic ? 'GET' : 'POST')) ||
     ((signalCommands ||
       expectedSignalCommand ||
       signalCommandStop ||
       signal ||
       signalWithdraw ||
       publicIntent ||
-      publicIntentStop) &&
+      publicIntentStop ||
+      communityShare ||
+      communityStop ||
+      communityReport) &&
       request.method !== 'POST')
   )
     return failure(405);
@@ -237,6 +272,21 @@ export async function proxyBrowserPublicIntents(
     upstreamFetch,
     { responseLimit: 64 * 1024, timeout: 12000 },
   );
+}
+export async function proxyBrowserCommunityShares(
+  request: Request,
+  config: BrowserAuthConfig | null,
+  upstreamFetch: typeof fetch = fetch,
+  communityTrafficV3Enabled = false,
+): Promise<Response> {
+  if (!config) return failure(503);
+  if (!communityTrafficV3Enabled) return failure(404);
+  if (request.method !== 'GET') return failure(405);
+  if (new URL(request.url).search) return failure(400);
+  return forwardBrowserRequest(request, 'community-shares', config, upstreamFetch, {
+    responseLimit: 64 * 1024,
+    timeout: 12000,
+  });
 }
 export async function proxyBrowserPlaceSearch(
   request: Request,

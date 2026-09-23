@@ -5,6 +5,13 @@ Chennai district official-alert pilot is defined in
 `PROVIDER_LIVE_PILOT_SPEC.md` and ADR 0050; it does not publish Quick Signals.
 Private domain, persistence and owner-only
 transport prerequisites exist; consult BUILD_STATUS.md for current verification.
+Traveller publication has two distinct design paths: the previously selected
+ADR 0053/0054 person-level DP candidate, whose research is now paused, and the
+ADR 0055 community summary, whose implementation and staging evaluation are
+authorized behind a disabled production flag. ADR 0055 would accept residual
+participation inference and different Stop/retention semantics. That privacy
+contract and production activation are not approved; see
+COMMUNITY_TRAFFIC_SUMMARY_SPEC.md and the release ledger before using either path.
 Agreed scope: an active-journey LIVE
 list; internal receipt transitions are specified in QUICK_SIGNAL_RECEIPT_SPEC.md.
 The release combines Live Moments and Quick Signals. This specification reconciles the
@@ -104,27 +111,40 @@ observations of physical presence. Arbitrary bounds, segments and membership
 probing are denied; no account-independent live discovery endpoint is planned.
 
 Follow PRESENCE_SPEC.md for consent, generation, expiry and anti-enumeration.
-Reading does not implicitly opt a traveller into publishing. Ghost Mode prevents
-new signals/publishing, revokes pending eligibility and makes already accepted
-contributions ineligible for future projections through the reviewed suppression
-policy. Reading under Ghost Mode
+Reading does not implicitly opt a traveller into publishing. Ghost Mode stops
+new private signals and future public Share, revokes discoverable individual
+presence and clears the viewer's local traveller rows. ADR 0054's selected but
+unapproved design would retain an input already frozen by an explicit successful
+Share; later Ghost Mode, deletion or Stop could not retract that aggregate input.
+Under the separate ADR 0055 proposal, a pending candidate is excluded only if
+withdrawal commits before the publication snapshot; later withdrawal may be too
+late for a summary already being prepared. That timing and residual inference
+must be disclosed and approved before any V3 Share is exposed.
+The current private intent flow does not implement this exception and remains
+default off. Reading under Ghost Mode
 may be allowed only using owned-journey relevance, without a presence lease or
 observable reader membership. Ending a journey, account changes and deletion
 revoke admission and clear private client state.
 
-Do not publish a moment from an identifiable or single reporter. The existing
-proposed minimum of 10 distinct eligible actors is a starting privacy-review
-candidate, not a guarantee or release approval. Before public output, specify and
-test fixed publication windows, minimum independent evidence, suppression,
-resistance to account collusion, overlapping queries and temporal differencing.
+Do not expose an identifiable reporter. The earlier proposed minimum of ten
+actors was rejected as a person-level privacy guarantee. ADR 0053's candidate
+randomized threshold of 22 can exceptionally emit a key with only one report;
+it cannot support a public minimum-support or corroboration claim. Before any
+output, independently review the whole fixed-pilot mechanism, one-person budget,
+quality of the traffic estimate, repeated queries and temporal differencing.
+ADR 0055 separately proposes 12 eligible accounts/10 agreeing/80% as a staging
+aggregation heuristic, with no person-level privacy claim. Account limits do not
+establish independent people; its collusion and repeated-window risks need an
+explicit contract decision and validation.
 Freshness badges and moment appearance/disappearance are observable signals too.
 
-Blocking, moderation, consent withdrawal and deletion must remove prohibited
-contributions from future outputs and invalidate affected caches. Do not create
-viewer-specific count differences or stable contributor handles. Choose the exact
-block-safe aggregation/suppression policy in the cohort ADR before aggregate API
-implementation; do not silently subtract a blocked reporter and publish a
-distinguishable replacement. Fail closed when policy authority is unavailable.
+Before a new Share commits, blocking, moderation, consent withdrawal and deletion
+deny ineligible contributions. Under the selected ADR 0054 direction, they cannot
+remove a previously frozen public input or edit a released aggregate. Do not
+create viewer-specific count differences or stable contributor handles. The
+block-safe reader and source-independent emergency rule require independent
+review before an aggregate API; do not silently subtract a blocked reporter.
+Fail closed when policy authority is unavailable.
 
 ## Evidence lifecycle and writes
 
@@ -135,7 +155,8 @@ before migrations or public endpoints:
 | Record | Proposed lifecycle |
 |---|---|
 | Quick Signal | Server-received timestamp; useful for 15 minutes in the disabled ADR 0035 private transport; one current contribution per actor/anchor/category; replacement cannot add independent corroboration |
-| Live Moment | Derived only from eligible, nonexpired evidence; disappears when publication rules cease to hold; no permanent browsable archive |
+| Live Moment | Under the unapproved ADR 0054 design, derived once from frozen eligible Share inputs, first served and expired at fixed boundaries; no mutable source-dependent suppression or permanent browsable archive |
+| Community traffic summary (ADR 0055 proposal) | A separate canonical result selected from a committed publication snapshot; pending withdrawals before that snapshot exclude the candidate, while later withdrawals may be too late; short absolute expiry and audited safety suppression require approval |
 | Submission receipt | Account-bound command and request fingerprint, retained 24 hours in the disabled ADR 0035 private transport; a retry after evidence expiry cannot resurrect evidence |
 | Raw signal | Purge by 24 hours unless a specific bounded moderation hold applies; never store a raw GPS trail |
 | Moderation hold | Separate access-controlled minimal evidence; duration, deletion exceptions and audit policy must be agreed before retention is enabled |
@@ -147,7 +168,11 @@ proposed starting quota is one accepted contribution per actor/anchor/category
 per minute and 20 across the actor per hour; distributed duplicate, peer and abuse
 budgets also need definition. No numeric value here bypasses adversarial review.
 
-Moment formation should be deterministic from approved evidence rules, not AI.
+Under ADR 0054, moment formation would use the one-time reviewed randomized
+mechanism and deterministic post-processing of its surviving keys. ADR 0055
+instead proposes deterministic account aggregation from a committed snapshot;
+its 12/10/80% staging rule is not a privacy guarantee. Neither path uses AI to
+invent a condition, and neither is approved for public delivery.
 Expose conflicts without fabricating a precise consensus. Distinct accounts alone
 do not prove independent witnesses. Confidence labels require explicit tested
 corroboration rules; omit a label when not justified.

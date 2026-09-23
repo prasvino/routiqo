@@ -69,6 +69,11 @@ type LivePath =
   | `/api/v1/journeys/${string}/signals/${string}/withdraw`
   | `/api/v1/journeys/${string}/signals/${string}/public-intent`
   | `/api/v1/journeys/${string}/signals/${string}/public-intent/stop`
+  | `/api/v1/journeys/${string}/signals/${string}/community-share`
+  | `/api/v1/journeys/${string}/signals/${string}/community-share/stop`
+  | `/api/v1/journeys/${string}/community-traffic`
+  | `/api/v1/journeys/${string}/community-traffic/${string}/reports`
+  | '/api/v1/community-shares'
   | '/api/v1/public-intents'
   | `/api/v1/public-intents?cursor=${string}`;
 
@@ -589,8 +594,9 @@ async function readJson(
   limit: number,
   signal: AbortSignal,
   expiresAt: number,
+  expectedStatus = 200,
 ): Promise<unknown> {
-  if (response.status !== 200 || response.redirected) {
+  if (response.status !== expectedStatus || response.redirected) {
     ignoreCancellation(response.body);
     throw new BrowserLiveError(response.redirected ? 'unavailable' : errorKind(response.status));
   }
@@ -674,6 +680,7 @@ export async function liveRequest<T>(options: {
   body?: unknown;
   timeoutMilliseconds: 12000 | 30000;
   responseLimit?: 65536 | 262144;
+  expectedStatus?: 200 | 202;
   signal?: AbortSignal | undefined;
   validate: (value: unknown) => T;
 }): Promise<T> {
@@ -718,6 +725,7 @@ export async function liveRequest<T>(options: {
       options.responseLimit ?? 64 * 1024,
       cancellation,
       expiresAt,
+      options.expectedStatus ?? 200,
     );
     let value: T;
     try {

@@ -71,9 +71,28 @@ and survive subject deletion. Logical expiry does not claim physical erasure.
 Operator deletion cascades them. Finite action-specific operator grants last at
 most 24 hours; stored expired grants are inert and may remain until replacement
 or operator deletion. No account-owner role is provisioned by migrations.
-Expiry, Ghost withdrawal, block changes and deletion must invalidate derived
-projections/caches, not only the original row. Do not retain raw location history
+Expiry, Ghost withdrawal, block changes and deletion invalidate current private
+evidence, discoverable presence and viewer-local rows. A future ADR 0054 frozen
+public input would be an explicit, disclosed exception: it cannot be retracted
+or cause a source-dependent published-row change. This is not enabled and needs
+approved retention and deletion terms. Do not retain raw location history
 or put Live evidence into journals, backups, analytics or journey outboxes.
+
+ADR 0055's distinct V3 community traffic summary is authorized for staging
+implementation only. Its database design logically expires source candidates
+24 hours after their five-minute window ends, stops serving a projection at
+window end plus ten minutes, and schedules bounded removal of expired projection
+content within another 24 hours. Daily debit rows have a short cleanup window;
+report and suppression-audit rows have a 30-day staging expiry; terminal
+decision tombstones remain durable to prevent reopening.
+These are implementation settings, **not approved production retention or legal
+deletion terms**. Account-bound retry, decision/audit and backup horizons need
+separate review and operating procedures. Source cleanup and account deletion
+must not cascade-delete a canonical summary. A Stop, Ghost Mode or deletion
+committed after the publication snapshot may be too late to exclude that
+candidate, and previously captured output cannot be erased. This V3 contract
+does not reuse V18 intent or V22 frozen input as consent, and no V3 production
+flag is approved for activation.
 
 Memory-only rows expire locally; remote changes cannot erase previously delivered
 information from disconnected clients immediately. Clear on local account/Ghost/

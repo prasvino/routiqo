@@ -63,6 +63,12 @@ vi.mock('./private-signals-panel', () => ({
     return <div data-testid="private-signals" />;
   },
 }));
+vi.mock('./community-traffic-panel', () => ({
+  CommunityTrafficPanel: () => <div data-testid="v3-feed" />,
+}));
+vi.mock('./community-share-recovery-panel', () => ({
+  CommunityShareRecoveryPanel: () => <div data-testid="v3-recovery" />,
+}));
 vi.mock('./commute-summaries', () => ({ CommuteSummaries: () => null }));
 vi.mock('./journey-history', () => ({ JourneyHistory: () => null }));
 
@@ -148,8 +154,23 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   vi.resetAllMocks();
+});
+
+it('mounts V3 reader and recovery only with the separate V3 flag', async () => {
+  vi.stubEnv('NEXT_PUBLIC_ROUTIQO_PUBLIC_SIGNAL_INTENT_UI_ENABLED', 'true');
+  vi.stubEnv('NEXT_PUBLIC_ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED', 'false');
+  const first = render(<JourneyWorkspace />);
+  await screen.findByTestId('consent-panel');
+  expect(screen.queryByTestId('v3-feed')).toBeNull();
+  expect(screen.queryByTestId('v3-recovery')).toBeNull();
+  first.unmount();
+  vi.stubEnv('NEXT_PUBLIC_ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED', 'true');
+  render(<JourneyWorkspace />);
+  expect(await screen.findByTestId('v3-feed')).toBeTruthy();
+  expect(screen.getByTestId('v3-recovery')).toBeTruthy();
 });
 
 it('mounts route binding only after the consent panel publishes matching confirmed authority', async () => {

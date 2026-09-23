@@ -2,6 +2,8 @@
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. The September 23 audit reconciles the committed reliability batches with this status; release gates below remain open.
 
+The user has now authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag. The different production privacy contract is not accepted. Person-level research is paused with its existing code/docs preserved. Traveller-derived public LIVE remains disabled in production.
+
 ## Implemented
 
 | Area | Current behavior |
@@ -33,7 +35,8 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Audited moderation prerequisite | Internal RESTRICT/RESTORE commands require finite action-specific database grants, ordered enabled operator/subject locks and exact revisions. Effect, minimized audit and an independent 20/hour operator debit commit atomically; bounded 30-day audit and independently default-off audit/debit maintenance. Signal ingestion is read-only; no admin authentication, seeded grants, queue or HTTP endpoint |
 | Private browser LIVE clients and controls | Typed consent, context, choice/expected-issuance and terminal command-stop clients with strict schema/identity/lifetime validation, exact long values, bounded CSRF/stream deadlines and explicit cancellation. Confirmed active journeys mount consent, route preparation and deliberate private Quick Signal controls. A successful fresh bind supplies exact account/journey/consent/selection/context authority; GET alone cannot authorize contribution. The UI permits one explicit issue/accept, keeps at most five same-account recovery handles in workspace memory, supports Stop after Ghost Mode or completion, expires receipt metadata, never writes automatically or offline, and shares the navigation warning with journal protection. No browser persistence, feature activation or public projection |
 | Official alert pilot | Default-off active-journey GET for bounded NDMA SACHET CAP weather alerts covering the Chennai district area, with current owner/rate checks, fixed-host XML validation and ETag reuse. Web list labels official source, district scope, expiry, offline/stale/empty/error states and keeps private Quick Signals separate. Full `pnpm check` passed (558 tests/63 files), web build passed and sequential `:core-api:check` passed (437 tests). A live feed/CAP shape smoke check passed on September 23; the feed had no Chennai match at that time. Real OAuth, coverage when a Chennai alert exists and rendered device QA remain pending. This is not traveller-derived public LIVE publication. |
-| Traveller public LIVE prerequisites | V17 adds private dual-review verified-person authority. V18/V20 add per-receipt intent, one-person/window reservation, default-off owner share/Stop API and account-wide recovery after reload or journey completion. V19 adds a disconnected private window evaluator; bounded cleanup is separately default off. A default-off browser control requests consideration and exposes owner Stop recovery. ADR 0051's source-dependent suppression and ADR 0052's immutable-window follow-up failed independent privacy review. The user chose a measurable person-level guarantee; proposed ADR 0053 has a disconnected V21 pilot-wide person claim and an isolated 64-bit capped sampler that draws for every fixed key. Focused tests and sequential `:core-api:check` pass. Follow-up review found that a later lock-based cutoff can cause person-dependent deadline failures; immediate irreversible Share is a possible contract change, not an approved release. Transcript, authority, secure randomness and real-density utility gates remain open. Earlier `pnpm check` (572 tests across 66 files) and web production build passed on September 23. No public traveller feed is enabled. |
+| Traveller public LIVE prerequisites | V17 adds private dual-review verified-person authority. V18/V20 add per-receipt intent, one-person/window reservation, default-off owner share/Stop API and account-wide recovery after reload or journey completion. V19 adds a disconnected private window evaluator; bounded cleanup is separately default off. A default-off browser control requests consideration and exposes owner Stop recovery. ADR 0051's source-dependent suppression and ADR 0052's immutable-window follow-up failed independent privacy review. The user chose a measurable person-level guarantee; proposed ADR 0053 has a V21 pilot-wide person claim and an isolated 64-bit capped sampler. ADR 0054 records the selected irreversible Share direction. V22 adds a disconnected internal frozen Share foundation with atomic V21 claim, owner recovery, verification-row locking and aligned pilot manifests; independent code review accepted that isolated foundation after two fixes. Full `:core-api:check` passed with 484 tests/77 suites. A later lock-based cutoff can cause person-dependent deadline failures; the proposed immediate Share still lacks a commit/window seal proof. Transcript, stable person identity, consent/retention and real-density utility gates remain open. Earlier `pnpm check` (572 tests across 66 files) and web production build passed on September 23. No public traveller feed is enabled. |
+| V3 community traffic staging implementation | V23/V24 candidate/debit, fresh Share/Stop/recovery, catalog-versioned `REPEATABLE READ` terminal publisher, canonical active-journey reader/report, internal audited suppression and independent retention maintenance are implemented. Generated contracts and mounted web controls use separate default-off production flags. The 12/10/80% rule is a staging heuristic, not privacy protection. Real OAuth/regional data, authenticated moderator access, restore/device QA, utility and production privacy acceptance remain open; no V3 production output is enabled. |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
 | Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
@@ -43,6 +46,22 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+September 23 V3 community-summary implementation:
+
+- Proposed ADR 0055 and `COMMUNITY_TRAFFIC_SUMMARY_SPEC.md` describe a distinct consented aggregation option using an actual publication snapshot, account limits and a provisional 12/10/80% staging rule. They explicitly retain residual participation inference and do not claim DP, legal anonymity, approval or real utility. The owner-selected ADR 0053/0054 research path and its four public-protocol P1 findings remain open.
+- The owner subsequently authorized full V3 implementation and staging evaluation behind disabled production flags. Sequential `:core-api:check` passed **514 Java tests/85 suites**; `pnpm check` passed **586 TypeScript tests/68 files**, generated-contract drift, formatting, typecheck and lint; the web production build and secret scan passed. Browser Share/report/Stop/recovery/offline interactions and the final server-time feed were rendered with temporary simulated-transport fixtures, removed before build. See [staging implementation evidence](../validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) for exact coverage, synthetic utility and open release gates.
+
+September 23 internal frozen Share foundation:
+
+- V22 stores immutable pilot manifest metadata and an owner recovery link tied atomically to the retained V21 one-person claim. The internal service checks current owner/journey, private signal, consent, context, restriction, verification, catalog and whole-window pilot bounds. Verification-row locking serializes reviewer-account deletion with Share. No Spring bean, API, flag, UI, publisher, pilot data or V18 migration was added.
+- Independent code review found a reviewer-deletion race and unaligned pilot-window defect; both were corrected and re-reviewed with no remaining P1/P2 in the disconnected foundation. PostgreSQL tests cover rollback, replay, duplicate-person accounts, account deletion, reviewer-deletion order and pilot-window boundaries. Stop/Ghost/completion/moderation race coverage remains pending for any active V2 action.
+- From `backend`, a fresh `.\\gradlew.bat :core-api:check` passed: **484 tests across 77 suites, zero failures/errors/skips**. `git diff --check` passed. The public protocol's four P1 findings remain open; traveller output and V2 user actions remain disabled.
+
+September 23 public LIVE protocol design pass:
+
+- ADR 0054 and the focused protocol spec now describe a candidate irreversible explicit Share input and fixed whole-pilot transcript. An independent engineering adversarial review did **not** approve implementation or public release. It found four open P1 areas: commit/window sealing and deadline dependence, stable person identity across deletion, consent/retention compatibility, and operational/delivery transcript rules. Two P2 document defects were corrected. See [review findings](../validation/PUBLIC_LIVE_PROTOCOL_REVIEW_2026-09-23.md).
+- That earlier design pass changed documentation only. The subsequent disconnected V22 foundation is described separately above. No flag was enabled, no V18 intent was migrated, and no publisher/reader or real-density utility was established. Traveller-derived public LIVE remains disabled.
 
 September 23 status reconciliation:
 
@@ -303,11 +322,12 @@ as real LIVE activity.
 
 ## Pending, in dependency order
 
-1. **Public LIVE privacy contract.** Resolve ADR 0038's collusion and withdrawal
-   inference problem with measurable permitted inference, fixed partitions/windows,
-   evidence independence, budgets and block/revocation semantics. Independently
-   review adversarial whole-output tests before any public projection. This is an
-   engineering/design gate, not merely a missing credential.
+1. **Public LIVE privacy contract.** ADR 0054 proposes an irreversible explicit
+   Share commit and frozen whole-pilot input under ADR 0053's candidate person-level
+   bound. It is not approved or implemented: current V18 Stop semantics, browser
+   disclosure and deletion behavior conflict with it. Stable person identity,
+   source-independent timing/failure behavior, real-density utility and independent
+   adversarial whole-transcript review remain required before any public projection.
 2. **Reporting, moderation and safe delivery.** Resolve canonical evidence
    references, current authorization/lock ordering and useful investigation
    retention before durable report intake. Internal scoped operator permissions

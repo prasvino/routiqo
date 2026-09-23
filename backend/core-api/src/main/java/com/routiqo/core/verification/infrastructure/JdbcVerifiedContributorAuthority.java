@@ -24,6 +24,17 @@ public final class JdbcVerifiedContributorAuthority implements VerificationParti
 
     @Override
     public Optional<VerifiedContributor> current(UUID accountId, Instant now) {
+        return readCurrent(accountId, now, false);
+    }
+
+    @Override
+    public Optional<VerifiedContributor> currentForFrozenShare(UUID accountId, Instant now) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Frozen Share authority transaction required");
+        return readCurrent(accountId, now, true);
+    }
+
+    private Optional<VerifiedContributor> readCurrent(UUID accountId, Instant now, boolean lock) {
         if (accountId == null || NIL.equals(accountId) || now == null) return Optional.empty();
         try {
             List<VerifiedContributor> rows = jdbc.query("""
@@ -32,7 +43,7 @@ public final class JdbcVerifiedContributorAuthority implements VerificationParti
                 JOIN routiqo_account a ON a.id = v.account_id
                 WHERE v.account_id = ? AND v.state = 'active' AND a.enabled = TRUE
                   AND v.expires_at > ?
-                """, (rs, row) -> new VerifiedContributor(
+                """ + (lock ? " FOR SHARE OF v" : ""), (rs, row) -> new VerifiedContributor(
                         rs.getObject("person_ref", UUID.class), rs.getLong("revision"),
                         rs.getTimestamp("expires_at").toInstant()), accountId, Timestamp.from(now));
             return rows.size() == 1 ? Optional.of(rows.getFirst()) : Optional.empty();

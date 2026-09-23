@@ -21,11 +21,12 @@ public class BrowserAuthConfiguration {
             @Value("${ROUTIQO_LIVE_SIGNAL_API_ENABLED:false}") boolean signalEnabled,
             @Value("${ROUTIQO_LIVE_CHOICE_API_ENABLED:false}") boolean choiceEnabled,
             @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED:false}") boolean publicIntentEnabled,
-            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_SHARE_ENABLED:false}") boolean publicIntentShareEnabled) throws Exception {
+            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_SHARE_ENABLED:false}") boolean publicIntentShareEnabled,
+            @Value("${ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED:false}") boolean communityTrafficEnabled) throws Exception {
         var csrf = new CookieCsrfTokenRepository();
         csrf.setCookieName(policy.cookieName("routiqo_csrf")); csrf.setCookiePath("/");
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(policy.secureCookies()).sameSite("Strict"));
-        return http.securityMatcher("/api/v1/auth/**", "/api/v1/journeys", "/api/v1/journeys/**", "/api/v1/routes", "/api/v1/routes/**", "/api/v1/public-intents")
+        return http.securityMatcher("/api/v1/auth/**", "/api/v1/journeys", "/api/v1/journeys/**", "/api/v1/routes", "/api/v1/routes/**", "/api/v1/public-intents", "/api/v1/community-shares")
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.csrfTokenRepository(csrf))
@@ -69,6 +70,15 @@ public class BrowserAuthConfiguration {
                             a.requestMatchers(org.springframework.http.HttpMethod.POST,
                                     "/api/v1/journeys/*/signals/*/public-intent").permitAll();
                         }
+                    }
+                    if (communityTrafficEnabled) {
+                        a.requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/v1/community-shares",
+                                "/api/v1/journeys/*/community-traffic").permitAll();
+                        a.requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/v1/journeys/*/signals/*/community-share",
+                                "/api/v1/journeys/*/signals/*/community-share/stop",
+                                "/api/v1/journeys/*/community-traffic/*/reports").permitAll();
                     }
                     a.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/google/challenge", "/api/v1/auth/google/exchange", "/api/v1/auth/logout", "/api/v1/auth/session/renew", "/api/v1/auth/account/delete").permitAll();
                     a.anyRequest().denyAll();
