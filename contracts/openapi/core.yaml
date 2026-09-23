@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Routiqo core API
-  version: 0.16.0
-  description: Discovery plus isolated browser and native authentication transports. Auth transports require explicit profiles; default preview denies them. Browser consent, private route-context and private signal-choice, command and stop transports are separately default-off; no public live traffic or user presence.
+  version: 0.17.0
+  description: Discovery plus isolated browser and native authentication and journey transports. Auth transports require explicit profiles; default preview denies them. Browser consent, private route-context and private signal-choice, command and stop transports are separately default-off; no public live traffic or user presence.
 servers:
   - url: http://localhost:8080
 paths:
@@ -280,7 +280,7 @@ paths:
     post:
       operationId: beginNativeGoogleLogin
       security: []
-      description: Creates a five-minute one-use challenge. Authorization, cookies, browser-origin headers and query strings are rejected. The binding remains only in native sign-in coordination memory.
+      description: Creates a five-minute one-use challenge with a SHA-256-hex nonce for Android Credential Manager. Authorization, cookies, browser-origin headers and query strings are rejected. The binding remains only in native sign-in coordination memory.
       requestBody:
         required: true
         content:
@@ -393,6 +393,91 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '428': { description: 'Sign in with Google again, then explicitly reconfirm deletion' }
         '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/journeys:
+    get:
+      operationId: listNativeJourneys
+      security: [{ nativeBearer: [] }]
+      description: Latest 50 owner-scoped journeys. No query string, browser cookie or route geometry. Older cached active journey can be checked by ID.
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      responses:
+        '200':
+          description: Recent journey history
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [journeys]
+                properties:
+                  journeys: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Journey' } }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+    post:
+      operationId: startNativeJourney
+      security: [{ nativeBearer: [] }]
+      description: Explicit owner-scoped idempotent start. Local plans are never implicitly uploaded.
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, kind]
+              properties:
+                id: { type: string, format: uuid }
+                kind: { type: string, enum: [trip, commute] }
+      responses:
+        '200': { $ref: '#/components/responses/JourneyResult' }
+        '400': { description: Invalid JSON or journey identity }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '409': { description: Journey conflict }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Journey write unavailable; retry the same command }
+  /api/v1/native/journeys/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getNativeJourney
+      security: [{ nativeBearer: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/JourneyResult' }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: Journey absent or inaccessible }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/journeys/{id}/complete:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: completeNativeJourney
+      security: [{ nativeBearer: [] }]
+      description: Owner-scoped idempotent completion; exact empty JSON object required.
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeEmptyRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/JourneyResult' }
+        '400': { description: Invalid JSON or journey identity }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: Journey absent or inaccessible }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: Journey write unavailable; retry the same command }
   /api/v1/journeys/{id}/journal:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1270,7 +1355,7 @@ components:
       required: [id, nonce, binding, expiresAt]
       properties:
         id: { type: string, format: uuid }
-        nonce: { type: string, minLength: 43, maxLength: 43, pattern: '^[A-Za-z0-9_-]{43}$' }
+        nonce: { type: string, minLength: 64, maxLength: 64, pattern: '^[a-f0-9]{64}$' }
         binding: { type: string, minLength: 43, maxLength: 43, pattern: '^[A-Za-z0-9_-]{43}$' }
         expiresAt: { type: string, format: date-time }
     NativeExchangeRequest:

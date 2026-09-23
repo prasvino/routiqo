@@ -8,6 +8,9 @@ import {
   updateJourneyOutbox,
   acknowledgeJourneyResult,
   clearJourneyPartition,
+  queueMobileJourney,
+  reconcileMobileJourney,
+  resumeMobileJourneyAuthentication,
   type OutboxDatabase,
 } from '../apps/mobile/src/storage/journey-outbox';
 import {
@@ -92,6 +95,49 @@ describe('native outbox SQL on file-backed SQLite', () => {
       ),
     );
   }
+  it('queues an explicit command durably and reconciles only matching server work', async () => {
+    const { db, adapter, path } = await setup();
+    await queueMobileJourney(adapter, owner, { journeyId, action: 'start', kind: 'trip' }, 0);
+    db.close();
+    const reopened = open(path);
+    const saved = await updateJourneyOutbox(reopened.adapter, owner, (state) => state);
+    expect(saved.entries).toHaveLength(1);
+    await updateJourneyOutbox(reopened.adapter, owner, (state) =>
+      settleJourneyCommand(claimJourneyCommand(state, 0, lease), lease, 'conflict', 1),
+    );
+    expect(
+      await reconcileMobileJourney(
+        reopened.adapter,
+        other,
+        { journeyId, action: 'start', kind: 'trip' },
+        result,
+      ),
+    ).toBe(false);
+    await expect(
+      reconcileMobileJourney(
+        reopened.adapter,
+        owner,
+        { journeyId: other, action: 'start', kind: 'trip' },
+        result,
+      ),
+    ).resolves.toBe(false);
+    expect(
+      await reconcileMobileJourney(
+        reopened.adapter,
+        owner,
+        { journeyId, action: 'start', kind: 'trip' },
+        result,
+      ),
+    ).toBe(true);
+    expect(
+      (await updateJourneyOutbox(reopened.adapter, owner, (state) => state)).entries,
+    ).toHaveLength(0);
+    expect(
+      reopened.db
+        .prepare('SELECT payload FROM journey_snapshots_v1 WHERE account_id = ?')
+        .get(owner)?.payload,
+    ).toContain(journeyId);
+  });
   it('commits the server snapshot and acknowledgement together across reopen', async () => {
     const { db, adapter, path } = await setup();
     await pending(adapter);
@@ -110,6 +156,25 @@ describe('native outbox SQL on file-backed SQLite', () => {
     );
     expect(saved.journeys[0]).toMatchObject({ id: journeyId, status: 'active' });
     expect(await acknowledgeJourneyResult(reopened.adapter, owner, lease, result, 2)).toBe(false);
+  });
+  it('releases only authentication-blocked work after a verified renewal', async () => {
+    const { adapter } = await setup();
+    await pending(adapter);
+    await updateJourneyOutbox(adapter, owner, (state) =>
+      settleJourneyCommand(state, lease, 'authentication', 1),
+    );
+    expect(await resumeMobileJourneyAuthentication(adapter, other, 2)).toBe(false);
+    expect(await resumeMobileJourneyAuthentication(adapter, owner, 2)).toBe(true);
+    const resumed = await updateJourneyOutbox(adapter, owner, (state) => state);
+    expect(resumed.entries[0]).toMatchObject({ blocked: null, nextAttemptAt: 2 });
+    expect(await resumeMobileJourneyAuthentication(adapter, owner, 3)).toBe(false);
+    await updateJourneyOutbox(adapter, owner, (state) =>
+      settleJourneyCommand(claimJourneyCommand(state, 2, nextLease), nextLease, 'conflict', 3),
+    );
+    expect(await resumeMobileJourneyAuthentication(adapter, owner, 4)).toBe(false);
+    expect((await updateJourneyOutbox(adapter, owner, (state) => state)).entries[0]?.blocked).toBe(
+      'conflict',
+    );
   });
   it('rolls back both writes when queue persistence fails after snapshot insert', async () => {
     const { db, adapter } = await setup();
@@ -170,6 +235,7 @@ describe('native outbox SQL on file-backed SQLite', () => {
     expect(marker?.account_id).toBe(owner);
     expect(Object.keys(marker ?? {})).toEqual(['account_id']);
     expect(await acknowledgeJourneyResult(adapter, owner, lease, result, 2)).toBe(false);
+    expect(await resumeMobileJourneyAuthentication(adapter, owner, 2)).toBe(false);
     expect((await updateJourneyOutbox(adapter, other, (state) => state)).accountId).toBe(other);
     await clearJourneyPartition(adapter, owner);
     expect(

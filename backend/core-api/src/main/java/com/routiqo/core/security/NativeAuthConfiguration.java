@@ -16,7 +16,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 public class NativeAuthConfiguration {
     @Bean @Order(0) SecurityFilterChain nativeAuthSecurity(HttpSecurity http, AuthRateGate rates,
             GoogleSessionService sessions) throws Exception {
-        return http.securityMatcher("/api/v1/native/auth/**")
+        return http.securityMatcher("/api/v1/native/**")
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.disable())
@@ -27,6 +27,10 @@ public class NativeAuthConfiguration {
                         "/api/v1/native/auth/session/renew", "/api/v1/native/auth/logout",
                         "/api/v1/native/auth/account/delete").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/native/auth/session").permitAll()
+                    .requestMatchers(org.springframework.http.HttpMethod.GET,
+                        "/api/v1/native/journeys", "/api/v1/native/journeys/*").permitAll()
+                    .requestMatchers(org.springframework.http.HttpMethod.POST,
+                        "/api/v1/native/journeys", "/api/v1/native/journeys/*/complete").permitAll()
                     .anyRequest().denyAll())
                 .exceptionHandling(e -> e
                     .authenticationEntryPoint((request, response, error) -> response.setStatus(401))

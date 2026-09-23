@@ -59,8 +59,11 @@ class NativeAuthHttpTest {
         @Bean @Primary GoogleIdentityVerifier localTestVerifier() {
             return (token, nonce) -> {
                 VERIFICATIONS.incrementAndGet();
-                if (!nonce.equals(token)) throw new SecurityException("Test verification rejected");
-                return new GoogleIdentityVerifier.Identity("google", "native-http-test-subject");
+                if (nonce.equals(token))
+                    return new GoogleIdentityVerifier.Identity("google", "native-http-test-subject");
+                if ((nonce + "-other").equals(token))
+                    return new GoogleIdentityVerifier.Identity("google", "native-http-other-subject");
+                throw new SecurityException("Test verification rejected");
             };
         }
     }
@@ -119,6 +122,69 @@ class NativeAuthHttpTest {
         return new Login(JsonPath.read(exchange.body(), "$.accountId"), JsonPath.read(exchange.body(), "$.credential"));
     }
 
+    Login loginOther() throws Exception {
+        var challenge = post("google/challenge", "{}", null);
+        String challengeId = JsonPath.read(challenge.body(), "$.id");
+        String nonce = JsonPath.read(challenge.body(), "$.nonce");
+        String binding = JsonPath.read(challenge.body(), "$.binding");
+        var exchange = post("google/exchange", exchangeBody(challengeId, binding, nonce + "-other"), null);
+        assertThat(exchange.statusCode()).isEqualTo(200);
+        return new Login(JsonPath.read(exchange.body(), "$.accountId"), JsonPath.read(exchange.body(), "$.credential"));
+    }
+
+    HttpResponse<String> journey(String method, String path, String body, Login identity,
+            List<String[]> extra) throws Exception {
+        var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/native/journeys" + path));
+        if (identity != null) {
+            builder.header("Authorization", "Bearer " + identity.credential());
+            builder.header("X-Routiqo-Account", identity.accountId());
+        }
+        for (var header : extra) builder.header(header[0], header[1]);
+        if (method.equals("POST")) builder.header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body));
+        else if (method.equals("GET")) builder.GET();
+        else builder.method(method, HttpRequest.BodyPublishers.noBody());
+        var response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(response.headers().firstValue("Cache-Control")).hasValueSatisfying(
+                value -> assertThat(value).contains("no-store"));
+        assertThat(response.headers().allValues("Set-Cookie")).isEmpty();
+        return response;
+    }
+
+    @Test void nativeJourneysRemainOwnerScopedAndIdempotent() throws Exception {
+        Login owner = login(), stranger = loginOther();
+        String id = UUID.randomUUID().toString();
+        String start = "{\"id\":\"" + id + "\",\"kind\":\"trip\"}";
+        var first = journey("POST", "", start, owner, List.of());
+        assertThat(first.statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "", start, owner, List.of()).body()).isEqualTo(first.body());
+        assertThat(journey("GET", "/" + id, "", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("GET", "/" + id, "", stranger, List.of()).statusCode()).isEqualTo(404);
+        assertThat(journey("POST", "/" + id + "/complete", "{}", stranger, List.of()).statusCode()).isEqualTo(404);
+        assertThat(journey("GET", "/" + id, "", null, List.of()).statusCode()).isEqualTo(401);
+        var completed = journey("POST", "/" + id + "/complete", "{}", owner, List.of());
+        assertThat(completed.statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "/" + id + "/complete", "{}", owner, List.of()).body())
+                .isEqualTo(completed.body());
+        assertThat(journey("GET", "", "", owner, List.of()).body()).contains(id);
+        assertThat(journey("GET", "", "", stranger, List.of()).body()).doesNotContain(id);
+    }
+
+    @Test void nativeJourneyTransportRejectsBrowserSourcesAndMalformedCommands() throws Exception {
+        Login owner = login();
+        String id = UUID.randomUUID().toString();
+        assertThat(journey("POST", "", "{\"id\":\"" + id + "\",\"kind\":\"trip\",\"extra\":1}",
+                owner, List.of()).statusCode()).isEqualTo(400);
+        assertThat(journey("POST", "", "{\"id\":\"" + id + "\",\"kind\":\"trip\",\"kind\":\"trip\"}",
+                owner, List.of()).statusCode()).isEqualTo(400);
+        assertThat(journey("GET", "?limit=1", "", owner, List.of()).statusCode()).isEqualTo(403);
+        assertThat(journey("GET", "", "", owner, List.<String[]>of(
+                new String[] {"Cookie", "routiqo_session=forbidden"})).statusCode()).isEqualTo(403);
+        assertThat(journey("GET", "", "", owner, List.<String[]>of(
+                new String[] {"Origin", "https://example.org"})).statusCode()).isEqualTo(403);
+        assertThat(journey("DELETE", "", "", owner, List.of()).statusCode()).isEqualTo(403);
+    }
+
     static String exchangeBody(String challengeId, String binding, String token) {
         return "{\"challengeId\":\"" + challengeId + "\",\"binding\":\"" + binding
                 + "\",\"idToken\":\"" + token + "\"}";
@@ -132,7 +198,7 @@ class NativeAuthHttpTest {
         String id = JsonPath.read(challenge.body(), "$.id");
         String nonce = JsonPath.read(challenge.body(), "$.nonce");
         String binding = JsonPath.read(challenge.body(), "$.binding");
-        assertThat(nonce).hasSize(43);
+        assertThat(nonce).hasSize(64);
         assertThat(binding).hasSize(43);
 
         assertThat(post("google/exchange", exchangeBody(id, "x".repeat(43), nonce), null).statusCode()).isEqualTo(401);

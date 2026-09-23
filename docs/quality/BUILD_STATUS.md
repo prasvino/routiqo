@@ -12,13 +12,13 @@ The user has now authorized V3 community-summary implementation and staging eval
 | Recent web reliability | Batch 01 added storage, journal and transport regression coverage. Batches 02–04 implemented bounded Explore query handling, minute-boundary departure refresh, planning/backup/save error recovery, accessible category grouping, commute/plan feedback fixes, resumed time-zone grouping, and history response cleanup and explicit latest-page refresh. These are local web improvements, not authenticated cross-device or public LIVE verification. |
 | Scheduling | Shared next-departure calculation, weekday recurrence, upcoming ordering, foreground refresh, DST-gap handling; no automatic journey completion or reminders |
 | Commute summaries | Monthly counts and exact recorded elapsed minutes from the verified account's confirmed completed commutes saved on this device; time-zone-aware start-month grouping and explicit incomplete-history disclosure. Read-only, no invented distance or new persistence |
-| Local storage | Validated web localStorage with write-error handling and cross-tab refresh; native SQLite adapter; native restart behavior still needs device testing |
-| Native deletion storage | Atomic account retirement marker plus queue/snapshot removal prevents delayed updates recreating deleted data; restart, rollback and account isolation tested with file-backed SQLite. Not yet connected to native authentication/deletion UI |
-| Native authentication API | Opt-in bearer-only challenge/exchange, session read/renew, lineage logout and recent-auth account deletion; bounded strict JSON, shared database peer/account/challenge limits and browser isolation. Mobile response validators implemented; native network adapter and Google UI remain pending |
-| Native credential store | Expo SecureStore adapter and bounded session vault, serialized writes/clear, stale-ticket rejection, expiry checks and fail-closed recovery. Not yet mounted in native sign-in or network transport |
+| Local storage | Validated web localStorage with write-error handling and cross-tab refresh; native SQLite adapter; local-plan restart passed on the API 36 emulator; authenticated restoration still needs configured-device testing |
+| Native deletion storage | Atomic account retirement marker plus queue/snapshot removal prevents delayed updates recreating deleted data; restart, rollback and account isolation tested with file-backed SQLite. Native deletion UI now invokes server deletion before local retirement, with explicit local cleanup retry. |
+| Native authentication API | Opt-in bearer-only challenge/exchange, session read/renew, lineage logout and recent-auth account deletion; bounded strict JSON, shared database peer/account/challenge limits and browser isolation. Native Google sign-in and bounded OkHttp transport are mounted for Android development builds; real OAuth/TLS trial remains pending. |
+| Native credential store | Expo SecureStore adapter and bounded session vault, serialized writes/clear, stale-ticket rejection, expiry checks and fail-closed recovery. Mounted in native sign-in, cold-start verification, renewal, logout and deletion. |
 | Account history | Explicit 20-row account-history browsing, earlier/latest pages, completed-trip journal access, retry handling and account-switch isolation; no expansion of the offline cache |
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
-| Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; Android JavaScript export, not a tested APK; native backup text export/share and pasted-JSON restore implemented, device QA pending |
+| Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; native account controls, explicit Trips journey lifecycle/recovery and MapLibre regional basemap preview are mounted in a development client. x86_64 debug APK and unconfigured-service emulator smoke passed; real configured services and physical-device validation remain pending. Native backup text export/share and pasted-JSON restore exist. |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
 | Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion invokes consent then route-context participants atomically; signal acceptance composes both current authorities |
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
@@ -40,7 +40,7 @@ The user has now authorized V3 community-summary implementation and staging eval
 | V3 moderator staging workflow | V25 and ADR 0056 add separate default-off admin authentication, finite grant checks, bounded report queue, audited dismissal/suppression, cleanup, generated transport and an admin UI. Consumer sessions cannot operate it. Real admin OAuth/MFA, supervised finite-grant operation, operator trial, appeals and retention review are pending. |
 | V3 operator grants for staging | V26 and ADR 0057 add a separately disabled grant-administrator boundary for exact-account, short-lived V3 review/suppression grants, issue/revoke audit, bounded cleanup, generated transport and an admin panel. A root grant cannot be created through HTTP; real root bootstrap, OAuth/MFA, named operator trial, supervision and retention review remain open. |
 | Persistence | Owner-scoped reads/completion, one active journey per owner, retry-safe start/completion, bounded keyset history; guarded browser journey endpoints; web client dispatch mounted on Trips |
-| Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web transport and IndexedDB dispatch adapter; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation |
+| Offline queue | Bounded commands, native SQLite and web IndexedDB partitions; atomic result/acknowledgement, stale leases, retry/block states, single-command orchestration, web and native transport; Trips workspace with foreground/reconnect dispatch, bounded recent restore and confirmed-result reconciliation. Native device restart and network QA remain pending. |
 | Google identity | RS256 token verification with configured audience, issuer/time/nonce checks; durable subject-to-account mapping and disabled-account protection |
 | Login sessions | Five-minute one-use challenge, atomic account/session exchange, hashed 15-minute opaque credentials, bounded rotation up to 12 hours, lineage revocation and disabled-account enforcement |
 | Browser auth API | Opt-in challenge/exchange/session/logout and CSRF bootstrap; HttpOnly cookies, exact origin/CSRF checks, PostgreSQL rate limits, body limits and bounded expiry cleanup. Default preview still denies auth; web Google button UI and allowlisted same-origin proxy implemented; real OAuth configuration pending |
@@ -48,6 +48,11 @@ The user has now authorized V3 community-summary implementation and staging eval
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+September 23 native Android journey implementation:
+
+- Full `:core-api:check` passed **544 Java tests / 88 suites**, zero failures/errors/skips. Full `pnpm check` passed **607 TypeScript tests / 74 files** with contract drift, format, type and lint checks. Focused native account/transport/map/SQLite checks passed 21 tests. `git diff --check` and the secret scan passed. These are synthetic identity and local protocol tests; Android compile and device QA are tracked in [the native pending ledger](../validation/NATIVE_ANDROID_PENDING.md).
+- V27 widens only the native challenge nonce storage. Native bearer journeys remain separately opt-in, and the V3 production flags are unchanged. Android staging still needs real Google OAuth registration, HTTPS backend, reviewed regional map resources and a device trial.
 
 September 23 V3 operator grant administration:
 
@@ -357,7 +362,7 @@ as real LIVE activity.
    server journeys.
 5. **Native integration.** Redirect-safe network transport, Google UI/challenge and
    vault coordination, authenticated resources/reconnect dispatch, native MapLibre
-   and actual development-build/device verification. Run Android doctor to establish
+   are implemented with debug APK and unconfigured-service emulator smoke evidence. Complete real OAuth/TLS/maps and physical-device verification. Run Android doctor to establish
    current machine readiness; do not rely on historical missing-tool lists.
 6. **External configuration and operations.** Real Google OAuth and staging login;
    controlled regional Valhalla/Photon/tiles and reviewed anchor catalog; production

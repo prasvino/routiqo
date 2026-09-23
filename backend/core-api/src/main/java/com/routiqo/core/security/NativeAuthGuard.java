@@ -21,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class NativeAuthGuard extends OncePerRequestFilter {
     public static final String CREDENTIAL_ATTRIBUTE = NativeAuthGuard.class.getName() + ".credential";
+    public static final String ACCOUNT_ATTRIBUTE = NativeAuthGuard.class.getName() + ".account";
     private static final int MAX_BODY_BYTES = 20 * 1024;
     private static final Pattern BEARER = Pattern.compile("Bearer ([A-Za-z0-9_-]{43})");
     private final AuthRateGate rates;
@@ -47,12 +48,18 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 && "/api/v1/native/auth/google/exchange".equals(path);
         boolean logout = "POST".equals(request.getMethod())
                 && "/api/v1/native/auth/logout".equals(path);
+        boolean journey = ("GET".equals(request.getMethod()) &&
+                    ("/api/v1/native/journeys".equals(path)
+                        || path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}")))
+                || ("POST".equals(request.getMethod()) &&
+                    ("/api/v1/native/journeys".equals(path)
+                        || path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}/complete")));
         boolean protectedOperation = ("GET".equals(request.getMethod())
                     && "/api/v1/native/auth/session".equals(path))
                 || ("POST".equals(request.getMethod()) && ("/api/v1/native/auth/session/renew".equals(path)
                     || "/api/v1/native/auth/logout".equals(path)
                     || "/api/v1/native/auth/account/delete".equals(path)));
-        if (!challenge && !exchange && !protectedOperation) {
+        if (!challenge && !exchange && !protectedOperation && !journey) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -83,7 +90,7 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
             response.setStatus(429);
             return;
         }
-        if (protectedOperation) {
+        if (protectedOperation || journey) {
             String credential = (String) request.getAttribute(CREDENTIAL_ATTRIBUTE);
             String accountId = null;
             if (logout) {
@@ -101,6 +108,7 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 response.setStatus(429);
                 return;
             }
+            if (journey) request.setAttribute(ACCOUNT_ATTRIBUTE, accountId);
         }
 
         if ("POST".equals(request.getMethod())) {

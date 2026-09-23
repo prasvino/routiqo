@@ -12,7 +12,7 @@ const credential = 'A'.repeat(43);
 const session = { accountId, credential, expiresAt: '2026-09-12T00:15:00.000000Z' };
 const challenge = {
   id: accountId,
-  nonce: credential,
+  nonce: 'a'.repeat(64),
   binding: 'B'.repeat(43),
   expiresAt: '2026-09-12T00:05:00Z',
 };
@@ -71,6 +71,9 @@ it('rejects wrong shape, extra data and malformed identities or secrets without 
     );
   }
   expect(() => readNativeChallenge({ ...challenge, binding: 'private-binding' }, now)).toThrow(
+    'Native authentication response is invalid.',
+  );
+  expect(() => readNativeChallenge({ ...challenge, nonce: credential }, now)).toThrow(
     'Native authentication response is invalid.',
   );
   expect(() => readNativeAccount({ accountId, credential })).toThrow(

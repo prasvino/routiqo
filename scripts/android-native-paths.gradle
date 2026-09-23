@@ -1,0 +1,17 @@
+// Local Windows build only. The wrapper passes an ignored, workspace-owned root.
+// Included plugin builds do not inherit -P project properties. A JVM property
+// keeps the same staging root available throughout this composite build.
+def nativeRoot = System.getProperty('routiqo.native.stagingRoot')
+if (!nativeRoot) {
+    throw new GradleException('Pass the native staging root through android-build.ps1.')
+}
+
+gradle.beforeProject { project ->
+    ['com.android.application', 'com.android.library'].each { pluginId ->
+        project.pluginManager.withPlugin(pluginId) {
+            def android = project.extensions.getByName('android')
+            def directory = new File(nativeRoot, project.name)
+            android.externalNativeBuild.cmake.buildStagingDirectory = directory
+        }
+    }
+}

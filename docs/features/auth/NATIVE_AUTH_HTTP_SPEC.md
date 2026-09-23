@@ -19,8 +19,9 @@ do not accept Authorization. Reject Cookie, Origin, Sec-Fetch-Site and URL query
 strings on this namespace. These exclusions are transport separation, not client
 authentication: possession/verification of the opaque credential authorizes access.
 Disable CSRF only in this isolated native filter chain; browser CSRF remains intact.
-No CORS permission, redirect or browser cookie fallback. No native resource access
-to browser journey/routing controllers is introduced in this phase.
+No CORS permission, redirect or browser cookie fallback. The separate native
+journey controller uses the same verified bearer and explicit owner context;
+browser journey/routing controllers are not exposed to native credentials.
 
 Every response is no-store. Bound POST bodies to 20 KiB before parsing and require
 application/json. Validate JSON types, duplicate/unknown fields and exact expected
@@ -37,14 +38,14 @@ distinct fixed categories; never key or log the raw bearer/binding/Google token.
 Future native client transport must use a fixed configured HTTPS origin (no credentials,
 query, fragment or path), bounded timeout/response sizes, omitted cookies, no
 redirect following, minimal validated responses and generic redacted errors.
-This slice adds response validators only; no production UI or network client is
-mounted. React Native's built-in fetch has documented redirect limitations, so
-setting a JavaScript redirect option is not proof of redirect safety. An enforceable
-native adapter and device verification are required before sending credentials.
-Credential persistence
-must use the native session vault; challenge binding and Google ID tokens must not
-enter backups, logs or planning storage. Full native sign-in coordination, Google
-UI, journey transport and real device verification follow this boundary.
+The Android development client now mounts an OkHttp-backed Expo module with fixed
+HTTPS origin/path checks, disabled redirects/cookies, bounded payloads and timeouts;
+the response validators and SecureStore session vault are used by native sign-in,
+renewal, logout and owner journey transport. React Native's built-in fetch is not
+used for credentials. Challenge binding and Google ID tokens must not enter backups,
+logs or planning storage. The native journey resource paths have their own strict
+bearer/account boundary, with no browser-cookie fallback. Real-device verification
+with staging OAuth/TLS remains a release gate, not an implementation claim.
 
 Verification: actual HTTP tests with disposable PostgreSQL and synthetic verifier
 cover exchange/replay, wrong binding, bearer rejection, cookie/origin isolation,

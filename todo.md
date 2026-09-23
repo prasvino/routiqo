@@ -79,11 +79,13 @@ ADR 0055's community traffic summary is authorized for V3 implementation and sta
 
 ## Android release
 
-- [ ] Implement redirect-safe native authenticated transport.
-- [ ] Implement Google challenge binding and sign-in UI, secure-vault coordination, session renewal and coordinated logout/deletion.
-- [ ] Mount authenticated journey resources and native reconnect dispatch.
-- [ ] Integrate MapLibre in a development build and verify platform permissions.
-- [ ] Run `scripts/android-doctor.ps1` and resolve current SDK, build-tools, JDK, emulator/device prerequisites.
+- [x] Implement the bounded, redirect-safe Android authenticated transport and owner-scoped native journey API.
+- [x] Implement Google challenge binding and sign-in UI, secure-vault coordination, session renewal and coordinated logout/deletion.
+- [x] Mount authenticated journey resources, durable native reconnect dispatch and exact blocked-command recovery.
+- [x] Integrate MapLibre as an explicit regional basemap preview in the Android development client; GPS and route geometry are separate future work.
+- [x] Run `scripts/android-doctor.ps1` and resolve API 36, build-tools, command-line tools and JDK 17 prerequisites; API 36 emulator configured.
+- [x] Finish the x86_64 Android debug build and unconfigured-service emulator smoke test; APK/hash, screenshots and results are in [native pending ledger](docs/validation/NATIVE_ANDROID_PENDING.md). Real OAuth, staging, map resources and physical-device validation remain open there.
+- [ ] Supply the recommended staging Google OAuth registration, HTTPS API, regional map resources and test identities; complete the real authenticated trial.
 - [ ] Verify SQLite/SecureStore restart, account isolation, backup behavior, location denial, accessibility, performance and unreliable networks on real devices.
 - [ ] Produce a signed release candidate and complete device QA.
 

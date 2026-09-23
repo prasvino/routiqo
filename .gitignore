@@ -4,6 +4,9 @@ node_modules/
 .next/
 apps/web/public/maplibre/
 .expo/
+apps/mobile/android/
+apps/mobile/ios/
+.local-gradle-android/
 .turbo/
 .gradle/
 **/build/

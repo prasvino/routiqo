@@ -35,6 +35,15 @@ public final class GoogleSessionService {
         store.createChallenge(id, nonce, digest(binding), now, expires);
         return new Challenge(id, nonce, binding, expires);
     }
+    /** Android Credential Manager uses a SHA-256-hex nonce; browser challenges keep their original format. */
+    public Challenge beginNative() {
+        Instant now = now(); var id = UUID.randomUUID(); String binding = secret();
+        byte[] bytes = new byte[32]; random.nextBytes(bytes);
+        String nonce = HexFormat.of().formatHex(bytes);
+        Instant expires = now.plusSeconds(300);
+        store.createChallenge(id, nonce, digest(binding), now, expires);
+        return new Challenge(id, nonce, binding, expires);
+    }
     public Session exchange(UUID challengeId, String binding, String googleToken) {
         if (challengeId == null) throw denied();
         String bindingHash = digest(binding);

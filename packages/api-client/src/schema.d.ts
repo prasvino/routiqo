@@ -224,7 +224,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Creates a five-minute one-use challenge. Authorization, cookies, browser-origin headers and query strings are rejected. The binding remains only in native sign-in coordination memory. */
+        /** @description Creates a five-minute one-use challenge with a SHA-256-hex nonce for Android Credential Manager. Authorization, cookies, browser-origin headers and query strings are rejected. The binding remains only in native sign-in coordination memory. */
         post: operations["beginNativeGoogleLogin"];
         delete?: never;
         options?: never;
@@ -311,6 +311,67 @@ export interface paths {
         put?: never;
         /** @description Deletes the matching Routiqo account and all sessions. Requires Google authentication within five minutes; renewal does not reset that time. */
         post: operations["deleteNativeAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/journeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Latest 50 owner-scoped journeys. No query string, browser cookie or route geometry. Older cached active journey can be checked by ID. */
+        get: operations["listNativeJourneys"];
+        put?: never;
+        /** @description Explicit owner-scoped idempotent start. Local plans are never implicitly uploaded. */
+        post: operations["startNativeJourney"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/journeys/{id}": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getNativeJourney"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/journeys/{id}/complete": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Owner-scoped idempotent completion; exact empty JSON object required. */
+        post: operations["completeNativeJourney"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2159,6 +2220,158 @@ export interface operations {
                 content?: never;
             };
             429: components["responses"]["AuthLimited"];
+        };
+    };
+    listNativeJourneys: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent journey history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        journeys: components["schemas"]["Journey"][];
+                    };
+                };
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    startNativeJourney: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    id: string;
+                    /** @enum {string} */
+                    kind: "trip" | "commute";
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["JourneyResult"];
+            /** @description Invalid JSON or journey identity */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            /** @description Journey conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Journey write unavailable; retry the same command */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getNativeJourney: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["JourneyResult"];
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            /** @description Journey absent or inaccessible */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    completeNativeJourney: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeEmptyRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["JourneyResult"];
+            /** @description Invalid JSON or journey identity */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            /** @description Journey absent or inaccessible */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Journey write unavailable; retry the same command */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getPrivateTripJournal: {

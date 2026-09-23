@@ -20,14 +20,15 @@ does not retire local journey data. Removal failures remain visible and retryabl
 through the vault's existing fail-closed behavior. Do not wrap native vault calls
 in a timeout or bypass their serialization.
 
-This phase has no production adapter or UI mounting. Future callers must discard
-previous verified-account state when restoration begins, fails or is invalidated;
-the returned snapshot is not a perpetual authentication grant. All protected
-resource requests still require server authorization. Native Google sign-in,
-renewal and coordinated server logout are separate work.
+The Android development provider now mounts this restorer with the bounded native
+HTTPS bridge. It clears the previous verified-account UI while restoration is
+pending or failed; the returned snapshot is not a perpetual authentication grant.
+All protected resource requests still require server authorization. Native Google
+sign-in, renewal and coordinated server logout share the same vault. Staging/device
+evidence is tracked in `docs/validation/NATIVE_ANDROID_PENDING.md`.
 
-All future writers to the shared vault must invalidate this restorer synchronously
-before beginning sign-in, renewal, account switch or deletion. The restorer cannot
+All writers to the shared vault invalidate this restorer synchronously before
+beginning sign-in, renewal, account switch or deletion. The restorer cannot
 observe independent vault writes during network verification. It deliberately owns
 no cached verified-account state; callers must apply the lifecycle rules above.
 

@@ -1,0 +1,1 @@
+ALTER TABLE login_challenge ALTER COLUMN nonce TYPE VARCHAR(64);

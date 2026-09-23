@@ -31,6 +31,8 @@ import {
 import { tokens } from '@routiqo/design-tokens';
 import { useMobilePlanning } from '../../storage/planning';
 import { NativePlanningBackup } from './planning-backup';
+import { NativeJourneyPanel } from '../journey/native-journey-panel';
+import { NativeAccountControls } from '../../auth/native-account-controls';
 import pondicherry from '../../../assets/pondicherry.jpg';
 import heritage from '../../../assets/heritage.jpg';
 import hills from '../../../assets/hills.jpg';
@@ -152,7 +154,7 @@ export function DiscoveryScreen({
             </Text>
             <Text style={s.subtitle}>
               {section === 'Profile'
-                ? 'You’re exploring without an account. Plans stay on this device.'
+                ? 'Plans and saved places stay on this device.'
                 : 'Your everyday route. Your next little escape.'}
             </Text>
             {error ? (
@@ -214,6 +216,7 @@ export function DiscoveryScreen({
             )}
             {section === 'Trips' && (
               <>
+                <NativeJourneyPanel />
                 <Text style={s.notice}>
                   Device local time. No reminders or cloud sync. Earlier plans follow upcoming
                   departures.
@@ -265,6 +268,7 @@ export function DiscoveryScreen({
             )}
             {section === 'Profile' && (
               <>
+                <NativeAccountControls />
                 <Text style={s.notice}>
                   No GPS collected. No live position shared. Clear your plans and saved places at
                   any time.

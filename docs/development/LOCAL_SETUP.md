@@ -2,16 +2,16 @@
 
 Checked on 2026-09-06, Windows/PowerShell. Project: `D:\Pras\routiqo`.
 
-| Tool | Observed state | Action |
-|---|---|---|
-| Node.js | 22.21.1 available | Retain; verify package-specific engine requirements when locking dependencies |
-| npm | 10.9.4 available | Can bootstrap the project-local package manager |
-| Git | 2.52.0.windows.1 available | Ready |
-| Docker Desktop/engine | Engine responds with 29.1.3 | Ready for Compose-managed local services |
-| Java | JDK 25.0.4.1 installed; JAVA_HOME may still reference 21 | Use scripts/backend.ps1, which selects installed JDK 25 locally |
-| pnpm | Not on PATH; Corepack exists | Pin in package.json and bootstrap during foundation setup |
-| Gradle | Not required as a system installation | Add a pinned Gradle wrapper compatible with Java 25 |
-| Android Studio / SDK | Not found at standard checked paths; adb/emulator not on PATH | Needed for local Android emulator/native builds; may be installed elsewhere |
+| Tool                  | Observed state                                                | Action                                                                        |
+| --------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Node.js               | 22.21.1 available                                             | Retain; verify package-specific engine requirements when locking dependencies |
+| npm                   | 10.9.4 available                                              | Can bootstrap the project-local package manager                               |
+| Git                   | 2.52.0.windows.1 available                                    | Ready                                                                         |
+| Docker Desktop/engine | Engine responds with 29.1.3                                   | Ready for Compose-managed local services                                      |
+| Java                  | JDK 25.0.4.1 installed; JAVA_HOME may still reference 21      | Use scripts/backend.ps1, which selects installed JDK 25 locally               |
+| pnpm                  | Not on PATH; Corepack exists                                  | Pin in package.json and bootstrap during foundation setup                     |
+| Gradle                | Not required as a system installation                         | Add a pinned Gradle wrapper compatible with Java 25                           |
+| Android Studio / SDK  | Not found at standard checked paths; adb/emulator not on PATH | Needed for local Android emulator/native builds; may be installed elsewhere   |
 
 ## JDK 25
 
@@ -44,7 +44,6 @@ AWS credentials, AI providers, and push configuration are not needed to initiali
 3. Add local Compose services bound to loopback with development-only credentials.
 4. Add initial OpenAPI contract/client generation, shared design tokens, and quality checks.
 5. Verify builds/tests and render the client shells, recording environment limitations honestly.
-
 
 ## Current backend database modes
 
@@ -255,13 +254,28 @@ above. It can coexist with `web-auth`. Native routes use the separate
 credentials and challenge bindings are sensitive response data: do not paste them
 into messages, log them, or place them in browser/public environment variables.
 
-The mobile UI/credential transport is not connected by this API slice. Response
-validators and the existing SecureStore vault are prerequisites, not working native
-sign-in. Complete the redirect-safe native HTTP adapter, Google UI/nonce binding,
-vault coordination and authenticated journey transport before device sign-in QA.
-Use TLS at the deployed API boundary. Automated API verification uses loopback
-HTTP, disposable PostgreSQL and synthetic Google identity; it does not prove live
-Google or production proxy behavior. See `NATIVE_AUTH_HTTP_SPEC.md` and ADR 0020.
+The Android client now has a native OkHttp bridge, Google Credential Manager sign-in,
+SecureStore coordination, and owner-scoped native journey dispatch. The server's
+native `/api/v1/native/journeys` namespace is independent of browser cookies/CSRF.
+The native Google challenge uses a 64-character SHA-256-hex nonce, while the browser
+challenge retains its 43-character format. Run the API with
+`persistence,google-auth,native-auth` and the server secrets described above.
+
+Copy `apps/mobile/.env.example` to a local `.env` and set the public HTTPS API
+origin and Web OAuth client ID. The same client ID must be the backend verifier
+audience. Register the Android package `com.routiqo.app` and every debug/release
+signing SHA-1 with the Google project. No Google client secret is needed in the
+app. Use a native development build; Expo Go lacks the Google and MapLibre modules.
+The pinned Google sign-in 2.3.0 package ships C++ generated against Nitro Modules
+0.37.1. Keep the installed Nitro runtime at that generator version; the mobile
+dependency compatibility test checks this pairing before a native build.
+Set `EXPO_PUBLIC_ROUTIQO_MAP_STYLE_PATH` only after serving and reviewing all style,
+sprite, glyph and tile assets under the same HTTPS origin. The map is an explicit
+regional basemap preview near Chennai, without GPS or journey route geometry.
+Unconfigured builds preserve local plans and disable account/map access. Automated
+API tests use disposable PostgreSQL and synthetic identity; real Google, TLS/proxy
+and regional-resource behavior remain in `docs/validation/NATIVE_ANDROID_PENDING.md`.
+See `NATIVE_ANDROID_JOURNEY_SPEC.md` and ADR 0020/0021.
 
 ## Android prerequisite inspection
 
@@ -279,6 +293,24 @@ Use `-RequireReady` to return a nonzero exit code if any checked prerequisite is
 missing. A Ready result verifies files only: accept SDK licenses, configure an
 emulator or USB-debugging device, then build and exercise the native app separately.
 
+For a repeatable local Windows debug APK build after `expo prebuild --platform
+android --no-install`, run the wrapper with explicit installed paths:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-build.ps1 `
+  -SdkPath 'C:\Users\<you>\AppData\Local\Android\Sdk' `
+  -AndroidJavaHome 'D:\<installed-jdk-17>'
+```
+
+`-Architectures 'arm64-v8a,x86_64'` is the default; pass another unique subset of
+`armeabi-v7a,arm64-v8a,x86,x86_64` when testing a specific device. The wrapper
+requires the generated `apps/mobile/android/gradlew.bat`, validates API 36, Build
+Tools 36.0.0 and JDK 17, caps Gradle at two workers, and places Gradle state and
+CMake staging under ignored `.local-gradle-android/`. Its init script uses a short
+staging path for each Android app/library project to avoid deep pnpm paths in
+Windows native builds. Environment variables changed for the child build are
+restored when the script exits; the backend can continue using Java 25. The APK
+is generated under `apps/mobile/android/app/build/outputs/apk/debug/`.
 
 The web `dev` and `build` commands also run `scripts/prepare-maplibre.mjs` from the
 web package. This copies the installed, pinned worker/shared module and license

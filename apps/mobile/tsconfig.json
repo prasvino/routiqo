@@ -4,5 +4,5 @@
     "jsx": "react-jsx",
     "types": ["react"]
   },
-  "include": ["app/**/*.tsx", "src/**/*.tsx", "src/**/*.ts", "expo-env.d.ts"]
+  "include": ["app/**/*.tsx", "src/**/*.tsx", "src/**/*.ts", "expo-env.d.ts", ".expo/types/**/*.ts"]
 }

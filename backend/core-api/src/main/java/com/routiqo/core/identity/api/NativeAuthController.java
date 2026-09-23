@@ -40,7 +40,7 @@ public class NativeAuthController {
 
     @PostMapping("/google/challenge") NativeChallengeResponse challenge(HttpServletRequest request) {
         NativeAuthJson.emptyObject(request);
-        var challenge = sessions.begin();
+        var challenge = sessions.beginNative();
         return new NativeChallengeResponse(challenge.id(), challenge.nonce(), challenge.binding(), challenge.expiresAt());
     }
 

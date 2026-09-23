@@ -10,6 +10,7 @@ export interface NativeChallenge {
 const uuid =
   /^(?!00000000-0000-0000-0000-000000000000$)[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const secret = /^[A-Za-z0-9_-]{43}$/;
+const nativeNonce = /^[a-f0-9]{64}$/;
 function invalid(): Error {
   return new Error('Native authentication response is invalid.');
 }
@@ -48,7 +49,7 @@ export function readNativeChallenge(value: unknown, now: number): NativeChalleng
     const item = fields(value, ['id', 'nonce', 'binding', 'expiresAt']);
     return {
       id: text(item.id, uuid),
-      nonce: text(item.nonce, secret),
+      nonce: text(item.nonce, nativeNonce),
       binding: text(item.binding, secret),
       expiresAt: expiry(item.expiresAt, now, 300000),
     };
