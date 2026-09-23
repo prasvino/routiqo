@@ -1,6 +1,6 @@
 # Routiqo
 
-A privacy-first travel and commute app. The first runnable slice provides curated discovery, bookmarks, and local trip/commute planning.
+A privacy-first travel and commute app. The runnable web preview provides curated discovery, local trip/commute planning, private journey and journal flows, and default-off private LIVE controls. It is not a public LIVE release or a production deployment.
 
 ## Run on Windows
 
@@ -31,13 +31,13 @@ npx.cmd --yes pnpm@10.34.4 backend:check
 
 - Web Home, Explore, Trips, Profile, privacy page, search, categories, destination details, bookmarks, editable local plans, next departures and JSON backup/restore.
 - Expo screens reuse catalog, planning validation, and tokens; SQLite stores local plans.
-- Shared lifecycle outbox with a native SQLite adapter handles durable pending actions, retry leases and account partitions. It is not connected to a network dispatcher yet.
-- Java core/realtime/workers boot applications, public health/catalog, fail-closed protected routes, tested lifecycle and privacy rules. Internal journey persistence uses PostgreSQL/Flyway with ownership, retry and concurrency integration tests.
+- Shared lifecycle outbox handles durable pending actions and account partitions. Web dispatch is mounted on Trips; native authenticated transport and reconnect dispatch remain pending.
+- Java core/realtime/workers boot applications. Core API has opt-in authenticated journey and private LIVE prerequisites with PostgreSQL/Flyway ownership, retry and concurrency tests. Public LIVE publication, realtime messaging and administration workflows remain pending.
 - Local PostGIS, Redis, and S3-compatible services; versioned OpenAPI and generated client.
-- Google verification, account mapping and revocable sessions plus opt-in browser auth endpoints are tested. Browser transport uses HttpOnly cookies, CSRF/origin checks and database rate limits. Login UI, real OAuth configuration and native transport are still pending; phone OTP is deferred.
+- Google verification, account mapping and revocable sessions plus opt-in browser auth endpoints are tested. Browser transport uses HttpOnly cookies, CSRF/origin checks and database rate limits. Web Google UI exists; real OAuth configuration, staging lifecycle verification and native transport are still pending.
 
-Authentication, cloud plan sync, live routing/presence, conversations, push reminders, trip journals, provider integrations, and deployment remain deferred. Admin is a restricted foundation shell. Local drafts are not live journeys. Device testing requires Android tooling.
+Private trip journal title/notes and browser editing exist, but authenticated device QA, media and sharing remain pending. Regional provider setup, public LIVE, conversations, push reminders and deployment remain pending. Admin is a restricted foundation shell. Local drafts are not live journeys. Device testing requires Android tooling.
 
-Backend verification requires Docker for disposable PostgreSQL tests. Default API preview remains database-independent; see [database profile setup](docs/development/LOCAL_SETUP.md) to enable internal persistence with external database credentials. No public journey writes are enabled.
+Backend verification requires Docker for disposable PostgreSQL tests. Default API preview remains database-independent; see [database profile setup](docs/development/LOCAL_SETUP.md) for opt-in persistence and protected endpoints. Private LIVE endpoints remain default off; no public LIVE publication is enabled.
 
 Start with [AGENTS.md](AGENTS.md), [build plan](docs/development/BUILD_PLAN.md), and [verification notes](docs/quality/BUILD_STATUS.md). Source requirements remain unchanged under docs/product, docs/design and docs/development; previous Wayfind references are historical.

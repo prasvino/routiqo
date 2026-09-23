@@ -1,12 +1,13 @@
-# Build status — 2026-09-20
+# Build status — 2026-09-23
 
-Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. This consolidated audit supersedes the previous continuation lists.
+Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. The September 23 audit reconciles the committed reliability batches with this status; release gates below remain open.
 
 ## Implemented
 
 | Area | Current behavior |
 |---|---|
 | Web | Home, Explore, Trips, Profile; curated destination search/filter/details, bookmarks, editable trip and recurring commute drafts |
+| Recent web reliability | Batch 01 added storage, journal and transport regression coverage. Batches 02–04 implemented bounded Explore query handling, minute-boundary departure refresh, planning/backup/save error recovery, accessible category grouping, commute/plan feedback fixes, resumed time-zone grouping, and history response cleanup and explicit latest-page refresh. These are local web improvements, not authenticated cross-device or public LIVE verification. |
 | Scheduling | Shared next-departure calculation, weekday recurrence, upcoming ordering, foreground refresh, DST-gap handling; no automatic journey completion or reminders |
 | Commute summaries | Monthly counts and exact recorded elapsed minutes from the verified account's confirmed completed commutes saved on this device; time-zone-aware start-month grouping and explicit incomplete-history disclosure. Read-only, no invented distance or new persistence |
 | Local storage | Validated web localStorage with write-error handling and cross-tab refresh; native SQLite adapter; native restart behavior still needs device testing |
@@ -40,6 +41,13 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 | Engineering | Strict TypeScript, generated OpenAPI types/drift checks, formatting/lint/tests, Java architecture tests, secret scanner, local Compose services, CI definition |
 
 ## Verification
+
+September 23 status reconciliation:
+
+- Commits `54007b6`, `edfacc3`, `db622e6` and `14b73c9` contain the batch 01 regression tests and batch 02–04 web source/test changes. The batch handoff README files describe their earlier preparation state; those queues are now implemented in the current tree.
+- Current-tree `pnpm exec vitest run --maxWorkers=2` passed **551 tests / 61 files**. `pnpm contracts:check`, `pnpm format:check`, `pnpm typecheck`, `pnpm lint`, and `pnpm --filter @routiqo/web build` passed. Typecheck used five Turbo cache hits and ran the web package afresh.
+- `pnpm secrets:check` could not connect to the Docker Desktop Linux engine and exited 1; it did not establish a clean secret scan. Backend checks and browser/device QA were not rerun for this documentation/status audit.
+- The audit inspected commits, source ownership and release documents. It did not establish real OAuth, provider, device, multi-device, public LIVE or production behavior.
 
 Latest delayed journey history restoration pass, 2026-09-20:
 
@@ -309,10 +317,12 @@ as real LIVE activity.
    one foreground request in flight, stale/suppressed/conflicting/offline states,
    account/journey clearing and exact explicit retry. Public output depends on the
    first two gates; private controls are not a working public LIVE release.
-4. **Journey and UI release reliability.** Broader cross-device restoration and
-   unresolved conflicts; authenticated journal/history/backup QA; storage failures,
+4. **Journey and UI release reliability.** The batch 01–04 local web regressions
+   and fixes above are complete. Broader cross-device restoration and unresolved
+   conflicts; authenticated journal/history/backup QA; storage failures,
    interrupted writes, account switches, large text, reduced motion and screen
-   readers. Existing local plans remain separate from server journeys.
+   readers still need release evidence. Existing local plans remain separate from
+   server journeys.
 5. **Native integration.** Redirect-safe network transport, Google UI/challenge and
    vault coordination, authenticated resources/reconnect dispatch, native MapLibre
    and actual development-build/device verification. Run Android doctor to establish

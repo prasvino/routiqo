@@ -1,5 +1,11 @@
 # Current implementation plan
 
+Status reconciliation, 2026-09-23: reliability batch 01 tests and production
+batches 02–04 web fixes are committed (`54007b6`, `edfacc3`, `db622e6`,
+`14b73c9`). Their handoff queues are historical preparation notes, not open
+implementation items. See `docs/quality/BUILD_STATUS.md` for current verification
+and remaining release gates.
+
 ## Next priority: Routiqo Live first release
 
 Current browser slice (2026-09-19): private active-journey consent, route
