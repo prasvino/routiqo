@@ -16,6 +16,7 @@ import {
 import { Modal } from './modal';
 import { RoutePlanner, type RoutePlannerContributionSource } from './route-planner';
 import { PrivateSignalsPanel } from './private-signals-panel';
+import { PublicIntentRecoveryPanel } from './public-intent-recovery-panel';
 import { ProviderLiveAlerts } from './provider-live-alerts';
 import { LiveSignalRecoveryCoordinator } from '../lib/live-signal-recovery';
 import type { LiveConsentAuthority } from './live-route-binding-panel';
@@ -28,6 +29,10 @@ import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 import { LiveConsentPanel, type LiveConsentConfirmation } from './live-consent-panel';
 
 export function JourneyWorkspace() {
+  const [publicIntentRecovery, setPublicIntentRecovery] = useState<{
+    accountId: string;
+    ready: boolean;
+  } | null>(null);
   const [signalRecovery] = useState(() => new LiveSignalRecoveryCoordinator());
   useEffect(() => () => signalRecovery.setAccount(null), [signalRecovery]);
   const signalListeners = useRef(new Set<() => void>());
@@ -520,6 +525,23 @@ export function JourneyWorkspace() {
           online={!offline}
           available={liveAvailable && currentConsentAuthority !== null}
           source={signalSource}
+          publicIntentControls={
+            process.env.NEXT_PUBLIC_ROUTIQO_PUBLIC_SIGNAL_INTENT_UI_ENABLED === 'true'
+          }
+          publicIntentShareEnabled={
+            process.env.NEXT_PUBLIC_ROUTIQO_PUBLIC_SIGNAL_INTENT_SHARE_ENABLED === 'true' &&
+            publicIntentRecovery?.accountId === account &&
+            publicIntentRecovery.ready
+          }
+        />
+      )}
+      {account && process.env.NEXT_PUBLIC_ROUTIQO_PUBLIC_SIGNAL_INTENT_UI_ENABLED === 'true' && (
+        <PublicIntentRecoveryPanel
+          key={account}
+          accountId={account}
+          online={!offline}
+          identityConfirmed={identityConfirmed}
+          onReady={(ready) => setPublicIntentRecovery({ accountId: account, ready })}
         />
       )}
       {availability === 'ready' && account && partition && (

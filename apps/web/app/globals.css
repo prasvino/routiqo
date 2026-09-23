@@ -2359,3 +2359,40 @@ textarea::placeholder {
   outline: 3px solid var(--ink);
   outline-offset: 4px;
 }
+.public-signal-intent-control {
+  display: grid;
+  gap: 10px;
+  max-width: 65ch;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.private-signal-recovery .public-signal-intent-control p {
+  margin: 0;
+}
+.public-signal-intent-control .private-signal-safe {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.public-signal-intent-control .button {
+  justify-self: start;
+}
+.public-intent-recovery {
+  margin-top: 24px;
+}
+.public-intent-recovery ul {
+  list-style: none;
+  padding: 0;
+}
+.public-intent-recovery li {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.public-intent-recovery .button {
+  min-height: 44px;
+  white-space: normal;
+}

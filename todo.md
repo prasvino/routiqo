@@ -2,6 +2,14 @@
 
 ## First release — privacy and publication
 
+Detailed traveller-derived public LIVE release ledger: [`docs/validation/PUBLIC_LIVE_PENDING.md`](docs/validation/PUBLIC_LIVE_PENDING.md). Keep validation evidence there as each gate closes.
+
+- [x] Implement private dual-review verified-person authority and an explicit per-receipt public-purpose intent ledger; neither is a public LIVE release.
+- [x] Add default-off purpose-specific share/Stop transport, account-wide retained Stop recovery, private candidate evaluation and bounded cleanup foundations; no traveller moment is public.
+- [ ] Replace the rejected ADR 0051 fixed-window candidate with a transcript-level privacy protocol that resolves known revocation/Ghost/completion inference, then obtain independent adversarial approval before any traveller output.
+- [x] Choose the policy after ADR 0052's rejected immutable-window follow-up: user selected a measurable person-level guarantee. ADR 0053 is a proposed whole-pilot DP design; its isolated sampler and disconnected V21 person claim need full protocol integration and review. No public reader or flag is authorized.
+- [ ] Build independently authenticated operator case/grant provisioning, document-review operations, maintenance scheduling and retention review for verified contributors.
+
 - [x] Implement the separate default-off Chennai district official-alert pilot: bounded NDMA CAP reader, owner-only active-journey API, browser list and explicit source/freshness states. This does not satisfy the traveller publication items below.
 - [ ] User-led staging validation of the official-alert pilot is deferred; follow the checklist and record results in `docs/features/live/PROVIDER_LIVE_PILOT_SPEC.md` before activation.
 

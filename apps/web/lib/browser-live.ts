@@ -14,6 +14,10 @@ import {
   readSignalIssue,
   readSignalReceipt,
   readSignalStopResponse,
+  readPublicSignalShareRequest,
+  readPublicSignalShareResponse,
+  readPublicSignalStopResponse,
+  readPublicIntentPage,
   readUuid,
   type BrowserLiveErrorKind,
   type LiveConsent,
@@ -30,6 +34,11 @@ import {
   type LiveSignalIssue,
   type LiveSignalReceipt,
   type LiveSignalStopResponse,
+  type LivePublicSignalShareRequest,
+  type LivePublicSignalShareResponse,
+  type LivePublicSignalStopResponse,
+  type LivePublicIntent,
+  type LivePublicIntentPage,
 } from './browser-live-private';
 
 export {
@@ -49,6 +58,11 @@ export {
   type LiveSignalIssue,
   type LiveSignalReceipt,
   type LiveSignalStopResponse,
+  type LivePublicSignalShareRequest,
+  type LivePublicSignalShareResponse,
+  type LivePublicSignalStopResponse,
+  type LivePublicIntent,
+  type LivePublicIntentPage,
 };
 
 function identities(accountId: unknown, journeyId: unknown): [string, string] {
@@ -226,5 +240,61 @@ export function stopBrowserLiveSignalCommand(
     timeoutMilliseconds: 12000,
     signal,
     validate: (value) => readSignalStopResponse(value, commandId),
+  });
+}
+
+export function shareBrowserLiveSignalPublicIntent(
+  accountId: string,
+  journeyId: string,
+  commandId: string,
+  input: unknown,
+  signal?: AbortSignal,
+): Promise<LivePublicSignalShareResponse> {
+  [accountId, journeyId] = identities(accountId, journeyId);
+  commandId = readUuid(commandId);
+  const body = readPublicSignalShareRequest(input);
+  return liveRequest({
+    accountId,
+    path: `/api/v1/journeys/${journeyId}/signals/${commandId}/public-intent`,
+    body,
+    timeoutMilliseconds: 12000,
+    signal,
+    validate: (value) => readPublicSignalShareResponse(value, commandId),
+  });
+}
+
+export function stopBrowserLiveSignalPublicIntent(
+  accountId: string,
+  journeyId: string,
+  commandId: string,
+  signal?: AbortSignal,
+): Promise<LivePublicSignalStopResponse> {
+  [accountId, journeyId] = identities(accountId, journeyId);
+  commandId = readUuid(commandId);
+  return liveRequest({
+    accountId,
+    path: `/api/v1/journeys/${journeyId}/signals/${commandId}/public-intent/stop`,
+    body: {},
+    timeoutMilliseconds: 12000,
+    signal,
+    validate: (value) => readPublicSignalStopResponse(value, commandId),
+  });
+}
+
+export function readBrowserLivePublicIntents(
+  accountId: string,
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<LivePublicIntentPage> {
+  accountId = readUuid(accountId);
+  if (cursor !== undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(cursor))
+    throw new BrowserLiveError('invalid');
+  return liveRequest({
+    accountId,
+    path:
+      cursor === undefined ? '/api/v1/public-intents' : `/api/v1/public-intents?cursor=${cursor}`,
+    timeoutMilliseconds: 12000,
+    signal,
+    validate: readPublicIntentPage,
   });
 }

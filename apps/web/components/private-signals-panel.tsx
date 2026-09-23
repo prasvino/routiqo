@@ -22,6 +22,7 @@ import type {
   RoutePlannerContributionSource,
 } from './route-planner';
 import { Modal } from './modal';
+import { PublicSignalIntentControl } from './public-signal-intent-control';
 
 interface Props {
   coordinator: LiveSignalRecoveryCoordinator;
@@ -31,6 +32,8 @@ interface Props {
   online: boolean;
   available: boolean;
   source: RoutePlannerContributionSource | null;
+  publicIntentControls?: boolean;
+  publicIntentShareEnabled?: boolean;
 }
 interface ChoiceState {
   authority: RoutePlannerContributionAuthority;
@@ -524,6 +527,25 @@ export function PrivateSignalsPanel(props: Props) {
                   <strong>Private command {index + 1}</strong>
                 </p>
                 <p role="status">{phases[record.phase]}</p>
+                {props.publicIntentControls && record.receipt && (
+                  <PublicSignalIntentControl
+                    key={`${record.accountId}:${record.journeyId}:${record.commandId}`}
+                    accountId={props.accountId}
+                    journeyId={record.journeyId}
+                    commandId={record.commandId}
+                    receiptExpiresAt={record.receipt.expiresAt}
+                    eligible={record.receipt.status === 'accepted'}
+                    identityConfirmed={props.identityConfirmed}
+                    online={props.online}
+                    shareEnabled={props.publicIntentShareEnabled === true}
+                    activeJourney={
+                      props.available &&
+                      props.journeyId === record.journeyId &&
+                      record.phase === 'accepted' &&
+                      !!activeAuthority
+                    }
+                  />
+                )}
                 <div className="detail-actions live-consent-actions">
                   {record.phase !== 'stopped' && (
                     <button

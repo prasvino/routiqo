@@ -96,6 +96,7 @@ export async function proxyBrowserJourneys(
   path: string[],
   config: BrowserAuthConfig | null,
   upstreamFetch: typeof fetch = fetch,
+  publicIntentApiEnabled = false,
 ): Promise<Response> {
   if (!config) return failure(503);
   const listing = path.length === 0;
@@ -133,6 +134,20 @@ export async function proxyBrowserJourneys(
     path[1] === 'signals' &&
     journeyId.test(path[2] ?? '') &&
     path[3] === 'withdraw';
+  const publicIntent =
+    path.length === 4 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'signals' &&
+    journeyId.test(path[2] ?? '') &&
+    path[3] === 'public-intent';
+  const publicIntentStop =
+    path.length === 5 &&
+    journeyId.test(path[0] ?? '') &&
+    path[1] === 'signals' &&
+    journeyId.test(path[2] ?? '') &&
+    path[3] === 'public-intent' &&
+    path[4] === 'stop';
+  if ((publicIntent || publicIntentStop) && !publicIntentApiEnabled) return failure(404);
   if (
     !listing &&
     !detail &&
@@ -146,14 +161,22 @@ export async function proxyBrowserJourneys(
     !expectedSignalCommand &&
     !signalCommandStop &&
     !signal &&
-    !signalWithdraw
+    !signalWithdraw &&
+    !publicIntent &&
+    !publicIntentStop
   )
     return failure(404);
   if (
     !(listing || journal || consent || routeContext
       ? ['GET', 'POST'].includes(request.method)
       : request.method === (detail || signalChoices || providerAlerts ? 'GET' : 'POST')) ||
-    ((signalCommands || expectedSignalCommand || signalCommandStop || signal || signalWithdraw) &&
+    ((signalCommands ||
+      expectedSignalCommand ||
+      signalCommandStop ||
+      signal ||
+      signalWithdraw ||
+      publicIntent ||
+      publicIntentStop) &&
       request.method !== 'POST')
   )
     return failure(405);
@@ -188,6 +211,31 @@ export async function proxyBrowserJourneys(
         : routeContext && request.method === 'POST'
           ? { responseLimit: 64 * 1024, timeout: 25000 }
           : undefined,
+  );
+}
+export async function proxyBrowserPublicIntents(
+  request: Request,
+  config: BrowserAuthConfig | null,
+  upstreamFetch: typeof fetch = fetch,
+  publicIntentApiEnabled = false,
+): Promise<Response> {
+  if (!config) return failure(503);
+  if (!publicIntentApiEnabled) return failure(404);
+  if (request.method !== 'GET') return failure(405);
+  const query = new URL(request.url).searchParams;
+  if (
+    query.size > 1 ||
+    (query.size === 1 && (query.getAll('cursor').length !== 1 || !query.has('cursor')))
+  )
+    return failure(400);
+  const cursor = query.get('cursor');
+  if (cursor !== null && !/^[A-Za-z0-9_-]{1,128}$/.test(cursor)) return failure(400);
+  return forwardBrowserRequest(
+    request,
+    `public-intents${cursor === null ? '' : `?cursor=${encodeURIComponent(cursor)}`}`,
+    config,
+    upstreamFetch,
+    { responseLimit: 64 * 1024, timeout: 12000 },
   );
 }
 export async function proxyBrowserPlaceSearch(

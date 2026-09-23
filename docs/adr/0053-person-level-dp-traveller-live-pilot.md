@@ -1,0 +1,36 @@
+# ADR 0053: Person-level private traveller LIVE pilot candidate
+
+Date: 2026-09-23
+Status: proposed for mathematical, security and product review; public output prohibited
+
+## Decision under evaluation
+
+Use a finite 30-day Chennai/OMR pilot with one public-purpose contribution per independently verified person for the entire pilot. A Stop never refunds the slot. A later pilot requires a new privacy-budget decision; this ADR grants no automatic reset. Private Quick Signals remain available outside this public budget. The privacy unit is one verified person, not one account, report, window or journey. Neighboring pilot datasets differ by adding or removing all public input from one person. Enforcement must survive account deletion and re-verification until the pilot and retention period end.
+
+The pilot has a public, versioned set of at most ten curated anchors, the traffic category, four existing structured traffic values and five-minute windows. No client-selected coordinate, route slice, dynamic category or data-derived anchor enters the release universe. One person can affect at most one histogram key across all anchors, values and windows in the pilot. The full release transcript is the one-time collection of outputs for all keys; repeated reads return the same immutable bytes and do not resample noise.
+
+For each fixed public key, draw independent 64-bit capped geometric variables `G1` and `G2`, even when the key is absent. The ideal uncapped difference `Z=G1−G2` has mass `Pr[Z=0]=1/3` and `Pr[Z=±k]=(1/3)·2^-k` for integer `k≥1`; the cap adds the explicitly bounded approximation term below. Emit an *observed* key only when its noisy count is at least 22. Per fixed anchor/window, post-process surviving values to at most one coarse traffic condition; ties or incompatible survivors yield no condition. Do not publish counts, confidence scores, member lists, exact times or contributor identifiers. The output must be described as a privacy-protected estimate from traveller reports that can be wrong; it cannot be used as a safety or travel-time guarantee. A key with no actual report is never emitted, so no condition is fabricated from zero support.
+
+## Candidate guarantee and proof obligation
+
+For add/remove neighboring datasets under the enforced one-key-per-person bound, the ideal sparse thresholded histogram has `(ε=ln 2, δ≤1/3,145,728≈3.18×10^-7)` person-level approximate differential privacy for the *entire 30-day pilot transcript*. Existing keys' noisy counts have likelihood ratio at most 2 for a one-count change. If adding a person creates a previously absent key, its chance of crossing threshold 22 is `Pr[Z≥21]=1/3,145,728`; this is the exceptional event bounded by δ. Coupling each 64-bit capped draw to the ideal draw adds at most `3K·2^-63` to δ over the full fixed key universe of size `K≤345,600`. Repeated reads of frozen output are post-processing, not new draws. A change from one person's key to another is bounded via two add/remove steps and needs its own stated composed guarantee. This is a proposal, not a verified proof or production privacy claim.
+
+Input clipping, catalog/version selection, eligibility, Stop cutoff, window finalization, reporting, moderation and operational failures are part of the mechanism and must be included in independent proof review. Data-dependent discovery of a key must never create an unnoised public existence path. Per-account rate limits do not substitute for the one-person total contribution bound. Every candidate decision, including no output, must be terminal across replicas; retries cannot redraw noise. No individual source change may edit a released result.
+
+## Timing and consent
+
+A fixed cutoff and first-visibility schedule must be selected and disclosed before public use. Stop, Ghost Mode, completion, deletion and moderation changes before cutoff must affect eligibility under one serializable authority snapshot. After cutoff, those actions cannot retract the pilot histogram input or any released aggregate; they stop further public contribution, but the one pilot slot is already consumed. The current immediate-suppression contract is incompatible and must be explicitly replaced. The implementation must not infer a fixed historical authority state from a later current-state read.
+
+## Utility and reliability gates
+
+Threshold 22 makes sparse-window output unlikely. Simulate with observed, consented pilot-density distributions before activation; no synthetic density assumption can approve utility. Compare the rate of no output, wrong coarse value, false reassurance and latency against provider-sourced utility. If this mechanism cannot produce useful and truthful-enough moments in Chennai/OMR, keep traveller publication closed. Secure noise generation, key-space bounds, one-person budget enforcement, fixed catalog, multi-replica snapshots and the actual read transcript need independent review and adversarial tests. No Java DP library or hand-written sampler is approved merely because unit tests pass.
+
+## Sources and relationship
+
+This candidate follows [NIST SP 800-226](https://csrc.nist.gov/pubs/sp/800/226/final)'s emphasis on the unit of privacy, total contribution bounds and composition, and [OpenDP's thresholded-noise documentation](https://docs.opendp.org/en/stable/api/user-guide/measurements/thresholded-noise-mechanisms.html) for sparse keys. ADR 0038's deterministic impossibility result still applies to the rejected 12/10 releases. ADR 0051 and ADR 0052 remain rejected for public release. This ADR is a new candidate, not a release approval.
+
+## Implementation checkpoint
+
+An isolated Java sampler now implements a **64-bit capped** version of the candidate sparse geometric threshold. It draws twice for every fixed-universe key, including absent keys, and emits only observed keys. Coupling to the ideal mechanism yields an additional full-pilot approximation term at most `3K·2^-63` in δ for `K≤345,600`, or about `1.13×10^-13`; the resulting candidate bound is `(ε=ln 2, δ≤1/3,145,728 + 3K·2^-63)`. This removes variable sampler work by observed-key count, but database and publication timing remain unsolved. V21 supplies an immutable 30-day pilot interval and a nonrefundable `(pilot_id, person_ref)` claim that survives account deletion, with exact retry matching and bounded post-pilot cleanup. Both are disconnected from public intent, finalization and delivery. They do not establish the stated privacy guarantee until a single approved release transaction binds the verified person, canonical key, cutoff authority and durable frozen output to that claim across the entire pilot.
+
+Independent follow-up review found that the current fixed historical cutoff cannot be reconstructed safely from later state. A lock-based freeze can serialize source changes, but target-dependent lock waits and deadline misses could alter the public output for other contributors. Freezing each person's input irreversibly in the successful explicit Share transaction is a simpler candidate; it changes Stop/Ghost Mode semantics and requires a revised disclosure and product decision before implementation. No public reader or publisher is authorized by this checkpoint.

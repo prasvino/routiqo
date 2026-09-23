@@ -743,6 +743,92 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+  /api/v1/journeys/{id}/signals/{commandId}/public-intent:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - $ref: '#/components/parameters/PrivateSignalCommandId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: sharePrivateSignalForPublicConsideration
+      security: [{ browserSession: [] }]
+      description: Explicit private purpose change for one accepted signal. Requires current owner, active journey, receipt, context, catalog, consent, restriction and verified-person authority. It does not publish a moment. Both API and share flags default off; twelve requests per account per minute.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserPublicSignalShareRequest' }
+      responses:
+        '200':
+          description: Private retained share intent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserPublicSignalShareResponse' }
+        '400': { description: 'Invalid canonical path identifier, query or exact JSON request' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: Person/window conflict or nonmatching replay }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+  /api/v1/public-intents:
+    get:
+      operationId: listOwnPublicSignalIntents
+      security: [{ browserSession: [] }]
+      description: Owner-only retained private Stop handles across journeys, including completed journeys. Keyset pages are limited to 100 and expire with the 24-hour window retention. No public moment, person reference, anchor, condition or location is returned. Thirty reads per account per minute. API flag is default off.
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$' }
+          description: Server-issued keyset cursor from the previous page.
+      responses:
+        '200':
+          description: One bounded owner-only handle page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserPublicSignalIntentPage' }
+        '400': { description: Invalid cursor or query }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Session, account or rate infrastructure unavailable. Empty response body.' }
+  /api/v1/journeys/{id}/signals/{commandId}/public-intent/stop:
+    parameters:
+      - $ref: '#/components/parameters/PrivateJourneyId'
+      - $ref: '#/components/parameters/PrivateSignalCommandId'
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: stopPrivateSignalPublicIntent
+      security: [{ browserSession: [] }]
+      description: Idempotently stops a retained private share intent after journey completion, consent loss, or disabling the share flag. API flag remains separately default off. Thirty requests per account per minute.
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserSignalStopRequest' }
+      responses:
+        '200':
+          description: Terminal private intent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserPublicSignalStopResponse' }
+        '400': { description: 'Invalid canonical path identifier, query or nonempty JSON request' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '409': { description: Unknown or foreign intent }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
   /api/v1/routes/places:
     post:
       operationId: searchPrivateRoutePlaces
@@ -1127,6 +1213,47 @@ components:
       type: object
       additionalProperties: false
       maxProperties: 0
+    BrowserPublicSignalShareRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, purpose]
+      properties:
+        requestId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        purpose: { type: string, enum: [public-live-moment-v1] }
+    BrowserPublicSignalShareResponse:
+      type: object
+      additionalProperties: false
+      required: [commandId, status, sharedAt]
+      properties:
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        status: { type: string, enum: [shared] }
+        sharedAt: { type: string, format: date-time }
+    BrowserPublicSignalStopResponse:
+      type: object
+      additionalProperties: false
+      required: [commandId, status]
+      properties:
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        status: { type: string, enum: [stopped] }
+    BrowserPublicSignalIntentPage:
+      type: object
+      additionalProperties: false
+      required: [intents, nextCursor]
+      properties:
+        intents:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/BrowserPublicSignalIntentHandle' }
+        nextCursor: { type: string, nullable: true, maxLength: 128 }
+    BrowserPublicSignalIntentHandle:
+      type: object
+      additionalProperties: false
+      required: [journeyId, commandId, status, sharedAt]
+      properties:
+        journeyId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
+        status: { type: string, enum: [shared, stopped] }
+        sharedAt: { type: string, format: date-time }
     BrowserSignalStopResponse:
       type: object
       additionalProperties: false

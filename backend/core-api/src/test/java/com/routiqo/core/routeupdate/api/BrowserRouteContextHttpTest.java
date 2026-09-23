@@ -69,7 +69,9 @@ import static org.assertj.core.api.Assertions.assertThat;
     "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true",
     "ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED=true",
     "ROUTIQO_LIVE_SIGNAL_API_ENABLED=true",
-    "ROUTIQO_LIVE_CHOICE_API_ENABLED=true"
+    "ROUTIQO_LIVE_CHOICE_API_ENABLED=true",
+    "ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED=true",
+    "ROUTIQO_PUBLIC_SIGNAL_INTENT_SHARE_ENABLED=false"
 })
 @ActiveProfiles({"persistence", "google-auth", "web-auth", "routing"})
 @Import(BrowserRouteContextHttpTest.TestIdentity.class)
@@ -86,6 +88,34 @@ class BrowserRouteContextHttpTest {
             new AtomicReference<>(new CountDownLatch(0));
     private static final HttpServer SERVER;
     private static final Path CATALOG;
+
+    @Test void publicIntentRecoveryUsesBrowserGuardAndStopRemainsWhenShareIsOff()
+            throws Exception {
+        Browser owner = login(UUID.randomUUID());
+        UUID journey = start(owner);
+        UUID command = UUID.randomUUID();
+        var own = send(owner, "GET", "public-intents", null, null, null,
+                owner.account().toString(), null, null);
+        assertThat(own.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<List<?>>read(own.body(), "$.intents")).isEmpty();
+        assertThat(own.headers().firstValue("Cache-Control")).hasValue("no-store");
+        assertThat(send(owner, "GET", "public-intents", null, null, null,
+                UUID.randomUUID().toString(), null, null).statusCode()).isEqualTo(401);
+        assertThat(send(owner, "GET", "public-intents?actor=" + owner.account(),
+                null, null, null, owner.account().toString(), null, null).statusCode())
+                .isEqualTo(400);
+        String stopPath = "journeys/" + journey + "/signals/" + command + "/public-intent/stop";
+        assertThat(send(owner, "POST", stopPath, "{}", "application/json", null,
+                owner.account().toString(), null, "http://localhost:3000").statusCode())
+                .isEqualTo(403);
+        assertThat(send(owner, "POST", stopPath, "{}", "application/json", owner.csrf(),
+                owner.account().toString(), null, "http://localhost:3000").statusCode())
+                .isEqualTo(401);
+        assertThat(send(owner, "POST", "journeys/" + journey + "/signals/" + command
+                        + "/public-intent", "{}", "application/json", owner.csrf(),
+                owner.account().toString(), null, "http://localhost:3000").statusCode())
+                .isEqualTo(401);
+    }
 
     static {
         try {

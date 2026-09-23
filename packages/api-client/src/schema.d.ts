@@ -554,6 +554,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/signals/{commandId}/public-intent": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Explicit private purpose change for one accepted signal. Requires current owner, active journey, receipt, context, catalog, consent, restriction and verified-person authority. It does not publish a moment. Both API and share flags default off; twelve requests per account per minute. */
+        post: operations["sharePrivateSignalForPublicConsideration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Owner-only retained private Stop handles across journeys, including completed journeys. Keyset pages are limited to 100 and expire with the 24-hour window retention. No public moment, person reference, anchor, condition or location is returned. Thirty reads per account per minute. API flag is default off. */
+        get: operations["listOwnPublicSignalIntents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{id}/signals/{commandId}/public-intent/stop": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Idempotently stops a retained private share intent after journey completion, consent loss, or disabling the share flag. API flag remains separately default off. Thirty requests per account per minute. */
+        post: operations["stopPrivateSignalPublicIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/routes/places": {
         parameters: {
             query?: never;
@@ -726,6 +793,35 @@ export interface components {
             choices: components["schemas"]["BrowserSignalChoice"][];
         };
         BrowserSignalStopRequest: Record<string, never>;
+        BrowserPublicSignalShareRequest: {
+            requestId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            purpose: "public-live-moment-v1";
+        };
+        BrowserPublicSignalShareResponse: {
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            status: "shared";
+            /** Format: date-time */
+            sharedAt: string;
+        };
+        BrowserPublicSignalStopResponse: {
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            status: "stopped";
+        };
+        BrowserPublicSignalIntentPage: {
+            intents: components["schemas"]["BrowserPublicSignalIntentHandle"][];
+            nextCursor: string | null;
+        };
+        BrowserPublicSignalIntentHandle: {
+            journeyId: components["schemas"]["PrivateSignalUuid"];
+            commandId: components["schemas"]["PrivateSignalUuid"];
+            /** @enum {string} */
+            status: "shared" | "stopped";
+            /** Format: date-time */
+            sharedAt: string;
+        };
         BrowserSignalStopResponse: {
             commandId: components["schemas"]["PrivateSignalUuid"];
             /** @enum {string} */
@@ -2375,6 +2471,180 @@ export interface operations {
                 content?: never;
             };
             /** @description Missing, foreign or expired command */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sharePrivateSignalForPublicConsideration: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserPublicSignalShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Private retained share intent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserPublicSignalShareResponse"];
+                };
+            };
+            /** @description Invalid canonical path identifier, query or exact JSON request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Person/window conflict or nonmatching replay */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listOwnPublicSignalIntents: {
+        parameters: {
+            query?: {
+                /** @description Server-issued keyset cursor from the previous page. */
+                cursor?: string;
+            };
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One bounded owner-only handle page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserPublicSignalIntentPage"];
+                };
+            };
+            /** @description Invalid cursor or query */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session, account or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stopPrivateSignalPublicIntent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: components["parameters"]["PrivateJourneyId"];
+                /** @description Canonical lowercase non-nil private command UUID. */
+                commandId: components["parameters"]["PrivateSignalCommandId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserSignalStopRequest"];
+            };
+        };
+        responses: {
+            /** @description Terminal private intent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserPublicSignalStopResponse"];
+                };
+            };
+            /** @description Invalid canonical path identifier, query or nonempty JSON request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Unknown or foreign intent */
             409: {
                 headers: {
                     [name: string]: unknown;

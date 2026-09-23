@@ -2,6 +2,8 @@
 
 Status: design and implementation in progress; public publication remains closed. This specification narrows the next engineering step under ADR 0038. It does not promote the current private signal receipt to public evidence.
 
+ADR 0051's fixed-window 12-person/10-agreement candidate was independently reviewed and rejected for public release on 2026-09-23: contributor-dependent suppression after a known revocation remains a participation oracle. Durable verification and per-receipt public-purpose intent may advance privately, but they do not authorize public output.
+
 ## Acceptance criteria
 
 1. A release configuration cannot enable traveller-derived output without a reviewed protocol version, independently human-verified contributor authority, current consent/journey/context/catalog/safety authority, and operational moderation/reporting.

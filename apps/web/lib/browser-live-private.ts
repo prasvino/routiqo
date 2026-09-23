@@ -23,6 +23,12 @@ export type LiveSignalAcceptance = components['schemas']['BrowserSignalAcceptanc
 export type LiveSignalGrant = components['schemas']['BrowserSignalCommandGrant'];
 export type LiveSignalReceipt = components['schemas']['BrowserSignalReceipt'];
 export type LiveSignalStopResponse = components['schemas']['BrowserSignalStopResponse'];
+export type LivePublicSignalShareRequest = components['schemas']['BrowserPublicSignalShareRequest'];
+export type LivePublicSignalShareResponse =
+  components['schemas']['BrowserPublicSignalShareResponse'];
+export type LivePublicSignalStopResponse = components['schemas']['BrowserPublicSignalStopResponse'];
+export type LivePublicIntent = components['schemas']['BrowserPublicSignalIntentHandle'];
+export type LivePublicIntentPage = components['schemas']['BrowserPublicSignalIntentPage'];
 
 const uuidPattern =
   /^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -60,7 +66,11 @@ type LivePath =
   | `/api/v1/journeys/${string}/signal-commands/expected-context`
   | `/api/v1/journeys/${string}/signal-commands/${string}/stop`
   | `/api/v1/journeys/${string}/signals/${string}`
-  | `/api/v1/journeys/${string}/signals/${string}/withdraw`;
+  | `/api/v1/journeys/${string}/signals/${string}/withdraw`
+  | `/api/v1/journeys/${string}/signals/${string}/public-intent`
+  | `/api/v1/journeys/${string}/signals/${string}/public-intent/stop`
+  | '/api/v1/public-intents'
+  | `/api/v1/public-intents?cursor=${string}`;
 
 type PlainRecord = Record<string, unknown>;
 
@@ -445,6 +455,60 @@ export function readSignalStopResponse(
     status: 'stopped',
     receipt,
   };
+}
+
+export function readPublicSignalShareRequest(value: unknown): LivePublicSignalShareRequest {
+  const item = plainRecord(value, ['requestId', 'purpose']);
+  if (item.purpose !== 'public-live-moment-v1') invalid();
+  return { requestId: readUuid(item.requestId), purpose: 'public-live-moment-v1' };
+}
+
+export function readPublicSignalShareResponse(
+  value: unknown,
+  requestedCommand: string,
+): LivePublicSignalShareResponse {
+  const item = plainRecord(value, ['commandId', 'status', 'sharedAt']);
+  if (readUuid(item.commandId) !== requestedCommand || item.status !== 'shared') invalid();
+  return {
+    commandId: requestedCommand,
+    status: 'shared',
+    sharedAt: readInstant(item.sharedAt).raw,
+  };
+}
+
+export function readPublicSignalStopResponse(
+  value: unknown,
+  requestedCommand: string,
+): LivePublicSignalStopResponse {
+  const item = plainRecord(value, ['commandId', 'status']);
+  if (readUuid(item.commandId) !== requestedCommand || item.status !== 'stopped') invalid();
+  return { commandId: requestedCommand, status: 'stopped' };
+}
+
+export function readPublicIntentPage(value: unknown): LivePublicIntentPage {
+  const page = plainRecord(value, ['intents', 'nextCursor']);
+  if (!Array.isArray(page.intents) || page.intents.length > 100) invalid();
+  if (
+    page.nextCursor !== null &&
+    (typeof page.nextCursor !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(page.nextCursor))
+  )
+    invalid();
+  const seen = new Set<string>();
+  const intents = page.intents.map((raw): LivePublicIntent => {
+    const item = plainRecord(raw, ['journeyId', 'commandId', 'status', 'sharedAt']);
+    const journeyId = readUuid(item.journeyId);
+    const commandId = readUuid(item.commandId);
+    const key = `${journeyId}:${commandId}`;
+    if (seen.has(key) || (item.status !== 'shared' && item.status !== 'stopped')) invalid();
+    seen.add(key);
+    return {
+      journeyId,
+      commandId,
+      status: item.status,
+      sharedAt: readInstant(item.sharedAt).raw,
+    };
+  });
+  return { intents, nextCursor: page.nextCursor as string | null };
 }
 
 function errorKind(status: number): BrowserLiveErrorKind {

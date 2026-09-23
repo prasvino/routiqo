@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   proxyBrowserAuth,
   proxyBrowserJourneys,
+  proxyBrowserPublicIntents,
   readBrowserAuthConfig,
 } from '../apps/web/lib/auth-proxy';
 const config = {
@@ -637,5 +638,54 @@ describe('same-origin auth proxy', () => {
     );
     expect(huge.status).toBe(503);
     expect(await huge.text()).toBe('');
+  });
+});
+
+describe('owner public intent proxy', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const command = '00000000-0000-4000-8000-000000000002';
+  it('is closed by default and permits only exact flagged POST routes', async () => {
+    const upstream = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ commandId: command, status: 'stopped' }));
+    const path = [id, 'signals', command, 'public-intent', 'stop'];
+    const incoming = new Request(`${config.origin}/api/v1/journeys/${path.join('/')}`, {
+      method: 'POST',
+      headers: { Origin: config.origin, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect((await proxyBrowserJourneys(incoming, path, config, upstream)).status).toBe(404);
+    expect((await proxyBrowserJourneys(incoming, path, config, upstream, true)).status).toBe(200);
+    expect(upstream.mock.calls[0]?.[0]).toBe(
+      `${config.upstream}/api/v1/journeys/${path.join('/')}`,
+    );
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+  it('validates owner cursor and forwards no unexpected query or credential', async () => {
+    const upstream = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ intents: [], nextCursor: null }));
+    const make = (query = '') =>
+      new Request(`${config.origin}/api/v1/public-intents${query}`, {
+        headers: {
+          Cookie: 'routiqo_session=private; unrelated=blocked',
+          'X-Routiqo-Account': id,
+          Authorization: 'Bearer no',
+        },
+      });
+    expect((await proxyBrowserPublicIntents(make(), config, upstream)).status).toBe(404);
+    for (const query of ['?x=1', '?cursor=x&cursor=y', '?cursor=%2F', `?cursor=${'x'.repeat(129)}`])
+      expect((await proxyBrowserPublicIntents(make(query), config, upstream, true)).status).toBe(
+        400,
+      );
+    expect(
+      (await proxyBrowserPublicIntents(make('?cursor=abc_123'), config, upstream, true)).status,
+    ).toBe(200);
+    const [url, init] = upstream.mock.calls[0]!;
+    expect(url).toBe(`${config.upstream}/api/v1/public-intents?cursor=abc_123`);
+    const headers = new Headers(init?.headers);
+    expect(headers.get('cookie')).toBe('routiqo_session=private');
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-routiqo-account')).toBe(id);
   });
 });

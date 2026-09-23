@@ -7,6 +7,8 @@ async function handle(request: Request, context: { params: Promise<{ path?: stri
       request,
       (await context.params).path ?? [],
       readBrowserAuthConfig(process.env),
+      fetch,
+      process.env.ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED === 'true',
     );
   } catch {
     return new Response(null, { status: 503, headers: { 'Cache-Control': 'no-store' } });
