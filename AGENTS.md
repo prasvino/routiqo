@@ -51,8 +51,10 @@ The user's current instructions govern task scope. Documents describe requiremen
 For substantial implementation tasks, follow
 `docs/development/CODEX_ORCHESTRATION.md`.
 
-Use delegation selectively. The root agent retains responsibility for architecture,
-security/privacy invariants, integration, and final verification.
+For substantial work, GPT-6 Astra plans and orchestrates, GPT-6 Sol implements,
+and Astra reviews and verifies the integrated result. GPT-6 Luna handles super
+basic bounded work. Follow active session rules for delegation. The root retains
+responsibility for architecture and security/privacy invariants.
 
 ## Implementation and verification
 

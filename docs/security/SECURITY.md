@@ -207,7 +207,7 @@ CI must enforce applicable:
 - migration and rollback checks;
 - multi-replica/realtime tests where relevant.
 
-High-risk changes require manual adversarial review and, when justified, independent Astra-high review. Automated scanners are supporting evidence, not the security decision-maker.
+High-risk changes require manual adversarial review and, when justified, a separate independent Astra review. The root Astra resolves findings and owns final verification. Automated scanners are supporting evidence, not the security decision-maker.
 
 No security or privacy control may be silently weakened to make a test pass, simplify implementation, or meet a deadline.
 

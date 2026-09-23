@@ -115,7 +115,7 @@ Critical and High findings block completion. Medium findings require correction 
 
 ## 5. Independent review
 
-Use an independent **GPT-6 Astra · high** review when justified by risk, as defined in `CODEX_ORCHESTRATION.md`.
+GPT-6 Astra reviews every substantial Sol implementation as defined in `CODEX_ORCHESTRATION.md`. For high-risk changes, add a separate independent Astra review when available and justified. The root Astra owns the disposition of findings and final verification.
 
 Provide the reviewer:
 
