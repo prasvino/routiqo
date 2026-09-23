@@ -4,6 +4,10 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 The user has now authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag. The different production privacy contract is not accepted. Person-level research is paused with its existing code/docs preserved. Traveller-derived public LIVE remains disabled in production.
 
+## September 24 native completion and history
+
+Native Android account/journey integration is committed with debug APK and unconfigured-service emulator smoke evidence. Native account history adds explicit 20-row latest/earlier reads with strict owner/session isolation and no durable cache expansion. Final checks: **617 TypeScript tests / 75 files**, **545 Java tests / 88 suites**, all six typechecks, lint, formatting, contracts and secret scan passed. Native view evidence is labeled synthetic; real OAuth/TLS/maps and physical-device gates remain in [native Android](../validation/NATIVE_ANDROID_PENDING.md) and [native history](../validation/NATIVE_HISTORY_PENDING.md) ledgers.
+
 ## Implemented
 
 | Area | Current behavior |
@@ -16,7 +20,7 @@ The user has now authorized V3 community-summary implementation and staging eval
 | Native deletion storage | Atomic account retirement marker plus queue/snapshot removal prevents delayed updates recreating deleted data; restart, rollback and account isolation tested with file-backed SQLite. Native deletion UI now invokes server deletion before local retirement, with explicit local cleanup retry. |
 | Native authentication API | Opt-in bearer-only challenge/exchange, session read/renew, lineage logout and recent-auth account deletion; bounded strict JSON, shared database peer/account/challenge limits and browser isolation. Native Google sign-in and bounded OkHttp transport are mounted for Android development builds; real OAuth/TLS trial remains pending. |
 | Native credential store | Expo SecureStore adapter and bounded session vault, serialized writes/clear, stale-ticket rejection, expiry checks and fail-closed recovery. Mounted in native sign-in, cold-start verification, renewal, logout and deletion. |
-| Account history | Explicit 20-row account-history browsing, earlier/latest pages, completed-trip journal access, retry handling and account-switch isolation; no expansion of the offline cache |
+| Account history | Web and native Android explicit 20-row owner-history browsing with earlier/latest pages, retry/offline handling and account/session isolation; no expansion of the durable recovery cache. Completed-trip journal access remains web-only. Native configured-service validation is in `docs/validation/NATIVE_HISTORY_PENDING.md`. |
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; native account controls, explicit Trips journey lifecycle/recovery and MapLibre regional basemap preview are mounted in a development client. x86_64 debug APK and unconfigured-service emulator smoke passed; real configured services and physical-device validation remain pending. Native backup text export/share and pasted-JSON restore exist. |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |

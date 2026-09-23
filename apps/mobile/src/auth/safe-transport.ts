@@ -13,7 +13,7 @@ const account = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
 const journeyId = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
 const nativePath = new RegExp(
-  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/${journeyId}(?:/complete)?)?)$`,
+  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/complete)?)?)$`,
 );
 
 export function nativeApiOrigin(value: string | undefined): string | null {
@@ -54,6 +54,8 @@ export function createNativeTransport(
   ): Promise<unknown> {
     if (!origin) throw new Error('Secure server connection is not configured.');
     if (!nativePath.test(path) || path.includes('?') || path.includes('#'))
+      throw new Error('Native request is invalid.');
+    if (path === '/api/v1/native/journeys/history' && method !== 'POST')
       throw new Error('Native request is invalid.');
     const credential = options.credential ?? null;
     const accountId = options.accountId ?? null;

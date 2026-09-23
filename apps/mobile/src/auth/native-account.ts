@@ -7,6 +7,11 @@ type Transport = ReturnType<typeof createNativeTransport>;
 export interface GoogleIdentityPort {
   idToken(nonce: string): Promise<string | null>;
 }
+export class NativeSessionRequired extends Error {
+  constructor() {
+    super('Sign in to continue.');
+  }
+}
 
 export function createNativeAccount(
   vault: NativeSessionVault,
@@ -172,11 +177,11 @@ export function createNativeAccount(
   }
   async function credentialFor(expectedAccount: string): Promise<string> {
     const attempt = generation;
-    if (accountId !== expectedAccount) throw new Error('Sign in to continue.');
+    if (accountId !== expectedAccount) throw new NativeSessionRequired();
     const session = await vault.load();
     current(attempt);
     if (!session || session.accountId !== expectedAccount || session.expiresAt <= now())
-      throw new Error('Sign in to continue.');
+      throw new NativeSessionRequired();
     return session.credential;
   }
   async function verifiedRequest(
@@ -186,11 +191,17 @@ export function createNativeAccount(
   ): Promise<unknown> {
     const attempt = generation;
     const credential = await credentialFor(options.accountId);
-    const result = await transport.request(path, method, {
-      credential,
-      accountId: options.accountId,
-      body: options.body,
-    });
+    let result: unknown;
+    try {
+      result = await transport.request(path, method, {
+        credential,
+        accountId: options.accountId,
+        body: options.body,
+      });
+    } catch (error) {
+      current(attempt);
+      throw error;
+    }
     current(attempt);
     return result;
   }
@@ -205,6 +216,7 @@ export function createNativeAccount(
     credentialFor,
     verifiedRequest,
     activeAccount: () => accountId,
+    revision: () => generation,
     invalidate: changed,
     configured: transport.configured,
     isAuthenticationError: (error: unknown) =>

@@ -185,6 +185,53 @@ class NativeAuthHttpTest {
         assertThat(journey("DELETE", "", "", owner, List.of()).statusCode()).isEqualTo(403);
     }
 
+    @Test void nativeHistoryPaginatesOnlyOwnerRecordsWithStrictCursorAndBody() throws Exception {
+        Login owner = login(), other = loginOther();
+        var ids = new ArrayList<String>();
+        for (int index = 0; index < 21; index++) {
+            String id = UUID.randomUUID().toString();
+            ids.add(id);
+            assertThat(journey("POST", "", "{\"id\":\"" + id + "\",\"kind\":\"trip\"}", owner, List.of()).statusCode()).isEqualTo(200);
+            assertThat(journey("POST", "/" + id + "/complete", "{}", owner, List.of()).statusCode()).isEqualTo(200);
+        }
+        String foreign = UUID.randomUUID().toString();
+        assertThat(journey("POST", "", "{\"id\":\"" + foreign + "\",\"kind\":\"commute\"}", other, List.of()).statusCode()).isEqualTo(200);
+        var latest = journey("POST", "/history", "{}", owner, List.of());
+        assertThat(latest.statusCode()).isEqualTo(200);
+        assertThat(latest.body()).doesNotContain(foreign, owner.accountId());
+        List<String> firstIds = JsonPath.read(latest.body(), "$.journeys[*].id");
+        assertThat(firstIds).hasSize(20).doesNotHaveDuplicates();
+        String lastId = JsonPath.read(latest.body(), "$.next.id");
+        assertThat(lastId).isEqualTo(firstIds.getLast());
+        String startedAt = JsonPath.read(latest.body(), "$.next.startedAt");
+        String canonical = new java.time.format.DateTimeFormatterBuilder().appendInstant(6)
+                .toFormatter().format(java.time.Instant.parse(startedAt));
+        String before = "{\"before\":{\"startedAt\":\"" + canonical + "\",\"id\":\"" + lastId + "\"}}";
+        var earlier = journey("POST", "/history", before, owner, List.of());
+        assertThat(earlier.statusCode()).isEqualTo(200);
+        List<String> olderIds = JsonPath.read(earlier.body(), "$.journeys[*].id");
+        assertThat(olderIds).hasSize(1).doesNotContainAnyElementsOf(firstIds);
+        Object terminalCursor = JsonPath.read(earlier.body(), "$.next");
+        assertThat(terminalCursor).isNull();
+        String otherPage = journey("POST", "/history", "{}", other, List.of()).body();
+        assertThat(otherPage).contains(foreign);
+        for (String id : ids) assertThat(otherPage).doesNotContain(id);
+        assertThat(journey("POST", "/history", "{}", null, List.of()).statusCode()).isEqualTo(401);
+        assertThat(journey("POST", "/history", "{}", owner,
+                List.<String[]>of(new String[] {"X-Routiqo-Account", other.accountId()})).statusCode()).isEqualTo(401);
+        for (String invalid : List.of("{\"extra\":1}", "{\"before\":null}",
+                "{\"before\":{\"startedAt\":\"" + canonical + "\"}}",
+                "{\"before\":{\"startedAt\":\"" + canonical + "\",\"id\":\"" + lastId + "\",\"extra\":1}}",
+                "{\"before\":{\"startedAt\":\"2026-09-12T24:00:00.000000Z\",\"id\":\"" + lastId + "\"}}",
+                "{\"before\":{\"startedAt\":\"2026-09-12T12:00:00Z\",\"id\":\"" + lastId + "\"}}",
+                "{\"before\":{},\"before\":{}}")) {
+            assertThat(journey("POST", "/history", invalid, owner, List.of()).statusCode()).isEqualTo(400);
+        }
+        assertThat(journey("POST", "/history?limit=1", "{}", owner, List.of()).statusCode()).isEqualTo(403);
+        assertThat(journey("POST", "/history", "{}", owner,
+                List.<String[]>of(new String[] {"Cookie", "routiqo_session=forbidden"})).statusCode()).isEqualTo(403);
+    }
+
     static String exchangeBody(String challengeId, String binding, String token) {
         return "{\"challengeId\":\"" + challengeId + "\",\"binding\":\"" + binding
                 + "\",\"idToken\":\"" + token + "\"}";

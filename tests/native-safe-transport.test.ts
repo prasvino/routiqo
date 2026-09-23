@@ -59,6 +59,38 @@ it('accepts only a fixed bare HTTPS origin and native API paths', async () => {
   ).rejects.toThrow('Native request is invalid.');
   expect(request).toHaveBeenCalledTimes(1);
 });
+it('allows fixed native history POST only with a verified account and no query', async () => {
+  const request = vi.fn(async () => ({ status: 200, body: '{"journeys":[],"next":null}' }));
+  const transport = createNativeTransport({ request }, origin);
+  await expect(
+    transport.request('/api/v1/native/journeys/history', 'POST', {
+      credential,
+      accountId: account,
+      body: {},
+    }),
+  ).resolves.toEqual({ journeys: [], next: null });
+  expect(request).toHaveBeenCalledWith(
+    origin,
+    '/api/v1/native/journeys/history',
+    'POST',
+    credential,
+    account,
+    '{}',
+  );
+  await expect(
+    transport.request('/api/v1/native/journeys/history?before=1', 'POST', {
+      credential,
+      accountId: account,
+      body: {},
+    }),
+  ).rejects.toThrow();
+  await expect(
+    transport.request('/api/v1/native/journeys/history', 'GET', { credential, accountId: account }),
+  ).rejects.toThrow();
+  await expect(
+    transport.request('/api/v1/native/journeys/history', 'POST', { credential, body: {} }),
+  ).rejects.toThrow();
+});
 it('bounds and redacts failures without returning server error bodies', async () => {
   const failed = createNativeTransport(
     { request: async () => ({ status: 401, body: 'private secret' }) },

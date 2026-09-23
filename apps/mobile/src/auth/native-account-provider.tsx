@@ -15,9 +15,14 @@ import type { JourneyKind } from '@routiqo/shared';
 import { NativeHttpStatus } from './safe-transport';
 import { nativeTransport } from './android-transport';
 import { nativeGoogle } from './native-google';
-import { createNativeAccount } from './native-account';
+import { createNativeAccount, NativeSessionRequired } from './native-account';
 import { nativeSessionVault } from './secure-session';
 import { createNativeJourneys } from '../features/journey/native-journeys';
+import {
+  readNativeJourneyPage,
+  type NativeHistoryCursor,
+  type NativeHistoryPage,
+} from '../features/journey/native-history';
 import {
   clearJourneyPartition,
   queueMobileJourney,
@@ -35,6 +40,8 @@ interface NativeAccountContext {
   error: string;
   recentRequired: boolean;
   deletionCleanupPending: boolean;
+  historyEpoch: number;
+  readHistory(before: NativeHistoryCursor | null): Promise<NativeHistoryPage>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   reauthenticateForDeletion(): Promise<void>;
@@ -70,6 +77,46 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
   const deletionPendingRef = useRef<string | null>(null);
   const working = useRef(false);
   const dispatchRef = useRef<AbortController | null>(null);
+  const historyEpochRef = useRef(0);
+  const [historyEpoch, setHistoryEpoch] = useState(0);
+  function invalidateHistory() {
+    historyEpochRef.current += 1;
+    setHistoryEpoch(historyEpochRef.current);
+  }
+  async function readHistory(before: NativeHistoryCursor | null): Promise<NativeHistoryPage> {
+    const account = identity.activeAccount();
+    if (!account || accountId !== account) throw new Error('Sign in to load account history.');
+    const epoch = historyEpochRef.current;
+    const revision = identity.revision();
+    try {
+      const page = await readNativeJourneyPage(identity, account, before);
+      if (
+        epoch !== historyEpochRef.current ||
+        revision !== identity.revision() ||
+        identity.activeAccount() !== account
+      )
+        throw new Error('Account history session changed.');
+      return page;
+    } catch (failure) {
+      if (
+        epoch !== historyEpochRef.current ||
+        revision !== identity.revision() ||
+        identity.activeAccount() !== account
+      )
+        throw new Error('Account history session changed.');
+      if (
+        failure instanceof NativeSessionRequired ||
+        (failure instanceof NativeHttpStatus && (failure.status === 401 || failure.status === 403))
+      ) {
+        invalidateHistory();
+        identity.invalidate();
+        setAccountId(null);
+        setPartition(null);
+        setError('Your session needs verification. Sign in from Profile to continue.');
+      }
+      throw failure;
+    }
+  }
 
   async function load(account: string) {
     const value = await readMobileJourneyPartition(db, account);
@@ -102,6 +149,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
   }
   async function restore() {
     if (!identity.configured || working.current || deletionPendingRef.current) return;
+    invalidateHistory();
     working.current = true;
     setRestoring(true);
     setAccountId(null);
@@ -124,6 +172,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
   }
   async function signIn() {
     if (working.current || !identity.configured || deletionPendingRef.current) return;
+    invalidateHistory();
     working.current = true;
     setBusy(true);
     setError('');
@@ -146,6 +195,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
   }
   async function signOut() {
     if (working.current) return;
+    invalidateHistory();
     working.current = true;
     setBusy(true);
     setError('');
@@ -171,6 +221,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
   }
   async function reauthenticateForDeletion() {
     if (!recentRequired || working.current) return;
+    invalidateHistory();
     working.current = true;
     setBusy(true);
     try {
@@ -215,6 +266,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
   }
   async function deleteAccount() {
     if (!identity.activeAccount() || working.current) return;
+    invalidateHistory();
     let serverDeleted: string | null = null;
     working.current = true;
     setBusy(true);
@@ -255,6 +307,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
     )
       return;
     working.current = true;
+    const beforeRevision = identity.revision();
     let retryPending = false;
     try {
       const account = await identity.renew(force);
@@ -267,6 +320,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
       setPartition(null);
       setError('Your session needs verification. Sign in again if retry does not work.');
     } finally {
+      if (identity.revision() !== beforeRevision) invalidateHistory();
       working.current = false;
     }
     if (retryPending || syncAfter) void sync();
@@ -342,6 +396,8 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         error,
         recentRequired,
         deletionCleanupPending: deletedAccountId !== null,
+        historyEpoch,
+        readHistory,
         signIn,
         signOut,
         reauthenticateForDeletion,

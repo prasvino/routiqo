@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { createNativeAccount } from '../apps/mobile/src/auth/native-account';
-import { createNativeTransport } from '../apps/mobile/src/auth/safe-transport';
+import { createNativeAccount, NativeSessionRequired } from '../apps/mobile/src/auth/native-account';
+import { createNativeTransport, NativeHttpStatus } from '../apps/mobile/src/auth/safe-transport';
 import { createSessionVault } from '../apps/mobile/src/auth/session-vault';
 
 const account = '00000000-0000-4000-8000-000000000001';
@@ -19,6 +19,7 @@ const session = { accountId: account, credential, expiresAt: new Date(now + 9000
 
 function fixture(
   google: (nonce: string) => Promise<string | null> = async () => 'google-id-token',
+  time: () => number = () => now,
 ) {
   let raw: string | null = null;
   const vault = createSessionVault(
@@ -31,7 +32,7 @@ function fixture(
         raw = null;
       },
     },
-    () => now,
+    time,
   );
   const sent: {
     path: string;
@@ -65,7 +66,7 @@ function fixture(
     vault,
     createNativeTransport(driver, 'https://staging.routiqo.example'),
     { idToken: google },
-    () => now,
+    time,
   );
   return { identity, vault, driver, sent, stored: () => raw };
 }
@@ -154,4 +155,54 @@ it('forces server renewal after a 401 even when local expiry is far away', async
   expect(f.sent.filter((entry) => entry.path.endsWith('/session/renew'))).toHaveLength(0);
   expect(await f.identity.renew(true)).toBe(account);
   expect(f.sent.filter((entry) => entry.path.endsWith('/session/renew'))).toHaveLength(1);
+});
+
+it('fences late native resource success and 401 from a superseded same-account session', async () => {
+  const f = fixture();
+  await f.identity.signIn();
+  const original = f.driver.request.getMockImplementation()!;
+  for (const outcome of ['success', 'unauthorized'] as const) {
+    let complete!: (result: { status: number; body: string }) => void;
+    const pending = new Promise<{ status: number; body: string }>((resolve) => {
+      complete = resolve;
+    });
+    f.driver.request.mockImplementation((...args) =>
+      args[1] === '/api/v1/native/journeys/history' ? pending : original(...args),
+    );
+    const sentBefore = f.driver.request.mock.calls.length;
+    const request = f.identity
+      .verifiedRequest('/api/v1/native/journeys/history', 'POST', { accountId: account, body: {} })
+      .catch((failure: unknown) => failure);
+    await vi.waitFor(() =>
+      expect(
+        f.driver.request.mock.calls
+          .slice(sentBefore)
+          .some((args) => args[1] === '/api/v1/native/journeys/history'),
+      ).toBe(true),
+    );
+    expect(await f.identity.renew(true)).toBe(account);
+    complete(
+      outcome === 'success'
+        ? { status: 200, body: '{"journeys":[],"next":null}' }
+        : { status: 401, body: '' },
+    );
+    const result = await request;
+    expect(result).toBeInstanceOf(Error);
+    expect(result).not.toBeInstanceOf(NativeHttpStatus);
+    expect((result as Error).message).toBe('Native account flow changed.');
+    f.driver.request.mockImplementation(original);
+  }
+});
+
+it('classifies a locally expired credential as requiring sign-in', async () => {
+  let currentTime = now;
+  const f = fixture(undefined, () => currentTime);
+  await f.identity.signIn();
+  currentTime += 900001;
+  await expect(
+    f.identity.verifiedRequest('/api/v1/native/journeys/history', 'POST', {
+      accountId: account,
+      body: {},
+    }),
+  ).rejects.toBeInstanceOf(NativeSessionRequired);
 });

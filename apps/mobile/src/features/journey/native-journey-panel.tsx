@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import { NativeMapPreview } from './native-map';
+import { NativeJourneyHistory } from './native-journey-history';
 
 const c = tokens.colors;
 export function NativeJourneyPanel() {
@@ -88,7 +89,7 @@ export function NativeJourneyPanel() {
             </Text>
           </Pressable>
           <NativeMapPreview />
-          <Text style={styles.subheading}>Recent journeys</Text>
+          <Text style={styles.subheading}>Recent journeys on this device</Text>
           {session.partition?.snapshots.journeys.length ? (
             session.partition.snapshots.journeys.slice(0, 10).map((item) => (
               <Text key={item.id} style={styles.history}>
@@ -101,6 +102,7 @@ export function NativeJourneyPanel() {
           ) : (
             <Text style={styles.notice}>No server journeys yet.</Text>
           )}
+          <NativeJourneyHistory />
         </>
       )}
     </View>

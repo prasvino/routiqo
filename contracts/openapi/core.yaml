@@ -441,6 +441,40 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Journey write unavailable; retry the same command }
+  /api/v1/native/journeys/history:
+    post:
+      operationId: readNativeJourneyHistory
+      security: [{ nativeBearer: [] }]
+      description: Explicit owner-scoped 20-row keyset page. Does not change the latest-50 recovery cache.
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                before: { $ref: '#/components/schemas/NativeHistoryCursor' }
+      responses:
+        '200':
+          description: One account history page
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [journeys, next]
+                properties:
+                  journeys: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/Journey' } }
+                  next: { $ref: '#/components/schemas/JourneyCursor' }
+        '400': { description: Invalid request or cursor }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/native/journeys/{id}:
     parameters:
       - { $ref: '#/components/parameters/JourneyAccount' }
@@ -1816,6 +1850,19 @@ components:
       properties:
         startedAt: { type: string, format: date-time }
         id: { type: string, format: uuid }
+    NativeHistoryCursor:
+      type: object
+      additionalProperties: false
+      required: [startedAt, id]
+      properties:
+        startedAt:
+          type: string
+          format: date-time
+          pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{6}Z$'
+        id:
+          type: string
+          format: uuid
+          pattern: '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$'
     CsrfToken:
       type: object
       additionalProperties: false

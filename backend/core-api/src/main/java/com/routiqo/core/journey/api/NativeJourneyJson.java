@@ -17,9 +17,14 @@ final class NativeJourneyJson {
     private NativeJourneyJson() {}
 
     static JsonNode object(HttpServletRequest request, Set<String> keys) {
+        return object(request, keys, Set.of());
+    }
+    static JsonNode object(HttpServletRequest request, Set<String> required, Set<String> optional) {
         try {
             JsonNode node = MAPPER.readTree(request.getInputStream());
-            if (node == null || !node.isObject() || !node.propertyNames().equals(keys)) throw invalid();
+            if (node == null || !node.isObject() || !node.propertyNames().containsAll(required)
+                    || !java.util.stream.Stream.concat(required.stream(), optional.stream()).toList()
+                            .containsAll(node.propertyNames())) throw invalid();
             return node;
         } catch (IOException | RuntimeException error) {
             throw invalid();

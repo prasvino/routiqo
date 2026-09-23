@@ -35,9 +35,10 @@ class RoutiqoSafeHttpModule : Module() {
           base.port == -1) { "Invalid origin" }
         val authPath = path.matches(Regex("/api/v1/native/auth/(google/(challenge|exchange)|session(/renew)?|logout|account/delete)"))
         val uuid = "[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"
-        val journeyPath = path.matches(Regex("/api/v1/native/journeys(?:/$uuid(?:/complete)?)?"))
+        val journeyPath = path.matches(Regex("/api/v1/native/journeys(?:/history|/$uuid(?:/complete)?)?"))
         require((authPath || journeyPath) && !path.contains('?') && !path.contains('#')) { "Invalid path" }
         require(method == "GET" || method == "POST") { "Invalid method" }
+        require(path != "/api/v1/native/journeys/history" || method == "POST") { "Invalid history method" }
         require((method == "POST") == (payload != null)) { "Invalid body" }
         require(payload == null || payload.toByteArray(StandardCharsets.UTF_8).size <= 20 * 1024) { "Body too large" }
         require(credential == null || credential.matches(Regex("[A-Za-z0-9_-]{43}"))) { "Invalid credential" }

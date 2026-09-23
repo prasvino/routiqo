@@ -109,3 +109,8 @@ ADR 0055's community traffic summary is authorized for V3 implementation and sta
 - [ ] Implement reminders/push, media and AI workflows with permissions, bounded retention/jobs/uploads, fallbacks and feature-specific QA.
 - [ ] Implement Pulse and Travel Waves after evidence quality and participation justify them.
 - [ ] Expand journal media/sharing and administration workflows under separate reviewed specifications.
+
+## Native account history
+
+- [x] Implement fixed 20-row owner history, strict native transport/API contract, latest/earlier/retry controls and session-fenced in-memory pages.
+- [ ] Complete real authenticated staging and physical-device checks in [native history ledger](docs/validation/NATIVE_HISTORY_PENDING.md).

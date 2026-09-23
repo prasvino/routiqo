@@ -4,6 +4,7 @@ import com.routiqo.core.identity.application.AccountWriteUnavailable;
 import com.routiqo.core.journey.application.JourneyConflict;
 import com.routiqo.core.journey.application.JourneyNotFound;
 import com.routiqo.core.journey.application.JourneyService;
+import com.routiqo.core.journey.application.JourneyStore;
 import com.routiqo.core.journey.domain.Journey;
 import com.routiqo.core.security.NativeAuthGuard;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +32,7 @@ public final class NativeJourneyController {
         }
     }
     public record PageResponse(List<JourneyResponse> journeys) {}
+    public record HistoryResponse(List<JourneyResponse> journeys, JourneyStore.Cursor next) {}
 
     @PostMapping JourneyResponse start(HttpServletRequest request) {
         UUID actor = actor(request);
@@ -52,6 +54,30 @@ public final class NativeJourneyController {
     @GetMapping PageResponse list(HttpServletRequest request) {
         var page = journeys.list(actor(request), null, 50);
         return new PageResponse(page.journeys().stream().map(JourneyResponse::from).toList());
+    }
+    @PostMapping("/history") HistoryResponse history(HttpServletRequest request) {
+        UUID owner = actor(request);
+        var input = NativeJourneyJson.object(request, Set.of(), Set.of("before"));
+        JourneyStore.Cursor before = null;
+        if (input.has("before")) {
+            var cursor = input.get("before");
+            if (!cursor.isObject() || !cursor.propertyNames().equals(Set.of("startedAt", "id")))
+                throw new IllegalArgumentException("Invalid history cursor");
+            String startedAt = NativeJourneyJson.text(cursor, "startedAt", 27);
+            if (!startedAt.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z"))
+                throw new IllegalArgumentException("Invalid history cursor");
+            Instant time;
+            try { time = Instant.parse(startedAt); }
+            catch (java.time.DateTimeException invalid) { throw new IllegalArgumentException("Invalid history cursor"); }
+            if (!new java.time.format.DateTimeFormatterBuilder().appendInstant(6)
+                    .toFormatter(Locale.ROOT).format(time).equals(startedAt)
+                    || time.isBefore(Instant.parse("0001-01-01T00:00:00Z"))
+                    || time.isAfter(Instant.parse("9999-12-31T23:59:59.999999Z")))
+                throw new IllegalArgumentException("Invalid history cursor");
+            before = new JourneyStore.Cursor(time, NativeJourneyJson.uuid(cursor, "id"));
+        }
+        var page = journeys.list(owner, before, 20);
+        return new HistoryResponse(page.journeys().stream().map(JourneyResponse::from).toList(), page.next());
     }
     private static UUID actor(HttpServletRequest request) {
         Object value = request.getAttribute(NativeAuthGuard.ACCOUNT_ATTRIBUTE);

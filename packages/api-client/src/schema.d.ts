@@ -335,6 +335,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/native/journeys/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Explicit owner-scoped 20-row keyset page. Does not change the latest-50 recovery cache. */
+        post: operations["readNativeJourneyHistory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/native/journeys/{id}": {
         parameters: {
             query?: never;
@@ -1362,6 +1379,12 @@ export interface components {
             /** Format: uuid */
             id: string;
         } | null;
+        NativeHistoryCursor: {
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: uuid */
+            id: string;
+        };
         CsrfToken: {
             token: string;
         };
@@ -2298,6 +2321,50 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    readNativeJourneyHistory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    before?: components["schemas"]["NativeHistoryCursor"];
+                };
+            };
+        };
+        responses: {
+            /** @description One account history page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        journeys: components["schemas"]["Journey"][];
+                        next: components["schemas"]["JourneyCursor"];
+                    };
+                };
+            };
+            /** @description Invalid request or cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
         };
     };
     getNativeJourney: {
