@@ -7,6 +7,8 @@ export default defineConfig({
       'tests/**/*.test.ts',
       'apps/web/**/*.test.ts',
       'apps/web/**/*.test.tsx',
+      'apps/admin/**/*.test.ts',
+      'apps/admin/**/*.test.tsx',
     ],
     environment: 'node',
   },

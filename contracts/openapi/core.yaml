@@ -1055,8 +1055,91 @@ paths:
         '404': { description: Moment not visible to this journey; no existence disclosure }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Intake unavailable }
+  /api/v1/admin/auth/csrf:
+    get:
+      operationId: adminCsrf
+      description: Default-off staging moderator CSRF bootstrap; separate admin cookie namespace and exact admin origin.
+      responses:
+        '200': { description: Admin CSRF token, content: { application/json: { schema: { $ref: '#/components/schemas/CsrfToken' } } } }
+  /api/v1/admin/auth/google/challenge:
+    post:
+      operationId: beginAdminGoogleChallenge
+      description: Separate one-time admin binding and nonce; requires exact admin Origin and CSRF.
+      responses:
+        '200': { description: Google challenge, content: { application/json: { schema: { $ref: '#/components/schemas/GoogleChallenge' } } } }
+  /api/v1/admin/auth/google/exchange:
+    post:
+      operationId: exchangeAdminGoogleIdentity
+      description: Separate Google audience; resolves an existing enabled account with a current finite traffic grant; never creates an account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [challengeId, idToken]
+              properties:
+                challengeId: { type: string, format: uuid }
+                idToken: { type: string, maxLength: 16384 }
+      responses:
+        '200': { description: Admin session, content: { application/json: { schema: { $ref: '#/components/schemas/BrowserSession' } } } }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+  /api/v1/admin/auth/session:
+    get:
+      operationId: readAdminSession
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Current admin session, content: { application/json: { schema: { $ref: '#/components/schemas/BrowserSession' } } } }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+  /api/v1/admin/auth/logout:
+    post:
+      operationId: revokeAdminSession
+      security: [{ adminSession: [] }]
+      responses:
+        '204': { description: Admin session cookie cleared }
+  /api/v1/admin/community-traffic/reports:
+    get:
+      operationId: readAdminTrafficReportQueue
+      security: [{ adminSession: [] }]
+      description: Bounded, cursor-paged canonical report groups; unavailable evidence has no value or area detail. Every read is audited. A page may have zero items and a non-null nextCursor when scanned groups closed or expired; continue paging until nextCursor is null.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, maxLength: 128 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: Moderator queue, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficQueueV3' } } } }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '404': { description: Current grant unavailable }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/community-traffic/reports/{ref}/dismiss:
+    post:
+      operationId: dismissAdminTrafficReport
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: ref, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionV3' } } } }
+      responses:
+        '200': { description: Report group dismissed, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionResponseV3' } } } }
+        '404': { description: No current investigable open group or grant }
+        '409': { description: Conflicting request identity replay }
+  /api/v1/admin/community-traffic/reports/{ref}/suppress:
+    post:
+      operationId: suppressAdminTrafficSummary
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: ref, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionV3' } } } }
+      responses:
+        '200': { description: Canonical projection suppressed atomically with audit, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionResponseV3' } } } }
+        '404': { description: No current investigable open group or grant }
+        '409': { description: Conflicting request identity replay }
 components:
   securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: __Host-routiqo_admin_session
+      description: Separate default-off admin session; loopback development uses routiqo_admin_session.
     browserSession:
       type: apiKey
       in: cookie
@@ -1620,6 +1703,48 @@ components:
       properties:
         accountId: { type: string, format: uuid }
         expiresAt: { type: string, format: date-time }
+    AdminTrafficQueueV3:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/AdminTrafficQueueItemV3' }
+        nextCursor: { type: string, nullable: true }
+    AdminTrafficQueueItemV3:
+      type: object
+      additionalProperties: false
+      required: [ref, reasonCounts, evidenceStatus, areaLabel, trafficValue, observationPeriod, expiresAt]
+      properties:
+        ref: { type: string, format: uuid }
+        reasonCounts:
+          type: object
+          additionalProperties: false
+          required: [INACCURATE, UNSAFE, SPAM]
+          properties:
+            INACCURATE: { type: integer, minimum: 0 }
+            UNSAFE: { type: integer, minimum: 0 }
+            SPAM: { type: integer, minimum: 0 }
+        evidenceStatus: { type: string, enum: [AVAILABLE, EVIDENCE_UNAVAILABLE] }
+        areaLabel: { type: string, nullable: true }
+        trafficValue: { type: string, nullable: true }
+        observationPeriod: { type: string, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+    AdminTrafficDecisionV3:
+      type: object
+      additionalProperties: false
+      required: [requestId, reason]
+      properties:
+        requestId: { type: string, format: uuid }
+        reason: { type: string, enum: [INACCURATE, UNSAFE, SPAM, POLICY] }
+    AdminTrafficDecisionResponseV3:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, enum: [dismissed, suppressed] }
     Destination:
       type: object
       additionalProperties: false

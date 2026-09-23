@@ -4,6 +4,9 @@ import com.routiqo.core.routeupdate.domain.QuickSignalValue;
 import com.routiqo.core.routeupdate.domain.RouteAnchor;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import com.routiqo.core.routing.domain.RouteRequest;
+import com.routiqo.core.moderation.infrastructure.JdbcTrafficReview;
+import com.routiqo.core.moderation.infrastructure.AdminSessionService;
+import com.routiqo.core.identity.application.GoogleIdentityVerifier;
 import java.sql.Timestamp;
 import java.sql.Connection;
 import java.time.Clock;
@@ -53,6 +56,10 @@ class JdbcCommunityTrafficV3IntegrationTest {
     private final List<Owner> owners = new ArrayList<>();
 
     @BeforeEach void clear() {
+        jdbc.update("DELETE FROM community_traffic_review_action_audit_v3");
+        jdbc.update("DELETE FROM community_traffic_review_disposition_v3");
+        jdbc.update("DELETE FROM community_traffic_moderator_read_audit_v3");
+        jdbc.update("DELETE FROM community_traffic_report_group_v3");
         jdbc.update("DELETE FROM community_traffic_report_v3");
         jdbc.update("DELETE FROM community_traffic_suppression_audit_v3");
         jdbc.update("DELETE FROM community_traffic_projection_v3");
@@ -153,21 +160,309 @@ class JdbcCommunityTrafficV3IntegrationTest {
         jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)",
                 operator, "traffic-operator-" + operator);
         var store = store(WINDOW.plusSeconds(303));
-        assertThatThrownBy(() -> store.suppress(operator, request, ref, "INACCURATE"))
-                .isInstanceOf(JdbcCommunityTrafficV3.Missing.class);
+        store.report(owners.getFirst().actor(), owners.getFirst().journey(), ref, UUID.randomUUID(), "INACCURATE");
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
+        assertThatThrownBy(() -> reviewer.decide(operator, request, ref, "SUPPRESS", "INACCURATE", () -> {}))
+                .isInstanceOf(JdbcTrafficReview.Missing.class);
         jdbc.update("""
                 INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
                 VALUES (?, 'traffic_suppress', ?, ?)
                 """, operator, Timestamp.from(WINDOW.plusSeconds(280)),
                 Timestamp.from(WINDOW.plusSeconds(600)));
-        store.suppress(operator, request, ref, "INACCURATE");
-        store.suppress(operator, request, ref, "INACCURATE");
+        reviewer.decide(operator, request, ref, "SUPPRESS", "INACCURATE", () -> {});
+        reviewer.decide(operator, request, ref, "SUPPRESS", "INACCURATE", () -> {});
         assertThat(store.read(owners.getFirst().actor(), owners.getFirst().journey()).moments())
                 .isEmpty();
         assertThat(jdbc.queryForObject("SELECT outcome FROM community_traffic_decision_v3 WHERE window_start = ?",
                 String.class, Timestamp.from(WINDOW))).isEqualTo("PUBLISHED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_suppression_audit_v3",
                 Integer.class)).isEqualTo(1);
+    }
+
+    @Test void dismissalReopensOnNewReportAndConflictingRetryFails() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        var first = owners.getFirst();
+        UUID ref = store(WINDOW.plusSeconds(302)).read(first.actor(), first.journey()).moments().getFirst().ref();
+        UUID operator = UUID.randomUUID(), request = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, "traffic-review-" + operator);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_review', ?, ?)
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+        store(WINDOW.plusSeconds(302)).report(first.actor(), first.journey(), ref, UUID.randomUUID(), "SPAM");
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
+        assertThat(reviewer.queue(operator, null, 20, () -> {}).items()).hasSize(1);
+        reviewer.decide(operator, request, ref, "DISMISS", "SPAM", () -> {});
+        assertThat(reviewer.queue(operator, null, 20, () -> {}).items()).isEmpty();
+        reviewer.decide(operator, request, ref, "DISMISS", "SPAM", () -> {});
+        assertThatThrownBy(() -> reviewer.decide(operator, request, ref, "DISMISS", "POLICY", () -> {}))
+                .isInstanceOf(JdbcTrafficReview.Conflict.class);
+        var second = owners.get(1);
+        store(WINDOW.plusSeconds(304)).report(second.actor(), second.journey(), ref, UUID.randomUUID(), "INACCURATE");
+        var reopened = reviewer.queue(operator, null, 20, () -> {}).items();
+        assertThat(reopened).hasSize(1);
+        assertThat(reopened.getFirst().reasonCounts()).containsEntry("SPAM", 1).containsEntry("INACCURATE", 1);
+        jdbc.update("DELETE FROM community_traffic_report_v3 WHERE actor_id = ?", first.actor());
+        assertThat(reviewer.queue(operator, null, 20, () -> {}).items().getFirst().reasonCounts())
+                .containsEntry("SPAM", 0).containsEntry("INACCURATE", 1);
+        jdbc.update("DELETE FROM routiqo_account WHERE id = ?", second.actor());
+        assertThat(reviewer.queue(operator, null, 20, () -> {}).items()).isEmpty();
+        assertThatThrownBy(() -> reviewer.decide(operator, UUID.randomUUID(), ref, "DISMISS", "POLICY", () -> {}))
+                .isInstanceOf(JdbcTrafficReview.Missing.class);
+        jdbc.update("UPDATE routiqo_account SET enabled = FALSE WHERE id = ?", operator);
+        assertThatThrownBy(() -> reviewer.queue(operator, null, 20, () -> {})).isInstanceOf(JdbcTrafficReview.Missing.class);
+    }
+
+    @Test void expiredProjectionIsUnavailableAndCannotBeReviewed() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        var first = owners.getFirst();
+        UUID ref = store(WINDOW.plusSeconds(302)).read(first.actor(), first.journey()).moments().getFirst().ref();
+        store(WINDOW.plusSeconds(302)).report(first.actor(), first.journey(), ref, UUID.randomUUID(), "UNSAFE");
+        UUID operator = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, "traffic-expiry-" + operator);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_suppress', ?, ?)
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(1200)));
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(901), ZoneOffset.UTC));
+        assertThat(reviewer.queue(operator, null, 20, () -> {}).items().getFirst().evidenceStatus())
+                .isEqualTo("EVIDENCE_UNAVAILABLE");
+        assertThat(reviewer.queue(operator, null, 20, () -> {}).items().getFirst().areaLabel()).isNull();
+        assertThatThrownBy(() -> reviewer.decide(operator, UUID.randomUUID(), ref, "SUPPRESS", "UNSAFE", () -> {}))
+                .isInstanceOf(JdbcTrafficReview.Missing.class);
+        assertThat(jdbc.queryForObject("SELECT suppressed_at FROM community_traffic_projection_v3 WHERE ref = ?",
+                Timestamp.class, ref)).isNull();
+    }
+
+    @Test void adminExchangeRequiresExistingEnabledAccountAndCurrentFiniteGrant() {
+        UUID operator = UUID.randomUUID();
+        String subject = "admin-subject-" + operator;
+        var admin = new AdminSessionService(jdbc, manager,
+                (token, nonce) -> new GoogleIdentityVerifier.Identity("google", subject),
+                Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
+        var challenge = admin.begin();
+        assertThatThrownBy(() -> admin.exchange(challenge.id(), challenge.binding(), "verified-token"))
+                .isInstanceOf(SecurityException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM routiqo_account WHERE google_subject = ?",
+                Integer.class, subject)).isZero();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, subject);
+        assertThatThrownBy(() -> admin.exchange(challenge.id(), challenge.binding(), "verified-token"))
+                .isInstanceOf(SecurityException.class);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_review', ?, ?)
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+        var session = admin.exchange(challenge.id(), challenge.binding(), "verified-token");
+        assertThat(session.accountId()).isEqualTo(operator);
+        assertThat(admin.authenticate(session.credential()).accountId()).isEqualTo(operator);
+        assertThatThrownBy(() -> admin.exchange(challenge.id(), challenge.binding(), "verified-token"))
+                .isInstanceOf(SecurityException.class);
+        jdbc.update("UPDATE routiqo_account SET enabled = FALSE WHERE id = ?", operator);
+        assertThatThrownBy(() -> admin.authenticate(session.credential())).isInstanceOf(SecurityException.class);
+    }
+
+    @Test void moderatorQueueHasBoundedCursorPages() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        var owner = owners.getFirst();
+        UUID firstRef = store(WINDOW.plusSeconds(302)).read(owner.actor(), owner.journey()).moments().getFirst().ref();
+        store(WINDOW.plusSeconds(302)).report(owner.actor(), owner.journey(), firstRef, UUID.randomUUID(), "SPAM");
+        UUID secondRef = UUID.randomUUID(), secondAnchor = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO community_traffic_decision_v3
+                (catalog_version, anchor_id, window_start, outcome, traffic_value, decided_at, expires_at)
+                VALUES (?, ?, ?, 'PUBLISHED', 'TRAFFIC_SLOW', ?, ?)
+                """, CATALOG_VERSION, secondAnchor, Timestamp.from(WINDOW),
+                Timestamp.from(WINDOW.plusSeconds(301)), Timestamp.from(WINDOW.plusSeconds(900)));
+        jdbc.update("""
+                INSERT INTO community_traffic_projection_v3
+                (ref, catalog_version, anchor_id, window_start, area_label, traffic_value, expires_at)
+                VALUES (?, ?, ?, ?, 'Test area', 'TRAFFIC_SLOW', ?)
+                """, secondRef, CATALOG_VERSION, secondAnchor, Timestamp.from(WINDOW),
+                Timestamp.from(WINDOW.plusSeconds(900)));
+        UUID reportRequest = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO community_traffic_report_v3
+                (actor_id, request_id, ref, reason, created_at, expires_at)
+                VALUES (?, ?, ?, 'UNSAFE', ?, ?)
+                """, owner.actor(), reportRequest, secondRef, Timestamp.from(WINDOW.plusSeconds(303)),
+                Timestamp.from(WINDOW.plusSeconds(303 + 720L * 3600)));
+        Long sequence = jdbc.queryForObject("SELECT review_sequence FROM community_traffic_report_v3 WHERE request_id = ?",
+                Long.class, reportRequest);
+        jdbc.update("""
+                INSERT INTO community_traffic_report_group_v3
+                (ref, latest, latest_sequence, inaccurate, unsafe, spam, expires_at)
+                VALUES (?, ?, ?, 0, 1, 0, ?)
+                """, secondRef, Timestamp.from(WINDOW.plusSeconds(303)), sequence,
+                Timestamp.from(WINDOW.plusSeconds(303 + 720L * 3600)));
+        UUID operator = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, "traffic-page-" + operator);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_review', ?, ?)
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(304), ZoneOffset.UTC));
+        assertThatThrownBy(() -> reviewer.queue(operator, null, 51, () -> {}))
+                .isInstanceOf(IllegalArgumentException.class);
+        var page1 = reviewer.queue(operator, null, 1, () -> {});
+        assertThat(page1.items()).hasSize(1);
+        assertThat(page1.nextCursor()).isNotNull();
+        var page2 = reviewer.queue(operator, page1.nextCursor(), 1, () -> {});
+        assertThat(page2.items()).hasSize(1);
+        assertThat(page2.nextCursor()).isNull();
+        assertThat(Set.of(page1.items().getFirst().ref(), page2.items().getFirst().ref()))
+                .containsExactlyInAnyOrder(firstRef, secondRef);
+        reviewer.decide(operator, UUID.randomUUID(), secondRef, "DISMISS", "UNSAFE", () -> {});
+        var skipped = reviewer.queue(operator, null, 1, () -> {});
+        assertThat(skipped.items()).isEmpty();
+        assertThat(skipped.nextCursor()).isNotNull();
+        assertThat(reviewer.queue(operator, skipped.nextCursor(), 1, () -> {}).items().getFirst().ref())
+                .isEqualTo(firstRef);
+    }
+
+    @Test void suppressionAuditFailureRollsBackProjection() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        var owner = owners.getFirst();
+        UUID ref = store(WINDOW.plusSeconds(302)).read(owner.actor(), owner.journey()).moments().getFirst().ref();
+        store(WINDOW.plusSeconds(302)).report(owner.actor(), owner.journey(), ref, UUID.randomUUID(), "UNSAFE");
+        UUID operator = UUID.randomUUID(), priorOperator = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, "traffic-rollback-" + operator);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_suppress', ?, ?)
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+        // Existing unique audit deliberately forces the insert after UPDATE to fail.
+        jdbc.update("""
+                INSERT INTO community_traffic_suppression_audit_v3
+                (operator_id, request_id, ref, reason, occurred_at, expires_at)
+                VALUES (?, ?, ?, 'UNSAFE', ?, ?)
+                """, priorOperator, UUID.randomUUID(), ref, Timestamp.from(WINDOW.plusSeconds(302)),
+                Timestamp.from(WINDOW.plusSeconds(302 + 720L * 3600)));
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
+        assertThatThrownBy(() -> reviewer.decide(operator, UUID.randomUUID(), ref, "SUPPRESS", "UNSAFE", () -> {}))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(jdbc.queryForObject("SELECT suppressed_at FROM community_traffic_projection_v3 WHERE ref = ?",
+                Timestamp.class, ref)).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_review_action_audit_v3 WHERE ref = ?",
+                Integer.class, ref)).isZero();
+    }
+
+    @Test void concurrentSuppressionHasOneWinner() throws Exception {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        var owner = owners.getFirst();
+        UUID ref = store(WINDOW.plusSeconds(302)).read(owner.actor(), owner.journey()).moments().getFirst().ref();
+        store(WINDOW.plusSeconds(302)).report(owner.actor(), owner.journey(), ref, UUID.randomUUID(), "UNSAFE");
+        UUID operator = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, "traffic-race-" + operator);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_suppress', ?, ?)
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var work = (java.util.concurrent.Callable<String>) () -> {
+                ready.countDown(); start.await();
+                try { reviewer.decide(operator, UUID.randomUUID(), ref, "SUPPRESS", "UNSAFE", () -> {}); return "won"; }
+                catch (JdbcTrafficReview.Missing unavailable) { return "lost"; }
+            };
+            var first = pool.submit(work);
+            var second = pool.submit(work);
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder("won", "lost");
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_suppression_audit_v3 WHERE ref = ?",
+                Integer.class, ref)).isEqualTo(1);
+    }
+
+    @Test void accountDeletionOfLastReportWinsRaceAgainstSuppression() throws Exception {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        var owner = owners.getFirst();
+        UUID ref = store(WINDOW.plusSeconds(302)).read(owner.actor(), owner.journey()).moments().getFirst().ref();
+        store(WINDOW.plusSeconds(302)).report(owner.actor(), owner.journey(), ref, UUID.randomUUID(), "UNSAFE");
+        UUID operator = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, "traffic-delete-race-" + operator);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_suppress', ?, ?)
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(600)));
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
+        var deleted = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var decisionStarted = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var deletion = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(manager)
+                    .executeWithoutResult(status -> {
+                        jdbc.update("DELETE FROM routiqo_account WHERE id = ?", owner.actor());
+                        deleted.countDown();
+                        try { if (!release.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Release timed out"); }
+                        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+                    }));
+            assertThat(deleted.await(5, TimeUnit.SECONDS)).isTrue();
+            var decision = pool.submit(() -> {
+                decisionStarted.countDown();
+                try { reviewer.decide(operator, UUID.randomUUID(), ref, "SUPPRESS", "UNSAFE", () -> {}); return "suppressed"; }
+                catch (JdbcTrafficReview.Missing missing) { return "missing"; }
+            });
+            assertThat(decisionStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            Thread.sleep(100);
+            assertThat(decision.isDone()).isFalse();
+            release.countDown();
+            deletion.get(10, TimeUnit.SECONDS);
+            assertThat(decision.get(10, TimeUnit.SECONDS)).isEqualTo("missing");
+        }
+        assertThat(jdbc.queryForObject("SELECT suppressed_at FROM community_traffic_projection_v3 WHERE ref = ?",
+                Timestamp.class, ref)).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_review_action_audit_v3 WHERE ref = ?",
+                Integer.class, ref)).isZero();
+    }
+
+    @Test void adminSessionExpiryIsCheckedAfterRowLockWait() throws Exception {
+        UUID operator = UUID.randomUUID();
+        String subject = "admin-lock-wait-" + operator;
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, subject);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, 'traffic_review', ?, ?)
+                """, operator, Timestamp.from(WINDOW.plusSeconds(280)), Timestamp.from(WINDOW.plusSeconds(1800)));
+        var instant = new java.util.concurrent.atomic.AtomicReference<>(WINDOW.plusSeconds(303));
+        Clock clock = org.mockito.Mockito.mock(Clock.class);
+        org.mockito.Mockito.when(clock.instant()).thenAnswer(invocation -> instant.get());
+        var admin = new AdminSessionService(jdbc, manager,
+                (token, nonce) -> new GoogleIdentityVerifier.Identity("google", subject), clock);
+        var challenge = admin.begin();
+        var session = admin.exchange(challenge.id(), challenge.binding(), "verified-token");
+        var locked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var holder = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(manager)
+                    .executeWithoutResult(status -> {
+                        jdbc.query("SELECT token_hash FROM admin_auth_session WHERE account_id = ? FOR UPDATE",
+                                (rs, n) -> rs.getString(1), operator);
+                        locked.countDown();
+                        try { if (!release.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Release timed out"); }
+                        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+                    }));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            var check = pool.submit(() -> {
+                try { admin.assertCurrent(operator, session.credential()); return "current"; }
+                catch (SecurityException expired) { return "expired"; }
+            });
+            Thread.sleep(100);
+            assertThat(check.isDone()).isFalse();
+            instant.set(session.expiresAt().plusSeconds(1));
+            release.countDown();
+            holder.get(10, TimeUnit.SECONDS);
+            assertThat(check.get(10, TimeUnit.SECONDS)).isEqualTo("expired");
+        }
     }
 
     @Test void catalogChangeDoesNotServeOldVersionProjection() {

@@ -769,6 +769,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Default-off staging moderator CSRF bootstrap; separate admin cookie namespace and exact admin origin. */
+        get: operations["adminCsrf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auth/google/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Separate one-time admin binding and nonce; requires exact admin Origin and CSRF. */
+        post: operations["beginAdminGoogleChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auth/google/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Separate Google audience; resolves an existing enabled account with a current finite traffic grant; never creates an account. */
+        post: operations["exchangeAdminGoogleIdentity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readAdminSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revokeAdminSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/community-traffic/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Bounded, cursor-paged canonical report groups; unavailable evidence has no value or area detail. Every read is audited. A page may have zero items and a non-null nextCursor when scanned groups closed or expired; continue paging until nextCursor is null. */
+        get: operations["readAdminTrafficReportQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/community-traffic/reports/{ref}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dismissAdminTrafficReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/community-traffic/reports/{ref}/suppress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["suppressAdminTrafficSummary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1116,6 +1248,36 @@ export interface components {
             accountId: string;
             /** Format: date-time */
             expiresAt: string;
+        };
+        AdminTrafficQueueV3: {
+            items: components["schemas"]["AdminTrafficQueueItemV3"][];
+            nextCursor: string | null;
+        };
+        AdminTrafficQueueItemV3: {
+            /** Format: uuid */
+            ref: string;
+            reasonCounts: {
+                INACCURATE: number;
+                UNSAFE: number;
+                SPAM: number;
+            };
+            /** @enum {string} */
+            evidenceStatus: "AVAILABLE" | "EVIDENCE_UNAVAILABLE";
+            areaLabel: string | null;
+            trafficValue: string | null;
+            observationPeriod: string | null;
+            /** Format: date-time */
+            expiresAt: string | null;
+        };
+        AdminTrafficDecisionV3: {
+            /** Format: uuid */
+            requestId: string;
+            /** @enum {string} */
+            reason: "INACCURATE" | "UNSAFE" | "SPAM" | "POLICY";
+        };
+        AdminTrafficDecisionResponseV3: {
+            /** @enum {string} */
+            status: "dismissed" | "suppressed";
         };
         Destination: {
             id: string;
@@ -3219,6 +3381,226 @@ export interface operations {
             429: components["responses"]["AuthLimited"];
             /** @description Intake unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    adminCsrf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Admin CSRF token */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CsrfToken"];
+                };
+            };
+        };
+    };
+    beginAdminGoogleChallenge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Google challenge */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleChallenge"];
+                };
+            };
+        };
+    };
+    exchangeAdminGoogleIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    challengeId: string;
+                    idToken: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Admin session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserSession"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+        };
+    };
+    readAdminSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current admin session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserSession"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+        };
+    };
+    revokeAdminSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Admin session cookie cleared */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readAdminTrafficReportQueue: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moderator queue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrafficQueueV3"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description Current grant unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    dismissAdminTrafficReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: components["schemas"]["PrivateSignalUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTrafficDecisionV3"];
+            };
+        };
+        responses: {
+            /** @description Report group dismissed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrafficDecisionResponseV3"];
+                };
+            };
+            /** @description No current investigable open group or grant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflicting request identity replay */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    suppressAdminTrafficSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: components["schemas"]["PrivateSignalUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTrafficDecisionV3"];
+            };
+        };
+        responses: {
+            /** @description Canonical projection suppressed atomically with audit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrafficDecisionResponseV3"];
+                };
+            };
+            /** @description No current investigable open group or grant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflicting request identity replay */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

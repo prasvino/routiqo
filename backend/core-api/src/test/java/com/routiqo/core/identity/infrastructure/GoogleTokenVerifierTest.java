@@ -69,4 +69,16 @@ class GoogleTokenVerifierTest {
         String raw = token(c -> {});
         assertThatThrownBy(() -> verifier().verify(raw, null)).isInstanceOf(SecurityException.class);
     }
+    @Test void separateAdminAudienceRejectsConsumerTokensAndStaleIssueTime() throws Exception {
+        String adminClient = "admin-client.apps.googleusercontent.com";
+        var admin = new GoogleTokenVerifier(NimbusJwtDecoder.withPublicKey(KEY.toRSAPublicKey()).build(),
+                adminClient, Clock.fixed(NOW, ZoneOffset.UTC), 600);
+        assertThatThrownBy(() -> admin.verify(token(c -> {}), NONCE)).isInstanceOf(SecurityException.class);
+        assertThat(admin.verify(token(c -> c.audience(adminClient)), NONCE).subject())
+                .isEqualTo("google-subject-123");
+        assertThatThrownBy(() -> admin.verify(token(c -> {
+            c.audience(adminClient);
+            c.issueTime(Date.from(NOW.minusSeconds(601)));
+        }), NONCE)).isInstanceOf(SecurityException.class);
+    }
 }

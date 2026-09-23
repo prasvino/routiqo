@@ -43,6 +43,36 @@ public final class JdbcCommunityTrafficV3Cleanup {
                        WHERE expires_at <= ? ORDER BY expires_at, actor_id, request_id LIMIT ?)
                     """, Timestamp.from(now), limit);
             deleted += jdbc.update("""
+                    DELETE FROM community_traffic_report_group_v3 WHERE ref IN
+                      (SELECT ref FROM community_traffic_report_group_v3
+                       WHERE expires_at <= ? ORDER BY expires_at, ref LIMIT ?)
+                    """, Timestamp.from(now), limit);
+            deleted += jdbc.update("""
+                    DELETE FROM community_traffic_review_disposition_v3 WHERE ref IN
+                      (SELECT ref FROM community_traffic_review_disposition_v3
+                       WHERE expires_at <= ? ORDER BY expires_at, ref LIMIT ?)
+                    """, Timestamp.from(now), limit);
+            deleted += jdbc.update("""
+                    DELETE FROM community_traffic_review_action_audit_v3 WHERE (operator_id, request_id) IN
+                      (SELECT operator_id, request_id FROM community_traffic_review_action_audit_v3
+                       WHERE expires_at <= ? ORDER BY expires_at, operator_id, request_id LIMIT ?)
+                    """, Timestamp.from(now), limit);
+            deleted += jdbc.update("""
+                    DELETE FROM community_traffic_moderator_read_audit_v3 WHERE id IN
+                      (SELECT id FROM community_traffic_moderator_read_audit_v3
+                       WHERE expires_at <= ? ORDER BY expires_at, id LIMIT ?)
+                    """, Timestamp.from(now), limit);
+            deleted += jdbc.update("""
+                    DELETE FROM admin_login_challenge WHERE id IN
+                      (SELECT id FROM admin_login_challenge
+                       WHERE expires_at <= ? ORDER BY expires_at, id LIMIT ?)
+                    """, Timestamp.from(now), limit);
+            deleted += jdbc.update("""
+                    DELETE FROM admin_auth_session WHERE token_hash IN
+                      (SELECT token_hash FROM admin_auth_session
+                       WHERE expires_at <= ? ORDER BY expires_at, token_hash LIMIT ?)
+                    """, Timestamp.from(now), limit);
+            deleted += jdbc.update("""
                     DELETE FROM community_traffic_suppression_audit_v3 WHERE (operator_id, request_id) IN
                       (SELECT operator_id, request_id FROM community_traffic_suppression_audit_v3
                        WHERE expires_at <= ? ORDER BY expires_at, operator_id, request_id LIMIT ?)

@@ -16,16 +16,19 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 public final class GoogleTokenVerifier implements GoogleIdentityVerifier {
     private final NimbusJwtDecoder decoder;
     public GoogleTokenVerifier(NimbusJwtDecoder decoder, String clientId, Clock clock) {
+        this(decoder, clientId, clock, Long.MAX_VALUE);
+    }
+    public GoogleTokenVerifier(NimbusJwtDecoder decoder, String clientId, Clock clock, long maxTokenAgeSeconds) {
         this.decoder = Objects.requireNonNull(decoder);
         Objects.requireNonNull(clock);
         if (clientId == null || !clientId.matches("[A-Za-z0-9-]{1,200}\\.apps\\.googleusercontent\\.com"))
             throw new IllegalArgumentException("A Google OAuth client ID is required");
-        decoder.setJwtValidator(jwt -> validClaims(jwt, clientId, clock.instant())
+        decoder.setJwtValidator(jwt -> validClaims(jwt, clientId, clock.instant(), maxTokenAgeSeconds)
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Google credential rejected", null)));
     }
 
-    private static boolean validClaims(Jwt jwt, String clientId, Instant now) {
+    private static boolean validClaims(Jwt jwt, String clientId, Instant now, long maxTokenAgeSeconds) {
         try {
             String issuer = jwt.getClaimAsString("iss");
             String subject = jwt.getSubject();
@@ -38,6 +41,7 @@ public final class GoogleTokenVerifier implements GoogleIdentityVerifier {
                     && subject != null && subject.matches("[A-Za-z0-9_-]{1,255}")
                     && issued != null && expiry != null && expiry.isAfter(issued)
                     && !issued.isAfter(now.plusSeconds(60)) && expiry.isAfter(now)
+                    && (maxTokenAgeSeconds == Long.MAX_VALUE || issued.isAfter(now.minusSeconds(maxTokenAgeSeconds)))
                     && (notBefore == null || !notBefore.isAfter(now.plusSeconds(60)));
         } catch (RuntimeException malformedClaim) { return false; }
     }

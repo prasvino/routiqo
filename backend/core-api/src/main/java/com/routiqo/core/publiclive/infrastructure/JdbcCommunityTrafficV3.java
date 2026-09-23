@@ -69,6 +69,10 @@ public final class JdbcCommunityTrafficV3 {
             Instant now = clock.instant();
             if (!eligibleReader(actor, journey, now) || !visible(actor, journey, ref, now))
                 throw new Missing();
+            // The projection share lock serializes report creation with moderator review.
+            // Recheck time after a possible wait so an expired projection cannot be reported.
+            now = clock.instant();
+            if (!visible(actor, journey, ref, now)) throw new Missing();
             List<Report> prior = jdbc.query("""
                     SELECT ref, reason FROM community_traffic_report_v3
                     WHERE actor_id = ? AND request_id = ?
@@ -87,45 +91,27 @@ public final class JdbcCommunityTrafficV3 {
                     """, actor, requestId, ref, reason, Timestamp.from(now),
                     Timestamp.from(now.plusSeconds(720L * 3600)));
             if (created == 0) throw new Conflict();
+            Long sequence = jdbc.queryForObject("""
+                    SELECT review_sequence FROM community_traffic_report_v3
+                    WHERE actor_id = ? AND request_id = ?
+                    """, Long.class, actor, requestId);
+            jdbc.update("""
+                    INSERT INTO community_traffic_report_group_v3
+                      (ref, latest, latest_sequence, inaccurate, unsafe, spam, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (ref) DO UPDATE SET
+                      latest = GREATEST(community_traffic_report_group_v3.latest, EXCLUDED.latest),
+                      latest_sequence = GREATEST(community_traffic_report_group_v3.latest_sequence, EXCLUDED.latest_sequence),
+                      inaccurate = community_traffic_report_group_v3.inaccurate + EXCLUDED.inaccurate,
+                      unsafe = community_traffic_report_group_v3.unsafe + EXCLUDED.unsafe,
+                      spam = community_traffic_report_group_v3.spam + EXCLUDED.spam,
+                      expires_at = GREATEST(community_traffic_report_group_v3.expires_at, EXCLUDED.expires_at)
+                    """, ref, Timestamp.from(now), sequence,
+                    reason.equals("INACCURATE") ? 1 : 0, reason.equals("UNSAFE") ? 1 : 0,
+                    reason.equals("SPAM") ? 1 : 0, Timestamp.from(now.plusSeconds(720L * 3600)));
         });
     }
 
-    /** Internal only. Caller must be authenticated by an external admin boundary. */
-    public void suppress(UUID operator, UUID requestId, UUID ref, String reason) {
-        if (!List.of("INACCURATE", "UNSAFE", "SPAM", "POLICY").contains(reason))
-            throw new IllegalArgumentException("Invalid suppression reason");
-        transaction.executeWithoutResult(status -> {
-            Instant now = clock.instant();
-            Boolean allowed = jdbc.query("""
-                    SELECT TRUE FROM moderation_operator_grant g
-                    JOIN routiqo_account a ON a.id = g.operator_id AND a.enabled
-                    WHERE g.operator_id = ? AND g.permission = 'traffic_suppress'
-                      AND g.issued_at <= ? AND g.expires_at > ? FOR UPDATE OF g
-                    """, (org.springframework.jdbc.core.ResultSetExtractor<Boolean>) rows -> rows.next(),
-                    operator, Timestamp.from(now), Timestamp.from(now));
-            if (!Boolean.TRUE.equals(allowed)) throw new Missing();
-            List<Audit> prior = jdbc.query("""
-                    SELECT ref, reason FROM community_traffic_suppression_audit_v3
-                    WHERE operator_id = ? AND request_id = ?
-                    """, (row, n) -> new Audit(row.getObject(1, UUID.class), row.getString(2)),
-                    operator, requestId);
-            if (!prior.isEmpty()) {
-                if (prior.getFirst().ref().equals(ref) && prior.getFirst().reason().equals(reason))
-                    return;
-                throw new Conflict();
-            }
-            if (jdbc.update("""
-                    UPDATE community_traffic_projection_v3 SET suppressed_at = ?
-                    WHERE ref = ? AND suppressed_at IS NULL AND expires_at > ?
-                    """, Timestamp.from(now), ref, Timestamp.from(now)) != 1) throw new Missing();
-            jdbc.update("""
-                    INSERT INTO community_traffic_suppression_audit_v3
-                      (operator_id, request_id, ref, reason, occurred_at, expires_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """, operator, requestId, ref, reason, Timestamp.from(now),
-                    Timestamp.from(now.plusSeconds(720L * 3600)));
-        });
-    }
 
     private boolean eligibleReader(UUID actor, UUID journey, Instant now) {
         return Boolean.TRUE.equals(jdbc.query("""
@@ -148,13 +134,13 @@ public final class JdbcCommunityTrafficV3 {
                   AND p.anchor_id = ANY(x.anchor_ids)
                   AND p.catalog_version = x.catalog_version
                 WHERE p.ref = ? AND p.suppressed_at IS NULL AND p.expires_at > ?
+                FOR SHARE OF p
                 """, (org.springframework.jdbc.core.ResultSetExtractor<Boolean>) rows -> rows.next(),
                 actor, journey, Timestamp.from(now), catalog.version(),
                 ref, Timestamp.from(now)));
     }
 
     private record Report(UUID ref, String reason) {}
-    private record Audit(UUID ref, String reason) {}
     public static final class Missing extends RuntimeException {}
     public static final class Conflict extends RuntimeException {}
 }

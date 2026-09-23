@@ -66,4 +66,15 @@ class BrowserCommunityTrafficOffHttpTest {
                     .isEqualTo(403);
         }
     }
+    @Test void adminRoutesAreDefaultOff() throws Exception {
+        var client = HttpClient.newHttpClient();
+        for (String path : new String[] {
+                "/api/v1/admin/auth/csrf",
+                "/api/v1/admin/auth/session",
+                "/api/v1/admin/community-traffic/reports"
+        }) {
+            var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build();
+            assertThat(client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode()).isIn(401, 403);
+        }
+    }
 }

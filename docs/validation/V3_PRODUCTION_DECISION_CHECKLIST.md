@@ -2,6 +2,8 @@
 
 Status: V3 implementation and staging evaluation authorized; **production activation not approved**. This checklist separates engineering evidence from acceptance of ADR 0055's different privacy contract. The existing ADR 0053/0054 code/docs remain preserved and disconnected.
 
+The [real staging trial handoff](V3_STAGING_TRIAL_PENDING.md) assigns the remaining engineering and external inputs. The V3 moderator workflow is staged separately under [ADR 0056](../adr/0056-v3-moderator-staging-boundary.md); implementing it does not close the real OAuth, operator-policy or privacy-review gates below.
+
 - [ ] Owner reviews the completed staging release packet and explicitly accepts the V3 disclosure: participation may be inferred; accepted Share is only for consideration; withdrawal after the publication snapshot may be too late; authorized safety suppression and saved outside copies remain possible. This is not person-level differential privacy.
 - [ ] Product/privacy and security review approve the exact Share, Stop, Ghost Mode, deletion, blocking and moderation wording, plus purpose/versioned consent and no migration of V18/V22 records.
 - [ ] Real authenticated staging flow passes Share/Stop/recovery, publisher, active-journey reader, report/moderation and cleanup with reviewed regional catalog, Google OAuth, separate admin authentication and configuration. Confirm all production V3 flags remain disabled until approval.

@@ -179,9 +179,15 @@ Share and Stop from separate sessions, observe a canonical traffic row or
 truthful empty state, report a visible row, and confirm expiry without relying
 on cleanup timing. The automated PostgreSQL/HTTP and browser component tests
 provide repeatable evidence when OAuth or regional credentials are absent.
-There is no public moderator HTTP route: audited suppression currently requires
-a separately authenticated internal operator boundary and finite
-`traffic_suppress` grant. Do not expose the internal store method directly.
+The consumer API has no moderator route. The separate default-off admin boundary
+requires independent authentication and a finite `traffic_review` or
+`traffic_suppress` grant; suppression stays behind that boundary.
+
+The separately flagged V3 moderator implementation and its isolated staging
+preflight are documented in [the moderator runbook](V3_MODERATOR_STAGING_RUNBOOK.md).
+Until that workflow is verified with real admin OAuth, MFA policy, finite grants
+and operators, do not treat a local moderator UI or automated test as completed
+staging moderation.
 
 Rollback closes the web, backend V3 API and publisher flags together, while
 maintenance continues; preserve
