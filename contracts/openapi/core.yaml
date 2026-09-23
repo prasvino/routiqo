@@ -537,6 +537,33 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: 'Provider, persistence, session or rate infrastructure unavailable. Empty response body.' }
+  /api/v1/journeys/{id}/provider-alerts:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        description: Canonical lowercase non-nil journey UUID.
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    get:
+      operationId: getActiveJourneyProviderAlerts
+      security: [{ browserSession: [] }]
+      description: Returns current official NDMA SACHET district weather alerts for an owned active journey. No traveller signals or route data are sent to the provider. Default off with ROUTIQO_PROVIDER_LIVE_ENABLED. Five reads per account per minute. Never cache this response.
+      responses:
+        '200':
+          description: Current bounded alerts; an empty list is a valid result and does not imply safety.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProviderAlertsResponse' }
+        '400': { description: Invalid canonical journey identifier or query string }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '404': { description: 'Journey missing, completed or not owned by this account' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Provider, session or rate infrastructure unavailable. Empty response body.' }
   /api/v1/journeys/{id}/signal-commands:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -967,6 +994,31 @@ components:
           pattern: '^(0|[1-9][0-9]{0,18})$'
           description: Canonical decimal string from zero through 9223372036854775807.
         sharing: { type: boolean }
+    ProviderAlertsResponse:
+      type: object
+      additionalProperties: false
+      required: [region, scope, source, alerts]
+      properties:
+        region: { type: string, enum: ['Chennai district area'] }
+        scope: { type: string, enum: ['District-wide alerts; not road conditions'] }
+        source: { type: string, enum: ['NDMA SACHET'] }
+        alerts:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/ProviderAlert' }
+    ProviderAlert:
+      type: object
+      additionalProperties: false
+      required: [id, event, area, severity, issuer, sourceUrl, issuedAt, expiresAt]
+      properties:
+        id: { type: string, pattern: '^[0-9]{8,24}$' }
+        event: { type: string, maxLength: 120 }
+        area: { type: string, maxLength: 140 }
+        severity: { type: string, enum: [Minor, Moderate, Severe, Extreme] }
+        issuer: { type: string, maxLength: 80 }
+        sourceUrl: { type: string, format: uri }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
     BrowserRouteContext:
       type: object
       additionalProperties: false

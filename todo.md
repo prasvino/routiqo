@@ -2,6 +2,9 @@
 
 ## First release — privacy and publication
 
+- [x] Implement the separate default-off Chennai district official-alert pilot: bounded NDMA CAP reader, owner-only active-journey API, browser list and explicit source/freshness states. This does not satisfy the traveller publication items below.
+- [ ] User-led staging validation of the official-alert pilot is deferred; follow the checklist and record results in `docs/features/live/PROVIDER_LIVE_PILOT_SPEC.md` before activation.
+
 - [ ] Define and independently review a measurable public LIVE privacy contract, including collusion assumptions and permitted inference.
 - [ ] Specify fixed geographic partitions, publication windows, evidence independence, contribution eligibility and distributed query budgets.
 - [ ] Resolve block, withdrawal, Ghost Mode, journey completion and account deletion without exposing individual contributions.

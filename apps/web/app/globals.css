@@ -1891,6 +1891,65 @@ textarea::placeholder {
   margin-top: 16px;
   font-size: 13px;
 }
+.provider-live {
+  margin-top: 24px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+}
+.provider-live h3 {
+  margin-bottom: 6px;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 400;
+}
+.provider-live-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.provider-live-head p,
+.provider-live-checked,
+.provider-live-disclosure {
+  color: var(--muted);
+  font-size: 13px;
+}
+.provider-live .button {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.provider-live-list {
+  list-style: none;
+  margin: 18px 0;
+  padding: 0;
+}
+.provider-live-list li {
+  display: grid;
+  gap: 4px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.provider-live-list li span {
+  color: var(--muted);
+}
+.provider-live-list a {
+  width: fit-content;
+  margin-top: 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.provider-live-disclosure {
+  margin-top: 12px;
+}
+@media (max-width: 480px) {
+  .provider-live-head {
+    display: block;
+  }
+  .provider-live .button {
+    margin-top: 12px;
+    width: 100%;
+  }
+}
 .live-consent-panel {
   margin-top: 24px;
   padding: 20px;

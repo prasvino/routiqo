@@ -16,6 +16,7 @@ import {
 import { Modal } from './modal';
 import { RoutePlanner, type RoutePlannerContributionSource } from './route-planner';
 import { PrivateSignalsPanel } from './private-signals-panel';
+import { ProviderLiveAlerts } from './provider-live-alerts';
 import { LiveSignalRecoveryCoordinator } from '../lib/live-signal-recovery';
 import type { LiveConsentAuthority } from './live-route-binding-panel';
 import { JournalEditor } from './journal-editor';
@@ -436,14 +437,22 @@ export function JourneyWorkspace() {
             this device; trip journal notes are saved separately when you choose.
           </p>
           {account && active && (
-            <LiveConsentPanel
-              key={`${account}:${active.id}`}
-              accountId={account}
-              journeyId={active.id}
-              online={!offline}
-              available={liveAvailable}
-              onAuthorityChange={updateConsentAuthority}
-            />
+            <>
+              <ProviderLiveAlerts
+                key={`provider:${account}:${active.id}`}
+                accountId={account}
+                journeyId={active.id}
+                online={!offline}
+              />
+              <LiveConsentPanel
+                key={`${account}:${active.id}`}
+                accountId={account}
+                journeyId={active.id}
+                online={!offline}
+                available={liveAvailable}
+                onAuthorityChange={updateConsentAuthority}
+              />
+            </>
           )}
           {completed.length > 0 && (
             <div className="journey-history">

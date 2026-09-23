@@ -16,6 +16,45 @@ const request = (body = '{}', origin: string | null = config.origin) =>
     headers: { 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) },
   });
 describe('same-origin auth proxy', () => {
+  it('allows only a bounded GET for provider alerts', async () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    const path = [id, 'provider-alerts'];
+    const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ alerts: [] }));
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${id}/provider-alerts`),
+          path,
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(200);
+    expect(upstream.mock.calls[0]?.[0]).toBe(
+      `${config.upstream}/api/v1/journeys/${id}/provider-alerts`,
+    );
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${id}/provider-alerts`, { method: 'POST' }),
+          path,
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(405);
+    expect(
+      (
+        await proxyBrowserJourneys(
+          new Request(`${config.origin}/api/v1/journeys/${id}/provider-alerts?x=1`),
+          path,
+          config,
+          upstream,
+        )
+      ).status,
+    ).toBe(400);
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
   it('allows only journey routes and bounded cursor queries', async () => {
     const upstream = vi
       .fn<typeof fetch>()

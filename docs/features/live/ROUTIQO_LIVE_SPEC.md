@@ -1,6 +1,9 @@
 # Routiqo Live: first release plan
 
-Status: first release not implemented. Private domain, persistence and owner-only
+Status: traveller-derived first release not implemented. A separate default-off
+Chennai district official-alert pilot is defined in
+`PROVIDER_LIVE_PILOT_SPEC.md` and ADR 0050; it does not publish Quick Signals.
+Private domain, persistence and owner-only
 transport prerequisites exist; consult BUILD_STATUS.md for current verification.
 Agreed scope: an active-journey LIVE
 list; internal receipt transitions are specified in QUICK_SIGNAL_RECEIPT_SPEC.md.

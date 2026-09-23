@@ -4,6 +4,10 @@ Status: safety direction recorded in ADR 0038, not publication approval. ADR 002
 admission consistency only. This checkpoint records concrete remaining decisions
 instead of treating a minimum actor threshold as proof of privacy.
 
+The [public LIVE privacy protocol implementation contract](PUBLIC_LIVE_PRIVACY_PROTOCOL_SPEC.md)
+records the current human-verification direction and fail-closed acceptance criteria.
+It does not approve a public projection or relax the collusion threat boundary.
+
 ## Fixed first-release direction
 
 - Active owned-journey relevance, server-owned anchor registry and no arbitrary

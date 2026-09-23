@@ -105,6 +105,8 @@ export async function proxyBrowserJourneys(
   const consent = path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'consent';
   const routeContext =
     path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'route-context';
+  const providerAlerts =
+    path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'provider-alerts';
   const signalCommands =
     path.length === 2 && journeyId.test(path[0] ?? '') && path[1] === 'signal-commands';
   const signalChoices =
@@ -138,6 +140,7 @@ export async function proxyBrowserJourneys(
     !journal &&
     !consent &&
     !routeContext &&
+    !providerAlerts &&
     !signalCommands &&
     !signalChoices &&
     !expectedSignalCommand &&
@@ -149,7 +152,7 @@ export async function proxyBrowserJourneys(
   if (
     !(listing || journal || consent || routeContext
       ? ['GET', 'POST'].includes(request.method)
-      : request.method === (detail || signalChoices ? 'GET' : 'POST')) ||
+      : request.method === (detail || signalChoices || providerAlerts ? 'GET' : 'POST')) ||
     ((signalCommands || expectedSignalCommand || signalCommandStop || signal || signalWithdraw) &&
       request.method !== 'POST')
   )
@@ -178,11 +181,13 @@ export async function proxyBrowserJourneys(
     `journeys${listing ? '' : '/' + path.join('/')}${suffix}`,
     config,
     upstreamFetch,
-    signalChoices
-      ? { responseLimit: 256 * 1024, timeout: 8000 }
-      : routeContext && request.method === 'POST'
-        ? { responseLimit: 64 * 1024, timeout: 25000 }
-        : undefined,
+    providerAlerts
+      ? { responseLimit: 32 * 1024, timeout: 25000 }
+      : signalChoices
+        ? { responseLimit: 256 * 1024, timeout: 8000 }
+        : routeContext && request.method === 'POST'
+          ? { responseLimit: 64 * 1024, timeout: 25000 }
+          : undefined,
   );
 }
 export async function proxyBrowserPlaceSearch(

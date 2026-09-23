@@ -387,6 +387,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journeys/{id}/provider-alerts": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Returns current official NDMA SACHET district weather alerts for an owned active journey. No traveller signals or route data are sent to the provider. Default off with ROUTIQO_PROVIDER_LIVE_ENABLED. Five reads per account per minute. Never cache this response. */
+        get: operations["getActiveJourneyProviderAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/journeys/{id}/signal-commands": {
         parameters: {
             query?: never;
@@ -620,6 +643,29 @@ export interface components {
             /** @description Canonical decimal string from zero through 9223372036854775807. */
             expectedGeneration: string;
             sharing: boolean;
+        };
+        ProviderAlertsResponse: {
+            /** @enum {string} */
+            region: "Chennai district area";
+            /** @enum {string} */
+            scope: "District-wide alerts; not road conditions";
+            /** @enum {string} */
+            source: "NDMA SACHET";
+            alerts: components["schemas"]["ProviderAlert"][];
+        };
+        ProviderAlert: {
+            id: string;
+            event: string;
+            area: string;
+            /** @enum {string} */
+            severity: "Minor" | "Moderate" | "Severe" | "Extreme";
+            issuer: string;
+            /** Format: uri */
+            sourceUrl: string;
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
         };
         BrowserRouteContext: {
             /** Format: uuid */
@@ -1891,6 +1937,56 @@ export interface operations {
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
             /** @description Provider, persistence, session or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getActiveJourneyProviderAlerts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                /** @description Canonical lowercase non-nil journey UUID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current bounded alerts; an empty list is a valid result and does not imply safety. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderAlertsResponse"];
+                };
+            };
+            /** @description Invalid canonical journey identifier or query string */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Journey missing, completed or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Provider, session or rate infrastructure unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;

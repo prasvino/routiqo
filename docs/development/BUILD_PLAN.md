@@ -8,6 +8,12 @@ and remaining release gates.
 
 ## Next priority: Routiqo Live first release
 
+The separate Chennai official-alert pilot (ADR 0050) now has a default-off
+active-journey API, NDMA CAP reader and web list. It provides district-wide
+provider context without exposing traveller contributions. Real authenticated
+staging/provider and device QA remain before activation; it does not close the
+traveller-derived publication and safety gates below.
+
 Current browser slice (2026-09-19): private active-journey consent, route
 preparation and Quick Signal controls are implemented. Contribution requires a
 successful fresh bind and exact current account, journey, consent, route selection,
