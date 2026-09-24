@@ -12,6 +12,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { randomUUID } from 'expo-crypto';
 import { useSQLiteContext } from 'expo-sqlite';
 import type { JourneyKind } from '@routiqo/shared';
+import type { TripJournal } from '@routiqo/shared';
 import { NativeHttpStatus } from './safe-transport';
 import { nativeTransport } from './android-transport';
 import { nativeGoogle } from './native-google';
@@ -23,6 +24,7 @@ import {
   type NativeHistoryCursor,
   type NativeHistoryPage,
 } from '../features/journey/native-history';
+import { readNativeJournal } from '../features/journey/native-journal';
 import {
   clearJourneyPartition,
   queueMobileJourney,
@@ -42,6 +44,7 @@ interface NativeAccountContext {
   deletionCleanupPending: boolean;
   historyEpoch: number;
   readHistory(before: NativeHistoryCursor | null): Promise<NativeHistoryPage>;
+  readJournal(journeyId: string, signal: AbortSignal): Promise<TripJournal>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   reauthenticateForDeletion(): Promise<void>;
@@ -104,6 +107,43 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         identity.activeAccount() !== account
       )
         throw new Error('Account history session changed.');
+      if (
+        failure instanceof NativeSessionRequired ||
+        (failure instanceof NativeHttpStatus && (failure.status === 401 || failure.status === 403))
+      ) {
+        invalidateHistory();
+        identity.invalidate();
+        setAccountId(null);
+        setPartition(null);
+        setError('Your session needs verification. Sign in from Profile to continue.');
+      }
+      throw failure;
+    }
+  }
+  async function readJournal(journeyId: string, signal: AbortSignal): Promise<TripJournal> {
+    const account = identity.activeAccount();
+    if (!account || accountId !== account || deletionPendingRef.current)
+      throw new NativeSessionRequired();
+    const epoch = historyEpochRef.current;
+    const revision = identity.revision();
+    try {
+      const journal = await readNativeJournal(identity, account, journeyId, signal);
+      if (
+        epoch !== historyEpochRef.current ||
+        revision !== identity.revision() ||
+        identity.activeAccount() !== account ||
+        accountId !== account
+      )
+        throw new NativeSessionRequired();
+      return journal;
+    } catch (failure) {
+      if (
+        epoch !== historyEpochRef.current ||
+        revision !== identity.revision() ||
+        identity.activeAccount() !== account ||
+        accountId !== account
+      )
+        throw new NativeSessionRequired();
       if (
         failure instanceof NativeSessionRequired ||
         (failure instanceof NativeHttpStatus && (failure.status === 401 || failure.status === 403))
@@ -398,6 +438,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         deletionCleanupPending: deletedAccountId !== null,
         historyEpoch,
         readHistory,
+        readJournal,
         signIn,
         signOut,
         reauthenticateForDeletion,

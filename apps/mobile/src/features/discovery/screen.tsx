@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AppState,
   Alert,
@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -68,6 +69,18 @@ export function DiscoveryScreen({
   const [form, setForm] = useState<JourneyPlan | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const listRef = useRef<FlatList<Destination>>(null);
+  const panelY = useRef<number | null>(null);
+  const historyY = useRef<number | null>(null);
+  function positionHistory() {
+    requestAnimationFrame(() => {
+      if (panelY.current === null || historyY.current === null) return;
+      listRef.current?.scrollToOffset({
+        offset: panelY.current + historyY.current,
+        animated: false,
+      });
+    });
+  }
   function plan(destination = '') {
     setForm({
       id:
@@ -135,6 +148,7 @@ export function DiscoveryScreen({
   return (
     <SafeAreaView edges={['bottom']} style={s.safe}>
       <FlatList
+        ref={listRef}
         data={section === 'Trips' ? [] : places}
         keyExtractor={(item) => item.id}
         contentContainerStyle={s.list}
@@ -216,7 +230,15 @@ export function DiscoveryScreen({
             )}
             {section === 'Trips' && (
               <>
-                <NativeJourneyPanel />
+                <NativeJourneyPanel
+                  onLayout={(event: LayoutChangeEvent) => {
+                    panelY.current = event.nativeEvent.layout.y;
+                  }}
+                  onHistoryLayout={(event: LayoutChangeEvent) => {
+                    historyY.current = event.nativeEvent.layout.y;
+                  }}
+                  onHistoryNavigate={positionHistory}
+                />
                 <Text style={s.notice}>
                   Device local time. No reminders or cloud sync. Earlier plans follow upcoming
                   departures.

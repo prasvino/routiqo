@@ -1,16 +1,24 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import { NativeMapPreview } from './native-map';
 import { NativeJourneyHistory } from './native-journey-history';
 
 const c = tokens.colors;
-export function NativeJourneyPanel() {
+export function NativeJourneyPanel({
+  onLayout,
+  onHistoryLayout,
+  onHistoryNavigate,
+}: {
+  onLayout?: (event: LayoutChangeEvent) => void;
+  onHistoryLayout?: (event: LayoutChangeEvent) => void;
+  onHistoryNavigate?: () => void;
+}) {
   const session = useNativeAccount();
   const active = session.partition?.snapshots.journeys.find((item) => item.status === 'active');
   const pending = session.partition?.outbox.entries ?? [];
   return (
-    <View style={styles.section}>
+    <View style={styles.section} onLayout={onLayout}>
       <Text style={styles.heading}>Active journey</Text>
       {!session.configured ? (
         <Text style={styles.notice}>
@@ -102,7 +110,7 @@ export function NativeJourneyPanel() {
           ) : (
             <Text style={styles.notice}>No server journeys yet.</Text>
           )}
-          <NativeJourneyHistory />
+          <NativeJourneyHistory onLayout={onHistoryLayout} onNavigate={onHistoryNavigate} />
         </>
       )}
     </View>

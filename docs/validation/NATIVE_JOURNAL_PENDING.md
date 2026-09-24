@@ -1,13 +1,22 @@
-# Native journal read validation ledger
+# Native journal validation ledger
 
-Updated: 2026-09-24. Scope is the owner-only completed-trip journal API and native
-read transport. Android journal browsing and editing are not part of this phase.
+Updated: 2026-09-24. Owner-only completed-trip journal reads and native browsing
+are implemented. Native durable editing remains the next implementation phase.
+
+## Implemented browsing
+
+- Completed account-history trips expose an explicit journal action. Inline detail
+  shows authored plain text and lifecycle dates, with Back preserving the page.
+- Loading, empty notes, unavailable/missing, session-required and offline states
+  are distinct. Loaded content is retained offline only within the current session.
+- Closing, selecting another trip, going offline and disposing cancel/fence reads.
+  Account/session epoch changes remount private views; authentication denial clears
+  private content. No journal persistence or writes are introduced by browsing.
+- Opening a trip far down a full history page and returning to history reposition
+  the section without animation. Dates and text wrap at increased font size.
 
 ## Remaining implementation
 
-- Mount explicit journal browsing from completed trips in native account history.
-  Include loading, empty annotation, unavailable, offline and retry states; clear
-  private content and reject late results on account/session changes.
 - Design account-bound durable drafts and conflict recovery before native editing.
   Do not reuse the lifecycle outbox for journal annotation mutations.
 
@@ -15,7 +24,7 @@ read transport. Android journal browsing and editing are not part of this phase.
 
 - Use the real Google OAuth and staging HTTPS configuration tracked in
   `NATIVE_ANDROID_PENDING.md` to verify owner reads and cross-account denial.
-- Once browsing is mounted, exercise real annotations on an emulator and a
+- Exercise real annotations on an emulator and a
   representative physical Android device, including large text, accessibility,
   network loss, renewal, sign-out and delayed reads during account changes.
 
@@ -23,7 +32,28 @@ No new provider, database migration, journal retention or production activation 
 required by the read transport. Existing planning backups and journey recovery
 snapshots must not acquire journal content.
 
-## Verification evidence
+## Browsing verification
+
+- Full TypeScript regression suite: **626 tests / 78 files passed**. Following the
+  final scroll correction, the five journal controller/view tests, mobile
+  TypeScript and focused lint passed again. Workspace formatting, all six typecheck
+  targets, lint, contract drift and secret scan passed before that correction.
+- Actual emulator screenshots cover loaded/empty/loading/error/missing/session
+  and both offline states, plus 360 dp width at 130% text. View callbacks were
+  exercised for open, Back and retry. A second temporary synthetic account-context
+  fixture exercised the complete Trips/history/controller scroll flow with 20 trips
+  and a long journal. Both fixtures were removed; neither used real credentials
+  or established real-service operation.
+- Evidence and limitations: `docs/quality/evidence/native-journal-browsing-2026-09-24/README.md`.
+- Final restored-app Android build passed (43 seconds, 467 tasks, 13 executed),
+  installed and launched. Startup logs showed the JavaScript app running with no
+  fatal exception/signal or ReactNativeJS error in the inspected process capture.
+- Root review checked cancellation, late replies, account epoch isolation, plain
+  text preservation, eligibility and deep-page navigation. No unresolved blocking
+  finding remains. Backend code is unchanged in this browsing phase; its prior
+  **546 Java tests** are historical transport evidence, not a new run.
+
+## Earlier read-transport verification
 
 - Full TypeScript regression suite: **621 tests / 76 files passed** with two
   workers. Focused native transport/account tests: **15 passed**.
@@ -45,5 +75,5 @@ snapshots must not acquire journal content.
   `90543278bdb1070390fd3795f8da8ce49ec223818d962007859a95da1a998ab0`.
   This is compilation/packaging evidence, not a new device or real-service trial.
 
-These tests use synthetic accounts. No journal browsing UI, configured-service
-device trial or production readiness is claimed.
+These earlier tests use synthetic accounts. Current browsing evidence is separately
+listed above. No configured-service device trial or production readiness is claimed.

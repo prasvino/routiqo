@@ -22,6 +22,25 @@ six typecheck targets, lint, formatting, contracts and secret scan passed. The
 x86_64 Android debug APK build passed (467 tasks, 15 executed). This transport
 phase does not claim a new emulator, physical-device or real OAuth trial.
 
+## September 24 native journal browsing
+
+Completed trips in native account history now open their private journal inline,
+with Back preserving the page, explicit retry, empty/missing/session states and
+session-only offline retention. Late reads are cancelled/fenced across selection,
+closing, network loss and account/session changes. Deep-page selections reposition
+the journal heading without animation. Native journal editing remains pending.
+
+The full **626 TypeScript tests / 78 files** passed, with five focused controller
+and view tests plus mobile types/lint repeated after the final navigation fix.
+Workspace formatting, all six typechecks, lint, contracts and secret scan passed;
+final changed-file formatting also passed. The Android debug APK built in 43 seconds
+(467 tasks, 13 executed) and installed. Labeled synthetic emulator evidence covers
+states, retry, Back, deep history navigation and 360 dp/large-text rendering in
+[the evidence folder](evidence/native-journal-browsing-2026-09-24/README.md).
+Real OAuth/staging and physical-device checks remain in the
+[journal ledger](../validation/NATIVE_JOURNAL_PENDING.md). Backend code was unchanged;
+the preceding 546-test Java result was not rerun for this UI-only phase.
+
 ## Implemented
 
 | Area | Current behavior |
