@@ -30,6 +30,11 @@ export async function initializeJourneyOutbox(db: Pick<OutboxDatabase, 'execAsyn
   await db.execAsync(`CREATE TABLE IF NOT EXISTS journey_retired_accounts_v1 (
     account_id TEXT PRIMARY KEY NOT NULL
   );`);
+  // Deletion must work for databases initialized by the outbox alone as well.
+  await db.execAsync(`CREATE TABLE IF NOT EXISTS journal_partitions_v1 (
+    account_id TEXT PRIMARY KEY NOT NULL,
+    payload TEXT NOT NULL
+  );`);
 }
 
 /** No network inside change. Return only after SQLite commits the new queue. */
@@ -155,6 +160,7 @@ export async function clearJourneyPartition(db: OutboxDatabase, accountId: strin
     );
     await tx.runAsync('DELETE FROM journey_outbox_v1 WHERE account_id = ?', accountId);
     await tx.runAsync('DELETE FROM journey_snapshots_v1 WHERE account_id = ?', accountId);
+    await tx.runAsync('DELETE FROM journal_partitions_v1 WHERE account_id = ?', accountId);
   });
 }
 

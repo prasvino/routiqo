@@ -58,7 +58,6 @@ export function createNativeTransport(
       throw new Error('Native request is invalid.');
     if (path === '/api/v1/native/journeys/history' && method !== 'POST')
       throw new Error('Native request is invalid.');
-    if (journalPath.test(path) && method !== 'GET') throw new Error('Native request is invalid.');
     const credential = options.credential ?? null;
     const accountId = options.accountId ?? null;
     if (credential !== null && !credentialPattern.test(credential))

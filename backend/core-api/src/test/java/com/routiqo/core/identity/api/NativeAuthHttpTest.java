@@ -143,8 +143,11 @@ class NativeAuthHttpTest {
             builder.header("X-Routiqo-Account", identity.accountId());
         }
         for (var header : extra) builder.header(header[0], header[1]);
-        if (method.equals("POST")) builder.header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body));
+        if (method.equals("POST")) {
+            if (extra.stream().noneMatch(header -> header[0].equalsIgnoreCase("Content-Type")))
+                builder.header("Content-Type", "application/json");
+            builder.POST(HttpRequest.BodyPublishers.ofString(body));
+        }
         else if (method.equals("GET")) builder.GET();
         else builder.method(method, HttpRequest.BodyPublishers.noBody());
         var response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
@@ -222,10 +225,84 @@ class NativeAuthHttpTest {
                 List.<String[]>of(new String[] {"Origin", "https://example.org"})).statusCode()).isEqualTo(403);
         assertThat(journey("GET", "/" + trip + "/journal", "", owner,
                 List.<String[]>of(new String[] {"X-Routiqo-Account", other.accountId()})).statusCode()).isEqualTo(401);
-        assertThat(journey("POST", "/" + trip + "/journal", "{}", owner, List.of()).statusCode()).isEqualTo(403);
+        assertThat(journey("POST", "/" + trip + "/journal", "{}", owner, List.of()).statusCode()).isEqualTo(400);
         assertThat(journey("DELETE", "/" + trip + "/journal", "", owner, List.of()).statusCode()).isEqualTo(403);
         assertThat(journey("GET", "/" + trip + "/journal/extra", "", owner, List.of()).statusCode()).isEqualTo(403);
         assertThat(journey("GET", "/" + trip + "/journal", "", owner, List.of()).body()).isEqualTo(populated.body());
+    }
+
+    static String journalWrite(String title, String notes, String version, String mutation) {
+        return "{\"title\":\"" + title + "\",\"notes\":\"" + notes
+                + "\",\"expectedVersion\":" + version + ",\"mutationId\":\"" + mutation + "\"}";
+    }
+
+    @Test void nativeJournalWriteUsesOwnerCasReplayAndStrictTransport() throws Exception {
+        Login owner = login(), other = loginOther();
+        String trip = UUID.randomUUID().toString(), active = UUID.randomUUID().toString();
+        assertThat(journey("POST", "", "{\"id\":\"" + trip + "\",\"kind\":\"trip\"}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "/" + trip + "/complete", "{}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "", "{\"id\":\"" + active + "\",\"kind\":\"trip\"}", owner, List.of()).statusCode()).isEqualTo(200);
+        String mutation = UUID.randomUUID().toString();
+        String first = journalWrite("Café", "first\\nsecond", "0", mutation);
+        var saved = journey("POST", "/" + trip + "/journal", first, owner, List.of());
+        assertThat(saved.statusCode()).isEqualTo(200);
+        assertThat(saved.body()).contains("Café", "first\\nsecond", "\"version\":1");
+        assertThat(journey("POST", "/" + trip + "/journal", first, owner, List.of()).body()).isEqualTo(saved.body());
+        assertThat(journey("POST", "/" + trip + "/journal", journalWrite("changed", "first\\nsecond", "0", mutation), owner, List.of()).statusCode()).isEqualTo(409);
+        assertThat(journey("POST", "/" + trip + "/journal", journalWrite("stale", "", "0", UUID.randomUUID().toString()), owner, List.of()).statusCode()).isEqualTo(409);
+        assertThat(journey("POST", "/" + trip + "/journal", journalWrite("foreign", "", "1", UUID.randomUUID().toString()), other, List.of()).statusCode()).isEqualTo(404);
+        assertThat(journey("POST", "/" + trip + "/journal", first, null, List.of()).statusCode()).isEqualTo(401);
+        assertThat(journey("POST", "/" + active + "/journal", first, owner, List.of()).statusCode()).isEqualTo(409);
+        assertThat(journey("POST", "/" + trip + "/journal?x=1", first, owner, List.of()).statusCode()).isEqualTo(403);
+        assertThat(journey("POST", "/" + trip + "/journal", first, owner,
+                List.<String[]>of(new String[] {"Cookie", "routiqo_session=forbidden"})).statusCode()).isEqualTo(403);
+        assertThat(journey("POST", "/" + trip + "/journal", first, owner,
+                List.<String[]>of(new String[] {"Origin", "https://example.org"})).statusCode()).isEqualTo(403);
+        assertThat(journey("POST", "/" + trip + "/journal", first, owner,
+                List.<String[]>of(new String[] {"X-Routiqo-Account", other.accountId()})).statusCode()).isEqualTo(401);
+        assertThat(journey("POST", "/" + trip + "/journal", first, owner,
+                List.<String[]>of(new String[] {"Content-Type", "text/plain"})).statusCode()).isEqualTo(415);
+        assertThat(journey("GET", "/" + trip + "/journal", "", owner, List.of()).body()).isEqualTo(saved.body());
+    }
+
+    @Test void nativeJournalWriteRejectsUnknownDuplicateAndInexactNumbers() throws Exception {
+        Login owner = login();
+        String trip = UUID.randomUUID().toString(), mutation = UUID.randomUUID().toString();
+        assertThat(journey("POST", "", "{\"id\":\"" + trip + "\",\"kind\":\"trip\"}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "/" + trip + "/complete", "{}", owner, List.of()).statusCode()).isEqualTo(200);
+        String valid = journalWrite("title", "notes", "0", mutation);
+        for (String body : List.of(
+                valid.replace("\"expectedVersion\":0", "\"expectedVersion\":0.5"),
+                valid.replace("\"expectedVersion\":0", "\"expectedVersion\":9007199254740991"),
+                valid.replace("\"expectedVersion\":0", "\"expectedVersion\":1e101"),
+                valid.replace("\"expectedVersion\":0", "\"expectedVersion\":\"0\""),
+                valid.replace("\"expectedVersion\":0", "\"expectedVersion\":false"),
+                valid.replace("\"title\":\"title\"", "\"title\":\"bad\\u0000\""),
+                valid.replace("\"title\":\"title\"", "\"title\":\"bad\\ud800\""),
+                valid.replace("\"mutationId\":\"" + mutation + "\"", "\"mutationId\":\"" + mutation.toUpperCase() + "\""),
+                valid.replace("\"notes\":\"notes\"", "\"notes\":4"),
+                valid.replace("\"notes\":\"notes\"", "\"notes\":\"notes\",\"extra\":1"),
+                valid.replace("\"notes\":\"notes\"", "\"notes\":\"notes\",\"notes\":\"again\""),
+                "{}", "[]", valid + "{}")) {
+            assertThat(journey("POST", "/" + trip + "/journal", body, owner, List.of()).statusCode()).isEqualTo(400);
+        }
+        assertThat(journey("GET", "/" + trip + "/journal", "", owner, List.of()).body()).contains("\"version\":0");
+        String integral = journalWrite("title", "notes", "0e0", mutation);
+        assertThat(journey("POST", "/" + trip + "/journal", integral, owner, List.of()).statusCode()).isEqualTo(200);
+    }
+
+    @Test void nativeJournalWriteSharesBrowserAccountQuota() throws Exception {
+        Login owner = login();
+        String trip = UUID.randomUUID().toString();
+        assertThat(journey("POST", "", "{\"id\":\"" + trip + "\",\"kind\":\"trip\"}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "/" + trip + "/complete", "{}", owner, List.of()).statusCode()).isEqualTo(200);
+        for (int count = 0; count < 19; count++)
+            assertThat(rates.allow(owner.accountId(), "journal-write-account", 20)).isTrue();
+        String body = journalWrite("saved", "", "0", UUID.randomUUID().toString());
+        assertThat(journey("POST", "/" + trip + "/journal", body, owner, List.of()).statusCode()).isEqualTo(200);
+        var denied = journey("POST", "/" + trip + "/journal", body, owner, List.of());
+        assertThat(denied.statusCode()).isEqualTo(429);
+        assertThat(denied.headers().firstValue("Retry-After")).contains("60");
     }
 
     @Test void nativeHistoryPaginatesOnlyOwnerRecordsWithStrictCursorAndBody() throws Exception {

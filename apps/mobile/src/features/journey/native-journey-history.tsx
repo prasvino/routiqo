@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
+import type { TripJournal } from '@routiqo/shared';
 import { useNativeAccount } from '../../auth/native-account-provider';
+import type { NativeJournalDraft } from '../../storage/journal-storage';
+import { NativeJournalEditor } from './native-journal-editor';
 import type { NativeHistoryPage } from './native-history';
 import {
   createNativeJournalController,
@@ -13,6 +16,7 @@ import {
 } from './native-history-controller';
 
 const c = tokens.colors;
+const journalTitle = (title: string) => (title.trim() ? title : 'Trip journal');
 export interface NativeJourneyHistoryViewProps {
   page: NativeHistoryPage | null;
   pageLabel?: 'Latest journeys' | 'Earlier journeys';
@@ -27,6 +31,7 @@ export interface NativeJourneyHistoryViewProps {
   onOpenJournal(id: string): void;
   onCloseJournal(): void;
   onRetryJournal(): void;
+  onEditJournal(journal: TripJournal): void;
 }
 
 export function NativeJourneyHistoryView({
@@ -43,6 +48,7 @@ export function NativeJourneyHistoryView({
   onOpenJournal,
   onCloseJournal,
   onRetryJournal,
+  onEditJournal,
 }: NativeJourneyHistoryViewProps) {
   if (journal.selectedId !== null) {
     const value = journal.journal;
@@ -80,6 +86,13 @@ export function NativeJourneyHistoryView({
                 : 'No notes have been added to this trip journal.'}
             </Text>
           </View>
+        ) : null}
+        {value ? (
+          <HistoryButton
+            label="Edit journal"
+            disabled={journal.busy}
+            onPress={() => onEditJournal(value)}
+          />
         ) : null}
         {journal.busy ? (
           <Text accessibilityRole="alert" style={styles.notice}>
@@ -213,7 +226,15 @@ interface HistoryPositionProps {
   onNavigate?: (() => void) | undefined;
 }
 
-function AccountHistory({ onLayout, onNavigate }: HistoryPositionProps) {
+function AccountHistory({
+  onLayout,
+  onNavigate,
+  onEditJournal,
+  updatedJournal,
+}: HistoryPositionProps & {
+  onEditJournal(journal: TripJournal): void;
+  updatedJournal: TripJournal | null;
+}) {
   const session = useNativeAccount();
   const live = useRef(session);
   live.current = session;
@@ -255,6 +276,9 @@ function AccountHistory({ onLayout, onNavigate }: HistoryPositionProps) {
   useEffect(() => {
     if (!session.online) journalController.current?.offline();
   }, [session.online]);
+  useEffect(() => {
+    if (updatedJournal) journalController.current?.replace(updatedJournal);
+  }, [updatedJournal]);
   return (
     <View onLayout={onLayout}>
       <NativeJourneyHistoryView
@@ -270,11 +294,114 @@ function AccountHistory({ onLayout, onNavigate }: HistoryPositionProps) {
           onNavigate?.();
         }}
         onRetryJournal={() => void journalController.current?.retry()}
+        onEditJournal={onEditJournal}
         onLatest={() => void controller.current?.latest()}
         onEarlier={() => void controller.current?.earlier()}
         onRetry={() => void controller.current?.retry()}
       />
     </View>
+  );
+}
+
+function VerifiedHistory({ onLayout, onNavigate }: HistoryPositionProps) {
+  const session = useNativeAccount();
+  const live = useRef(session);
+  live.current = session;
+  const ownerAccount = useRef(session.accountId).current;
+  const [entries, setEntries] = useState<
+    { draft: NativeJournalDraft | null; journal: TripJournal }[]
+  >([]);
+  const [libraryBusy, setLibraryBusy] = useState(false);
+  const [libraryError, setLibraryError] = useState(false);
+  const [editing, setEditing] = useState<TripJournal | null>(null);
+  const [updatedJournal, setUpdatedJournal] = useState<TripJournal | null>(null);
+  const listRevision = useRef(0);
+  const refreshLibrary = useCallback(async () => {
+    if (!ownerAccount || live.current.accountId !== ownerAccount) return;
+    const request = ++listRevision.current;
+    setLibraryBusy(true);
+    setLibraryError(false);
+    try {
+      const result = await live.current.storedJournals();
+      if (request === listRevision.current && live.current.accountId === ownerAccount)
+        setEntries(result);
+    } catch {
+      if (request === listRevision.current) {
+        setEntries([]);
+        setLibraryError(true);
+      }
+    } finally {
+      if (request === listRevision.current) setLibraryBusy(false);
+    }
+  }, [ownerAccount]);
+  useEffect(() => {
+    const revisions = listRevision;
+    void refreshLibrary();
+    return () => {
+      revisions.current++;
+    };
+  }, [session.historyEpoch, refreshLibrary]);
+  return (
+    <>
+      <View style={styles.section}>
+        <Text style={styles.heading} accessibilityRole="header">
+          Journals on this device
+        </Text>
+        <Text style={styles.notice}>Private drafts and journals for this signed-in account.</Text>
+        {libraryBusy ? (
+          <Text style={styles.notice} accessibilityRole="alert">
+            Loading saved journals…
+          </Text>
+        ) : null}
+        {libraryError ? (
+          <Text style={styles.error} accessibilityRole="alert">
+            Saved journals are unavailable on this device.
+          </Text>
+        ) : null}
+        {!libraryBusy && !libraryError && entries.length === 0 ? (
+          <Text style={styles.notice}>No journals saved on this device yet.</Text>
+        ) : null}
+        {entries.map(({ draft, journal }) => (
+          <View key={journal.journey.id} style={styles.row}>
+            <Text style={styles.rowTitle}>
+              {journalTitle(draft?.title ?? journal.annotation.title)}
+            </Text>
+            <Text style={styles.notice}>
+              {draft ? 'Device draft saved' : 'Account journal saved'} · Started{' '}
+              {new Date(journal.journey.startedAt).toLocaleString()}
+            </Text>
+            <HistoryButton
+              label="Edit saved journal"
+              accessibilityLabel={`Edit saved journal for trip started ${new Date(journal.journey.startedAt).toLocaleString()}`}
+              disabled={false}
+              onPress={() => setEditing(journal)}
+            />
+          </View>
+        ))}
+        <HistoryButton
+          label="Refresh device journals"
+          disabled={libraryBusy}
+          onPress={() => void refreshLibrary()}
+        />
+      </View>
+      <AccountHistory
+        key={`${session.accountId}:${session.historyEpoch}`}
+        onLayout={onLayout}
+        onNavigate={onNavigate}
+        onEditJournal={setEditing}
+        updatedJournal={updatedJournal}
+      />
+      {editing ? (
+        <NativeJournalEditor
+          journal={editing}
+          onClosed={() => setEditing(null)}
+          onChanged={(current) => {
+            if (current) setUpdatedJournal(current);
+            void refreshLibrary();
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -288,13 +415,7 @@ export function NativeJourneyHistory({ onLayout, onNavigate }: HistoryPositionPr
         <Text style={styles.notice}>Sign in from Profile to browse account history.</Text>
       </View>
     );
-  return (
-    <AccountHistory
-      key={`${session.accountId}:${session.historyEpoch}`}
-      onLayout={onLayout}
-      onNavigate={onNavigate}
-    />
-  );
+  return <VerifiedHistory key={session.accountId} onLayout={onLayout} onNavigate={onNavigate} />;
 }
 
 const styles = StyleSheet.create({

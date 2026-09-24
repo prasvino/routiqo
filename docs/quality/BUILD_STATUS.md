@@ -43,6 +43,25 @@ the preceding 546-test Java result was not rerun for this UI-only phase.
 
 ## Implemented
 
+The September 24 native durable journal editor is now implemented, superseding the
+editing-pending notes in the earlier phase reports above. It provides private
+title/notes editing, account-bound SQLite drafts, restart recovery through a saved
+journal list, explicit account delivery, exact mutation retry/acknowledgement and
+confirmed conflict review/replacement. Same-account renewal preserves typing;
+account changes clear private views, and deletion atomically retires journal data.
+The native POST reuses the existing journal service and shared durable write quota.
+
+Final checks: **656 TypeScript tests / 82 files**, **549 Java tests / 88 suites**,
+all six typechecks, lint, formatting, generated contracts and secret scan passed.
+The Android debug build passed (1 minute 49 seconds; 467 tasks, 21 executed),
+installed and launched with no fatal startup or ReactNativeJS error in the inspected
+capture. Synthetic-account emulator QA exercised actual SQLite offline save,
+force-stop recovery, send/acknowledgement, conflict review/cancel/confirmation,
+unsaved-close protection and 360 dp/130% text. See [editing evidence](evidence/native-journal-editing-2026-09-24/README.md)
+and the [journal validation ledger](../validation/NATIVE_JOURNAL_PENDING.md) for
+real-service, backup-transfer and physical-device limits. Media, AI enrichment,
+sharing and full native LIVE remain separate pending features.
+
 | Area | Current behavior |
 |---|---|
 | Web | Home, Explore, Trips, Profile; curated destination search/filter/details, bookmarks, editable trip and recurring commute drafts |
@@ -59,7 +78,7 @@ the preceding 546-test Java result was not rerun for this UI-only phase.
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
 | Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion invokes consent then route-context participants atomically; signal acceptance composes both current authorities |
 | Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
-| Trip journals (local preview) | Completed-trip private title/notes API, optimistic versions and retry identity; account-bound IndexedDB drafts, retained-journal library and editor connected to Trips. Explicit conflict recovery can discard only the exact reviewed device draft without a server write. No media, sharing or commute summaries; authenticated navigation/device QA remains pending |
+| Trip journals | Completed-trip private title/notes API with browser and native transports, optimistic versions and retry identity; account-bound IndexedDB/web and SQLite/Android drafts, saved-journal libraries and editors connected to Trips. Explicit conflict recovery discards only the exact reviewed device draft without a server write. Native restart/offline/conflict emulator QA passed with synthetic accounts; real OAuth/staging and physical-device checks remain pending. No journal media or sharing |
 | Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; private active-journey consent UI with explicit check/allow/stop and uncertain-write fencing; no presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration or output; optional bounded expiry job under ADR 0036 |
 | Route-area display metadata | Optional bounded operator-curated labels in the immutable catalog; old unlabeled catalogs remain valid, malformed labels fail closed, diagnostics stay redacted and existing APIs/resolver output are unchanged |

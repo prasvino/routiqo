@@ -42,7 +42,6 @@ class RoutiqoSafeHttpModule : Module() {
         require((authPath || journeyPath) && !path.contains('?') && !path.contains('#')) { "Invalid path" }
         require(method == "GET" || method == "POST") { "Invalid method" }
         require(path != "/api/v1/native/journeys/history" || method == "POST") { "Invalid history method" }
-        require(!journalPath || method == "GET") { "Invalid journal method" }
         require((method == "POST") == (payload != null)) { "Invalid body" }
         require(payload == null || payload.toByteArray(StandardCharsets.UTF_8).size <= 20 * 1024) { "Body too large" }
         require(credential == null || credential.matches(Regex("[A-Za-z0-9_-]{43}"))) { "Invalid credential" }

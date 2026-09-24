@@ -79,6 +79,11 @@ export function createNativeJournalController(
       return load(id);
     },
     retry: () => (state.selectedId && !state.busy ? load(state.selectedId) : Promise.resolve()),
+    replace: (journal: TripJournal) => {
+      if (disposed || state.selectedId !== journal.journey.id) return;
+      cancel();
+      update({ journal, busy: false, failure: null });
+    },
     close: () => {
       cancel();
       update({ selectedId: null, journal: null, busy: false, failure: null });

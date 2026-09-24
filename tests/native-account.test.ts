@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { createNativeAccount, NativeSessionRequired } from '../apps/mobile/src/auth/native-account';
+import { writeNativeJournal } from '../apps/mobile/src/features/journey/native-journal';
 import { createNativeTransport, NativeHttpStatus } from '../apps/mobile/src/auth/safe-transport';
 import { createSessionVault } from '../apps/mobile/src/auth/session-vault';
 
@@ -135,6 +136,36 @@ it('does not dispatch a native journal read after cancellation during vault acce
     '/api/v1/native/journeys/00000000-0000-4000-8000-000000000002/journal',
     'GET',
     { accountId: account, signal: cancellation.signal },
+  );
+  cancellation.abort();
+  release({ accountId: account, credential, expiresAt: now + 600000 });
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  expect(f.driver.request.mock.calls.length).toBe(earlierRequests);
+});
+
+it('does not dispatch a native journal write after cancellation during vault access', async () => {
+  const f = fixture();
+  await f.identity.signIn();
+  const earlierRequests = f.driver.request.mock.calls.length;
+  let release!: (value: { accountId: string; credential: string; expiresAt: number }) => void;
+  vi.spyOn(f.vault, 'load').mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  const cancellation = new AbortController();
+  const pending = writeNativeJournal(
+    f.identity,
+    account,
+    '00000000-0000-4000-8000-000000000002',
+    {
+      title: 'saved',
+      notes: '',
+      expectedVersion: 0,
+      mutationId: '00000000-0000-4000-8000-000000000003',
+    },
+    cancellation.signal,
   );
   cancellation.abort();
   release({ accountId: account, credential, expiresAt: now + 600000 });

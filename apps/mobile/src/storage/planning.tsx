@@ -2,11 +2,13 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { emptyPlanningState, readPlanningState, type PlanningState } from '@routiqo/shared';
 import { initializeJourneyOutbox } from './journey-outbox';
+import { initializeNativeJournalStorage } from './journal-storage';
 export async function initializeStorage(db: SQLiteDatabase) {
   await db.execAsync(
     'PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS planning_state (id INTEGER PRIMARY KEY CHECK (id = 1), payload TEXT NOT NULL);',
   );
   await initializeJourneyOutbox(db);
+  await initializeNativeJournalStorage(db);
 }
 interface Context {
   state: PlanningState;

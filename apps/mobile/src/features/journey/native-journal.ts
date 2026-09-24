@@ -1,4 +1,9 @@
-import { readTripJournal, type TripJournal } from '@routiqo/shared';
+import {
+  readTripJournal,
+  readTripJournalWrite,
+  type TripJournal,
+  type TripJournalWrite,
+} from '@routiqo/shared';
 import type { createNativeAccount } from '../../auth/native-account';
 
 type Account = ReturnType<typeof createNativeAccount>;
@@ -25,11 +30,12 @@ export function readNativeTripJournal(value: unknown, journeyId: string): TripJo
   return journal;
 }
 
-/** Private, explicit read only. The caller owns any display or session-scoped state. */
-export async function readNativeJournal(
+/** Private, explicit transport. The caller owns durable drafts and acknowledgement. */
+async function requestNativeJournal(
   identity: Account,
   accountId: string,
   journeyId: string,
+  input: TripJournalWrite | undefined,
   signal?: AbortSignal,
 ): Promise<TripJournal> {
   if (
@@ -42,6 +48,14 @@ export async function readNativeJournal(
   )
     throw new Error('Invalid native journal identity.');
   if (signal?.aborted) throw new DOMException('Journal request cancelled.', 'AbortError');
+  const edit = input === undefined ? undefined : readTripJournalWrite(input);
+  if (edit !== undefined && (edit.mutationId.length !== 36 || edit.mutationId === nil))
+    throw new Error('Invalid native journal edit.');
+  if (
+    input !== undefined &&
+    (!record(input) || !exact(input, ['title', 'notes', 'expectedVersion', 'mutationId']))
+  )
+    throw new Error('Invalid native journal edit.');
   if (identity.activeAccount() !== accountId) throw new Error('Native journal account changed.');
   const revision = identity.revision();
 
@@ -65,9 +79,10 @@ export async function readNativeJournal(
     if (signal?.aborted) onAbort();
     const pending = identity.verifiedRequest(
       `/api/v1/native/journeys/${journeyId}/journal`,
-      'GET',
+      edit === undefined ? 'GET' : 'POST',
       {
         accountId,
+        ...(edit === undefined ? {} : { body: edit }),
         signal: controller.signal,
       },
     );
@@ -77,6 +92,13 @@ export async function readNativeJournal(
     if (identity.activeAccount() !== accountId || identity.revision() !== revision)
       throw new Error('Native journal account changed.');
     const journal = readNativeTripJournal(raw, journeyId);
+    if (
+      edit !== undefined &&
+      (journal.annotation.title !== edit.title ||
+        journal.annotation.notes !== edit.notes ||
+        journal.annotation.version !== edit.expectedVersion + 1)
+    )
+      throw new Error('Native journal acknowledgement is invalid.');
     if (identity.activeAccount() !== accountId || identity.revision() !== revision)
       throw new Error('Native journal account changed.');
     return journal;
@@ -85,4 +107,23 @@ export async function readNativeJournal(
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
   }
+}
+
+export function readNativeJournal(
+  identity: Account,
+  accountId: string,
+  journeyId: string,
+  signal?: AbortSignal,
+): Promise<TripJournal> {
+  return requestNativeJournal(identity, accountId, journeyId, undefined, signal);
+}
+
+export function writeNativeJournal(
+  identity: Account,
+  accountId: string,
+  journeyId: string,
+  input: TripJournalWrite,
+  signal?: AbortSignal,
+): Promise<TripJournal> {
+  return requestNativeJournal(identity, accountId, journeyId, input, signal);
 }

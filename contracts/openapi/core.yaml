@@ -532,6 +532,29 @@ paths:
         '404': { description: Journey absent or inaccessible }
         '409': { description: Journey is not a completed trip }
         '429': { $ref: '#/components/responses/AuthLimited' }
+    post:
+      operationId: saveNativeTripJournal
+      security: [{ nativeBearer: [] }]
+      description: Save a private completed-trip annotation with the existing account-wide journal CAS and exact mutation replay. Twenty shared browser/native writes per account per minute.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TripJournalWrite' }
+      responses:
+        '200':
+          description: Saved completed-trip journal or exact latest-mutation replay
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TripJournal' }
+        '400': { description: 'Invalid exact JSON body, annotation, version or identifier' }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: Journey absent or inaccessible }
+        '409': { description: 'Ineligible journey, stale version or conflicting mutation reuse' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/journeys/{id}/journal:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }

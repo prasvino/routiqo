@@ -12,7 +12,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { randomUUID } from 'expo-crypto';
 import { useSQLiteContext } from 'expo-sqlite';
 import type { JourneyKind } from '@routiqo/shared';
-import type { TripJournal } from '@routiqo/shared';
+import type { TripJournal, TripJournalWrite } from '@routiqo/shared';
 import { NativeHttpStatus } from './safe-transport';
 import { nativeTransport } from './android-transport';
 import { nativeGoogle } from './native-google';
@@ -24,7 +24,16 @@ import {
   type NativeHistoryCursor,
   type NativeHistoryPage,
 } from '../features/journey/native-history';
-import { readNativeJournal } from '../features/journey/native-journal';
+import { readNativeJournal, writeNativeJournal } from '../features/journey/native-journal';
+import {
+  acknowledgeNativeJournalDraft,
+  cacheNativeTripJournal,
+  discardNativeJournalDraft,
+  listNativeStoredJournals,
+  readNativeStoredJournal,
+  saveNativeJournalDraft,
+  type NativeJournalDraft,
+} from '../storage/journal-storage';
 import {
   clearJourneyPartition,
   queueMobileJourney,
@@ -45,6 +54,30 @@ interface NativeAccountContext {
   historyEpoch: number;
   readHistory(before: NativeHistoryCursor | null): Promise<NativeHistoryPage>;
   readJournal(journeyId: string, signal: AbortSignal): Promise<TripJournal>;
+  writeJournal(
+    journeyId: string,
+    input: TripJournalWrite,
+    signal: AbortSignal,
+  ): Promise<TripJournal>;
+  storedJournal(
+    journeyId: string,
+  ): Promise<{ draft: NativeJournalDraft | null; journal: TripJournal | null }>;
+  storedJournals(): Promise<{ draft: NativeJournalDraft | null; journal: TripJournal }[]>;
+  cacheJournal(journal: TripJournal): Promise<TripJournal>;
+  saveJournalDraft(
+    draft: NativeJournalDraft,
+    previousMutationId: string | null,
+  ): Promise<NativeJournalDraft>;
+  acknowledgeJournalDraft(
+    journeyId: string,
+    mutationId: string,
+    response: TripJournal,
+  ): Promise<boolean>;
+  discardJournalDraft(
+    journeyId: string,
+    mutationId: string,
+    reviewed: TripJournal,
+  ): Promise<TripJournal>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   reauthenticateForDeletion(): Promise<void>;
@@ -157,6 +190,77 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
       throw failure;
     }
   }
+  function verifiedJournalAccount(): string {
+    const account = identity.activeAccount();
+    if (!account || accountId !== account || deletionPendingRef.current)
+      throw new NativeSessionRequired();
+    return account;
+  }
+  async function writeJournal(
+    journeyId: string,
+    input: TripJournalWrite,
+    signal: AbortSignal,
+  ): Promise<TripJournal> {
+    const account = verifiedJournalAccount();
+    const epoch = historyEpochRef.current;
+    const revision = identity.revision();
+    try {
+      const result = await writeNativeJournal(identity, account, journeyId, input, signal);
+      if (
+        epoch !== historyEpochRef.current ||
+        revision !== identity.revision() ||
+        identity.activeAccount() !== account ||
+        accountId !== account
+      )
+        throw new NativeSessionRequired();
+      return result;
+    } catch (failure) {
+      if (
+        epoch !== historyEpochRef.current ||
+        revision !== identity.revision() ||
+        identity.activeAccount() !== account ||
+        accountId !== account
+      )
+        throw new NativeSessionRequired();
+      if (
+        failure instanceof NativeSessionRequired ||
+        (failure instanceof NativeHttpStatus && (failure.status === 401 || failure.status === 403))
+      ) {
+        invalidateHistory();
+        identity.invalidate();
+        setAccountId(null);
+        setPartition(null);
+        setError('Your session needs verification. Sign in from Profile to continue.');
+      }
+      throw failure;
+    }
+  }
+  async function journalRead<T>(operation: (account: string) => Promise<T>): Promise<T> {
+    const account = verifiedJournalAccount();
+    const epoch = historyEpochRef.current;
+    const revision = identity.revision();
+    const value = await operation(account);
+    if (
+      epoch !== historyEpochRef.current ||
+      revision !== identity.revision() ||
+      identity.activeAccount() !== account ||
+      accountId !== account ||
+      deletionPendingRef.current
+    )
+      throw new NativeSessionRequired();
+    return value;
+  }
+  const storedJournal = (journeyId: string) =>
+    journalRead((account) => readNativeStoredJournal(db, account, journeyId));
+  const storedJournals = () => journalRead((account) => listNativeStoredJournals(db, account));
+  const cacheJournal = (journal: TripJournal) =>
+    journalRead((account) => cacheNativeTripJournal(db, account, journal));
+  const saveJournalDraft = (draft: NativeJournalDraft, previousMutationId: string | null) =>
+    saveNativeJournalDraft(db, verifiedJournalAccount(), draft, previousMutationId);
+  const acknowledgeJournalDraft = (journeyId: string, mutationId: string, response: TripJournal) =>
+    acknowledgeNativeJournalDraft(db, verifiedJournalAccount(), journeyId, mutationId, response);
+  const discardJournalDraft = (journeyId: string, mutationId: string, reviewed: TripJournal) =>
+    discardNativeJournalDraft(db, verifiedJournalAccount(), journeyId, mutationId, reviewed);
 
   async function load(account: string) {
     const value = await readMobileJourneyPartition(db, account);
@@ -439,6 +543,13 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         historyEpoch,
         readHistory,
         readJournal,
+        writeJournal,
+        storedJournal,
+        storedJournals,
+        cacheJournal,
+        saveJournalDraft,
+        acknowledgeJournalDraft,
+        discardJournalDraft,
         signIn,
         signOut,
         reauthenticateForDeletion,

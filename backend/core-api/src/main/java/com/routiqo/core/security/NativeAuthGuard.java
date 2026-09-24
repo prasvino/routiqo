@@ -55,7 +55,7 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 || ("POST".equals(request.getMethod()) &&
                     ("/api/v1/native/journeys".equals(path)
                         || "/api/v1/native/journeys/history".equals(path)
-                        || path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}/complete")));
+                        || path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}/(?:complete|journal)")));
         boolean protectedOperation = ("GET".equals(request.getMethod())
                     && "/api/v1/native/auth/session".equals(path))
                 || ("POST".equals(request.getMethod()) && ("/api/v1/native/auth/session/renew".equals(path)

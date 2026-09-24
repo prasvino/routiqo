@@ -410,7 +410,8 @@ export interface paths {
         /** @description Read-only private journal for an owned completed trip. No query string, cookie or browser origin. No native write route. */
         get: operations["getNativeTripJournal"];
         put?: never;
-        post?: never;
+        /** @description Save a private completed-trip annotation with the existing account-wide journal CAS and exact mutation replay. Twenty shared browser/native writes per account per minute. */
+        post: operations["saveNativeTripJournal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2509,6 +2510,61 @@ export interface operations {
                 };
                 content?: never;
             };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    saveNativeTripJournal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TripJournalWrite"];
+            };
+        };
+        responses: {
+            /** @description Saved completed-trip journal or exact latest-mutation replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TripJournal"];
+                };
+            };
+            /** @description Invalid exact JSON body, annotation, version or identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            /** @description Journey absent or inaccessible */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ineligible journey, stale version or conflicting mutation reuse */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
         };
     };

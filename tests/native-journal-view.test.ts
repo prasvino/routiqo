@@ -10,6 +10,9 @@ vi.mock('../apps/mobile/node_modules/react-native', () => ({
   StyleSheet: { create: (styles: unknown) => styles },
 }));
 vi.mock('../apps/mobile/src/auth/native-account-provider', () => ({ useNativeAccount: vi.fn() }));
+vi.mock('../apps/mobile/src/features/journey/native-journal-editor', () => ({
+  NativeJournalEditor: () => null,
+}));
 
 import {
   NativeJourneyHistoryView,
@@ -44,6 +47,7 @@ function props(
     onOpenJournal: vi.fn(),
     onCloseJournal: vi.fn(),
     onRetryJournal: vi.fn(),
+    onEditJournal: vi.fn(),
     ...overrides,
   };
 }

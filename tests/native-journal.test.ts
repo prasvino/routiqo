@@ -3,6 +3,7 @@ import type { createNativeAccount } from '../apps/mobile/src/auth/native-account
 import {
   readNativeJournal,
   readNativeTripJournal,
+  writeNativeJournal,
 } from '../apps/mobile/src/features/journey/native-journal';
 import { createNativeTransport, NativeHttpStatus } from '../apps/mobile/src/auth/safe-transport';
 
@@ -43,7 +44,7 @@ it('validates the complete private shape and exact requested journey', () => {
   ).toThrow();
 });
 
-it('uses the exact GET and rejects method, path, status and oversized replies', async () => {
+it('uses the exact journal path and rejects path, status and oversized replies', async () => {
   const request = vi.fn(async () => ({ status: 200, body: JSON.stringify(journal) }));
   const transport = createNativeTransport({ request }, 'https://staging.routiqo.example');
   const result = await transport.request(path, 'GET', { credential, accountId });
@@ -58,7 +59,15 @@ it('uses the exact GET and rejects method, path, status and oversized replies', 
   );
   await expect(
     transport.request(path, 'POST', { credential, accountId, body: {} }),
-  ).rejects.toThrow();
+  ).resolves.toEqual(journal);
+  expect(request).toHaveBeenLastCalledWith(
+    'https://staging.routiqo.example',
+    path,
+    'POST',
+    credential,
+    accountId,
+    '{}',
+  );
   await expect(
     transport.request(path + '?x=1', 'GET', { credential, accountId }),
   ).rejects.toThrow();
@@ -67,7 +76,7 @@ it('uses the exact GET and rejects method, path, status and oversized replies', 
       transport.request(path + suffix, 'GET', { credential, accountId }),
     ).rejects.toThrow();
   await expect(transport.request(path, 'GET', { credential })).rejects.toThrow();
-  expect(request).toHaveBeenCalledTimes(1);
+  expect(request).toHaveBeenCalledTimes(2);
   const unexpected = createNativeTransport(
     { request: async () => ({ status: 204, body: '' }) },
     'https://staging.routiqo.example',
@@ -87,6 +96,134 @@ it('uses the exact GET and rejects method, path, status and oversized replies', 
   await expect(oversized.request(path, 'GET', { credential, accountId })).rejects.toThrow(
     'Native server response is invalid.',
   );
+});
+
+it('sends an immutable validated write and accepts only the exact account acknowledgement', async () => {
+  const mutationId = '00000000-0000-4000-8000-000000000003';
+  const input = { title: 'Café', notes: 'first\nsecond', expectedVersion: 0, mutationId };
+  const accepted = {
+    ...journal,
+    annotation: {
+      title: input.title,
+      notes: input.notes,
+      version: 1,
+      updatedAt: '2026-09-12T13:00:00Z',
+    },
+  };
+  const verifiedRequest = vi.fn(async () => accepted);
+  const identity = {
+    verifiedRequest,
+    activeAccount: () => accountId,
+    revision: () => 1,
+  } as unknown as ReturnType<typeof createNativeAccount>;
+  await expect(writeNativeJournal(identity, accountId, journeyId, input)).resolves.toMatchObject({
+    journey: { id: journeyId },
+    annotation: { title: input.title, notes: input.notes, version: 1 },
+  });
+  expect(verifiedRequest).toHaveBeenCalledWith(path, 'POST', {
+    accountId,
+    body: input,
+    signal: expect.any(AbortSignal),
+  });
+  for (const response of [
+    { ...accepted, annotation: { ...accepted.annotation, version: 2 } },
+    { ...accepted, annotation: { ...accepted.annotation, title: 'changed' } },
+    { ...accepted, annotation: { ...accepted.annotation, notes: 'changed' } },
+    { ...accepted, journey: { ...accepted.journey, id: accountId } },
+  ]) {
+    verifiedRequest.mockResolvedValueOnce(response);
+    await expect(writeNativeJournal(identity, accountId, journeyId, input)).rejects.toThrow();
+  }
+  await expect(
+    writeNativeJournal(identity, accountId, journeyId, { ...input, expectedVersion: 0.5 }),
+  ).rejects.toThrow();
+  await expect(
+    writeNativeJournal(identity, accountId, journeyId, { ...input, extra: 'x' } as typeof input),
+  ).rejects.toThrow();
+  await expect(
+    writeNativeJournal(identity, accountId, journeyId, { ...input, mutationId: `${mutationId}\n` }),
+  ).rejects.toThrow();
+});
+
+it('does not dispatch after cancellation and fences late write responses across session epochs', async () => {
+  const input = {
+    title: 'title',
+    notes: '',
+    expectedVersion: 0,
+    mutationId: '00000000-0000-4000-8000-000000000003',
+  };
+  let finish!: (value: unknown) => void;
+  let revision = 1;
+  const verifiedRequest = vi.fn(
+    () =>
+      new Promise<unknown>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const identity = {
+    verifiedRequest,
+    activeAccount: () => accountId,
+    revision: () => revision,
+  } as unknown as ReturnType<typeof createNativeAccount>;
+  const controller = new AbortController();
+  const cancelled = writeNativeJournal(identity, accountId, journeyId, input, controller.signal);
+  controller.abort();
+  await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+  finish({
+    ...journal,
+    annotation: {
+      title: input.title,
+      notes: input.notes,
+      version: 1,
+      updatedAt: '2026-09-12T13:00:00Z',
+    },
+  });
+  const stale = writeNativeJournal(identity, accountId, journeyId, input);
+  revision++;
+  finish({
+    ...journal,
+    annotation: {
+      title: input.title,
+      notes: input.notes,
+      version: 1,
+      updatedAt: '2026-09-12T13:00:00Z',
+    },
+  });
+  await expect(stale).rejects.toThrow('account changed');
+  const alreadyCancelled = new AbortController();
+  alreadyCancelled.abort();
+  await expect(
+    writeNativeJournal(identity, accountId, journeyId, input, alreadyCancelled.signal),
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  expect(verifiedRequest).toHaveBeenCalledTimes(2);
+});
+
+it('times out a stalled write and ignores a later failed transport', async () => {
+  vi.useFakeTimers();
+  const input = {
+    title: 'title',
+    notes: '',
+    expectedVersion: 0,
+    mutationId: '00000000-0000-4000-8000-000000000003',
+  };
+  let fail!: (reason: Error) => void;
+  const verifiedRequest = vi.fn(
+    () =>
+      new Promise<unknown>((_, reject) => {
+        fail = reject;
+      }),
+  );
+  const identity = {
+    verifiedRequest,
+    activeAccount: () => accountId,
+    revision: () => 1,
+  } as unknown as ReturnType<typeof createNativeAccount>;
+  const pending = writeNativeJournal(identity, accountId, journeyId, input);
+  const assertion = expect(pending).rejects.toThrow('timed out');
+  await vi.advanceTimersByTimeAsync(12_000);
+  await assertion;
+  fail(new Error('private late transport detail'));
+  expect(verifiedRequest).toHaveBeenCalledTimes(1);
 });
 
 it('settles cancelled and timed-out reads without accepting late native results', async () => {

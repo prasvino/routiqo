@@ -32,7 +32,7 @@ public class NativeAuthConfiguration {
                         "/api/v1/native/journeys/*/journal").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.POST,
                         "/api/v1/native/journeys", "/api/v1/native/journeys/history",
-                        "/api/v1/native/journeys/*/complete").permitAll()
+                        "/api/v1/native/journeys/*/complete", "/api/v1/native/journeys/*/journal").permitAll()
                     .anyRequest().denyAll())
                 .exceptionHandling(e -> e
                     .authenticationEntryPoint((request, response, error) -> response.setStatus(401))

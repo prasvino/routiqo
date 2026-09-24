@@ -1,7 +1,8 @@
 # Native journal validation ledger
 
 Updated: 2026-09-24. Owner-only completed-trip journal reads and native browsing
-are implemented. Native durable editing remains the next implementation phase.
+and durable native editing are implemented. Configured-service and physical-device
+validation remains pending below.
 
 ## Implemented browsing
 
@@ -15,10 +16,23 @@ are implemented. Native durable editing remains the next implementation phase.
 - Opening a trip far down a full history page and returning to history reposition
   the section without animation. Dates and text wrap at increased font size.
 
-## Remaining implementation
+## Implemented editing
 
-- Design account-bound durable drafts and conflict recovery before native editing.
-  Do not reuse the lifecycle outbox for journal annotation mutations.
+- The native editor saves private title/notes drafts to a bounded account-bound
+  SQLite partition before explicit account delivery. Drafts survive restart and
+  logout; the verified account's saved-journal list keeps them discoverable.
+- Exact mutation retries, acknowledgement and conflict review/discard preserve
+  newer work. No automatic delivery or implicit rebase occurs. Unsaved editor text
+  requires confirmation before closing; only explicitly saved text survives restart.
+- Same-account verified renewal preserves typing while fencing earlier requests.
+  Account loss/change unmounts private views. Account deletion atomically retires
+  and removes journal content with the journey partition.
+- The guarded native POST uses the existing journal service and durable shared
+  write quota. Strict request/response validation, deadlines and bounded bridge
+  responses apply. No lifecycle-outbox reuse or new server migration is involved.
+- Scope and limits: `docs/features/journey/NATIVE_JOURNAL_EDITING_SPEC.md` and
+  `docs/adr/0058-native-durable-trip-journal-editing.md`. Media, AI enrichment and
+  sharing remain separate future features.
 
 ## External validation
 
@@ -27,10 +41,44 @@ are implemented. Native durable editing remains the next implementation phase.
 - Exercise real annotations on an emulator and a
   representative physical Android device, including large text, accessibility,
   network loss, renewal, sign-out and delayed reads during account changes.
+- For editing, use configured staging accounts to verify device-draft restart,
+  response-loss exact retry, browser/native concurrent edits, conflict review and
+  exact discard, same-account renewal while typing, sign-out/account isolation and
+  account-deletion cleanup failures. Private drafts cannot be opened at cold start
+  until the current account is verified; verify that limitation is clear on-device.
+- Run TalkBack, keyboard/large-text and physical-device lifecycle checks. Validate
+  packaged backup policy and actual supported cloud/device-transfer behavior;
+  logical SQLite deletion is not proof of physical erasure of filesystem/WAL blocks.
 
 No new provider, database migration, journal retention or production activation is
 required by the read transport. Existing planning backups and journey recovery
 snapshots must not acquire journal content.
+
+## Editing verification
+
+- Full TypeScript suite: **656 tests / 82 files passed**. All six workspace
+  typechecks, lint, formatting, generated contract drift and secret scan passed.
+- Full Java `:core-api:check`: **549 tests / 88 suites passed**, with no failures,
+  errors or skips, including native write HTTP, domain, PostgreSQL and architecture
+  checks. The native API remains opt-in.
+- Independent review of API/transport/SQLite boundaries found no blocking issue.
+  Root reviewed editor composition and session races; review findings for strict
+  identifiers, exact request shape, cache monotonicity, redacted storage failures
+  and same-account renewal during local transactions were resolved and tested.
+- Synthetic emulator checks exercised real SQLite draft saving offline, recovery
+  after force-stop/relaunch, explicit send/acknowledgement, conflict retention,
+  latest-version review, cancelled and confirmed replacement, unsaved-close guard,
+  and 360 dp/130% text. Fixtures and their synthetic account data were removed.
+  Evidence and limitations: `docs/quality/evidence/native-journal-editing-2026-09-24/README.md`.
+- The pinned Expo SQLite path and shared-preferences-only Android backup rules are
+  covered by a regression check. Actual cloud/device-transfer behavior remains an
+  external validation gate; logical deletion does not establish forensic erasure.
+- Final restored-app Android build passed (1 minute 49 seconds; 467 tasks,
+  21 executed), installed and launched on `emulator-5554`. Startup capture showed
+  JavaScript `Running "main"` and no fatal exception/signal or ReactNativeJS error.
+  The final APK's legacy/cloud/device-transfer resources allow shared preferences
+  only and exclude SecureStore; Expo SQLite is outside that allowlist. APK SHA-256:
+  `cc16499c0ef952e0b36038e8de2a15e535a79671040f878104584f4eddd56a94`.
 
 ## Browsing verification
 
