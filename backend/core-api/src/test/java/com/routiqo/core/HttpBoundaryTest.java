@@ -16,6 +16,7 @@ class HttpBoundaryTest {
    assertThat(health.body()).contains("\"UP\"","routiqo-core-api");
    assertThat(get("/api/v1/journeys").statusCode()).isIn(401,403);
    assertThat(get("/api/v1/auth/csrf").statusCode()).isIn(401,403);
+   assertThat(get("/api/v1/native/journeys/00000000-0000-4000-8000-000000000001/journal").statusCode()).isIn(401,403);
    assertThat(get("/ws/route/anything").statusCode()).isIn(401,403);
  }
  @Test void catalogHasPublicDestinationDataWithoutPersonLocation() throws Exception {

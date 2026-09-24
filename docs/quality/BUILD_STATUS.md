@@ -8,6 +8,20 @@ The user has now authorized V3 community-summary implementation and staging eval
 
 Native Android account/journey integration is committed with debug APK and unconfigured-service emulator smoke evidence. Native account history adds explicit 20-row latest/earlier reads with strict owner/session isolation and no durable cache expansion. Final checks: **617 TypeScript tests / 75 files**, **545 Java tests / 88 suites**, all six typechecks, lint, formatting, contracts and secret scan passed. Native view evidence is labeled synthetic; real OAuth/TLS/maps and physical-device gates remain in [native Android](../validation/NATIVE_ANDROID_PENDING.md) and [native history](../validation/NATIVE_HISTORY_PENDING.md) ledgers.
 
+## September 24 native journal read transport
+
+The opt-in native API now reads an owner's completed-trip journal through the
+existing journal service. The strict native reader checks the requested journey,
+response shape, deadline and current account generation. Journal bridge responses
+require JSON, valid UTF-8 and a 32 KiB cap; POST remains denied. No UI, annotation
+writes or persistence were added. Native browsing and durable editing remain
+pending in the [journal ledger](../validation/NATIVE_JOURNAL_PENDING.md).
+
+The full **621 TypeScript tests / 76 files**, **546 Java tests / 88 suites**, all
+six typecheck targets, lint, formatting, contracts and secret scan passed. The
+x86_64 Android debug APK build passed (467 tasks, 15 executed). This transport
+phase does not claim a new emulator, physical-device or real OAuth trial.
+
 ## Implemented
 
 | Area | Current behavior |

@@ -28,7 +28,8 @@ public class NativeAuthConfiguration {
                         "/api/v1/native/auth/account/delete").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/native/auth/session").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET,
-                        "/api/v1/native/journeys", "/api/v1/native/journeys/*").permitAll()
+                        "/api/v1/native/journeys", "/api/v1/native/journeys/*",
+                        "/api/v1/native/journeys/*/journal").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.POST,
                         "/api/v1/native/journeys", "/api/v1/native/journeys/history",
                         "/api/v1/native/journeys/*/complete").permitAll()

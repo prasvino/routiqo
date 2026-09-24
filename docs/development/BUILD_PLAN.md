@@ -1,5 +1,21 @@
 # Current implementation plan
 
+## September 24 continuation
+
+Native account/journey integration (`49c2f4a`) and paginated account history
+(`17cae44`) are implemented. Their remaining OAuth, staging, map-hosting, signing
+and device requirements are in `docs/validation/NATIVE_ANDROID_PENDING.md` and
+`docs/validation/NATIVE_HISTORY_PENDING.md`; they are not missing native transport
+implementation. V3 moderator and grant administration implementation is also
+complete for isolated staging; use `docs/validation/V3_STAGING_TRIAL_PENDING.md`
+for current external requirements rather than the historical queue below.
+
+The next bounded native implementation is private completed-trip journal reading.
+`docs/features/journey/NATIVE_JOURNAL_READ_SPEC.md` scopes the owner-only API and
+native transport phase. Native browsing, durable editing and real-service/device
+validation remain separately tracked in `docs/validation/NATIVE_JOURNAL_PENDING.md`.
+Production LIVE activation remains subject to its existing explicit decision gates.
+
 Status reconciliation, 2026-09-23: reliability batch 01 tests and production
 batches 02–04 web fixes are committed (`54007b6`, `edfacc3`, `db622e6`,
 `14b73c9`). Their handoff queues are historical preparation notes, not open

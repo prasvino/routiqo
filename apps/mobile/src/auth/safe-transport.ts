@@ -12,8 +12,9 @@ export interface NativeHttpDriver {
 const account = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
 const journeyId = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
+const journalPath = new RegExp(`^/api/v1/native/journeys/${journeyId}/journal$`);
 const nativePath = new RegExp(
-  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/complete)?)?)$`,
+  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal))?)?)$`,
 );
 
 export function nativeApiOrigin(value: string | undefined): string | null {
@@ -53,10 +54,11 @@ export function createNativeTransport(
     options: { credential?: string; accountId?: string; body?: unknown } = {},
   ): Promise<unknown> {
     if (!origin) throw new Error('Secure server connection is not configured.');
-    if (!nativePath.test(path) || path.includes('?') || path.includes('#'))
+    if (nativePath.exec(path)?.[0] !== path || path.includes('?') || path.includes('#'))
       throw new Error('Native request is invalid.');
     if (path === '/api/v1/native/journeys/history' && method !== 'POST')
       throw new Error('Native request is invalid.');
+    if (journalPath.test(path) && method !== 'GET') throw new Error('Native request is invalid.');
     const credential = options.credential ?? null;
     const accountId = options.accountId ?? null;
     if (credential !== null && !credentialPattern.test(credential))
@@ -86,11 +88,13 @@ export function createNativeTransport(
       response.status < 200 ||
       response.status > 599 ||
       typeof response.body !== 'string' ||
-      new TextEncoder().encode(response.body).length > 64 * 1024
+      new TextEncoder().encode(response.body).length > (journalPath.test(path) ? 32 : 64) * 1024
     )
       throw new Error('Native server response is invalid.');
     if (response.status < 200 || response.status >= 300)
       throw new NativeHttpStatus(response.status);
+    if (journalPath.test(path) && response.status !== 200)
+      throw new Error('Native server response is invalid.');
     if (response.status === 204) return null;
     try {
       return JSON.parse(response.body) as unknown;

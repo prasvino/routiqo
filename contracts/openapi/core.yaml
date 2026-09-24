@@ -512,6 +512,26 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Journey write unavailable; retry the same command }
+  /api/v1/native/journeys/{id}/journal:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid, pattern: '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' } }
+    get:
+      operationId: getNativeTripJournal
+      security: [{ nativeBearer: [] }]
+      description: Read-only private journal for an owned completed trip. No query string, cookie or browser origin. No native write route.
+      responses:
+        '200':
+          description: Completed trip and private annotation, or an empty version-zero annotation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TripJournal' }
+        '400': { description: Invalid journey identifier }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: Journey absent or inaccessible }
+        '409': { description: Journey is not a completed trip }
+        '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/journeys/{id}/journal:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }

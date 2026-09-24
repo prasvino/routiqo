@@ -3,6 +3,8 @@ package com.routiqo.core.identity.api;
 import com.jayway.jsonpath.JsonPath;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.identity.application.GoogleIdentityVerifier;
+import com.routiqo.core.journal.application.JournalService;
+import com.routiqo.core.journal.domain.JournalMutation;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -73,6 +75,7 @@ class NativeAuthHttpTest {
     @Value("${local.server.port}") int port;
     @Autowired JdbcTemplate jdbc;
     @Autowired AuthRateGate rates;
+    @Autowired JournalService journals;
     HttpClient client;
 
     @BeforeEach void reset() {
@@ -183,6 +186,46 @@ class NativeAuthHttpTest {
         assertThat(journey("GET", "", "", owner, List.<String[]>of(
                 new String[] {"Origin", "https://example.org"})).statusCode()).isEqualTo(403);
         assertThat(journey("DELETE", "", "", owner, List.of()).statusCode()).isEqualTo(403);
+    }
+
+    @Test void nativeJournalReadIsOwnerOnlyCompletedTripAndDefaultDeny() throws Exception {
+        Login owner = login(), other = loginOther();
+        String trip = UUID.randomUUID().toString();
+        String activeTrip = UUID.randomUUID().toString();
+        String commute = UUID.randomUUID().toString();
+        assertThat(journey("POST", "", "{\"id\":\"" + trip + "\",\"kind\":\"trip\"}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "/" + trip + "/complete", "{}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "", "{\"id\":\"" + activeTrip + "\",\"kind\":\"trip\"}", owner, List.of()).statusCode()).isEqualTo(200);
+        var journal = journey("GET", "/" + trip + "/journal", "", owner, List.of());
+        assertThat(journal.statusCode()).isEqualTo(200);
+        assertThat(journal.body()).contains(trip, "\"title\":\"\"", "\"notes\":\"\"", "\"version\":0", "\"updatedAt\":null");
+        assertThat(journal.body()).doesNotContain(owner.accountId(), other.accountId());
+        var saved = journals.save(UUID.fromString(owner.accountId()), UUID.fromString(trip),
+                new JournalMutation("Café trip", "First stop\nSecond stop", 0, UUID.randomUUID()));
+        assertThat(saved.annotation().version()).isEqualTo(1);
+        var populated = journey("GET", "/" + trip + "/journal", "", owner, List.of());
+        assertThat(populated.statusCode()).isEqualTo(200);
+        assertThat(populated.body()).contains("Café trip", "First stop\\nSecond stop", "\"version\":1", "\"updatedAt\":");
+        assertThat(journey("GET", "/" + trip + "/journal", "", other, List.of()).statusCode()).isEqualTo(404);
+        assertThat(journey("GET", "/" + trip + "/journal", "", null, List.of()).statusCode()).isEqualTo(401);
+        assertThat(journey("GET", "/" + activeTrip + "/journal", "", owner, List.of()).statusCode()).isEqualTo(409);
+        assertThat(journey("POST", "/" + activeTrip + "/complete", "{}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "", "{\"id\":\"" + commute + "\",\"kind\":\"commute\"}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("POST", "/" + commute + "/complete", "{}", owner, List.of()).statusCode()).isEqualTo(200);
+        assertThat(journey("GET", "/" + commute + "/journal", "", owner, List.of()).statusCode()).isEqualTo(409);
+        assertThat(journey("GET", "/" + UUID.randomUUID() + "/journal", "", owner, List.of()).statusCode()).isEqualTo(404);
+        assertThat(journey("GET", "/" + trip.toUpperCase() + "/journal", "", owner, List.of()).statusCode()).isEqualTo(400);
+        assertThat(journey("GET", "/" + trip + "/journal?x=1", "", owner, List.of()).statusCode()).isEqualTo(403);
+        assertThat(journey("GET", "/" + trip + "/journal", "", owner,
+                List.<String[]>of(new String[] {"Cookie", "routiqo_session=forbidden"})).statusCode()).isEqualTo(403);
+        assertThat(journey("GET", "/" + trip + "/journal", "", owner,
+                List.<String[]>of(new String[] {"Origin", "https://example.org"})).statusCode()).isEqualTo(403);
+        assertThat(journey("GET", "/" + trip + "/journal", "", owner,
+                List.<String[]>of(new String[] {"X-Routiqo-Account", other.accountId()})).statusCode()).isEqualTo(401);
+        assertThat(journey("POST", "/" + trip + "/journal", "{}", owner, List.of()).statusCode()).isEqualTo(403);
+        assertThat(journey("DELETE", "/" + trip + "/journal", "", owner, List.of()).statusCode()).isEqualTo(403);
+        assertThat(journey("GET", "/" + trip + "/journal/extra", "", owner, List.of()).statusCode()).isEqualTo(403);
+        assertThat(journey("GET", "/" + trip + "/journal", "", owner, List.of()).body()).isEqualTo(populated.body());
     }
 
     @Test void nativeHistoryPaginatesOnlyOwnerRecordsWithStrictCursorAndBody() throws Exception {

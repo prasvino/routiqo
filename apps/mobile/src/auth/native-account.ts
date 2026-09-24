@@ -187,10 +187,11 @@ export function createNativeAccount(
   async function verifiedRequest(
     path: string,
     method: 'GET' | 'POST',
-    options: { accountId: string; body?: unknown },
+    options: { accountId: string; body?: unknown; signal?: AbortSignal },
   ): Promise<unknown> {
     const attempt = generation;
     const credential = await credentialFor(options.accountId);
+    if (options.signal?.aborted) throw new DOMException('Native request cancelled.', 'AbortError');
     let result: unknown;
     try {
       result = await transport.request(path, method, {
