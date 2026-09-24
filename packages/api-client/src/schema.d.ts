@@ -745,6 +745,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/native/routes/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Separately default-off explicit owner place search through the configured provider. Twenty requests per account per minute shared with browser. */
+        post: operations["searchNativePrivateRoutePlaces"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Separately default-off explicit owner route estimate through the configured provider. Twenty requests per account per minute shared with browser; no journey or presence mutation. */
+        post: operations["calculateNativePrivateRoute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/routes/places": {
         parameters: {
             query?: never;
@@ -3647,6 +3681,132 @@ export interface operations {
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
             /** @description Session, authority or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    searchNativePrivateRoutePlaces: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    query: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Temporary normalized places and attribution */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        provider: "mapbox" | "photon";
+                        attribution: string;
+                        places: {
+                            id: string;
+                            label: string;
+                            coordinate: components["schemas"]["RouteCoordinate"];
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid exact JSON search request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Place provider, session or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    calculateNativePrivateRoute: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    mode: "driving" | "walking" | "cycling";
+                    origin: components["schemas"]["RouteCoordinate"];
+                    destination: components["schemas"]["RouteCoordinate"];
+                };
+            };
+        };
+        responses: {
+            /** @description Private normalized route estimates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        provider: "mapbox" | "valhalla";
+                        /** Format: date-time */
+                        calculatedAt: string;
+                        routes: {
+                            distanceMetres: number;
+                            durationSeconds: number;
+                            geometry: components["schemas"]["RouteCoordinate"][];
+                            steps: components["schemas"]["RouteStep"][];
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid exact JSON mode or endpoints */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            /** @description Route endpoints or returned geometry exceed configured coverage. Empty response body. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Routing provider, session or rate infrastructure unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;

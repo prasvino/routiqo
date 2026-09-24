@@ -8,10 +8,12 @@ import {
   type NativeConsentScope,
 } from '../live/native-consent-eligibility';
 import { NativeMapPreview } from './native-map';
+import { NativeRoutePlanner } from './native-route-planner';
 import { NativeJourneyHistory } from './native-journey-history';
 
 const c = tokens.colors;
 const consentEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_LIVE_CONSENT_ENABLED === 'true';
+const routingEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_ROUTING_ENABLED === 'true';
 export function NativeJourneyPanel({
   onLayout,
   onHistoryLayout,
@@ -117,6 +119,13 @@ export function NativeJourneyPanel({
           </Pressable>
         </>
       )}
+      {routingEnabled && session.configured && session.accountId ? (
+        <NativeRoutePlanner
+          key={session.accountId}
+          accountId={session.accountId}
+          available={!session.restoring && !session.busy && !session.deletionCleanupPending}
+        />
+      ) : null}
       {consentEnabled && consentScope ? (
         <NativeConsentPanel
           key={`${consentScope.accountId}:${consentScope.journeyId}`}

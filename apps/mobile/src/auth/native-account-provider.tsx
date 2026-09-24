@@ -11,7 +11,7 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { randomUUID } from 'expo-crypto';
 import { useSQLiteContext } from 'expo-sqlite';
-import type { JourneyKind } from '@routiqo/shared';
+import type { JourneyKind, PlaceResults, RouteRequest, RouteResult } from '@routiqo/shared';
 import type { TripJournal, TripJournalWrite } from '@routiqo/shared';
 import { NativeHttpStatus } from './safe-transport';
 import { nativeTransport } from './android-transport';
@@ -25,6 +25,11 @@ import {
   type NativeHistoryPage,
 } from '../features/journey/native-history';
 import { readNativeJournal, writeNativeJournal } from '../features/journey/native-journal';
+import {
+  calculateNativeRoute,
+  searchNativePlaces,
+  NativeRoutingError,
+} from '../features/journey/native-routing';
 import {
   readNativeConsent,
   submitNativeConsent,
@@ -89,6 +94,8 @@ interface NativeAccountContext {
     input: { expectedGeneration: string; sharing: boolean },
     signal: AbortSignal,
   ): Promise<NativeLiveConsent>;
+  searchPlaces(query: string, signal: AbortSignal): Promise<PlaceResults>;
+  calculateRoute(request: RouteRequest, signal: AbortSignal): Promise<RouteResult>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   reauthenticateForDeletion(): Promise<void>;
@@ -319,6 +326,46 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
     liveConsentRequest((account) =>
       submitNativeConsent(identity, account, journeyId, input, signal),
     );
+  async function routingRequest<T>(operation: (account: string) => Promise<T>): Promise<T> {
+    const account = identity.activeAccount();
+    if (!account || accountId !== account || deletionPendingRef.current)
+      throw new NativeSessionRequired();
+    if (!onlineRef.current || !foregroundRef.current || working.current || restoring || busy)
+      throw new Error('Route planning is unavailable.');
+    const epoch = historyEpochRef.current;
+    const revision = identity.revision();
+    const current = () =>
+      epoch === historyEpochRef.current &&
+      revision === identity.revision() &&
+      identity.activeAccount() === account &&
+      accountId === account &&
+      !deletionPendingRef.current;
+    try {
+      const result = await operation(account);
+      if (!current()) throw new NativeSessionRequired();
+      if (!onlineRef.current || !foregroundRef.current || working.current || restoring || busy)
+        throw new Error('Route planning is unavailable.');
+      return result;
+    } catch (failure) {
+      if (!current()) throw new NativeSessionRequired();
+      if (
+        failure instanceof NativeSessionRequired ||
+        (failure instanceof NativeRoutingError &&
+          (failure.code === 'session' || failure.status === 401))
+      ) {
+        invalidateHistory();
+        identity.invalidate();
+        setAccountId(null);
+        setPartition(null);
+        setError('Your session needs verification. Sign in from Profile to continue.');
+      }
+      throw failure;
+    }
+  }
+  const searchPlaces = (query: string, signal: AbortSignal) =>
+    routingRequest((account) => searchNativePlaces(identity, account, query, signal));
+  const calculateRoute = (request: RouteRequest, signal: AbortSignal) =>
+    routingRequest((account) => calculateNativeRoute(identity, account, request, signal));
 
   async function load(account: string) {
     const value = await readMobileJourneyPartition(db, account);
@@ -610,6 +657,8 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         discardJournalDraft,
         readLiveConsent,
         submitLiveConsent,
+        searchPlaces,
+        calculateRoute,
         signIn,
         signOut,
         reauthenticateForDeletion,

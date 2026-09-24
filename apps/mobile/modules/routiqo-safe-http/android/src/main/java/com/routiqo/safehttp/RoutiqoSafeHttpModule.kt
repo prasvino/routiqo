@@ -25,6 +25,7 @@ class RoutiqoSafeHttpModule : Module() {
     .readTimeout(7, TimeUnit.SECONDS)
     .writeTimeout(7, TimeUnit.SECONDS)
     .build()
+  private val routingClient = client.newBuilder().callTimeout(18, TimeUnit.SECONDS).build()
 
   override fun definition() = ModuleDefinition {
     Name("RoutiqoSafeHttp")
@@ -40,14 +41,18 @@ class RoutiqoSafeHttpModule : Module() {
         val journalPath = path.matches(Regex("/api/v1/native/journeys/$uuid/journal"))
         val consentPath = path.matches(Regex("/api/v1/native/journeys/$uuid/consent"))
         val journeyPath = path.matches(Regex("/api/v1/native/journeys(?:/history|/$uuid(?:/(?:complete|journal|consent))?)?"))
-        require((authPath || journeyPath) && !path.contains('?') && !path.contains('#')) { "Invalid path" }
+        val routePath = path == "/api/v1/native/routes"
+        val placePath = path == "/api/v1/native/routes/places"
+        val routingPath = routePath || placePath
+        require((authPath || journeyPath || routingPath) && !path.contains('?') && !path.contains('#')) { "Invalid path" }
         require(method == "GET" || method == "POST") { "Invalid method" }
         require(path != "/api/v1/native/journeys/history" || method == "POST") { "Invalid history method" }
+        require(!routingPath || method == "POST") { "Invalid routing method" }
         require((method == "POST") == (payload != null)) { "Invalid body" }
         require(payload == null || payload.toByteArray(StandardCharsets.UTF_8).size <= 20 * 1024) { "Body too large" }
         require(credential == null || credential.matches(Regex("[A-Za-z0-9_-]{43}"))) { "Invalid credential" }
         require(account == null || account.matches(Regex(uuid))) { "Invalid account" }
-        require(!journeyPath || credential != null && account != null) { "Journey requires identity" }
+        require(!(journeyPath || routingPath) || credential != null && account != null) { "Native resource requires identity" }
         require(!authPath || account == null) { "Auth cannot send account" }
         if (authPath) {
           val anonymous = path.startsWith("/api/v1/native/auth/google/")
@@ -62,9 +67,9 @@ class RoutiqoSafeHttpModule : Module() {
         if (method == "POST") {
           builder.post(payload!!.toRequestBody("application/json".toMediaType()))
         } else builder.get()
-        client.newCall(builder.build()).execute().use { response ->
+        (if (routingPath) routingClient else client).newCall(builder.build()).execute().use { response ->
           require(!response.isRedirect && response.code !in 300..399) { "Redirect denied" }
-          if ((journalPath || consentPath) && response.code == 200) {
+          if ((journalPath || consentPath || routingPath) && response.code == 200) {
             val contentType = response.header("Content-Type") ?: ""
             require(contentType.matches(Regex("(?i)application/(?:[a-z0-9!#$&^_.+-]+\\+)?json(?:\\s*;.*)?"))) { "Invalid JSON content type" }
           }
@@ -74,12 +79,18 @@ class RoutiqoSafeHttpModule : Module() {
             while (true) {
               val count = input.read(buffer)
               if (count < 0) break
-              require(output.size() + count <= (if (journalPath) 32 else 64) * 1024) { "Response too large" }
+              val limit = when {
+                routePath -> 1024 * 1024
+                placePath -> 256 * 1024
+                journalPath -> 32 * 1024
+                else -> 64 * 1024
+              }
+              require(output.size() + count <= limit) { "Response too large" }
               output.write(buffer, 0, count)
             }
             output.toByteArray()
           } ?: byteArrayOf()
-          val body = if (journalPath || consentPath) StandardCharsets.UTF_8.newDecoder()
+          val body = if (journalPath || consentPath || routingPath) StandardCharsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
             .decode(ByteBuffer.wrap(bytes)).toString() else String(bytes, StandardCharsets.UTF_8)

@@ -1,6 +1,7 @@
 import type { createNativeAccount } from '../../auth/native-account';
 import { NativeHttpStatus } from '../../auth/safe-transport';
 import { NativeSessionRequired } from '../../auth/native-account';
+import { nativeAbortError } from '../../auth/abort-error';
 
 type Account = ReturnType<typeof createNativeAccount>;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -71,7 +72,7 @@ export function readNativeLiveConsent(
 function safeFailure(error: unknown): Error {
   if (error instanceof NativeHttpStatus || error instanceof NativeSessionRequired) return error;
   if (error instanceof Error && error.name === 'AbortError')
-    return new DOMException('Consent request cancelled.', 'AbortError');
+    return nativeAbortError('Consent request cancelled.');
   return new Error('Native consent request could not be completed.');
 }
 async function request(
@@ -84,7 +85,7 @@ async function request(
   identity(accountId);
   identity(journeyId);
   const snapshot = input === undefined ? undefined : intent(input);
-  if (signal?.aborted) throw new DOMException('Consent request cancelled.', 'AbortError');
+  if (signal?.aborted) throw nativeAbortError('Consent request cancelled.');
   if (account.activeAccount() !== accountId) throw new NativeSessionRequired();
   const revision = account.revision();
   const current = () => {
@@ -104,7 +105,7 @@ async function request(
     controller.abort();
     rejectStop(reason);
   };
-  const onAbort = () => stop(new DOMException('Consent request cancelled.', 'AbortError'));
+  const onAbort = () => stop(nativeAbortError('Consent request cancelled.'));
   signal?.addEventListener('abort', onAbort, { once: true });
   const timer = setTimeout(() => stop(new Error('Native consent request timed out.')), deadlineMs);
   try {
@@ -121,7 +122,7 @@ async function request(
     );
     void pending.catch(() => undefined);
     const raw = await Promise.race([pending, stopped]);
-    if (!active) throw new DOMException('Consent request cancelled.', 'AbortError');
+    if (!active) throw nativeAbortError('Consent request cancelled.');
     current();
     const consent = readNativeLiveConsent(raw, journeyId);
     if (snapshot !== undefined) {

@@ -620,3 +620,13 @@ explicit stop can resolve that uncertainty. Completed journeys remain terminal.
 Client exposure is not authority, and a consent boolean does not authorize public
 presence, precise location or future traveller-derived output. No new publication
 or delivery surface is introduced by this native adapter.
+
+Native route planning (ADR 0060) adds explicit owner-account routing/search
+transport under T01/T02 and shared durable request budgets under T14. Precise
+endpoints and place queries remain transient private provider inputs under T12;
+redacted DTO diagnostics and bodyless failures must not disclose them. Account,
+foreground and operation revisions fence late native responses. Shared normalized
+geometry/step bounds and bridge byte/deadline limits bound hostile provider output.
+Loaded directions retained offline are historical estimates, not fresh guidance,
+physical presence or authority for LIVE participation. No new location watcher,
+persistence, provider deployment or public output is introduced.

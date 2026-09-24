@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("web-auth & routing")
+@Profile({"web-auth & routing", "native-auth & routing"})
 public class RoutingConfiguration {
     private static final String CONFIGURATION_ERROR = "Routing providers are not configured";
 

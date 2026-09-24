@@ -1035,6 +1035,111 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+  /api/v1/native/routes/places:
+    post:
+      operationId: searchNativePrivateRoutePlaces
+      security: [{ nativeBearer: [] }]
+      description: 'Separately default-off explicit owner place search through the configured provider. Twenty requests per account per minute shared with browser.'
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [query]
+              properties:
+                query: { type: string, minLength: 3, maxLength: 256 }
+      responses:
+        '200':
+          description: Temporary normalized places and attribution
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [provider, places, attribution]
+                properties:
+                  provider: { type: string, enum: [mapbox, photon] }
+                  attribution: { type: string, minLength: 1, maxLength: 2048 }
+                  places:
+                    type: array
+                    maxItems: 5
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, label, coordinate]
+                      properties:
+                        id: { type: string, minLength: 1, maxLength: 512 }
+                        label: { type: string, minLength: 1, maxLength: 512 }
+                        coordinate: { $ref: '#/components/schemas/RouteCoordinate' }
+        '400': { description: Invalid exact JSON search request }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Place provider, session or rate infrastructure unavailable. Empty response body.' }
+  /api/v1/native/routes:
+    post:
+      operationId: calculateNativePrivateRoute
+      security: [{ nativeBearer: [] }]
+      description: 'Separately default-off explicit owner route estimate through the configured provider. Twenty requests per account per minute shared with browser; no journey or presence mutation.'
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [mode, origin, destination]
+              properties:
+                mode: { type: string, enum: [driving, walking, cycling] }
+                origin: { $ref: '#/components/schemas/RouteCoordinate' }
+                destination: { $ref: '#/components/schemas/RouteCoordinate' }
+      responses:
+        '200':
+          description: Private normalized route estimates
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [provider, calculatedAt, routes]
+                properties:
+                  provider: { type: string, enum: [mapbox, valhalla] }
+                  calculatedAt: { type: string, format: date-time }
+                  routes:
+                    type: array
+                    maxItems: 3
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [distanceMetres, durationSeconds, geometry, steps]
+                      properties:
+                        distanceMetres: { type: number, minimum: 0 }
+                        durationSeconds: { type: number, minimum: 0 }
+                        geometry:
+                          type: array
+                          minItems: 2
+                          maxItems: 10000
+                          items: { $ref: '#/components/schemas/RouteCoordinate' }
+                        steps:
+                          type: array
+                          maxItems: 500
+                          items: { $ref: '#/components/schemas/RouteStep' }
+        '400': { description: Invalid exact JSON mode or endpoints }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '422': { description: 'Route endpoints or returned geometry exceed configured coverage. Empty response body.' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Routing provider, session or rate infrastructure unavailable. Empty response body.' }
   /api/v1/routes/places:
     post:
       operationId: searchPrivateRoutePlaces

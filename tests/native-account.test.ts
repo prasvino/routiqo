@@ -212,6 +212,43 @@ it('does not dispatch native consent after cancellation during credential access
   }
 });
 
+it('cancels before and during credential access without DOMException on Hermes', async () => {
+  const f = fixture();
+  await f.identity.signIn();
+  const earlierRequests = f.driver.request.mock.calls.length;
+  vi.stubGlobal('DOMException', undefined);
+  try {
+    const alreadyCancelled = new AbortController();
+    alreadyCancelled.abort();
+    await expect(
+      f.identity.verifiedRequest('/api/v1/native/journeys/history', 'POST', {
+        accountId: account,
+        body: {},
+        signal: alreadyCancelled.signal,
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    let release!: (value: { accountId: string; credential: string; expiresAt: number }) => void;
+    vi.spyOn(f.vault, 'load').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const cancellation = new AbortController();
+    const pending = f.identity.verifiedRequest('/api/v1/native/journeys/history', 'POST', {
+      accountId: account,
+      body: {},
+      signal: cancellation.signal,
+    });
+    cancellation.abort();
+    release({ accountId: account, credential, expiresAt: now + 600000 });
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(f.driver.request.mock.calls.length).toBe(earlierRequests);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it('does not dispatch consent when the account changes after credential resolution', async () => {
   const f = fixture();
   await f.identity.signIn();

@@ -5,6 +5,7 @@ import {
   type TripJournalWrite,
 } from '@routiqo/shared';
 import type { createNativeAccount } from '../../auth/native-account';
+import { nativeAbortError } from '../../auth/abort-error';
 
 type Account = ReturnType<typeof createNativeAccount>;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -47,7 +48,7 @@ async function requestNativeJournal(
     journeyId === nil
   )
     throw new Error('Invalid native journal identity.');
-  if (signal?.aborted) throw new DOMException('Journal request cancelled.', 'AbortError');
+  if (signal?.aborted) throw nativeAbortError('Journal request cancelled.');
   const edit = input === undefined ? undefined : readTripJournalWrite(input);
   if (edit !== undefined && (edit.mutationId.length !== 36 || edit.mutationId === nil))
     throw new Error('Invalid native journal edit.');
@@ -72,7 +73,7 @@ async function requestNativeJournal(
     controller.abort();
     rejectStop(reason);
   };
-  const onAbort = () => stop(new DOMException('Journal request cancelled.', 'AbortError'));
+  const onAbort = () => stop(nativeAbortError('Journal request cancelled.'));
   signal?.addEventListener('abort', onAbort, { once: true });
   const timer = setTimeout(() => stop(new Error('Native journal request timed out.')), DEADLINE_MS);
   try {
@@ -88,7 +89,7 @@ async function requestNativeJournal(
     );
     void pending.catch(() => undefined);
     const raw = await Promise.race([pending, stopped]);
-    if (!active) throw new DOMException('Journal request cancelled.', 'AbortError');
+    if (!active) throw nativeAbortError('Journal request cancelled.');
     if (identity.activeAccount() !== accountId || identity.revision() !== revision)
       throw new Error('Native journal account changed.');
     const journal = readNativeTripJournal(raw, journeyId);

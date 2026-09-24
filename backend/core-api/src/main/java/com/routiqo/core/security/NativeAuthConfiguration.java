@@ -17,13 +17,19 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 public class NativeAuthConfiguration {
     @Bean @Order(0) SecurityFilterChain nativeAuthSecurity(HttpSecurity http, AuthRateGate rates,
             GoogleSessionService sessions,
-            @Value("${ROUTIQO_NATIVE_LIVE_CONSENT_API_ENABLED:false}") boolean consentEnabled) throws Exception {
+            @Value("${ROUTIQO_NATIVE_LIVE_CONSENT_API_ENABLED:false}") boolean consentEnabled,
+            @Value("${ROUTIQO_NATIVE_ROUTING_API_ENABLED:false}") boolean routingEnabled) throws Exception {
         return http.securityMatcher("/api/v1/native/**")
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.disable())
-                .addFilterBefore(new NativeAuthGuard(rates, sessions, consentEnabled), AuthorizationFilter.class)
+                .addFilterBefore(new NativeAuthGuard(rates, sessions, consentEnabled, routingEnabled),
+                        AuthorizationFilter.class)
                 .authorizeHttpRequests(a -> {
+                    if (routingEnabled) {
+                        a.requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/v1/native/routes", "/api/v1/native/routes/places").permitAll();
+                    }
                     if (consentEnabled) {
                         a.requestMatchers(org.springframework.http.HttpMethod.GET,
                                 "/api/v1/native/journeys/*/consent").permitAll();

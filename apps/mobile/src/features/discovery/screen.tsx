@@ -149,6 +149,7 @@ export function DiscoveryScreen({
     <SafeAreaView edges={['bottom']} style={s.safe}>
       <FlatList
         ref={listRef}
+        keyboardShouldPersistTaps="handled"
         data={section === 'Trips' ? [] : places}
         keyExtractor={(item) => item.id}
         contentContainerStyle={s.list}

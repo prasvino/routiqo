@@ -62,6 +62,28 @@ uncertainty/recovery, lifecycle/account isolation and 360 dp/130% text. See
 physical-device checks remain pending. Native route planning/preparation and
 Quick Signal/list controls remain subsequent work.
 
+## September 24 native explicit route planning
+
+Android now supports explicit place search/selection, travel mode, swapping,
+route estimates/alternatives and manual directions through separately default-off
+native bearer endpoints. Existing regional Photon/Valhalla adapters and durable
+browser/native account quotas are reused. Loaded estimates and review position
+survive offline and same-account renewal; account changes clear private views.
+No GPS guidance, selected-route map, downloaded maps, route binding or publication
+is implied. The existing regional basemap remains a separate preview.
+
+Final checks passed: **689 TypeScript tests / 89 files**, **560 Java tests / 92
+suites**, formatting, all six typechecks, lint, generated contracts and secret scan.
+Independent backend/transport review passed with its configured default-off test
+coverage correction. Android build/install passed (1m41s; 467 tasks, 21 executed).
+Mounted synthetic emulator checks covered search, route/step selection, failure
+states, offline/renewal/navigation retention, account isolation and 360 dp/130% text.
+QA exposed Hermes' missing DOMException: native account/journal/consent/routing
+now use a portable AbortError, with absent-global regressions and a clean final
+background/late-response emulator trial. See [routing evidence](evidence/native-route-planning-2026-09-24/README.md)
+and [routing ledger](../validation/NATIVE_ROUTING_PENDING.md) for real service/device
+limits. Native private route preparation and Quick Signal/list controls remain next.
+
 ## Implemented
 
 The September 24 native durable journal editor is now implemented, superseding the
@@ -98,9 +120,9 @@ sharing and full native LIVE remain separate pending features.
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; native account controls, explicit Trips journey lifecycle/recovery and MapLibre regional basemap preview are mounted in a development client. x86_64 debug APK and unconfigured-service emulator smoke passed; real configured services and physical-device validation remain pending. Native backup text export/share and pasted-JSON restore exist. |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |
 | Journey write authority | PostgreSQL account-before-journey transaction boundary shared by start/completion and internal owned-journey callbacks; deletion serialization, rollback, five-second lock timeout and redacted retryable failures tested. Completion invokes consent then route-context participants atomically; signal acceptance composes both current authorities |
-| Route planning | Authenticated temporary place search, opt-in guarded Valhalla estimates and Photon search with bounded directions, route alternatives and explicit MapLibre web map display using configured same-origin resources. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
+| Route planning | Authenticated temporary place search and guarded Valhalla/Photon planning on web and opt-in native Android, with bounded manual directions and route alternatives. Selected-route MapLibre display remains web-only; native has a separate regional preview. Manual step review retains the last successful route through connection loss; no reload persistence, GPS-following navigation, downloaded offline maps or live provider verification yet |
 | Trip journals | Completed-trip private title/notes API with browser and native transports, optimistic versions and retry identity; account-bound IndexedDB/web and SQLite/Android drafts, saved-journal libraries and editors connected to Trips. Explicit conflict recovery discards only the exact reviewed device draft without a server write. Native restart/offline/conflict emulator QA passed with synthetic accounts; real OAuth/staging and physical-device checks remain pending. No journal media or sharing |
-| Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. An owner-only browser GET/POST transport exists behind a separate default-off flag with durable limits and string generations; private active-journey consent UI with explicit check/allow/stop and uncertain-write fencing; no presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
+| Presence consent | Privacy-owned PostgreSQL latest-row state with legacy journey-scoped CAS plus explicit revocation-precedence intents, opt-out reads and saturating atomic completion revocation. Owner-only browser and native GET/POST transports exist behind separate default-off flags with durable limits and string generations; private active-journey consent UI with explicit check/allow/stop and uncertain-write fencing; no presence lease issuance, cache invalidation, discoverable presence or realtime publication enabled |
 | Live route context | Route Update-owned PostgreSQL latest-row envelope with bounded private anchors, optional catalog provenance, fresh identity/exact-ID replacement, post-lock temporal checks, completion deletion and callable bounded expiry cleanup. A default-off internal two-transaction binder derives curated anchors from fresh guarded Valhalla geometry, uses a durable newest-attempt fence and rechecks consent/context authority before replacement; no public registration or output; optional bounded expiry job under ADR 0036 |
 | Route-area display metadata | Optional bounded operator-curated labels in the immutable catalog; old unlabeled catalogs remain valid, malformed labels fail closed, diagnostics stay redacted and existing APIs/resolver output are unchanged |
 | Private route-area choice reader | Internal read-only owned-journey service returns only the current context's complete labeled subset after consent, restriction, catalog and exact expiry checks. Immutable minimized snapshot; ADR0045 adds separately gated owner HTTP and typed browser reads. No provider calls or grants from reads |

@@ -14,8 +14,10 @@ const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
 const journeyId = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
 const journalPath = new RegExp(`^/api/v1/native/journeys/${journeyId}/journal$`);
 const consentPath = new RegExp(`^/api/v1/native/journeys/${journeyId}/consent$`);
+const routePath = '/api/v1/native/routes';
+const placePath = '/api/v1/native/routes/places';
 const nativePath = new RegExp(
-  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal|consent))?)?)$`,
+  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal|consent))?)?|routes(?:/places)?)$`,
 );
 
 export function nativeApiOrigin(value: string | undefined): string | null {
@@ -59,13 +61,15 @@ export function createNativeTransport(
       throw new Error('Native request is invalid.');
     if (path === '/api/v1/native/journeys/history' && method !== 'POST')
       throw new Error('Native request is invalid.');
+    if ((path === routePath || path === placePath) && method !== 'POST')
+      throw new Error('Native request is invalid.');
     const credential = options.credential ?? null;
     const accountId = options.accountId ?? null;
     if (credential !== null && !credentialPattern.test(credential))
       throw new Error('Native request is invalid.');
     if (accountId !== null && !account.test(accountId))
       throw new Error('Native request is invalid.');
-    if (path.startsWith('/api/v1/native/journeys')) {
+    if (path.startsWith('/api/v1/native/journeys') || path === routePath || path === placePath) {
       if (!credential || !accountId) throw new Error('Native journey session is unavailable.');
     } else if (path.startsWith('/api/v1/native/auth/google/')) {
       if (credential || accountId) throw new Error('Native request is invalid.');
@@ -88,14 +92,22 @@ export function createNativeTransport(
       response.status < 200 ||
       response.status > 599 ||
       typeof response.body !== 'string' ||
-      new TextEncoder().encode(response.body).length > (journalPath.test(path) ? 32 : 64) * 1024
+      new TextEncoder().encode(response.body).length >
+        (journalPath.test(path) ? 32 : path === routePath ? 1024 : path === placePath ? 256 : 64) *
+          1024
     )
       throw new Error('Native server response is invalid.');
     if (response.status < 200 || response.status >= 300)
       throw new NativeHttpStatus(response.status);
-    if ((journalPath.test(path) || consentPath.test(path)) && response.status !== 200)
+    if (
+      (journalPath.test(path) ||
+        consentPath.test(path) ||
+        path === routePath ||
+        path === placePath) &&
+      response.status !== 200
+    )
       throw new Error('Native server response is invalid.');
-    if (consentPath.test(path)) {
+    if (consentPath.test(path) || path === routePath || path === placePath) {
       const encoded = new TextEncoder().encode(response.body);
       if (new TextDecoder('utf-8', { fatal: true }).decode(encoded) !== response.body)
         throw new Error('Native server response is invalid.');

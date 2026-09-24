@@ -240,6 +240,14 @@ not public target authorization; a pair snapshot is not a reusable delivery gran
 
 ## Private command stopping
 
+ADR 0060's native route planning uses separately default-off exact POST leaves,
+native bearer/account guards and shared durable browser/native request budgets.
+Endpoints and place queries are private transient inputs; do not log or persist
+them in journey queues, analytics or diagnostic DTO strings. Native responses
+retain strict byte/UTF-8/JSON/deadline bounds. Abort and session changes must fence
+late dispatch/results. Routing remains independent of contribution consent and
+cannot grant physical-presence authority, route membership or public discovery.
+
 ADR 0059's native private consent boundary must retain the separate default-off
 server and client exposure gates. Bearer authority and one exact account header
 are required; browser cookies/origin headers cannot supply fallback authority.

@@ -2,6 +2,7 @@ import { readNativeAuthSession, readNativeChallenge } from './native-auth-protoc
 import { createNativeSessionRestorer } from './session-restore';
 import type { NativeSessionVault } from './session-vault';
 import { NativeHttpStatus, type createNativeTransport } from './safe-transport';
+import { nativeAbortError } from './abort-error';
 
 type Transport = ReturnType<typeof createNativeTransport>;
 export interface GoogleIdentityPort {
@@ -192,7 +193,7 @@ export function createNativeAccount(
     const attempt = generation;
     const credential = await credentialFor(options.accountId);
     current(attempt);
-    if (options.signal?.aborted) throw new DOMException('Native request cancelled.', 'AbortError');
+    if (options.signal?.aborted) throw nativeAbortError('Native request cancelled.');
     let result: unknown;
     try {
       result = await transport.request(path, method, {

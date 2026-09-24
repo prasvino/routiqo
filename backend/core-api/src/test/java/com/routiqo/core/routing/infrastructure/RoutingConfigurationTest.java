@@ -31,6 +31,9 @@ class RoutingConfigurationTest {
     private final ApplicationContextRunner active = new ApplicationContextRunner()
             .withUserConfiguration(RoutingConfiguration.class)
             .withPropertyValues("spring.profiles.active=web-auth,routing");
+    private final ApplicationContextRunner nativeActive = new ApplicationContextRunner()
+            .withUserConfiguration(RoutingConfiguration.class)
+            .withPropertyValues("spring.profiles.active=native-auth,routing");
 
     @Test void startsPairedSelfHostedProvidersWithoutNetworkOrMapboxConfiguration() throws Exception {
         var calls = new AtomicInteger();
@@ -99,13 +102,24 @@ class RoutingConfigurationTest {
     }
 
     @Test void profileExpressionRequiresBothWebAuthAndRouting() {
-        for (String profiles : new String[] {"", "web-auth", "routing"}) {
+        for (String profiles : new String[] {"", "web-auth", "native-auth", "routing"}) {
             var context = new ApplicationContextRunner().withUserConfiguration(RoutingConfiguration.class);
             if (!profiles.isEmpty()) context = context.withPropertyValues("spring.profiles.active=" + profiles);
             context.run(result -> assertThat(result).hasNotFailed()
                     .doesNotHaveBean(RouteProvider.class)
                     .doesNotHaveBean(PlaceProvider.class));
         }
+    }
+
+    @Test void nativeOnlyRoutingProfileCreatesRealProvidersAndRedactsMissingConfiguration() {
+        nativeActive.withPropertyValues(CONFIGURATION).run(context -> assertThat(context)
+                .hasNotFailed().hasSingleBean(RouteProvider.class).hasSingleBean(PlaceProvider.class));
+        nativeActive.withPropertyValues(Arrays.stream(CONFIGURATION)
+                .filter(property -> !property.startsWith("ROUTIQO_PHOTON_ORIGIN="))
+                .toArray(String[]::new)).run(context -> {
+                    assertThat(context).hasFailed();
+                    assertRedacted(context.getStartupFailure(), "127.0.0.1:18002", "12322");
+                });
     }
 
     private void assertInvalid(String invalidProperty, String... privateValues) {
