@@ -26,6 +26,11 @@ import {
 } from '../features/journey/native-history';
 import { readNativeJournal, writeNativeJournal } from '../features/journey/native-journal';
 import {
+  readNativeConsent,
+  submitNativeConsent,
+  type NativeLiveConsent,
+} from '../features/live/native-consent';
+import {
   acknowledgeNativeJournalDraft,
   cacheNativeTripJournal,
   discardNativeJournalDraft,
@@ -78,6 +83,12 @@ interface NativeAccountContext {
     mutationId: string,
     reviewed: TripJournal,
   ): Promise<TripJournal>;
+  readLiveConsent(journeyId: string, signal: AbortSignal): Promise<NativeLiveConsent>;
+  submitLiveConsent(
+    journeyId: string,
+    input: { expectedGeneration: string; sharing: boolean },
+    signal: AbortSignal,
+  ): Promise<NativeLiveConsent>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   reauthenticateForDeletion(): Promise<void>;
@@ -261,6 +272,53 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
     acknowledgeNativeJournalDraft(db, verifiedJournalAccount(), journeyId, mutationId, response);
   const discardJournalDraft = (journeyId: string, mutationId: string, reviewed: TripJournal) =>
     discardNativeJournalDraft(db, verifiedJournalAccount(), journeyId, mutationId, reviewed);
+  async function liveConsentRequest(
+    operation: (account: string) => Promise<NativeLiveConsent>,
+  ): Promise<NativeLiveConsent> {
+    const account = identity.activeAccount();
+    if (!account || accountId !== account || deletionPendingRef.current)
+      throw new NativeSessionRequired();
+    if (!onlineRef.current || !foregroundRef.current || working.current || restoring || busy)
+      throw new Error('LIVE settings are unavailable.');
+    const epoch = historyEpochRef.current;
+    const revision = identity.revision();
+    const current = () =>
+      epoch === historyEpochRef.current &&
+      revision === identity.revision() &&
+      identity.activeAccount() === account &&
+      accountId === account &&
+      !deletionPendingRef.current;
+    try {
+      const result = await operation(account);
+      if (!current()) throw new NativeSessionRequired();
+      if (!onlineRef.current || !foregroundRef.current || working.current || restoring || busy)
+        throw new Error('LIVE settings are unavailable.');
+      return result;
+    } catch (failure) {
+      if (!current()) throw new NativeSessionRequired();
+      if (
+        failure instanceof NativeSessionRequired ||
+        (failure instanceof NativeHttpStatus && (failure.status === 401 || failure.status === 403))
+      ) {
+        invalidateHistory();
+        identity.invalidate();
+        setAccountId(null);
+        setPartition(null);
+        setError('Your session needs verification. Sign in from Profile to continue.');
+      }
+      throw failure;
+    }
+  }
+  const readLiveConsent = (journeyId: string, signal: AbortSignal) =>
+    liveConsentRequest((account) => readNativeConsent(identity, account, journeyId, signal));
+  const submitLiveConsent = (
+    journeyId: string,
+    input: { expectedGeneration: string; sharing: boolean },
+    signal: AbortSignal,
+  ) =>
+    liveConsentRequest((account) =>
+      submitNativeConsent(identity, account, journeyId, input, signal),
+    );
 
   async function load(account: string) {
     const value = await readMobileJourneyPartition(db, account);
@@ -550,6 +608,8 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         saveJournalDraft,
         acknowledgeJournalDraft,
         discardJournalDraft,
+        readLiveConsent,
+        submitLiveConsent,
         signIn,
         signOut,
         reauthenticateForDeletion,

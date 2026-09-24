@@ -191,6 +191,7 @@ export function createNativeAccount(
   ): Promise<unknown> {
     const attempt = generation;
     const credential = await credentialFor(options.accountId);
+    current(attempt);
     if (options.signal?.aborted) throw new DOMException('Native request cancelled.', 'AbortError');
     let result: unknown;
     try {

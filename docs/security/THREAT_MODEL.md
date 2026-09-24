@@ -609,3 +609,14 @@ identity still abort the entire transaction. The input batch is normalized befor
 asynchronous storage access; duplicate IDs are rejected. Current pending commands,
 account isolation, the one-active invariant and deletion retirement remain enforced.
 This does not establish current authentication or complete cross-device history.
+
+Native private LIVE consent (ADR 0059) applies T01/T02 bearer/account and ownership
+checks, T12 minimized bodyless errors/no consent logs, T13 exact string generations
+and revocation ordering, and T14 shared durable browser/native account quotas.
+The Android UI must not erase uncertainty during refresh, session renewal,
+background/focus loss or navigation within the same active journey. A cancelled
+enable can still commit; a read of off is not a revocation fence. Only a validated
+explicit stop can resolve that uncertainty. Completed journeys remain terminal.
+Client exposure is not authority, and a consent boolean does not authorize public
+presence, precise location or future traveller-derived output. No new publication
+or delivery surface is introduced by this native adapter.

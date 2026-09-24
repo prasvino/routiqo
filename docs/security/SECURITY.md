@@ -240,6 +240,17 @@ not public target authorization; a pair snapshot is not a reusable delivery gran
 
 ## Private command stopping
 
+ADR 0059's native private consent boundary must retain the separate default-off
+server and client exposure gates. Bearer authority and one exact account header
+are required; browser cookies/origin headers cannot supply fallback authority.
+Consent generations remain canonical decimal strings, and browser/native adapters
+share the same durable per-account consent budgets. A successful Stop response
+must represent revocation precedence, not a same-generation no-op. Native request
+abort, offline state and a subsequent read do not prove an uncertain write failed.
+Preserve uncertainty across temporary same-scope lifecycle changes; never label
+these private controls as public Ghost enforcement. No publication, coordinates,
+presence enumeration, new retention or cross-channel delivery is authorized.
+
 ADRs 0046/0047 define terminal stopping of a known issued command under current
 owner/account and journey serialization. Stop consumes an existing unused grant
 or withdraws a retained receipt in one transaction. It does not require current

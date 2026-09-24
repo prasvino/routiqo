@@ -17,6 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.regex.Pattern;
 import org.springframework.http.HttpHeaders;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class NativeAuthGuard extends OncePerRequestFilter {
@@ -26,10 +28,12 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
     private static final Pattern BEARER = Pattern.compile("Bearer ([A-Za-z0-9_-]{43})");
     private final AuthRateGate rates;
     private final GoogleSessionService sessions;
+    private final boolean consentEnabled;
 
-    public NativeAuthGuard(AuthRateGate rates, GoogleSessionService sessions) {
+    public NativeAuthGuard(AuthRateGate rates, GoogleSessionService sessions, boolean consentEnabled) {
         this.rates = rates;
         this.sessions = sessions;
+        this.consentEnabled = consentEnabled;
     }
 
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -48,6 +52,9 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 && "/api/v1/native/auth/google/exchange".equals(path);
         boolean logout = "POST".equals(request.getMethod())
                 && "/api/v1/native/auth/logout".equals(path);
+        boolean consent = consentEnabled
+                && ("GET".equals(request.getMethod()) || "POST".equals(request.getMethod()))
+                && path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}/consent");
         boolean journey = ("GET".equals(request.getMethod()) &&
                     ("/api/v1/native/journeys".equals(path)
                         || path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}")
@@ -61,7 +68,7 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 || ("POST".equals(request.getMethod()) && ("/api/v1/native/auth/session/renew".equals(path)
                     || "/api/v1/native/auth/logout".equals(path)
                     || "/api/v1/native/auth/account/delete".equals(path)));
-        if (!challenge && !exchange && !protectedOperation && !journey) {
+        if (!challenge && !exchange && !protectedOperation && !journey && !consent) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -87,12 +94,18 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
 
         String category = challenge ? "native-challenge" : exchange ? "native-exchange" : "native-other";
         int limit = challenge ? 10 : exchange ? 20 : 120;
-        if (!rates.allow(request.getRemoteAddr(), category, limit)) {
+        final boolean peerAllowed;
+        try { peerAllowed = rates.allow(request.getRemoteAddr(), category, limit); }
+        catch (RuntimeException unavailable) {
+            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            return;
+        }
+        if (!peerAllowed) {
             response.setHeader(HttpHeaders.RETRY_AFTER, "60");
             response.setStatus(429);
             return;
         }
-        if (protectedOperation || journey) {
+        if (protectedOperation || journey || consent) {
             String credential = (String) request.getAttribute(CREDENTIAL_ATTRIBUTE);
             String accountId = null;
             if (logout) {
@@ -103,14 +116,23 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 } catch (SecurityException denied) {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     return;
+                } catch (DataAccessException | TransactionException unavailable) {
+                    response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+                    return;
                 }
             }
-            if (accountId != null && !rates.allow(accountId, "native-account", 120)) {
+            final boolean accountAllowed;
+            try { accountAllowed = accountId == null || rates.allow(accountId, "native-account", 120); }
+            catch (RuntimeException unavailable) {
+                response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+                return;
+            }
+            if (!accountAllowed) {
                 response.setHeader(HttpHeaders.RETRY_AFTER, "60");
                 response.setStatus(429);
                 return;
             }
-            if (journey) request.setAttribute(ACCOUNT_ATTRIBUTE, accountId);
+            if (journey || consent) request.setAttribute(ACCOUNT_ATTRIBUTE, accountId);
         }
 
         if ("POST".equals(request.getMethod())) {

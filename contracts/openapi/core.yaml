@@ -555,6 +555,50 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/journeys/{id}/consent:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid, pattern: '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' } }
+    get:
+      operationId: getNativePrivateJourneyConsent
+      security: [{ nativeBearer: [] }]
+      description: 'Separately default-off private owner consent read. Sixty reads per account per minute. No public publication authority.'
+      responses:
+        '200':
+          description: Current private journey consent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserJourneyConsent' }
+        '400': { description: Invalid canonical journey identifier }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: Journey absent or inaccessible }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Consent authority or rate store unavailable. Empty response body.' }
+    post:
+      operationId: submitNativePrivateJourneyConsentIntent
+      security: [{ nativeBearer: [] }]
+      description: 'Explicit private consent intent with revocation precedence. Ten enables or twenty disables per account per minute, shared with browser.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserJourneyConsentIntent' }
+      responses:
+        '200':
+          description: Current committed private journey consent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserJourneyConsent' }
+        '400': { description: Invalid canonical journey identifier or exact JSON intent }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: Journey absent or inaccessible }
+        '409': { description: Consent generation conflict or completed-journey enable }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Consent authority or rate store unavailable. Empty response body.' }
   /api/v1/journeys/{id}/journal:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }

@@ -41,6 +41,27 @@ Real OAuth/staging and physical-device checks remain in the
 [journal ledger](../validation/NATIVE_JOURNAL_PENDING.md). Backend code was unchanged;
 the preceding 546-test Java result was not rerun for this UI-only phase.
 
+## September 24 native private LIVE consent
+
+Android now provides explicit private consent check/allow/stop for a verified
+active journey behind independent default-off server and client flags. The native
+API reuses existing consent authority and browser/native durable quotas. Strict
+typed responses preserve string generations; uncertain writes survive temporary
+offline, navigation, renewal and busy states until an explicit Stop is confirmed.
+Background/account changes cancel and fence stale responses. This is private
+preparation, not public LIVE, discoverable presence or global Ghost Mode.
+
+Final checks passed: **671 TypeScript tests / 85 files**, **555 Java tests / 90
+suites**, formatting, all six typechecks, lint, generated contracts and secret scan.
+Independent security review passed after a credential-await dispatch race fix.
+Android build/install/startup passed (1m45s; 467 tasks, 21 executed); Home rendered
+with no fatal startup error in the captured log. Synthetic emulator QA covered
+uncertainty/recovery, lifecycle/account isolation and 360 dp/130% text. See
+[consent evidence](evidence/native-live-consent-2026-09-24/README.md) and the
+[native LIVE ledger](../validation/NATIVE_LIVE_PENDING.md). Real OAuth/staging and
+physical-device checks remain pending. Native route planning/preparation and
+Quick Signal/list controls remain subsequent work.
+
 ## Implemented
 
 The September 24 native durable journal editor is now implemented, superseding the
@@ -72,7 +93,7 @@ sharing and full native LIVE remain separate pending features.
 | Native deletion storage | Atomic account retirement marker plus queue/snapshot removal prevents delayed updates recreating deleted data; restart, rollback and account isolation tested with file-backed SQLite. Native deletion UI now invokes server deletion before local retirement, with explicit local cleanup retry. |
 | Native authentication API | Opt-in bearer-only challenge/exchange, session read/renew, lineage logout and recent-auth account deletion; bounded strict JSON, shared database peer/account/challenge limits and browser isolation. Native Google sign-in and bounded OkHttp transport are mounted for Android development builds; real OAuth/TLS trial remains pending. |
 | Native credential store | Expo SecureStore adapter and bounded session vault, serialized writes/clear, stale-ticket rejection, expiry checks and fail-closed recovery. Mounted in native sign-in, cold-start verification, renewal, logout and deletion. |
-| Account history | Web and native Android explicit 20-row owner-history browsing with earlier/latest pages, retry/offline handling and account/session isolation; no expansion of the durable recovery cache. Completed-trip journal access remains web-only. Native configured-service validation is in `docs/validation/NATIVE_HISTORY_PENDING.md`. |
+| Account history | Web and native Android explicit 20-row owner-history browsing with earlier/latest pages, retry/offline handling and account/session isolation; no expansion of the durable recovery cache. Completed-trip journal browsing/editing is available on web and native. Native configured-service validation is in `docs/validation/NATIVE_HISTORY_PENDING.md`. |
 | Web backup | JSON export with disclosure and copyable-text fallback; file validation, restore preview and idempotent merge retaining current edits; no upload |
 | Mobile | Expo four-tab UI sharing catalog, planning, scheduling and tokens; native account controls, explicit Trips journey lifecycle/recovery and MapLibre regional basemap preview are mounted in a development client. x86_64 debug APK and unconfigured-service emulator smoke passed; real configured services and physical-device validation remain pending. Native backup text export/share and pasted-JSON restore exist. |
 | Core API | Public health/catalog; opt-in authenticated journey start/get/list/complete with owner checks; default preview denies protected routes; PostgreSQL/Flyway persistence |

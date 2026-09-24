@@ -2,6 +2,8 @@ package com.routiqo.core.journal.api;
 
 import com.jayway.jsonpath.JsonPath;
 import com.routiqo.core.identity.application.GoogleIdentityVerifier;
+import com.routiqo.core.identity.application.AuthRateGate;
+import com.routiqo.core.identity.infrastructure.JdbcAuthRateGate;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.URI;
@@ -9,6 +11,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.time.Clock;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +45,11 @@ class BrowserJournalHttpTest {
         properties.add("ROUTIQO_AUTH_RATE_SECRET", () -> UUID.randomUUID().toString());
     }
     @TestConfiguration static class TestIdentity {
+        @Bean @Primary AuthRateGate fixedRateGate(JdbcTemplate jdbc,
+                @Value("${ROUTIQO_AUTH_RATE_SECRET}") String secret) {
+            return new JdbcAuthRateGate(jdbc, secret,
+                    Clock.fixed(Instant.parse("2026-09-12T12:00:00Z"), java.time.ZoneOffset.UTC));
+        }
         @Bean @Primary GoogleIdentityVerifier syntheticIdentity() {
             return (token, nonce) -> {
                 if (!token.startsWith(nonce + ":")) throw new SecurityException("Synthetic test credential rejected");

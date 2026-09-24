@@ -38,7 +38,8 @@ class RoutiqoSafeHttpModule : Module() {
         val authPath = path.matches(Regex("/api/v1/native/auth/(google/(challenge|exchange)|session(/renew)?|logout|account/delete)"))
         val uuid = "[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"
         val journalPath = path.matches(Regex("/api/v1/native/journeys/$uuid/journal"))
-        val journeyPath = path.matches(Regex("/api/v1/native/journeys(?:/history|/$uuid(?:/(?:complete|journal))?)?"))
+        val consentPath = path.matches(Regex("/api/v1/native/journeys/$uuid/consent"))
+        val journeyPath = path.matches(Regex("/api/v1/native/journeys(?:/history|/$uuid(?:/(?:complete|journal|consent))?)?"))
         require((authPath || journeyPath) && !path.contains('?') && !path.contains('#')) { "Invalid path" }
         require(method == "GET" || method == "POST") { "Invalid method" }
         require(path != "/api/v1/native/journeys/history" || method == "POST") { "Invalid history method" }
@@ -63,9 +64,9 @@ class RoutiqoSafeHttpModule : Module() {
         } else builder.get()
         client.newCall(builder.build()).execute().use { response ->
           require(!response.isRedirect && response.code !in 300..399) { "Redirect denied" }
-          if (journalPath && response.code == 200) {
+          if ((journalPath || consentPath) && response.code == 200) {
             val contentType = response.header("Content-Type") ?: ""
-            require(contentType.matches(Regex("(?i)application/(?:[a-z0-9!#$&^_.+-]+\\+)?json(?:\\s*;.*)?"))) { "Invalid journal content type" }
+            require(contentType.matches(Regex("(?i)application/(?:[a-z0-9!#$&^_.+-]+\\+)?json(?:\\s*;.*)?"))) { "Invalid JSON content type" }
           }
           val bytes = response.body?.byteStream()?.use { input ->
             val output = ByteArrayOutputStream()
@@ -78,7 +79,7 @@ class RoutiqoSafeHttpModule : Module() {
             }
             output.toByteArray()
           } ?: byteArrayOf()
-          val body = if (journalPath) StandardCharsets.UTF_8.newDecoder()
+          val body = if (journalPath || consentPath) StandardCharsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
             .decode(ByteBuffer.wrap(bytes)).toString() else String(bytes, StandardCharsets.UTF_8)

@@ -1,6 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import { createNativeAccount, NativeSessionRequired } from '../apps/mobile/src/auth/native-account';
 import { writeNativeJournal } from '../apps/mobile/src/features/journey/native-journal';
+import {
+  readNativeConsent,
+  submitNativeConsent,
+} from '../apps/mobile/src/features/live/native-consent';
 import { createNativeTransport, NativeHttpStatus } from '../apps/mobile/src/auth/safe-transport';
 import { createSessionVault } from '../apps/mobile/src/auth/session-vault';
 
@@ -170,6 +174,63 @@ it('does not dispatch a native journal write after cancellation during vault acc
   cancellation.abort();
   release({ accountId: account, credential, expiresAt: now + 600000 });
   await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  expect(f.driver.request.mock.calls.length).toBe(earlierRequests);
+});
+
+it('does not dispatch native consent after cancellation during credential access', async () => {
+  const f = fixture();
+  await f.identity.signIn();
+  const earlierRequests = f.driver.request.mock.calls.length;
+  for (const action of ['read', 'submit'] as const) {
+    let release!: (value: { accountId: string; credential: string; expiresAt: number }) => void;
+    vi.spyOn(f.vault, 'load').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const cancellation = new AbortController();
+    const pending =
+      action === 'read'
+        ? readNativeConsent(
+            f.identity,
+            account,
+            '00000000-0000-4000-8000-000000000002',
+            cancellation.signal,
+          )
+        : submitNativeConsent(
+            f.identity,
+            account,
+            '00000000-0000-4000-8000-000000000002',
+            { expectedGeneration: '0', sharing: false },
+            cancellation.signal,
+          );
+    cancellation.abort();
+    release({ accountId: account, credential, expiresAt: now + 600000 });
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(f.driver.request.mock.calls.length).toBe(earlierRequests);
+  }
+});
+
+it('does not dispatch consent when the account changes after credential resolution', async () => {
+  const f = fixture();
+  await f.identity.signIn();
+  const earlierRequests = f.driver.request.mock.calls.length;
+  let release!: (value: { accountId: string; credential: string; expiresAt: number }) => void;
+  vi.spyOn(f.vault, 'load').mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  const pending = submitNativeConsent(f.identity, account, '00000000-0000-4000-8000-000000000002', {
+    expectedGeneration: '0',
+    sharing: true,
+  }).catch((error: unknown) => error);
+  release({ accountId: account, credential, expiresAt: now + 600000 });
+  queueMicrotask(() => f.identity.invalidate());
+  expect(await pending).toBeInstanceOf(Error);
+  expect(f.identity.activeAccount()).toBeNull();
   expect(f.driver.request.mock.calls.length).toBe(earlierRequests);
 });
 

@@ -1,10 +1,17 @@
+import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
 import { useNativeAccount } from '../../auth/native-account-provider';
+import { NativeConsentPanel } from '../live/native-consent-panel';
+import {
+  nativeConsentEligibility,
+  type NativeConsentScope,
+} from '../live/native-consent-eligibility';
 import { NativeMapPreview } from './native-map';
 import { NativeJourneyHistory } from './native-journey-history';
 
 const c = tokens.colors;
+const consentEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_LIVE_CONSENT_ENABLED === 'true';
 export function NativeJourneyPanel({
   onLayout,
   onHistoryLayout,
@@ -17,6 +24,18 @@ export function NativeJourneyPanel({
   const session = useNativeAccount();
   const active = session.partition?.snapshots.journeys.find((item) => item.status === 'active');
   const pending = session.partition?.outbox.entries ?? [];
+  const scope = useRef<NativeConsentScope | null>(null);
+  const eligibility = nativeConsentEligibility(scope.current, {
+    accountId: session.accountId,
+    activeJourneyId: active?.id ?? null,
+    restoring: session.restoring,
+    busy: session.busy,
+    deletionCleanupPending: session.deletionCleanupPending,
+    pendingJourneyActions: pending.length,
+  });
+  scope.current = eligibility.scope;
+  const consentScope = eligibility.scope;
+  const consentAvailable = eligibility.available;
   return (
     <View style={styles.section} onLayout={onLayout}>
       <Text style={styles.heading}>Active journey</Text>
@@ -96,6 +115,18 @@ export function NativeJourneyPanel({
               {session.busy ? 'Updating…' : 'Refresh journeys'}
             </Text>
           </Pressable>
+        </>
+      )}
+      {consentEnabled && consentScope ? (
+        <NativeConsentPanel
+          key={`${consentScope.accountId}:${consentScope.journeyId}`}
+          accountId={consentScope.accountId}
+          journeyId={consentScope.journeyId}
+          available={consentAvailable}
+        />
+      ) : null}
+      {session.configured && !session.restoring && session.accountId ? (
+        <>
           <NativeMapPreview />
           <Text style={styles.subheading}>Recent journeys on this device</Text>
           {session.partition?.snapshots.journeys.length ? (
@@ -112,7 +143,7 @@ export function NativeJourneyPanel({
           )}
           <NativeJourneyHistory onLayout={onHistoryLayout} onNavigate={onHistoryNavigate} />
         </>
-      )}
+      ) : null}
     </View>
   );
 }

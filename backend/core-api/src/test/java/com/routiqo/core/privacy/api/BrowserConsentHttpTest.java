@@ -252,6 +252,14 @@ class BrowserConsentHttpTest {
         assertEmpty(send(expired, "GET", path(expiredJourney), null), 401);
     }
 
+    @Test void browserOnlyProfileDoesNotExposeNativeConsent() throws Exception {
+        String path = "http://localhost:" + port + "/api/v1/native/journeys/" + UUID.randomUUID() + "/consent";
+        var request = HttpRequest.newBuilder(URI.create(path)).GET().build();
+        var response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isIn(401, 403);
+        assertThat(response.body()).isEmpty();
+    }
+
     @Test void accountBudgetsSpanSessionsAndJourneysAndStaySeparate() throws Exception {
         UUID subject = UUID.randomUUID();
         Browser first = login(subject);

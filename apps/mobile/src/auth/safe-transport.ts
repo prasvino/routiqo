@@ -13,8 +13,9 @@ const account = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
 const journeyId = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
 const journalPath = new RegExp(`^/api/v1/native/journeys/${journeyId}/journal$`);
+const consentPath = new RegExp(`^/api/v1/native/journeys/${journeyId}/consent$`);
 const nativePath = new RegExp(
-  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal))?)?)$`,
+  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal|consent))?)?)$`,
 );
 
 export function nativeApiOrigin(value: string | undefined): string | null {
@@ -92,8 +93,13 @@ export function createNativeTransport(
       throw new Error('Native server response is invalid.');
     if (response.status < 200 || response.status >= 300)
       throw new NativeHttpStatus(response.status);
-    if (journalPath.test(path) && response.status !== 200)
+    if ((journalPath.test(path) || consentPath.test(path)) && response.status !== 200)
       throw new Error('Native server response is invalid.');
+    if (consentPath.test(path)) {
+      const encoded = new TextEncoder().encode(response.body);
+      if (new TextDecoder('utf-8', { fatal: true }).decode(encoded) !== response.body)
+        throw new Error('Native server response is invalid.');
+    }
     if (response.status === 204) return null;
     try {
       return JSON.parse(response.body) as unknown;
