@@ -32,6 +32,7 @@ function fixture() {
     eligible: true,
     foreground: true,
     focused: true,
+    sessionEpoch: 1,
   };
   const read = vi.fn(async () => off());
   const submit = vi.fn(async (input: { expectedGeneration: string; sharing: boolean }) =>
@@ -147,4 +148,36 @@ it('rejects MAX Allow, terminal completion, account changes and late results aft
   pending.reject(new Error('late'));
   await stop;
   expect(f.publish.mock.calls.length).toBe(before + 1);
+});
+
+it('invalidates binding authority at read and Stop start, and fences stale Allow after renewal', async () => {
+  const f = fixture();
+  const authority = vi.fn();
+  const read = vi.fn(async () => on());
+  const pending = deferred<NativeLiveConsent>();
+  const controller = createNativeConsentController(
+    accountId,
+    journeyId,
+    {
+      environment: () => f.environment,
+      onAuthorityChange: authority,
+      read,
+      submit: vi.fn(() => pending.promise),
+    },
+    vi.fn(),
+  );
+  await controller.check();
+  expect(authority).toHaveBeenLastCalledWith('2', 1);
+  const again = controller.check();
+  expect(authority).toHaveBeenLastCalledWith(null, 1);
+  await again;
+  const stop = controller.stop();
+  expect(authority).toHaveBeenLastCalledWith(null, 1);
+  f.environment.sessionEpoch = 2;
+  await controller.allow();
+  expect(authority).not.toHaveBeenLastCalledWith('2', 2);
+  controller.sessionChanged();
+  pending.resolve(off('3'));
+  await stop;
+  expect(controller.state().confirmed).toBeNull();
 });

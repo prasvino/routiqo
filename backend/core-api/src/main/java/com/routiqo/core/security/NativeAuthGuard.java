@@ -30,13 +30,15 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
     private final GoogleSessionService sessions;
     private final boolean consentEnabled;
     private final boolean routingEnabled;
+    private final boolean bindingEnabled;
 
     public NativeAuthGuard(AuthRateGate rates, GoogleSessionService sessions, boolean consentEnabled,
-            boolean routingEnabled) {
+            boolean routingEnabled, boolean bindingEnabled) {
         this.rates = rates;
         this.sessions = sessions;
         this.consentEnabled = consentEnabled;
         this.routingEnabled = routingEnabled;
+        this.bindingEnabled = bindingEnabled;
     }
 
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -60,6 +62,9 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 && path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}/consent");
         boolean routing = routingEnabled && "POST".equals(request.getMethod())
                 && ("/api/v1/native/routes".equals(path) || "/api/v1/native/routes/places".equals(path));
+        boolean binding = bindingEnabled
+                && ("GET".equals(request.getMethod()) || "POST".equals(request.getMethod()))
+                && path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}/route-context");
         boolean journey = ("GET".equals(request.getMethod()) &&
                     ("/api/v1/native/journeys".equals(path)
                         || path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}")
@@ -73,7 +78,8 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 || ("POST".equals(request.getMethod()) && ("/api/v1/native/auth/session/renew".equals(path)
                     || "/api/v1/native/auth/logout".equals(path)
                     || "/api/v1/native/auth/account/delete".equals(path)));
-        if (!challenge && !exchange && !protectedOperation && !journey && !consent && !routing) {
+        if (!challenge && !exchange && !protectedOperation && !journey && !consent && !routing
+                && !binding) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -110,7 +116,7 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
             response.setStatus(429);
             return;
         }
-        if (protectedOperation || journey || consent || routing) {
+        if (protectedOperation || journey || consent || routing || binding) {
             String credential = (String) request.getAttribute(CREDENTIAL_ATTRIBUTE);
             String accountId = null;
             if (logout) {
@@ -137,7 +143,7 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 response.setStatus(429);
                 return;
             }
-            if (journey || consent || routing) request.setAttribute(ACCOUNT_ATTRIBUTE, accountId);
+            if (journey || consent || routing || binding) request.setAttribute(ACCOUNT_ATTRIBUTE, accountId);
         }
 
         if ("POST".equals(request.getMethod())) {

@@ -418,6 +418,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/native/journeys/{id}/route-context": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Separately default-off owner-only recovery of the current private context without renewing or binding it. Sixty reads per account per minute shared with browser. */
+        get: operations["getNativePrivateJourneyRouteContext"];
+        put?: never;
+        /** @description One explicit private bind through the configured route resolver. Ten requests per account per minute shared with browser; empty outcomes preserve previous context. */
+        post: operations["bindNativePrivateJourneyRouteContext"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/native/journeys/{id}/consent": {
         parameters: {
             query?: never;
@@ -2623,6 +2646,117 @@ export interface operations {
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
+        };
+    };
+    getNativePrivateJourneyRouteContext: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current context or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserRouteContextRead"];
+                };
+            };
+            /** @description Invalid canonical journey identifier */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Context, session or rate authority unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bindNativePrivateJourneyRouteContext: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserRouteContextBindingRequest"];
+            };
+        };
+        responses: {
+            /** @description Binding outcome; only bound includes a context */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserRouteContextBindingResponse"];
+                };
+            };
+            /** @description Invalid canonical journey identifier or exact binding JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            /** @description Journey missing or not owned by this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stale context expectation, inactive consent, completed journey or binding conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Provider, persistence, session or rate authority unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getNativePrivateJourneyConsent: {

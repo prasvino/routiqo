@@ -23,7 +23,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("web-auth & routing")
+@Profile({"web-auth & routing", "native-auth & routing"})
 @ConditionalOnProperty(name = "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED", havingValue = "true")
 public class RouteAnchorResolutionConfiguration {
     private static final String CONFIGURATION_ERROR = "Route anchor resolver is not configured";

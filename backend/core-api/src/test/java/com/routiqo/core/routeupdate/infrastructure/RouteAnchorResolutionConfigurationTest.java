@@ -31,7 +31,8 @@ class RouteAnchorResolutionConfigurationTest {
 
     @Test void remainsAbsentByDefaultAndRequiresBothProfiles() throws Exception {
         Path catalog = catalog(0, 0);
-        for (String profiles : List.of("", "web-auth", "routing", "web-auth,routing")) {
+        for (String profiles : List.of("", "web-auth", "native-auth", "routing",
+                "web-auth,routing", "native-auth,routing")) {
             var runner = new ApplicationContextRunner()
                     .withUserConfiguration(RouteAnchorResolutionConfiguration.class, TestDependencies.class)
                     .withPropertyValues("ROUTIQO_LIVE_ANCHOR_CATALOG_PATH=" + catalog);
@@ -43,7 +44,7 @@ class RouteAnchorResolutionConfigurationTest {
                     .doesNotHaveBean(RouteAnchorCatalog.class));
         }
 
-        for (String profiles : List.of("", "web-auth", "routing")) {
+        for (String profiles : List.of("", "web-auth", "native-auth", "routing")) {
             var runner = new ApplicationContextRunner()
                     .withUserConfiguration(RouteAnchorResolutionConfiguration.class, TestDependencies.class)
                     .withPropertyValues("ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true",
@@ -66,6 +67,21 @@ class RouteAnchorResolutionConfigurationTest {
         Path outside = catalog(3, 0);
         assertMisconfigured(new String[] {"ROUTIQO_LIVE_ANCHOR_CATALOG_PATH=" + outside},
                 outside.toString(), "3.0", ANCHOR);
+        assertMisconfiguredNative(new String[0], "ROUTIQO_LIVE_ANCHOR_CATALOG_PATH");
+    }
+
+    @Test void nativeOnlyProfileLoadsTheRealResolverWhenFlagAndCatalogAreConfigured() throws Exception {
+        String[] settings = {
+            "spring.profiles.active=native-auth,routing",
+            "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true",
+            "ROUTIQO_LIVE_ANCHOR_CATALOG_PATH=" + catalog(0, 0)
+        };
+        new ApplicationContextRunner()
+                .withUserConfiguration(RouteAnchorResolutionConfiguration.class, TestDependencies.class)
+                .withPropertyValues(settings)
+                .run(context -> assertThat(context).hasNotFailed()
+                        .hasSingleBean(RouteAnchorResolver.class)
+                        .hasSingleBean(RouteAnchorCatalog.class));
     }
 
     @Test void composesTheConfiguredRegionGuardedValhallaAndBoundedLoopbackTransport()
@@ -133,9 +149,18 @@ class RouteAnchorResolutionConfigurationTest {
     }
 
     private void assertMisconfigured(String[] properties, String... privateValues) {
+        assertMisconfiguredForProfile("web-auth,routing", properties, privateValues);
+    }
+
+    private void assertMisconfiguredNative(String[] properties, String... privateValues) {
+        assertMisconfiguredForProfile("native-auth,routing", properties, privateValues);
+    }
+
+    private void assertMisconfiguredForProfile(String profiles, String[] properties,
+            String... privateValues) {
         new ApplicationContextRunner()
                 .withUserConfiguration(RouteAnchorResolutionConfiguration.class, TestDependencies.class)
-                .withPropertyValues("spring.profiles.active=web-auth,routing",
+                .withPropertyValues("spring.profiles.active=" + profiles,
                         "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true")
                 .withPropertyValues(properties)
                 .run(context -> {

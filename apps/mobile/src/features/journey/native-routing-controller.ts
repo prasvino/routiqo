@@ -51,6 +51,10 @@ export interface NativeRoutingEnvironment {
 }
 export interface NativeRoutingPorts {
   environment(): NativeRoutingEnvironment;
+  onSelectionChange?(
+    selection: (RouteRequest & { alternativeIndex: number }) | null,
+    sessionEpoch: number,
+  ): void;
   search(query: string, signal: AbortSignal): Promise<PlaceResults>;
   calculate(request: RouteRequest, signal: AbortSignal): Promise<RouteResult>;
 }
@@ -85,7 +89,11 @@ export function createNativeRoutingController(
   let revision = 0;
   let pending: AbortController | null = null;
   let requestEpoch = 0;
+  let selectedForPreparation = false;
+  let selectedEpoch = -1;
   let disposed = false;
+  const selectionChange = (value: (RouteRequest & { alternativeIndex: number }) | null) =>
+    ports.onSelectionChange?.(value, ports.environment().sessionEpoch);
   const update = (patch: Partial<NativeRoutingState>) => {
     state = { ...state, ...patch };
     if (!disposed) publish(state);
@@ -101,6 +109,8 @@ export function createNativeRoutingController(
     );
   };
   const cancel = () => {
+    selectedForPreparation = false;
+    selectionChange(null);
     revision++;
     pending?.abort();
     pending = null;
@@ -156,6 +166,8 @@ export function createNativeRoutingController(
     const endpoint = state[end];
     const found = endpoint.results?.places.find((place) => place.id === id);
     if (!found) return;
+    selectedForPreparation = false;
+    selectionChange(null);
     update({
       [end]: {
         text: found.label,
@@ -174,6 +186,8 @@ export function createNativeRoutingController(
   };
   const swap = () => {
     if (disposed || state.busy || !state.origin.selected || !state.destination.selected) return;
+    selectedForPreparation = false;
+    selectionChange(null);
     update({
       origin: state.destination,
       destination: state.origin,
@@ -220,7 +234,10 @@ export function createNativeRoutingController(
     }
     const started = begin('route');
     if (!started) return;
+    selectedForPreparation = false;
+    selectionChange(null);
     const { run, abort } = started;
+    let selectedResult = false;
     try {
       const result = readRouteResult(await ports.calculate(request, abort.signal));
       if (!current(run, abort)) return;
@@ -231,16 +248,43 @@ export function createNativeRoutingController(
         noRoute: result.routes.length === 0,
         failure: null,
       });
+      selectedResult = result.routes.length > 0;
     } catch (error) {
       if (!current(run, abort)) return;
       update({ failure: classify(error) }); // Keep the last successful same-input route.
     } finally {
+      const accepted = current(run, abort);
       finish(run, abort);
+      if (accepted && selectedResult) {
+        selectedForPreparation = true;
+        selectedEpoch = requestEpoch;
+        selectionChange({
+          mode: request.mode,
+          origin: [...request.origin],
+          destination: [...request.destination],
+          alternativeIndex: 0,
+        });
+      }
     }
   }
   const alternative = (index: number) => {
     if (disposed || !state.route?.routes[index] || index === state.alternative) return;
+    selectionChange(null);
     update({ alternative: index, step: 0 });
+    if (
+      selectedForPreparation &&
+      selectedEpoch === ports.environment().sessionEpoch &&
+      available() &&
+      state.origin.selected &&
+      state.destination.selected
+    )
+      selectionChange({
+        mode: state.mode,
+        origin: [...state.origin.selected.coordinate],
+        destination: [...state.destination.selected.coordinate],
+        alternativeIndex: index,
+      });
+    else selectedForPreparation = false;
   };
   const step = (index: number) => {
     const count = state.route?.routes[state.alternative]?.steps?.length ?? 0;
@@ -263,6 +307,7 @@ export function createNativeRoutingController(
     },
     sessionChanged: cancel,
     dispose: () => {
+      selectionChange(null);
       disposed = true;
       revision++;
       pending?.abort();

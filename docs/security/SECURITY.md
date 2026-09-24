@@ -240,6 +240,15 @@ not public target authorization; a pair snapshot is not a reusable delivery gran
 
 ## Private command stopping
 
+ADR 0061's native private route preparation must use existing owned read/bind
+authority, never raw context replacement. Keep native exposure, resolver and
+catalog configuration gates distinct. Endpoint inputs are transient; minimized
+contexts remain private and are not presence proof or publication authority.
+Synchronous client consent/selection invalidation must precede asynchronous work;
+server consent/context/attempt checks after provider I/O remain authoritative.
+Unknown, expired or cancelled client acknowledgements cannot grant readiness.
+Neither abort nor GET proves a prior write did not commit; recovery is explicit.
+
 ADR 0060's native route planning uses separately default-off exact POST leaves,
 native bearer/account guards and shared durable browser/native request budgets.
 Endpoints and place queries are private transient inputs; do not log or persist

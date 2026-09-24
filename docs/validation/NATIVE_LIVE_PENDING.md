@@ -21,7 +21,13 @@ These checks do not replace the configured-service and device gates below.
 
 ## Subsequent implementation
 
-- Native explicit route preparation and context recovery.
+- Native explicit route preparation and context recovery are implemented locally
+  but **paused on 2026-09-24, with a user-authorized checkpoint commit**. See
+  [resume handoff](IMPLEMENTATION_RESUME.md) for completed checks and remaining
+  verification. The contract is `docs/features/live/NATIVE_ROUTE_PREPARATION_SPEC.md`
+  and ADR 0061; this is not a completed feature until verification and commit.
+  Native route planning/manual directions are committed separately; see
+  `NATIVE_ROUTING_PENDING.md` for their configured-provider gates.
 - Native Quick Signal choice/issue/acceptance and exact receipt/stop recovery.
 - Native list/report experience for the separately authorized evidence projection.
   Do not conflate official-provider alerts with traveller-derived publication.
@@ -40,6 +46,12 @@ These checks do not replace the configured-service and device gates below.
   journey completion. An unconfirmed stop is never privacy-protection success.
 - Verify browser/native concurrent operations obey the same consent generation
   and account budgets, including stale enable after a successful stop.
+- For private route preparation, supply the reviewed regional anchor catalog and
+  existing resolver/provider configuration. Explicitly enable the independent
+  native route-binding API/client gates in controlled staging alongside native
+  consent and route planning. Confirm lost-response recovery, exact-context
+  replacement, expiry, completion and concurrent Stop while the provider is busy.
+  A read is only an observation; it cannot establish that a prior bind was undone.
 - Check TalkBack, switch/keyboard navigation, large text and reduced motion on a
   representative physical Android device. Record actual device/network results;
   emulator fixtures are not a configured-service or physical-device substitute.

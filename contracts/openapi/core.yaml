@@ -555,6 +555,50 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/native/journeys/{id}/route-context:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid, pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } }
+    get:
+      operationId: getNativePrivateJourneyRouteContext
+      security: [{ nativeBearer: [] }]
+      description: 'Separately default-off owner-only recovery of the current private context without renewing or binding it. Sixty reads per account per minute shared with browser.'
+      responses:
+        '200':
+          description: Current context or null
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserRouteContextRead' }
+        '400': { description: Invalid canonical journey identifier }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: Journey missing or not owned by this account }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Context, session or rate authority unavailable. Empty response body.' }
+    post:
+      operationId: bindNativePrivateJourneyRouteContext
+      security: [{ nativeBearer: [] }]
+      description: 'One explicit private bind through the configured route resolver. Ten requests per account per minute shared with browser; empty outcomes preserve previous context.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrowserRouteContextBindingRequest' }
+      responses:
+        '200':
+          description: Binding outcome; only bound includes a context
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrowserRouteContextBindingResponse' }
+        '400': { description: Invalid canonical journey identifier or exact binding JSON }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: Journey missing or not owned by this account }
+        '409': { description: 'Stale context expectation, inactive consent, completed journey or binding conflict' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Provider, persistence, session or rate authority unavailable. Empty response body.' }
   /api/v1/native/journeys/{id}/consent:
     parameters:
       - { $ref: '#/components/parameters/JourneyAccount' }

@@ -36,6 +36,14 @@ import {
   type NativeLiveConsent,
 } from '../features/live/native-consent';
 import {
+  bindNativeRouteContext,
+  readNativeRouteContext,
+  NativeRouteContextError,
+  type NativeRouteBindingInput,
+  type NativeRouteBindingResult,
+  type NativeRouteContextRead,
+} from '../features/live/native-route-context';
+import {
   acknowledgeNativeJournalDraft,
   cacheNativeTripJournal,
   discardNativeJournalDraft,
@@ -96,6 +104,12 @@ interface NativeAccountContext {
   ): Promise<NativeLiveConsent>;
   searchPlaces(query: string, signal: AbortSignal): Promise<PlaceResults>;
   calculateRoute(request: RouteRequest, signal: AbortSignal): Promise<RouteResult>;
+  readRouteContext(journeyId: string, signal: AbortSignal): Promise<NativeRouteContextRead>;
+  bindRouteContext(
+    journeyId: string,
+    input: NativeRouteBindingInput,
+    signal: AbortSignal,
+  ): Promise<NativeRouteBindingResult>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   reauthenticateForDeletion(): Promise<void>;
@@ -366,6 +380,65 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
     routingRequest((account) => searchNativePlaces(identity, account, query, signal));
   const calculateRoute = (request: RouteRequest, signal: AbortSignal) =>
     routingRequest((account) => calculateNativeRoute(identity, account, request, signal));
+  async function routeContextRequest<T>(
+    journeyId: string,
+    operation: (account: string) => Promise<T>,
+  ): Promise<T> {
+    const account = identity.activeAccount();
+    if (!account || accountId !== account || deletionPendingRef.current)
+      throw new NativeSessionRequired();
+    const eligible = () =>
+      onlineRef.current &&
+      foregroundRef.current &&
+      !working.current &&
+      !restoring &&
+      !busy &&
+      partition?.snapshots.journeys.some(
+        (item) => item.id === journeyId && item.status === 'active',
+      ) &&
+      partition.outbox.entries.length === 0;
+    if (!eligible()) throw new NativeRouteContextError('unavailable');
+    const epoch = historyEpochRef.current;
+    const revision = identity.revision();
+    const current = () =>
+      epoch === historyEpochRef.current &&
+      revision === identity.revision() &&
+      identity.activeAccount() === account &&
+      accountId === account &&
+      !deletionPendingRef.current;
+    try {
+      const result = await operation(account);
+      if (!current()) throw new NativeSessionRequired();
+      if (!eligible()) throw new NativeRouteContextError('unavailable');
+      return result;
+    } catch (failure) {
+      if (!current()) throw new NativeSessionRequired();
+      if (
+        failure instanceof NativeSessionRequired ||
+        (failure instanceof NativeRouteContextError &&
+          (failure.code === 'session' || failure.status === 401))
+      ) {
+        invalidateHistory();
+        identity.invalidate();
+        setAccountId(null);
+        setPartition(null);
+        setError('Your session needs verification. Sign in from Profile to continue.');
+      }
+      throw failure;
+    }
+  }
+  const readRouteContext = (journeyId: string, signal: AbortSignal) =>
+    routeContextRequest(journeyId, (account) =>
+      readNativeRouteContext(identity, account, journeyId, signal),
+    );
+  const bindRouteContext = (
+    journeyId: string,
+    input: NativeRouteBindingInput,
+    signal: AbortSignal,
+  ) =>
+    routeContextRequest(journeyId, (account) =>
+      bindNativeRouteContext(identity, account, journeyId, input, signal),
+    );
 
   async function load(account: string) {
     const value = await readMobileJourneyPartition(db, account);
@@ -659,6 +732,8 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         submitLiveConsent,
         searchPlaces,
         calculateRoute,
+        readRouteContext,
+        bindRouteContext,
         signIn,
         signOut,
         reauthenticateForDeletion,

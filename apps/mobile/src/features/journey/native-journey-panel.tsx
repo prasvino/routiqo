@@ -1,8 +1,10 @@
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import { NativeConsentPanel } from '../live/native-consent-panel';
+import { NativeRoutePreparationPanel } from '../live/native-route-preparation-panel';
+import { createNativeRoutePreparationCoordinator } from '../live/native-route-preparation-coordinator';
 import {
   nativeConsentEligibility,
   type NativeConsentScope,
@@ -14,6 +16,7 @@ import { NativeJourneyHistory } from './native-journey-history';
 const c = tokens.colors;
 const consentEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_LIVE_CONSENT_ENABLED === 'true';
 const routingEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_ROUTING_ENABLED === 'true';
+const bindingEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_LIVE_ROUTE_BINDING_ENABLED === 'true';
 export function NativeJourneyPanel({
   onLayout,
   onHistoryLayout,
@@ -24,6 +27,25 @@ export function NativeJourneyPanel({
   onHistoryNavigate?: () => void;
 }) {
   const session = useNativeAccount();
+  const coordinatorRef = useRef({
+    accountId: session.accountId,
+    value: createNativeRoutePreparationCoordinator(),
+  });
+  if (
+    session.accountId !== coordinatorRef.current.accountId &&
+    (session.accountId !== null || !session.restoring)
+  ) {
+    coordinatorRef.current = {
+      accountId: session.accountId,
+      value: createNativeRoutePreparationCoordinator(),
+    };
+  }
+  const coordinator = coordinatorRef.current.value;
+  const onSelectionChange = useMemo(
+    () => (selection: Parameters<typeof coordinator.setSelection>[0], sessionEpoch: number) =>
+      coordinator.setSelection(selection, sessionEpoch),
+    [coordinator],
+  );
   const active = session.partition?.snapshots.journeys.find((item) => item.status === 'active');
   const pending = session.partition?.outbox.entries ?? [];
   const scope = useRef<NativeConsentScope | null>(null);
@@ -38,6 +60,15 @@ export function NativeJourneyPanel({
   scope.current = eligibility.scope;
   const consentScope = eligibility.scope;
   const consentAvailable = eligibility.available;
+  const consentAccountId = consentScope?.accountId;
+  const consentJourneyId = consentScope?.journeyId;
+  const onConsentChange = useMemo(
+    () => (generation: string | null, sessionEpoch: number) => {
+      if (consentAccountId && consentJourneyId)
+        coordinator.setConsent(consentAccountId, consentJourneyId, generation, sessionEpoch);
+    },
+    [coordinator, consentAccountId, consentJourneyId],
+  );
   return (
     <View style={styles.section} onLayout={onLayout}>
       <Text style={styles.heading}>Active journey</Text>
@@ -124,6 +155,7 @@ export function NativeJourneyPanel({
           key={session.accountId}
           accountId={session.accountId}
           available={!session.restoring && !session.busy && !session.deletionCleanupPending}
+          onSelectionChange={onSelectionChange}
         />
       ) : null}
       {consentEnabled && consentScope ? (
@@ -132,6 +164,16 @@ export function NativeJourneyPanel({
           accountId={consentScope.accountId}
           journeyId={consentScope.journeyId}
           available={consentAvailable}
+          onAuthorityChange={onConsentChange}
+        />
+      ) : null}
+      {bindingEnabled && consentScope ? (
+        <NativeRoutePreparationPanel
+          key={`${consentScope.accountId}:${consentScope.journeyId}`}
+          accountId={consentScope.accountId}
+          journeyId={consentScope.journeyId}
+          available={consentAvailable}
+          coordinator={coordinator}
         />
       ) : null}
       {session.configured && !session.restoring && session.accountId ? (

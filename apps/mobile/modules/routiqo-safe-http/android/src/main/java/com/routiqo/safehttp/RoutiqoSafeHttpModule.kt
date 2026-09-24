@@ -26,6 +26,10 @@ class RoutiqoSafeHttpModule : Module() {
     .writeTimeout(7, TimeUnit.SECONDS)
     .build()
   private val routingClient = client.newBuilder().callTimeout(18, TimeUnit.SECONDS).build()
+  private val bindingClient = client.newBuilder()
+    .callTimeout(30, TimeUnit.SECONDS)
+    .readTimeout(25, TimeUnit.SECONDS)
+    .build()
 
   override fun definition() = ModuleDefinition {
     Name("RoutiqoSafeHttp")
@@ -40,7 +44,8 @@ class RoutiqoSafeHttpModule : Module() {
         val uuid = "[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"
         val journalPath = path.matches(Regex("/api/v1/native/journeys/$uuid/journal"))
         val consentPath = path.matches(Regex("/api/v1/native/journeys/$uuid/consent"))
-        val journeyPath = path.matches(Regex("/api/v1/native/journeys(?:/history|/$uuid(?:/(?:complete|journal|consent))?)?"))
+        val routeContextPath = path.matches(Regex("/api/v1/native/journeys/$uuid/route-context"))
+        val journeyPath = path.matches(Regex("/api/v1/native/journeys(?:/history|/$uuid(?:/(?:complete|journal|consent|route-context))?)?"))
         val routePath = path == "/api/v1/native/routes"
         val placePath = path == "/api/v1/native/routes/places"
         val routingPath = routePath || placePath
@@ -67,9 +72,10 @@ class RoutiqoSafeHttpModule : Module() {
         if (method == "POST") {
           builder.post(payload!!.toRequestBody("application/json".toMediaType()))
         } else builder.get()
-        (if (routingPath) routingClient else client).newCall(builder.build()).execute().use { response ->
+        (if (routeContextPath && method == "POST") bindingClient else if (routingPath) routingClient else client)
+          .newCall(builder.build()).execute().use { response ->
           require(!response.isRedirect && response.code !in 300..399) { "Redirect denied" }
-          if ((journalPath || consentPath || routingPath) && response.code == 200) {
+          if ((journalPath || consentPath || routeContextPath || routingPath) && response.code == 200) {
             val contentType = response.header("Content-Type") ?: ""
             require(contentType.matches(Regex("(?i)application/(?:[a-z0-9!#$&^_.+-]+\\+)?json(?:\\s*;.*)?"))) { "Invalid JSON content type" }
           }
@@ -90,7 +96,7 @@ class RoutiqoSafeHttpModule : Module() {
             }
             output.toByteArray()
           } ?: byteArrayOf()
-          val body = if (journalPath || consentPath || routingPath) StandardCharsets.UTF_8.newDecoder()
+          val body = if (journalPath || consentPath || routeContextPath || routingPath) StandardCharsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
             .decode(ByteBuffer.wrap(bytes)).toString() else String(bytes, StandardCharsets.UTF_8)

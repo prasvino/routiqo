@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
-import type { PlaceMatch, RouteMode } from '@routiqo/shared';
+import type { PlaceMatch, RouteMode, RouteRequest } from '@routiqo/shared';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import {
   createNativeRoutingController,
@@ -257,13 +257,20 @@ export function NativeRoutePlannerView({
 export function NativeRoutePlanner({
   accountId,
   available,
+  onSelectionChange,
 }: {
   accountId: string;
   available: boolean;
+  onSelectionChange?: (
+    selection: (RouteRequest & { alternativeIndex: number }) | null,
+    sessionEpoch: number,
+  ) => void;
 }) {
   const session = useNativeAccount();
   const live = useRef({ session, available });
   live.current = { session, available };
+  const selectionCallback = useRef(onSelectionChange);
+  selectionCallback.current = onSelectionChange;
   const foreground = useRef(
     AppState.currentState !== 'background' && AppState.currentState !== 'inactive',
   );
@@ -287,6 +294,8 @@ export function NativeRoutePlanner({
     const instance = createNativeRoutingController(
       accountId,
       {
+        onSelectionChange: (selection, sessionEpoch) =>
+          selectionCallback.current?.(selection, sessionEpoch),
         environment: () => ({
           accountId: live.current.session.accountId,
           online: live.current.session.online,

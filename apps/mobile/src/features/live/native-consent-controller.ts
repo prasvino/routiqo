@@ -30,9 +30,11 @@ export interface NativeConsentEnvironment {
   eligible: boolean;
   foreground: boolean;
   focused: boolean;
+  sessionEpoch: number;
 }
 export interface NativeConsentPorts {
   environment(): NativeConsentEnvironment;
+  onAuthorityChange?(generation: string | null, sessionEpoch: number): void;
   read(signal: AbortSignal): Promise<NativeLiveConsent>;
   submit(
     input: { expectedGeneration: string; sharing: boolean },
@@ -58,6 +60,8 @@ export function createNativeConsentController(
   let revision = 0;
   let pending: AbortController | null = null;
   let pendingMutation = false;
+  let requestEpoch = 0;
+  let confirmedEpoch = -1;
   let disposed = false;
   const update = (patch: Partial<NativeConsentState>) => {
     state = { ...state, ...patch };
@@ -75,6 +79,7 @@ export function createNativeConsentController(
     );
   };
   const cancel = () => {
+    ports.onAuthorityChange?.(null, ports.environment().sessionEpoch);
     revision++;
     pending?.abort();
     pending = null;
@@ -105,6 +110,7 @@ export function createNativeConsentController(
     )
       throw new Error('Invalid native consent response.');
     const terminal = state.terminal || !value.journeyActive;
+    confirmedEpoch = requestEpoch;
     const uncertain = sharing === false ? false : sharing === true ? false : state.uncertain;
     update({
       confirmed: terminal ? null : value,
@@ -123,7 +129,9 @@ export function createNativeConsentController(
   };
   const begin = (mutation: boolean, notice: NativeConsentNotice) => {
     if (disposed || state.busy || !available()) return null;
+    ports.onAuthorityChange?.(null, ports.environment().sessionEpoch);
     const run = ++revision;
+    requestEpoch = ports.environment().sessionEpoch;
     const abort = new AbortController();
     pending = abort;
     pendingMutation = mutation;
@@ -136,12 +144,23 @@ export function createNativeConsentController(
     return { run, abort };
   };
   const current = (run: number, abort: AbortController) =>
-    !disposed && run === revision && !abort.signal.aborted && available();
+    !disposed &&
+    run === revision &&
+    !abort.signal.aborted &&
+    available() &&
+    ports.environment().sessionEpoch === requestEpoch;
   const finish = (run: number, abort: AbortController) => {
     if (!current(run, abort)) return;
     pending = null;
     pendingMutation = false;
     update({ busy: false });
+    if (
+      state.confirmed?.journeyActive &&
+      state.confirmed.sharing &&
+      !state.uncertain &&
+      !state.terminal
+    )
+      ports.onAuthorityChange?.(state.confirmed.generation, requestEpoch);
   };
   async function check() {
     const started = begin(false, 'checking');
@@ -167,6 +186,7 @@ export function createNativeConsentController(
       sharing &&
       (state.uncertain ||
         state.terminal ||
+        confirmedEpoch !== ports.environment().sessionEpoch ||
         !state.confirmed?.journeyActive ||
         state.confirmed.sharing ||
         state.confirmed.generation === maxGeneration)
@@ -202,6 +222,7 @@ export function createNativeConsentController(
       if (!disposed) cancel();
     },
     dispose: () => {
+      ports.onAuthorityChange?.(null, ports.environment().sessionEpoch);
       disposed = true;
       revision++;
       pending?.abort();

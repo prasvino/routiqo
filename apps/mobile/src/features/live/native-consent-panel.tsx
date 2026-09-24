@@ -122,14 +122,18 @@ export function NativeConsentPanel({
   accountId,
   journeyId,
   available,
+  onAuthorityChange,
 }: {
   accountId: string;
   journeyId: string;
   available: boolean;
+  onAuthorityChange?: (generation: string | null, sessionEpoch: number) => void;
 }) {
   const session = useNativeAccount();
   const live = useRef({ session, available });
   live.current = { session, available };
+  const authorityCallback = useRef(onAuthorityChange);
+  authorityCallback.current = onAuthorityChange;
   const foreground = useRef(
     AppState.currentState !== 'background' && AppState.currentState !== 'inactive',
   );
@@ -152,6 +156,8 @@ export function NativeConsentPanel({
       accountId,
       journeyId,
       {
+        onAuthorityChange: (generation, sessionEpoch) =>
+          authorityCallback.current?.(generation, sessionEpoch),
         environment: () => ({
           accountId: live.current.session.accountId,
           journeyId,
@@ -159,6 +165,7 @@ export function NativeConsentPanel({
           eligible: live.current.available,
           foreground: foreground.current,
           focused: focused.current,
+          sessionEpoch: live.current.session.historyEpoch,
         }),
         read: (signal) => live.current.session.readLiveConsent(journeyId, signal),
         submit: (input, signal) => live.current.session.submitLiveConsent(journeyId, input, signal),

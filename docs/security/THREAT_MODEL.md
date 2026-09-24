@@ -105,28 +105,28 @@ Authentication at one boundary does not eliminate authorization, validation, min
 
 ## 5. Baseline threat register
 
-| ID | Threat / abuse case | Example impact | Required control direction |
-|---|---|---|---|
-| T01 | Authentication or session attack | account takeover, session fixation, token replay | strong token validation, secure storage, revocation, rotation, replay resistance, anomaly detection |
-| T02 | Broken object authorization / IDOR | read or modify another user's profile, route, room, report, or content | server-side object/action authorization, ownership isolation, negative cross-user tests |
-| T03 | Privilege escalation | consumer reaches admin/support/internal actions | deny-by-default roles, separated admin boundary, least privilege, audit |
-| T04 | Location or presence disclosure | stalking, home/work discovery, longitudinal tracking | server-side privacy transformation, consent, precision reduction, expiry, cohort protection |
-| T05 | Enumeration and scraping | discover users, rooms, presence, blocks, or private state at scale | opaque identifiers, response normalization, query bounds, rate limits, anti-automation controls |
-| T06 | Block/Ghost Mode bypass | blocked user observes target through another endpoint or channel | central policy enforcement across API, realtime, cache, notifications, search, and export |
-| T07 | Realtime subscription abuse | unauthorized topic access, replay, stale authorization, event leakage | subscription authorization, re-evaluation, scoped topics, expiry, replay limits |
-| T08 | Harassment, threats, stalking, or coercion | physical or psychological harm | block/report/mute, moderation, evidence-safe handling, anti-evasion, safety escalation |
-| T09 | Scams, impersonation, spam, or malicious links | fraud, account compromise, unwanted contact | identity and reputation controls, content/link defenses, rate limits, reporting and moderation |
-| T10 | Injection or unsafe content | SQL/NoSQL/command injection, XSS, template injection | parameterization, validation, encoding, CSP, safe rendering, least privilege |
-| T11 | CSRF, SSRF, unsafe redirects, traversal, or file abuse | action forgery, internal access, credential theft, code/data exposure | origin/session protections, outbound allowlists, canonicalization, upload isolation |
-| T12 | Sensitive-data leakage | tokens, PII, location, private state in logs/errors/analytics/cache | minimization, redaction, access control, safe errors, lifecycle enforcement |
-| T13 | Replay, race, or duplicate action | duplicate posts, bypassed limits, inconsistent block/privacy state | idempotency, atomic checks, concurrency tests, authoritative shared state |
-| T14 | Resource exhaustion / DoS | degraded route search, rooms, realtime, upload, notification, or database | multi-dimensional limits, timeouts, backpressure, quotas, load shedding, isolation |
-| T15 | Moderation evasion | ban/block bypass, coordinated abuse, evidence deletion | durable policy state, evasion signals, appeal controls, audited moderation actions |
-| T16 | Supply-chain or CI/CD compromise | malicious release, secret theft, runtime takeover | pinned dependencies, secret isolation, provenance, protected branches, review, artifact verification |
-| T17 | Provider/integration compromise | location, identity, notification, or message leakage/manipulation | data minimization, scoped credentials, egress limits, isolation, rotation, provider review |
-| T18 | Insider/admin misuse | unauthorized lookup, surveillance, modification, or export | least privilege, purpose limitation, strong auth, tamper-resistant audit, alerts and review |
-| T19 | Data-retention/deletion failure | supposedly deleted or expired data remains accessible | lifecycle propagation to caches, indexes, exports, analytics, backups, and realtime state |
-| T20 | Multi-replica inconsistency | bypassed rate limit, stale presence, divergent authorization or block state | shared authoritative state, atomic operations, deterministic expiry, distributed tests |
+| ID  | Threat / abuse case                                    | Example impact                                                              | Required control direction                                                                           |
+| --- | ------------------------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| T01 | Authentication or session attack                       | account takeover, session fixation, token replay                            | strong token validation, secure storage, revocation, rotation, replay resistance, anomaly detection  |
+| T02 | Broken object authorization / IDOR                     | read or modify another user's profile, route, room, report, or content      | server-side object/action authorization, ownership isolation, negative cross-user tests              |
+| T03 | Privilege escalation                                   | consumer reaches admin/support/internal actions                             | deny-by-default roles, separated admin boundary, least privilege, audit                              |
+| T04 | Location or presence disclosure                        | stalking, home/work discovery, longitudinal tracking                        | server-side privacy transformation, consent, precision reduction, expiry, cohort protection          |
+| T05 | Enumeration and scraping                               | discover users, rooms, presence, blocks, or private state at scale          | opaque identifiers, response normalization, query bounds, rate limits, anti-automation controls      |
+| T06 | Block/Ghost Mode bypass                                | blocked user observes target through another endpoint or channel            | central policy enforcement across API, realtime, cache, notifications, search, and export            |
+| T07 | Realtime subscription abuse                            | unauthorized topic access, replay, stale authorization, event leakage       | subscription authorization, re-evaluation, scoped topics, expiry, replay limits                      |
+| T08 | Harassment, threats, stalking, or coercion             | physical or psychological harm                                              | block/report/mute, moderation, evidence-safe handling, anti-evasion, safety escalation               |
+| T09 | Scams, impersonation, spam, or malicious links         | fraud, account compromise, unwanted contact                                 | identity and reputation controls, content/link defenses, rate limits, reporting and moderation       |
+| T10 | Injection or unsafe content                            | SQL/NoSQL/command injection, XSS, template injection                        | parameterization, validation, encoding, CSP, safe rendering, least privilege                         |
+| T11 | CSRF, SSRF, unsafe redirects, traversal, or file abuse | action forgery, internal access, credential theft, code/data exposure       | origin/session protections, outbound allowlists, canonicalization, upload isolation                  |
+| T12 | Sensitive-data leakage                                 | tokens, PII, location, private state in logs/errors/analytics/cache         | minimization, redaction, access control, safe errors, lifecycle enforcement                          |
+| T13 | Replay, race, or duplicate action                      | duplicate posts, bypassed limits, inconsistent block/privacy state          | idempotency, atomic checks, concurrency tests, authoritative shared state                            |
+| T14 | Resource exhaustion / DoS                              | degraded route search, rooms, realtime, upload, notification, or database   | multi-dimensional limits, timeouts, backpressure, quotas, load shedding, isolation                   |
+| T15 | Moderation evasion                                     | ban/block bypass, coordinated abuse, evidence deletion                      | durable policy state, evasion signals, appeal controls, audited moderation actions                   |
+| T16 | Supply-chain or CI/CD compromise                       | malicious release, secret theft, runtime takeover                           | pinned dependencies, secret isolation, provenance, protected branches, review, artifact verification |
+| T17 | Provider/integration compromise                        | location, identity, notification, or message leakage/manipulation           | data minimization, scoped credentials, egress limits, isolation, rotation, provider review           |
+| T18 | Insider/admin misuse                                   | unauthorized lookup, surveillance, modification, or export                  | least privilege, purpose limitation, strong auth, tamper-resistant audit, alerts and review          |
+| T19 | Data-retention/deletion failure                        | supposedly deleted or expired data remains accessible                       | lifecycle propagation to caches, indexes, exports, analytics, backups, and realtime state            |
+| T20 | Multi-replica inconsistency                            | bypassed rate limit, stale presence, divergent authorization or block state | shared authoritative state, atomic operations, deterministic expiry, distributed tests               |
 
 ---
 
@@ -333,18 +333,18 @@ Scope and lifecycle: `docs/features/live/ROUTIQO_LIVE_SPEC.md`; ADR 0022.
 No Live capability is enabled by this planning change. Treat authenticated actors
 as potentially malicious, including colluding accounts and commercial spammers.
 
-| Abuse case | Required design/verification |
-|---|---|
-| Fake journey admission or route/anchor scanning | Server-issued short-lived admission to fixed relevant partitions; generic denials and bounded query budgets; route intent is not physical-presence proof |
-| Correlating moment appearance, conditions or freshness | Fixed publication windows, sparse-evidence suppression, adversarial temporal/overlap tests; removing exact counts alone is insufficient |
-| Block/Ghost/deletion differencing | No individually tailored count subtraction; reviewed suppression and cache invalidation; withheld accepted evidence cannot return after retry/reconnect |
-| Coordinated false signals and commercial manipulation | Per-actor contribution replacement, duplicate suppression, independent corroboration rules, conflict states, moderation and accountable operator review |
-| Stale evidence replay or clock manipulation | Server-time expiry, exact idempotent retries, no offline report dispatch or resurrected expired moment |
-| Revocation races across replicas/cache/HTTP | Authoritative generations and current read/write checks; fail closed; do not rely solely on Pub/Sub |
-| Log/telemetry and source leakage | No raw GPS, private membership, per-user query traces or report payloads in observability; bounded operational outcomes only |
-| Resource exhaustion and scraping | Bounded list/payload/cardinality, distributed read/write/peer budgets, cleanup capacity tests and no arbitrary spatial queries |
-| Unsafe recommendations or driver distraction | Structured condition bands, uncertainty/source labels, no safety assurance from silence, no proactive driving prompts or lane-specific guidance |
-| Future Ask Ahead harassment/targeting | Separate gate for recipient consent, limited nondeterministic selection, repeated-target budgets, blocks and no recipient identifiers |
+| Abuse case                                             | Required design/verification                                                                                                                             |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fake journey admission or route/anchor scanning        | Server-issued short-lived admission to fixed relevant partitions; generic denials and bounded query budgets; route intent is not physical-presence proof |
+| Correlating moment appearance, conditions or freshness | Fixed publication windows, sparse-evidence suppression, adversarial temporal/overlap tests; removing exact counts alone is insufficient                  |
+| Block/Ghost/deletion differencing                      | No individually tailored count subtraction; reviewed suppression and cache invalidation; withheld accepted evidence cannot return after retry/reconnect  |
+| Coordinated false signals and commercial manipulation  | Per-actor contribution replacement, duplicate suppression, independent corroboration rules, conflict states, moderation and accountable operator review  |
+| Stale evidence replay or clock manipulation            | Server-time expiry, exact idempotent retries, no offline report dispatch or resurrected expired moment                                                   |
+| Revocation races across replicas/cache/HTTP            | Authoritative generations and current read/write checks; fail closed; do not rely solely on Pub/Sub                                                      |
+| Log/telemetry and source leakage                       | No raw GPS, private membership, per-user query traces or report payloads in observability; bounded operational outcomes only                             |
+| Resource exhaustion and scraping                       | Bounded list/payload/cardinality, distributed read/write/peer budgets, cleanup capacity tests and no arbitrary spatial queries                           |
+| Unsafe recommendations or driver distraction           | Structured condition bands, uncertainty/source labels, no safety assurance from silence, no proactive driving prompts or lane-specific guidance          |
+| Future Ask Ahead harassment/targeting                  | Separate gate for recipient consent, limited nondeterministic selection, repeated-target budgets, blocks and no recipient identifiers                    |
 
 Unresolved cohort/admission and evidence-retention mechanisms are explicitly listed
 in ADR 0022. They require design and adversarial acceptance before public output;
@@ -630,3 +630,11 @@ geometry/step bounds and bridge byte/deadline limits bound hostile provider outp
 Loaded directions retained offline are historical estimates, not fresh guidance,
 physical presence or authority for LIVE participation. No new location watcher,
 persistence, provider deployment or public output is introduced.
+
+Native private route preparation (ADR 0061) retains T01/T02 owner-account guards,
+T12 transient/minimized endpoint handling, T13 exact-context/newest-attempt and
+consent-generation fences, and T14 shared durable quotas. A Stop racing provider
+work must prevent a stale bind at the server; a client must also invalidate its
+local acknowledgement synchronously. Route input changes cannot reuse an unrelated
+context observation as proof of preparation. Recovery GET is not cancellation
+proof, and expired/private context is never a publication or physical-presence grant.
