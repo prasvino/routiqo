@@ -112,7 +112,7 @@ describe('confirmed commute summaries', () => {
     ).toThrow('Unable to resolve journey month.');
   });
 
-  it('handles browser ICU era labels and combined-format month fallback', () => {
+  it('ignores browser ICU era labels and combined-format month text', () => {
     const nativeFormatToParts = Intl.DateTimeFormat.prototype.formatToParts;
     const formatToParts = vi
       .spyOn(Intl.DateTimeFormat.prototype, 'formatToParts')
@@ -139,6 +139,72 @@ describe('confirmed commute summaries', () => {
           snapshots([journey(4, '0001-01-01T00:00:00.000000Z', '0001-01-01T00:00:01.000000Z')]),
           owner,
           'America/New_York',
+        ),
+      ).toThrow('Unable to resolve journey month.');
+    } finally {
+      formatToParts.mockRestore();
+    }
+  });
+
+  it('works when the runtime omits era parts (ICU 78 iso8601 behaviour)', () => {
+    const nativeFormatToParts = Intl.DateTimeFormat.prototype.formatToParts;
+    const formatToParts = vi
+      .spyOn(Intl.DateTimeFormat.prototype, 'formatToParts')
+      .mockImplementation(function (this: Intl.DateTimeFormat, date?: Date | number) {
+        return nativeFormatToParts.call(this, date).filter((part) => part.type !== 'era');
+      });
+    try {
+      expect(
+        summarizeCommutes(
+          snapshots([journey(5, '2026-10-05T02:00:00.000000Z', '2026-10-05T02:20:00.000000Z')]),
+          owner,
+          'America/Los_Angeles',
+        ),
+      ).toEqual([{ month: '2026-10', journeys: 1, recordedMinutes: 20 }]);
+    } finally {
+      formatToParts.mockRestore();
+    }
+  });
+
+  it('derives the local year across year boundaries in both directions', () => {
+    expect(
+      summarizeCommutes(
+        snapshots([journey(6, '2027-01-01T03:00:00.000000Z', '2027-01-01T03:10:00.000000Z')]),
+        owner,
+        'America/Los_Angeles',
+      ).map((summary) => summary.month),
+    ).toEqual(['2026-12']);
+    expect(
+      summarizeCommutes(
+        snapshots([journey(7, '2026-12-31T12:00:00.000000Z', '2026-12-31T12:10:00.000000Z')]),
+        owner,
+        'Pacific/Kiritimati',
+      ).map((summary) => summary.month),
+    ).toEqual(['2027-01']);
+    expect(
+      summarizeCommutes(
+        snapshots([journey(8, '0001-01-01T12:00:00.000000Z', '0001-01-01T12:10:00.000000Z')]),
+        owner,
+        'Asia/Kolkata',
+      ).map((summary) => summary.month),
+    ).toEqual(['0001-01']);
+  });
+
+  it('rejects a month the runtime does not render as Latin digits', () => {
+    const nativeFormatToParts = Intl.DateTimeFormat.prototype.formatToParts;
+    const formatToParts = vi
+      .spyOn(Intl.DateTimeFormat.prototype, 'formatToParts')
+      .mockImplementation(function (this: Intl.DateTimeFormat, date?: Date | number) {
+        return nativeFormatToParts
+          .call(this, date)
+          .map((part) => (part.type === 'month' ? { ...part, value: '١٠' } : part));
+      });
+    try {
+      expect(() =>
+        summarizeCommutes(
+          snapshots([journey(9, '2026-10-05T02:00:00.000000Z', '2026-10-05T02:20:00.000000Z')]),
+          owner,
+          'UTC',
         ),
       ).toThrow('Unable to resolve journey month.');
     } finally {
