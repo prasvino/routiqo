@@ -85,7 +85,7 @@ Sequence:
 2. Import and host Valhalla, Photon and tiles/styles scoped to the trunk and
    branch corridors (add Coimbatore before Pongal); set fixed origins, bounds and
    redacted logs.
-3. New spec: **Android Journey map** (full-screen journey mode opened from Home
+3. New spec: **Android Journey map** ([drafted](../features/journey/ANDROID_JOURNEY_MAP_SPEC.md); ADR 0067) (full-screen journey mode opened from Home
    with a "Back to journey" bar; selected route on map, foreground-only "me"
    during an active journey, a panel slot for Spots ahead, offline and permission
    states). Implement behind a flag.
@@ -120,10 +120,10 @@ Reuse:
 
 New specs, in order (1, 2 and 5 are needed for Diwali):
 
-1. **Spots** — seeding about 150–200 Spots on the trunk and branches, catalog
+1. **Spots** ([drafted](../features/spots/SPOTS_SPEC.md); ADR 0067) — seeding about 150–200 Spots on the trunk and branches, catalog
    versioning, live/fade, Spots-ahead ordering, honest empty states, bounded
    refresh per ADR 0066.
-2. **Posts and signals** — public one-tap signals (from private Quick Signals),
+2. **Posts and signals** ([drafted](../features/spots/POSTS_AND_SIGNALS_SPEC.md)) — public one-tap signals (from private Quick Signals),
    text posts, the decided per-type lifetimes on server time, "Still true?"
    (resets to half base life, capped), "No longer true" (two distinct accounts
    expire early), highlights ranked by confirmations, report counts, rate

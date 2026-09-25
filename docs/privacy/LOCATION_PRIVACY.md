@@ -18,6 +18,17 @@ Photon is selected by the opt-in routing configuration with matching browser
 disclosures. Verify internal request-URL logging controls and service ownership
 before accepting real search text.
 
+## Journey map position
+
+Proposed in [ANDROID_JOURNEY_MAP_SPEC.md](../features/journey/ANDROID_JOURNEY_MAP_SPEC.md)
+and ADR 0067; not implemented. Android shows the traveller's own position on the
+Journey map using while-in-use permission, requested only from an explicit action
+in Journey mode. Updates run only while Journey mode is visible in the
+foreground, readings stay in memory on the device, and they are used only to draw
+the dot and order Spots ahead along the device-only journey route. No position,
+route or endpoint is sent to any server; the server receives only the IDs of
+Spots whose activity is requested, and does not log them.
+
 ## Spot passage
 
 Planned for the pilot; not implemented unless
@@ -25,8 +36,8 @@ Planned for the pilot; not implemented unless
 
 Spot passage ("I passed Spot X") is opt-in. One clear opt-in covers it; Ghost
 Mode and sign-out stop it. Detection runs on the device, in the foreground, only
-during an active journey. This is the one carve-out from "no watch or background
-tracking" above: no location is watched outside an active journey, and no trail,
+during an active journey. With the Journey map position below, this is one of
+two carve-outs from "no watch or background tracking" above: no location is watched outside an active journey, and no trail,
 coordinates or distance are uploaded. The device sends only the answer (or a
 request to receive Ask Ahead questions for that Spot) with a coarse time. The
 server deletes Spot-passage records within 24 hours and logs them only as outcome

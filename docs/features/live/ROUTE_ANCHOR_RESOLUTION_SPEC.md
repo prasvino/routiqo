@@ -3,7 +3,7 @@
 Status: implemented and verified as a default-off internal resolver. This does not mount
 HTTP registration, bind a journey context, issue a signal grant or publish data.
 
-> **Direction brief (2026-09-25):** Kept and renamed: anchors are Spots, and this resolver is the basis for "Spots ahead" on a Journey. The curated anchor catalog seeds the pilot's ~50–100 GST Road corridor Spots; its 512-anchor bound covers that. See [PRODUCT.md](../../PRODUCT.md).
+> **Direction brief (2026-09-25):** Anchors become Spots. Update (ADR 0067, proposed): Spots ahead are matched on the device against a device-only journey route, reusing this spec's 100 m route match and 1,000 m endpoint exclusion; this server resolver stays with the archived route-binding code, default-off. The Spot catalog (about 150–200 Spots, new `routiqo-spots/1` format) is defined in [SPOTS_SPEC.md](../spots/SPOTS_SPEC.md). See [PRODUCT.md](../../PRODUCT.md).
 
 ## Trusted input and configuration
 
