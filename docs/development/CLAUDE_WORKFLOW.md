@@ -63,5 +63,6 @@ Report what passed, what failed and what was not run, with the real command resu
 
 - Confirm the acceptance criteria. Review the diff for unrelated edits, secrets and precise location data.
 - Update ADRs and contracts where required. Update `docs/quality/BUILD_STATUS.md` and the relevant `*_PENDING.md` ledger with actual results. Update `todo.md` only for items that are genuinely closed.
+- Claude-specific files (`CLAUDE.md`, this workflow doc, `.claude/`) stay on `feature-claude` and are never pushed or merged to `main` (see the branch policy in `CLAUDE.md`).
 - Commit on the designated branch with a clear message. Do not push to other branches, deploy or enable flags unless the user asks.
 - If you pause mid-feature, update `docs/validation/IMPLEMENTATION_RESUME.md` with what is done, what was verified, and the exact resume steps.

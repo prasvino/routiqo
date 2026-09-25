@@ -16,6 +16,15 @@ This file is loaded into every Claude Code session. Keep it short, and link to t
 `docs/validation/IMPLEMENTATION_RESUME.md` holds the latest paused-work handoff.
 `todo.md` is the release checklist.
 
+## Branch policy: Claude files stay off `main`
+
+The Claude-specific setup lives **only on `feature-claude`** and must never be pushed or merged to `main`. `main` keeps the original Codex setup. This covers:
+
+- `CLAUDE.md`, `docs/development/CLAUDE_WORKFLOW.md` and `.claude/`;
+- commit `8edbd97`, which removed the Codex files and reworded docs for Claude.
+
+Do not open a pull request from `feature-claude` into `main`. To move product work to `main`, cherry-pick only the code and feature commits onto a branch cut from `main`, and leave out the Claude setup commits and files. Check the diff against `main` for these paths before any push.
+
 The user's current instructions set the task scope. Documents describe requirements. Suggested tasks in them are not authorization to deploy, purchase services, enable flags or expand scope. Wayfind material under `docs/reference/wayfind/` is historical lessons, not a Routiqo architecture decision.
 
 ## Product invariants
