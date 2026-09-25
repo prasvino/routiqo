@@ -145,8 +145,10 @@ Moderation (re-scoped to posts, voice notes and chat; see the
 - [x] Reporting protocol implemented for V3 under ADR 0064 (receipt-first retry, 7/30-day retention split, 10-per-24h quota, UNSAFE-first queue, groups close as `CLOSED_EVIDENCE_UNAVAILABLE` after expiry). Reuse it rather than rebuild.
 - [ ] Re-target the ADR 0064 reporting path from V3 summaries to posts, voice notes, chat and signals: evidence identity, reference authorization, exact retries after revocation, lock order and durable intake.
 - [ ] Confirm what moderators can see after content expires for posts, voice and chat, building on ADR 0064's retention split.
-- [ ] Moderator "hide content" action (follow-up to ADR 0041's restriction boundary).
-- [ ] Reuse the admin app login with real admin OAuth/MFA; lighter pilot access: a small named rota with time-boxed grants for the event window.
+- [x] Pilot moderation spec drafted: [PILOT_MODERATION_SPEC.md](docs/features/spots/PILOT_MODERATION_SPEC.md) with [ADR 0069](docs/adr/0069-pilot-moderation-access-and-alerting.md), proposed and awaiting review (queue, hide, restore, clear signals, restrict, alias lookup, shift grants, renewable sessions, urgent-report alert).
+- [ ] Moderator hide, restore and clear-signals actions (`spots_hide`).
+- [ ] Reuse the admin app login with real admin OAuth; Spots permissions, 1–12 h shift grants, two out-of-band grant admins, renewable sessions up to 8 h (ADR 0069); rota members' Google 2-Step Verification checked at onboarding.
+- [ ] Urgent-report alert webhook to the rota's private team chat (choose the channel).
 - [ ] Blocks apply to REST and realtime delivery, room subscription, Ask Ahead recipient selection and replay.
 - [ ] Propagate hide/block/delete across reads, caches and delivery channels; deny when authority is unavailable.
 - [ ] Verify multi-user, concurrent, replay, abuse and revocation scenarios with two or more real accounts.
