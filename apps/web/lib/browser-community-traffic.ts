@@ -106,7 +106,8 @@ function shareHandle(value: unknown): CommunityShareHandle {
     'acceptedAt',
     'windowEndsAt',
   ]);
-  if (!statuses.has(String(item.status))) throw new BrowserLiveError('unavailable');
+  // The server reports a handle past its candidate lifetime as expired until cleanup removes it.
+  if (!shareStatuses.has(String(item.status))) throw new BrowserLiveError('unavailable');
   return {
     candidateId: readUuid(item.candidateId),
     journeyId: readUuid(item.journeyId),

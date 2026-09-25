@@ -134,6 +134,25 @@ it('recovers only bounded owner handles and rejects injected source identity', a
   expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/community-shares');
 });
 
+it('keeps recovery readable when a handle has expired but is not yet cleaned up', async () => {
+  const handle = {
+    candidateId: candidate,
+    journeyId: journey,
+    commandId: command,
+    requestId: request,
+    status: 'expired',
+    acceptedAt,
+    windowEndsAt,
+  };
+  const fetcher = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json([handle]))
+    .mockResolvedValueOnce(Response.json([{ ...handle, status: 'published' }]));
+  vi.stubGlobal('fetch', fetcher);
+  await expect(readBrowserCommunityShares(account)).resolves.toEqual([handle]);
+  await expect(readBrowserCommunityShares(account)).rejects.toMatchObject({ kind: 'unavailable' });
+});
+
 it('derives a conservative expiry deadline from server time even with a device clock five minutes slow', async () => {
   const serverTime = '2026-09-23T12:00:00.000000000Z';
   const expiresAt = '2026-09-23T12:00:00.600000000Z';

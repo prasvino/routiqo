@@ -1,5 +1,6 @@
 package com.routiqo.core.moderation.infrastructure;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,7 +11,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("persistence")
-@ConditionalOnProperty(name = "ROUTIQO_V3_GRANT_ADMIN_MAINTENANCE_ENABLED", havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_V3_GRANT_ADMIN_MAINTENANCE_ENABLED"})
 @EnableScheduling
 public class TrafficGrantMaintenanceConfiguration {
     @Bean JdbcTrafficGrantCleanup trafficGrantCleanup(JdbcTemplate jdbc, PlatformTransactionManager manager) {

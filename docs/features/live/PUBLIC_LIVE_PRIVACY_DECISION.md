@@ -1,10 +1,48 @@
 # Public LIVE privacy decision: ADR 0054 or ADR 0055
 
-Status: **decision document for the owner, 2026-09-25. Nothing here is approved.** It changes no code, flag or ADR status. Traveller-derived public LIVE stays disabled in production until the owner records a decision below.
+Status: **decided by the owner on 2026-09-25 and recorded in [ADR 0065](../../adr/0065-public-live-v1-policy.md).** Traveller-derived public LIVE stays disabled in production.
 
-## The decision
+## Decision
 
-Routiqo must choose the privacy contract for **traveller-derived public LIVE**: what other travellers see, built from people's Quick Signals. Official provider alerts (ADR 0050) and private Quick Signals are not affected by this choice.
+| Track | Option | Status |
+|---|---|---|
+| **Production (V1)** | **C**: official/provider LIVE and private Quick Signals only | Decided. Community-derived public LIVE is off and must fail closed. |
+| **Experimental candidate** | **B**: ADR 0055 consented community summary | Closed, explicitly consented, feature-flagged **staging** experiment only. Finishing the code does not authorize production; that needs a separate explicit decision after pilot evidence. |
+| **Research** | **A**: ADR 0054 person-level differential privacy | Paused and retained for possible future research. No further implementation effort. |
+
+Option C is the V1 production configuration. It is **not** necessarily Routiqo's permanent architecture for community LIVE; ADR 0055 is the primary candidate for that.
+
+ADR 0055 aggregation reduces exposure but **is not anonymity**. Participation can be inferred through known participants, collusion, small groups, multiple accounts or correlated outside observations. No copy, document or comment may say otherwise. A published summary can't be un-published for one person: Stop, Ghost Mode and deletion apply before the publication snapshot and to future summaries.
+
+The pilot targets, the identity constraint (no additional identity collection for Sybil resistance) and the fail-closed flag requirement are set out in ADR 0065. The analysis below is the background the decision was made on.
+
+## Implementation review against the decision (2026-09-25)
+
+Documented, implemented and tested behaviour were compared before any change. Findings:
+
+| Area | Found | Action |
+|---|---|---|
+| Flag parsing | Spring `havingValue = "true"` ignores case, so `TRUE` enabled backend beans while the web proxy (exact `'true'`) stayed off. The security chain bound the V3 and public-intent flags as `boolean`, which accepts `1/yes/on`, opening the V3 paths in the filter chain while no controller existed | **Fixed.** `FeatureFlags` and `@ConditionalOnExactlyTrue` now gate all 13 community, public-intent and V3 admin beans; the security chains parse strictly. Tests cover missing, empty, mixed-case, padded, numeric and word values, plus an ArchUnit guard against lenient conditions returning |
+| Web proxy | Already strict (`=== 'true'`) | Test added proving ambiguous values return 404 without contacting the core API |
+| Share recovery | The server marks a handle past its 24-hour candidate lifetime `expired` until cleanup, but the contract enum and browser parser rejected it, so one expired handle made owner recovery unreadable | **Fixed:** contract, generated client and parser accept `expired` |
+| Internal records | `Candidate.toString` was unredacted (account, anchor, value, times); nothing logged it | **Fixed:** redacted, with a test |
+| API field sets | Already contributor-free | Exact field-set tests for feed, owner, report and moderator responses |
+| Logs and telemetry | Constant-message job logs only; no metrics, tracing, MDC or actuator | Source-scan test fails on any parameterised log call or console output in `publiclive`/`moderation` |
+| Withdrawal | Before-snapshot tested for Stop, Ghost, completion, restriction and deletion; after-snapshot only for Stop; verification revocation untested | Tests added: verification revocation before the snapshot; Ghost, completion, restriction, deletion and revocation after it (summary unchanged, never redrawn) |
+| Threshold | Only partial boundaries | 11 all agreeing, 9 of 12, 78.6% and exactly 80% boundaries tested |
+| Quota and isolation | Sequential tests only | Concurrent Shares at the daily limit, concurrent Shares for one window, and the UTC day boundary tested in PostgreSQL |
+| Sybil | Verification is required at Share and snapshot; one active verified account per person (`person_ref` unique index) | Tests: 20 unverified agreeing accounts produce nothing; a second active verification for the same person is refused by the database |
+| Truthful copy | Share disclosure already says participation may be inferred and prepared summaries may include the report; no UI claims anonymity | No change. `docs/product/ROUTIQO_MASTER_CONTEXT.md` lists "Anonymous aggregate speeds" as a product idea; flagged for the owner, not edited |
+
+Known risks that remain (not fixable by tests):
+- **Coordinated verified accounts.** Ten colluding verified people in a 12-account window can still publish a wrong summary. Verification, quotas, reporting and moderation limit this; the threshold alone does not.
+- **The daily quota is per account, not per person.** A person who deletes and is re-verified gets a new account with a fresh daily quota. Re-verification is dual human review, which bounds this in practice.
+- **After-snapshot withdrawal.** Removing a contribution from a published summary is impossible by design, and the copy says so.
+
+
+## Background: the question
+
+Routiqo had to choose the privacy contract for **traveller-derived public LIVE**: what other travellers see, built from people's Quick Signals. Official provider alerts (ADR 0050) and private Quick Signals are not affected by this choice.
 
 There are three options:
 
@@ -65,31 +103,16 @@ Launch V1 with utility that doesn't depend on crowd publication: planning, activ
 - **Strength:** no new privacy risk. It matches "utility before participation and community", and nothing is irreversible.
 - **Cost:** no community traffic at launch. The LIVE list shows only official alerts, which are district-wide rather than per road.
 
-## Recommendation
+## Recommendation (accepted with changes)
 
-**Choose C for the V1 launch. Run B as a closed, consented staging pilot to gather evidence. Pause A.**
+The recommendation was C for launch, B as a staging pilot and A paused. The owner accepted it and strengthened the pilot bars. The binding versions are in ADR 0065:
+- correctness of at least 95% (up from 90%);
+- 0% dangerous false reassurance, measured separately from false congestion;
+- freshness of at least 95%;
+- a 100% passing withdrawal suite;
+- user understanding of at least 90%;
+- an adversarial and Sybil suite;
+- API and telemetry leakage checks;
+- performance measurements.
 
-1. **C now.** V1 isn't blocked by either privacy contract, so the launch shouldn't wait on this decision. Ship with provider alerts and private signals.
-2. **B as a staging pilot, not production.** Recruit consenting testers on the Chennai/OMR corridor and measure real density, coverage, wrong-value and false-reassurance rates, and output age. Use the existing V3 flags in staging only. Then decide on production with evidence, against go/no-go criteria you set in advance. Proposed starting points, for you to adjust:
-
-   | Criterion | Proposed bar |
-   |---|---|
-   | Coverage | A summary appears in at least 20% of peak-hour windows on pilot anchors |
-   | Accuracy | At most 10% of shown summaries disagree with independent ground truth |
-   | False reassurance | Zero summaries showing "moving" while ground truth shows stopped traffic |
-   | Abuse | A red-team test with coordinated accounts fails to publish a wrong summary without triggering review |
-   | Understanding | Pilot users correctly explain in a short survey that participation may be inferable |
-
-   If B fails the bars, keep public LIVE off. Do not lower the 12/10/80% rule to make it look busy.
-3. **Pause A, don't reject it.** Keep the research code and documents, disconnected as they are now. Revisit only if the window-seal flaw gets a published solution and a person-identity authority becomes available.
-
-Why not choose B for production now: its contract is honest and it's built, but accepting participation-inference risk before anyone knows whether it produces useful, accurate output would take on privacy risk without proven benefit. The pilot answers that cheaply and reversibly.
-
-## Decisions I need from you
-
-1. **Choose:** C for launch, B as a staging pilot, A paused, or another combination.
-2. **If B is piloted:** approve or adjust the five go/no-go bars above.
-3. **If B is piloted:** confirm the pilot disclosure wording in `COMMUNITY_TRAFFIC_SUMMARY_SPEC.md` ("Someone with other information may still infer that you contributed…") is acceptable for consenting testers.
-4. **Confirm:** whether A is paused (kept, disconnected) or formally rejected.
-
-Once you decide, I'll record it as an ADR, update ADR 0054/0055 statuses, `todo.md` and the decision checklist, and plan the staging pilot if B is chosen.
+The owner also made two things explicit: Sybil resistance must not come from collecting more identity data, and C is the V1 configuration, not the permanent community LIVE design.

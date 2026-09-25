@@ -1,7 +1,7 @@
 # ADR 0055: Consented community traffic summary proposal
 
 Date: 2026-09-23
-Status: **V3 implementation and staging evaluation authorized on 2026-09-23; production activation and privacy-contract acceptance pending**
+Status: **experimental candidate architecture under [ADR 0065](0065-public-live-v1-policy.md) (2026-09-25): closed, explicitly consented, disabled-by-default staging experiment only.** Production activation requires a separate explicit decision after the pilot evidence listed there. Previously: V3 implementation and staging evaluation authorized on 2026-09-23.
 
 Implementation record, 2026-09-23: V23/V24, guarded Share/Stop/recovery,
 catalog-versioned snapshot publisher, canonical reader/report, internal audited

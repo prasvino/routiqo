@@ -1,7 +1,7 @@
 # ADR 0054: Irreversible Share candidate for the traveller LIVE pilot
 
 Date: 2026-09-23
-Status: user-selected implementation direction, protocol review pending; **public traveller output remains prohibited**
+Status: **paused as research by [ADR 0065](0065-public-live-v1-policy.md) (2026-09-25).** Research, documentation and disconnected code are retained; no further implementation effort unless a future decision reopens it. Previously: user-selected implementation direction, protocol review pending; public traveller output remains prohibited.
 
 ADR 0055 records a later user-supplied community-summary alternative for review. It does not supersede this candidate or close its person-level privacy findings; it would require explicit approval of a different product/privacy contract.
 

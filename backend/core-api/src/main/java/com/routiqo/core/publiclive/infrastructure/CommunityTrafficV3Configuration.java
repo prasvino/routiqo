@@ -1,5 +1,6 @@
 package com.routiqo.core.publiclive.infrastructure;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.routeupdate.domain.RouteAnchorCatalog;
 import java.time.Clock;
 import javax.sql.DataSource;
@@ -12,8 +13,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("web-auth & routing & persistence")
-@ConditionalOnProperty(name = {"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED",
-        "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED"}, havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED",
+        "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED"})
 public class CommunityTrafficV3Configuration {
     @Bean JdbcCommunityTrafficV3 communityTrafficV3(JdbcTemplate jdbc,
             PlatformTransactionManager manager, RouteAnchorCatalog catalog) {

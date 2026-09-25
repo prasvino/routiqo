@@ -11,6 +11,8 @@ public interface CommunityTrafficCandidateStore {
             UUID catalogVersion, long consentGeneration, Instant receivedAt,
             Instant acceptedAt, Instant expiresAt, State state) {
         public Instant windowEndsAt() { return windowStart.plusSeconds(300); }
+        /** Redacted: identities, anchor, value and times must never reach logs through toString. */
+        @Override public String toString() { return "Candidate[private, state=" + state + "]"; }
     }
     enum State { ACTIVE, STOPPED }
 

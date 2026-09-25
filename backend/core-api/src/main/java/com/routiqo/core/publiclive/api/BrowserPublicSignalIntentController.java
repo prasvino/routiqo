@@ -1,5 +1,6 @@
 package com.routiqo.core.publiclive.api;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.identity.application.AccountWriteUnavailable;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.identity.application.GoogleSessionService;
@@ -27,8 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/journeys/{id}/signals/{commandId}/public-intent")
 @Profile("web-auth & routing & persistence")
-@ConditionalOnProperty(name = {"ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED",
-        "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED"}, havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED",
+        "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED"})
 public final class BrowserPublicSignalIntentController {
     private final PublicSignalIntentService intents;
     private final GoogleSessionService sessions;

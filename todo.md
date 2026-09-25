@@ -6,29 +6,37 @@ Detailed traveller-derived public LIVE release ledger: [`docs/validation/PUBLIC_
 
 The [V3 real staging trial handoff](docs/validation/V3_STAGING_TRIAL_PENDING.md) separates remaining engineering work from OAuth, regional-data, operator, pilot and review dependencies. The V3 moderator workflow and controlled operator grants under [ADR 0056](docs/adr/0056-v3-moderator-staging-boundary.md) and [ADR 0057](docs/adr/0057-v3-operator-grant-administration.md) are implemented behind disabled flags; real staging validation and production approval remain open.
 
-ADR 0055's community traffic summary is authorized for V3 implementation and staging evaluation behind a disabled production flag. Its different privacy contract is not accepted for production; prior person-level research is paused and preserved, and no traveller publication is enabled in production.
+**Production Public LIVE policy decided ([ADR 0065](docs/adr/0065-public-live-v1-policy.md), 2026-09-25): provider/private-only for V1. ADR 0055 is authorized only for closed, consented staging experimentation. ADR 0054 research is paused.** Community-derived public LIVE is off and must fail closed; empty LIVE is acceptable, misleading or manipulable LIVE is not.
 
 - [x] Implement private dual-review verified-person authority and an explicit per-receipt public-purpose intent ledger; neither is a public LIVE release.
 - [x] Add default-off purpose-specific share/Stop transport, account-wide retained Stop recovery, private candidate evaluation and bounded cleanup foundations; no traveller moment is public.
-- [ ] Independently approve a complete transcript-level privacy protocol before traveller output. ADR 0054 now proposes irreversible explicit Share as the input boundary, avoiding the rejected ADR 0051/0052 revocation and delayed-cutoff rules; product consent, deletion retention, implementation timing and whole-transcript review are still open.
+- [x] ~~Independently approve a complete transcript-level privacy protocol (ADR 0054).~~ Paused as research by ADR 0065; retained, no further implementation effort unless reopened.
 - [x] Authorize end-to-end V3 community-summary implementation and staging evaluation behind a disabled production flag; pause and preserve the person-level research code/docs.
 - [x] Implement V3 candidate/debit, Share/Stop/recovery, snapshot publisher, canonical reader/report, internal audited suppression, cleanup, contracts and active-journey web controls. [Staging evidence](docs/validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) records PostgreSQL, browser-fixture and full build checks; production flags remain off.
 - [x] Implement a separately flagged V3 moderator staging workflow: independent admin authentication, finite permission checks, bounded queue, audited dismissal/suppression, cleanup, generated contracts and UI. [Runbook](docs/development/V3_MODERATOR_STAGING_RUNBOOK.md) records the real trial prerequisites.
 - [x] Implement separately flagged V3 operator grant administration: exact-account finite issue/revoke, current grant-administrator authority, minimized audit, cleanup, contracts and admin UI. The [grant runbook](docs/development/V3_OPERATOR_GRANTS_STAGING_RUNBOOK.md) keeps root provisioning and real operation pending.
 - [ ] Finish authenticated regional staging, real moderator OAuth/MFA and named finite-grant operation, density/accuracy and output-age measurements, restore/failover/device QA and retention/backup operations before considering V3 production activation.
-- [ ] Decide explicitly whether to accept ADR 0055's different privacy contract for production. Decision document with options and a recommendation: `docs/features/live/PUBLIC_LIVE_PRIVACY_DECISION.md`. Review residual participation inference, publication-snapshot withdrawal, audited suppression, block semantics, retention, real density/accuracy and exact user disclosure before activation. The proposed 12/10/80% rule is not a privacy guarantee; V18/V22 data cannot supply V3 consent.
+- [x] Decide the V1 public LIVE policy: Option C in production, ADR 0055 as a closed staging experiment, ADR 0054 paused (ADR 0065; [decision document](docs/features/live/PUBLIC_LIVE_PRIVACY_DECISION.md)).
+
+### ADR 0055 closed pilot (experimental; never production without a separate explicit decision)
+
+- [x] P0: Prove community-derived public LIVE fails closed: every backend, publisher, maintenance, admin, proxy and UI flag is off when missing, malformed or ambiguous; no endpoint, job, fallback, debug route or tool exposes it while off. Automated tests. Done: `FeatureFlags`/`@ConditionalOnExactlyTrue` on all 13 gated beans, strict security-chain parsing, backend HTTP tests with `TRUE`/`1`/`yes`, web proxy test, ArchUnit guard.
+- [x] P1: Withdrawal suite at 100%: Stop, Ghost Mode, journey completion, account deletion and restriction/verification revocation before the snapshot exclude a candidate; after it they never redraw a summary. Copy says so truthfully. Automated suite passes in PostgreSQL (before and after snapshot for each action, plus verification revocation); real staging run pending.
+- [x] P1: Contribution isolation and daily quota enforced by database constraints under concurrency (one account per window; 12/day; retries never debit twice; UTC day boundary). Concurrency and UTC-day tests pass in PostgreSQL.
+- [x] P1: Publication threshold boundaries (11 accounts, 9 agreeing, 79% agreement) produce `NO_OUTPUT`; never below 12/10/80%. Boundary tests pass.
+- [x] P1: API and telemetry leakage checks: no contributor IDs, counts, coordinates, individual timestamps or raw metadata in responses, logs, analytics, traces or metrics. Exact field-set tests, redacted `Candidate`, and a log source scan; no analytics/tracing exists yet, so re-check when added.
+- [ ] P1: Adversarial/Sybil suite: coordinated accounts, repeated account creation, synchronized false signals, deletion/recreation, rapid identity switching, replay, concurrent submissions, quota bypass, verification deletion races and window-boundary attacks fail safe. No additional identity collection (ADR 0065). Partly covered: unverified-account flood, one active verification per person, concurrent submissions and quota races. Still open: synchronized false signals by verified accounts, deletion/re-verification churn, window-boundary timing and a staging red-team run.
+- [ ] P2: Pilot metrics without privacy leakage: coverage (target at least 20% of eligible peak windows), correctness (at least 95%), dangerous false reassurance (0%, separate from false congestion), freshness (at least 95%), plus Share/aggregation/publication/read/Stop/cleanup latency.
+- [ ] P2: Pilot comprehension study: at least 90% understand optional sharing, Stop/Ghost semantics, aggregation, no public identity, no absolute anonymity and irreversibility of published summaries.
+- [ ] Future: privacy-preserving `ParticipationEligibility` (one legitimate traveller, bounded influence) without an identity database. Not built until needed.
+- [ ] Separate explicit production decision after reviewing privacy, correctness, false reassurance, abuse/red-team, Sybil, withdrawal, comprehension, performance, observability privacy and incident/rollback evidence.
 - [x] Choose the policy after ADR 0052's rejected immutable-window follow-up: user selected a measurable person-level guarantee. ADR 0053 is a proposed whole-pilot DP design; its isolated sampler and disconnected V21 person claim need full protocol integration and review. No public reader or flag is authorized.
 - [ ] Build independently authenticated operator case/grant provisioning, document-review operations, maintenance scheduling and retention review for verified contributors.
 
 - [x] Implement the separate default-off Chennai district official-alert pilot: bounded NDMA CAP reader, owner-only active-journey API, browser list and explicit source/freshness states. This does not satisfy the traveller publication items below.
 - [ ] User-led staging validation of the official-alert pilot is deferred; follow the checklist and record results in `docs/features/live/PROVIDER_LIVE_PILOT_SPEC.md` before activation.
 
-- [ ] Define and independently review a measurable public LIVE privacy contract, including collusion assumptions and permitted inference.
-- [ ] Specify fixed geographic partitions, publication windows, evidence independence, contribution eligibility and distributed query budgets.
-- [ ] Resolve block, withdrawal, Ghost Mode, journey completion and account deletion without exposing individual contributions.
-- [ ] Record the approved publication protocol in an ADR and test coordinated accounts, repeated/adjacent queries, threshold changes, stale caches and consent races.
-- [ ] Implement the approved aggregation/projection, suppression, conflict and freshness rules.
-- [ ] Implement authenticated Live Moment reads with current authorization and revocation checks.
+Earlier generic publication items are superseded by the ADR 0055 pilot tasks above for community traffic. Live Moments beyond traffic summaries need their own future decision.
 
 ## First release — reporting, moderation and abuse prevention
 

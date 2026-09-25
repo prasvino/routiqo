@@ -141,6 +141,13 @@ hourly/category abuse controls, operated purge job or regional launch evidence.
 
 ## V3 community traffic staging evaluation (ADR 0055)
 
+Under [ADR 0065](../adr/0065-public-live-v1-policy.md), V3 is a closed,
+consented **staging experiment only**; V1 production uses official alerts and
+private Quick Signals. Community, public-intent and V3 admin switches enable
+only for the exact lowercase value `true`. `TRUE`, `True`, `1`, `yes`, `on`,
+padded, empty or missing values leave them off (`FeatureFlags`,
+`@ConditionalOnExactlyTrue`, and the web proxy's strict check).
+
 V3 implementation is authorized for staging evaluation; production activation
 and acceptance of its different privacy terms are **not approved**. The V3 path
 uses fresh `community-traffic-v3` Share requests for existing private traffic

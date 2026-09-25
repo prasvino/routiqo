@@ -1,5 +1,6 @@
 package com.routiqo.core.publiclive.infrastructure;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import java.time.Clock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -13,7 +14,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 /** Independent switch: disable public V3 while retention continues after staging rollback. */
 @Configuration(proxyBeanMethods = false)
 @Profile("persistence")
-@ConditionalOnProperty(name = "ROUTIQO_COMMUNITY_TRAFFIC_V3_MAINTENANCE_ENABLED", havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_COMMUNITY_TRAFFIC_V3_MAINTENANCE_ENABLED"})
 @EnableScheduling
 public class CommunityTrafficV3MaintenanceConfiguration {
     @Bean ThreadPoolTaskScheduler communityTrafficV3MaintenanceScheduler() {
