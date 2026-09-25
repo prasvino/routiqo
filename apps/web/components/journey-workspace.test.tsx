@@ -452,3 +452,37 @@ it('ignores a delayed journal library result after switching accounts', async ()
   expect(listBrowserJournals).toHaveBeenCalledWith(accountA);
   expect(listBrowserJournals).toHaveBeenCalledWith(accountB);
 });
+
+it('gives sibling panels unique keys so unmounting clears every panel timer', async () => {
+  vi.stubEnv('NEXT_PUBLIC_ROUTIQO_PUBLIC_SIGNAL_INTENT_UI_ENABLED', 'true');
+  const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const started = new Set<unknown>();
+  const cleared = new Set<unknown>();
+  const setInterval = window.setInterval.bind(window);
+  const clearInterval = window.clearInterval.bind(window);
+  vi.spyOn(window, 'setInterval').mockImplementation(((handler: TimerHandler, timeout?: number) => {
+    const handle = setInterval(handler, timeout);
+    started.add(handle);
+    return handle;
+  }) as typeof window.setInterval);
+  vi.spyOn(window, 'clearInterval').mockImplementation(((handle?: number) => {
+    cleared.add(handle);
+    clearInterval(handle);
+  }) as typeof window.clearInterval);
+  try {
+    vi.mocked(readBrowserJourneyPartition).mockResolvedValue(active());
+    render(<JourneyWorkspace />);
+    await screen.findByRole('heading', { name: 'Contribution settings' });
+    await screen.findByText(
+      /Recently completed|Journals saved on this device|Start a journey|Finish journey/,
+    );
+    expect(started.size).toBeGreaterThan(0);
+    cleanup();
+    expect([...started].filter((handle) => !cleared.has(handle))).toEqual([]);
+    expect(errors.mock.calls.filter(([message]) => String(message).includes('same key'))).toEqual(
+      [],
+    );
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});

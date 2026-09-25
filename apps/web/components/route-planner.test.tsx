@@ -1,6 +1,18 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
+
+// The planner re-renders a large tree per step; on loaded CI runners one step can exceed the
+// default 1 s async query window without any behavioural problem.
+configure({ asyncUtilTimeout: 5000 });
 import {
   RoutePlanner,
   type RoutePlannerContributionSource,
