@@ -152,7 +152,9 @@ export function LiveConsentPanel({
   }, [clear]);
 
   useEffect(() => {
-    if (busy || restoreFocusFromAllow.current === null) return;
+    // A click can set the flag before React flushes the previous render's effects. That stale effect
+    // must not consume the flag: busyRef is set synchronously by the click, busy only after render.
+    if (busy || busyRef.current || restoreFocusFromAllow.current === null) return;
     const requestedIdentity = restoreFocusFromAllow.current;
     restoreFocusFromAllow.current = null;
     if (
