@@ -1,8 +1,9 @@
 # Routiqo Threat Model
 
-2026-09-18 Live design decision: ADR 0038 records that fixed windows, opaque
-anchors and a shared deterministic output do not alone resist arbitrary collusion
-or revocation differencing. Public publication remains unapproved. ADR 0037's
+ADR 0038's analysis of collusion and revocation differencing against published
+aggregates (threshold-minus-one inference) is archived with the public LIVE
+designs; see [`docs/archive/`](../archive/README.md). It applies again only if
+aggregate counts return. Public publication remains unapproved. ADR 0037's
 rolling write budgets address resource abuse, not independent-person evidence.
 LIVE_SAFETY_FOUNDATION_SPEC.md defines private assessment/suspension, block and
 structured report transitions; pure primitives are not durable/public enforcement.
@@ -36,7 +37,7 @@ Native session storage addition (2026-09-12): the mobile runtime now has an Expo
 Routiqo must:
 
 - prevent unauthorized access and cross-user actions;
-- protect identity, precise location, presence, travel patterns, home/work inference, private communications, and social relationships;
+- protect identity, precise location, Spot-passage records, travel patterns, home/work inference, private communications, and social relationships;
 - resist stalking, harassment, coercion, scams, impersonation, and unwanted discovery;
 - preserve integrity of routes, rooms, reports, blocks, moderation, and user-generated content;
 - remain available under realistic abuse and resource pressure;
@@ -48,7 +49,8 @@ Routiqo must:
 ## 2. Protected assets
 
 - accounts, sessions, tokens, credentials, recovery mechanisms, and roles;
-- current and historical location, route endpoints, presence, travel timing, and recurring patterns;
+- current and historical location, route endpoints, travel timing, and recurring patterns (the pilot keeps no server-side presence);
+- Spot posts, one-tap signals, voice notes and their stored media, per-room aliases, Spot-passage records, and Ask Ahead questions, answers and recipient selection;
 - home/work and other sensitive-place inferences;
 - profiles, visibility settings, blocks, reports, moderation status, and social graph;
 - route communities, room membership, messages, calls, notifications, and user-generated content;
@@ -219,14 +221,17 @@ Security-sensitive details must remain in approved private systems.
 
 ## 11. Release gate
 
-Web maps boundary (2026-09-12): explicit Show map loads Mapbox GL with a separate
-public token; backend routing credentials remain server-only. Route geometry and
-validated instructions remain in application memory, with no temporary geocoding
-cache or automatic location watcher. Mapbox SDK tiles and event metadata can
-persist in browser storage across sign-out/account deletion. ADR 0019 records the
-Medium residual-risk disposition and pre-load/privacy disclosure; the root
-implementation owner must verify provider-cache lifecycle before release. No
-claim of complete browser cache erasure or downloaded offline navigation is made.
+Web maps boundary (2026-09-12, updated for ADR 0021): explicit Show map loads
+MapLibre GL with same-origin `/maps/` resources; the maps direction is self-hosted
+MapLibre/Valhalla/Photon (ADR 0021). Backend routing credentials remain
+server-only. Route geometry and validated instructions remain in application
+memory, with no temporary geocoding cache or automatic location watcher. Browser
+HTTP caches can retain viewed map resources, and tiles and event metadata left by
+the earlier Mapbox GL version can persist in browser storage across
+sign-out/account deletion. ADR 0019 records the Medium residual-risk disposition
+and pre-load/privacy disclosure; the root implementation owner must verify
+browser-cache lifecycle before release. No claim of complete browser cache
+erasure or downloaded offline navigation is made.
 See `docs/features/journey/MAPS_NAVIGATION_SPEC.md` and
 `docs/privacy/DATA_RETENTION_AND_DELETION.md` for boundaries and removal guidance.
 
@@ -237,7 +242,7 @@ Risk acceptance must be explicit, authorized, time-bounded where appropriate, an
 ## Open-source map migration controls (ADR 0021, 2026-09-12)
 
 Target rendering/routing/search/tiles are MapLibre, Valhalla, Photon and Martin.
-Current Mapbox findings remain until migration. Self-hosting retains T01/T02 account
+Web rendering has migrated to MapLibre; legacy Mapbox browser-cache findings remain. Self-hosting retains T01/T02 account
 authorization, T04/T12 endpoint/viewport privacy, T13 cancellation/update races,
 T14 resource exhaustion and T19 retention/deletion obligations. Internal service
 URLs are configuration, never caller input; constrain outbound destinations and
@@ -319,136 +324,57 @@ Review egress, private ports, TLS and log suppression (especially Photon query
 URLs) before enabling services. Deploy the matching browser disclosure version
 with the backend; previous Mapbox deployments must not serve the new disclosure.
 
-## Routiqo Live: first-list threats (planned)
+## Spots and Ask Ahead threats (pilot)
 
-Admission implementation boundary (ADR 0023): immutable context/admission objects
-are internal snapshots, not proof of identity or public capabilities. A malicious
-client can invent every field; HTTP must never deserialize these as authority.
-Snapshot consistency checks must be coupled to writes using current authoritative
-revisions across replicas. Coarse anchor sets are sensitive route intent even
-without raw geometry. Record constructors, short expiry and matching generations
-do not establish physical presence, prevent Sybils or approve public aggregation.
+Scope: [`docs/PRODUCT.md`](../PRODUCT.md). Nothing here is enabled unless
+[`BUILD_STATUS.md`](../quality/BUILD_STATUS.md) says so. Treat authenticated
+actors as potentially malicious, including colluding accounts, commercial
+spammers and people trying to find a specific traveller. The pilot runs on active
+input: posts and signals are public under a per-room alias, tied to a Spot,
+author-deletable and expiring; the server holds no continuous location.
 
-Scope and lifecycle: `docs/features/live/ROUTIQO_LIVE_SPEC.md`; ADR 0022.
-No Live capability is enabled by this planning change. Treat authenticated actors
-as potentially malicious, including colluding accounts and commercial spammers.
+| Abuse case | Required design/verification |
+| --- | --- |
+| Coordinated false signals and commercial manipulation | Per-actor duplicate suppression, rate limits with stricter new-account limits, conflict shown as conflict, report and quick hide, accountable moderator review |
+| Business spam and fake reviews at Spots | Report reason for promotion, link/phone-number friction, per-Spot and per-account posting limits, moderator hide and restriction; open question on businesses posting about their own Spots |
+| Abuse and harassment in anonymous chat, including Tamil and Tanglish | Report and Block on every item, quick hide, moderators able to read Tamil and Tanglish on the rota, new-account limits, restriction that follows the account across aliases |
+| False alarms (e.g. fake "accident" posts) | "Still true?" confirmation, type-based expiry, no safety assurance from silence, report and moderator hide; repeat offenders restricted |
+| Voice-note abuse or personal data | Explicit-record only; signed direct S3 upload with size, duration and type limits; scanning or isolation before delivery; same report/hide path as text; deleted with the post |
+| Alias linkability | Random per-room aliases with no account identifier, no cross-room reuse, no stable handle; responses, ordering and errors must not reveal the account behind an alias |
+| Spot passage leakage via Ask Ahead offers | Asker never learns who or how many were offered; bounded non-deterministic selection from opted-in recent passers; no repeated targeting; blocks respected; passage records deleted within 24 hours and logged only as outcome codes |
+| Ask Ahead harassment or targeting | Question rate limits, repeated-target budgets, blocks in both directions, no recipient identifiers, report and hide on questions and answers |
+| Festival-room raids and flooding | Per-account and per-room posting limits, new-account limits, bounded history and subscriptions, moderator hide and slow-mode controls, room expiry at the event window |
+| Membership scraping and block circumvention | No member lists or counts of passers; bounded reads and subscriptions; blocks apply to subscription, delivery, replay and Ask Ahead selection across aliases |
+| Block/Ghost/hide/deletion bypass | Ghost Mode stops all sending, including Spot passage and queued posts, ahead of reconnect and outbox replay; hidden, deleted or expired items cannot return through retry, reconnect, cache or replay |
+| Revocation races across replicas/cache/HTTP | Authoritative server state and current read/write checks; fail closed; do not rely solely on Pub/Sub |
+| Stale evidence replay or clock manipulation | Server-time expiry, exact idempotent retries, offline items accepted only within their lifetime since capture and shown with capture time, never as new |
+| Unsafe recommendations or driver distraction | Structured condition bands, uncertainty/source labels, no safety assurance from silence, no lane-specific guidance; post-passing prompt only when stopped/slow or for a passenger, never a blocking modal or sound while moving |
+| Log/telemetry and source leakage | No raw GPS, Spot-passage detail, per-user query traces or report payloads in observability; bounded operational outcomes only |
+| Resource exhaustion and scraping | Bounded list/payload/cardinality, distributed read/write budgets, upload quotas, cleanup capacity tests and no arbitrary spatial queries |
 
-| Abuse case                                             | Required design/verification                                                                                                                             |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fake journey admission or route/anchor scanning        | Server-issued short-lived admission to fixed relevant partitions; generic denials and bounded query budgets; route intent is not physical-presence proof |
-| Correlating moment appearance, conditions or freshness | Fixed publication windows, sparse-evidence suppression, adversarial temporal/overlap tests; removing exact counts alone is insufficient                  |
-| Block/Ghost/deletion differencing                      | No individually tailored count subtraction; reviewed suppression and cache invalidation; withheld accepted evidence cannot return after retry/reconnect  |
-| Coordinated false signals and commercial manipulation  | Per-actor contribution replacement, duplicate suppression, independent corroboration rules, conflict states, moderation and accountable operator review  |
-| Stale evidence replay or clock manipulation            | Server-time expiry, exact idempotent retries, no offline report dispatch or resurrected expired moment                                                   |
-| Revocation races across replicas/cache/HTTP            | Authoritative generations and current read/write checks; fail closed; do not rely solely on Pub/Sub                                                      |
-| Log/telemetry and source leakage                       | No raw GPS, private membership, per-user query traces or report payloads in observability; bounded operational outcomes only                             |
-| Resource exhaustion and scraping                       | Bounded list/payload/cardinality, distributed read/write/peer budgets, cleanup capacity tests and no arbitrary spatial queries                           |
-| Unsafe recommendations or driver distraction           | Structured condition bands, uncertainty/source labels, no safety assurance from silence, no proactive driving prompts or lane-specific guidance          |
-| Future Ask Ahead harassment/targeting                  | Separate gate for recipient consent, limited nondeterministic selection, repeated-target budgets, blocks and no recipient identifiers                    |
+Previously delivered in-memory rows cannot be remotely erased while a client is
+offline: local events clear them and bounded expiry limits display. Do not claim
+stronger revocation.
 
-Unresolved cohort/admission and evidence-retention mechanisms are explicitly listed
-in ADR 0022. They require design and adversarial acceptance before public output;
-a minimum actor threshold alone is not proof of anonymity. Previously delivered
-in-memory rows cannot be remotely erased while a client is offline: local events
-clear them and bounded expiry limits display. Do not claim stronger revocation.
+## Archived private LIVE threat detail
 
-Command replay controls (ADR 0024, SIGNAL_COMMAND_SPEC.md) distinguish retained
-private outcomes from permission to accept new evidence. Current authenticated
-ownership is required even for replay; a known command UUID is not authentication.
-Changed retained fingerprints conflict, while an expired receipt cannot restore
-an unused grant. Consumed grant state is independent of receipt cleanup. Pure
-ADR 0028's atomic database boundary now prevents concurrent replay and current
-consent/context authority races across replicas. Never
-deserialize grants/admissions from client input or expose internal decision codes
-as an existence oracle. No public Live endpoint is enabled by these primitives.
+The private LIVE threat analysis covered admission snapshots (ADR 0023), command
+replay and receipts (ADRs 0024, 0028), account/journey lock order (ADR 0025),
+durable and explicit-intent consent (ADRs 0026, 0029, 0030), route context,
+anchor resolution and binding (ADRs 0027, 0031–0034), browser signal commands
+(ADR 0035), private choices and exact-context issuance (ADRs 0043–0045), command
+stopping and browser recovery (ADRs 0046–0048), native private consent (ADR 0059)
+and native private route preparation (ADR 0061), plus the browser consent and
+route-preparation UI boundaries. That code remains in the repository, default-off,
+and the controls recorded in those ADRs still apply to it: server authority is
+never deserialized from clients, lost or cancelled writes stay uncertain, consent
+and route context never prove physical presence or authorize publication, and no
+unknown-command tombstones, budget refunds or retention extensions exist. The
+ADRs in [`docs/adr/`](../adr/) hold the full detail; the product specs they served
+are archived under [`docs/archive/`](../archive/README.md). ADR 0025's
+account-before-journey transaction boundary still protects journey writes.
 
-ADR 0028 persists server-issued grants and private receipts under the complete
-account/journey/consent/context lock order. Durable consumed state survives receipt
-cleanup, retained retries do not consume quota, and a partial unique index limits
-each actor/anchor/category to one ACTIVE contribution across journeys. Fixed-minute
-database budgets resist context or connection rotation across replicas. ACTIVE is
-only lifecycle state; provider anchor proof, peer limits, anti-Sybil moderation,
-durable Ghost/block invalidation and cohort-safe publication remain mandatory.
-
-ADR 0025 addresses T02/T13 races between current ownership, journey mutation and
-account deletion with a PostgreSQL account-before-journey transaction boundary.
-Independent adapter instances must serialize on database rows, not process-local
-locks. An ambient transaction is rejected to prevent reversed acquisition; unknown
-SQL/transaction failures become redacted availability errors. A per-actor gate
-also creates a contention surface: bound transaction/query work and keep provider
-calls and asynchronous callbacks outside it.
-
-ADR 0026 adds one privacy-owned latest consent row per account under that boundary.
-Journey-scoped CAS, owned-journey constraints and atomic completion revocation
-reduce T02/T06/T13/T19/T20 stale-consent and race risks without exposing a new
-endpoint. Reads are opt-out and nonmutating; account deletion cascades state.
-The legacy state-change path preserves generation for unchanged off. ADR 0029's
-separate explicit-intent path advances every accepted disable, requires exact
-enable generations and gives stale/current revocation precedence under the same
-database locks. Future public adapters must use that path without automatic enable
-retry. Delivered caches still require reliable revocation before publication.
-
-ADR 0030 exposes that explicit-intent path only to the authenticated journey owner
-through a separately default-off browser route. Exact account partition, cookie,
-origin, CSRF and bounded JSON checks precede mutation; database peer and stable
-account budgets deny on store failure. Separate enable and disable budgets prevent
-enable traffic from consuming the revocation allowance. Canonical decimal strings
-avoid JavaScript generation truncation. Responses are private and no-store, and
-owner/missing journeys share 404 behavior. This does not solve offline ordering,
-cache/delivery revocation, location proof or public presence safety.
-
-ADR 0027 adds one Route Update-owned latest context row per account. Owned-journey
-constraints, exact current-ID replacement, fresh identities, post-row-lock time
-sampling and ordered completion deletion reduce stale-context and cross-replica
-races. Expiry maintenance is bounded, skips locked rows and cannot acquire earlier
-authority locks. Stored anchors remain sensitive route intent and are not proof of
-location, admission or publication permission. Provider-to-anchor validation,
-block/Ghost delivery invalidation and cohort-safe publication remain mandatory
-before public Live use. Internal transactional signal storage is implemented under
-ADR 0028.
-
-ADR 0031 adds a default-off internal route-anchor resolver without accepting route
-geometry from a caller. A strict 256 KiB local catalog and the same configured
-routing region constrain the trusted anchor set; fresh guarded Valhalla geometry
-is held only in memory. Vertex-only 100-metre matching avoids invented segment
-membership, and inclusive 1,000-metre requested/provider endpoint exclusion reduces
-home/work inference. The output omits coordinates and rejects more than 128
-matches. These heuristics do not prove physical presence, accessibility, grade
-separation, catalog safety or anonymity.
-
-ADR 0032 adds internal journey binding, an account budget and post-provider
-consent/context/catalog revalidation. A single durable latest attempt prevents an
-older or failed provider request from regaining authority, including after another
-context is replaced and physically expired. Provider work holds no authority
-locks, and only opaque anchor IDs enter the 15-minute context. This still does not
-prove physical presence. Public signal publication and cohort-safe projection
-remain mandatory before exposure; grant category revalidation is implemented
-under ADR 0033.
-
-ADR 0033 prevents matching opaque anchor IDs alone from being treated as provider
-provenance. Only a context bound to the current immutable catalog may issue through
-the configured facade, and new acceptance rechecks the current anchor and category
-inside the storage transaction before any quota or receipt mutation. Raw context
-replacement clears provenance. Retained replay remains private command recovery,
-not renewed evidence or publication authority. Catalog-version reuse, rollout
-consistency, moderation and cohort-safe output remain operational release risks.
-
-ADR 0034 adds a private, default-off browser boundary for owner context recovery
-and explicit binding. Exact session/account, same-origin CSRF, strict bounded JSON,
-database peer/account quotas and post-provider consent/context rechecks limit
-cross-user disclosure, stale writes and provider amplification. Responses omit
-geometry, endpoints, actor, journey and catalog metadata; API architecture prevents
-raw context replacement. Opaque anchors still reveal private route intent to their
-owner and do not prove location or permit public Live publication.
-
-ADR 0035 adds private, default-off browser command issue, acceptance and withdrawal
-through the catalog-aware facade. Strict structured input, authenticated owner
-scope and separate durable request/storage budgets limit forgery, cross-account
-probing, replay amplification and command exhaustion. Exact retained replay and
-terminal withdrawal return only the original owner's minimal receipt and never
-refresh timestamps. Public cohort differencing, collusion, moderation, operated
-expiry cleanup and revocation delivery remain unresolved release threats, so no
-Live projection or UI is enabled.
+## Kept infrastructure boundaries
 
 Browser client transport also treats redirected, oversized, malformed and stalled
 responses as untrusted. Auth token exchange must never follow a redirect. Private
@@ -463,27 +389,6 @@ These controls do not address malicious clients bypassing validation: all existi
 server authentication, ownership, consent, budgets and publication gates still apply.
 See BROWSER_LIVE_CLIENT_SPEC.md and BROWSER_AUTH_TRANSPORT_SPEC.md for limits and
 verification scope.
-
-The private active-journey consent panel adds a UI authority boundary described in
-`BROWSER_LIVE_CONSENT_UI_SPEC.md`. A lost enable response may still commit after a
-later read returns off. Reads therefore cannot resolve uncertain mutation state;
-only an acknowledged explicit stop fences older enables. Account re-verification,
-journey completion, offline/hidden transitions and stale responses must remove
-enable authority immediately. No browser persistence or automatic consent retry
-is permitted. These controls do not establish public discoverability, Ghost Mode
-or a right to repurpose private consent for future public publication.
-
-Private route preparation must not confuse a last-observed context with a binding
-to the displayed route. The context GET has no input fingerprint; an earlier lost
-POST may commit after that read. `BROWSER_ROUTE_BINDING_UI_SPEC.md` requires exact
-observed-context CAS, copied calculation inputs, explicit actions and truthful
-uncertainty/empty outcomes. Consent operation start invalidates a synchronous
-account/journey/generation epoch, so a pending Stop cannot race a stale preparation
-response into apparent readiness. Route choices have an independent synchronous
-epoch. Recheck both epochs, foreground and expiry at send and acceptance; React
-effect cleanup alone is insufficient. These UI fences do not replace the server's
-current ownership, consent, context, newest-attempt and provider checks, and do not
-establish public eligibility or physical presence.
 
 The existing journal and journey recovery clients must also resist unbounded or
 stalled responses: check streamed bytes rather than whole-text length after a
@@ -522,31 +427,6 @@ Future owner choices require current consent/context/catalog authority, bounded
 read quotas and explicit exact-context issuance semantics. A readable label is
 neither proof of physical presence nor an anti-Sybil or publication guarantee.
 
-ADR 0043's internal choice reader enters one owned-journey authority boundary,
-reads consent/context/restriction in established order and samples exact time
-after those reads. Deny foreign, expired, suspended, unprovenanced or partially
-labeled contexts as a whole. Return only the bounded current labeled subset and
-exact context/consent versions, with immutable collections and redacted diagnostics.
-It creates no grants and performs no provider or persistence writes. ADR 0045 wires this reader to HTTP with no-store guards, quotas and explicit exact-context issuance semantics. Existing issue-by-anchor can use a replacement
-context containing that anchor; a prior choice snapshot cannot authorize a write.
-
-ADR 0044 defines an additional internal issuance precondition: exact context ID,
-route revision and consent generation must match current locked authority before
-grant budget reservation or insertion. The tuple is not identity, presence proof
-or evidence of a rendered choice. Keep current catalog-derived permissions and
-acceptance/replay/withdrawal checks. Legacy anchor-only HTTP remains unchanged;
-Displayed-choice callers use the ADR 0045 guarded wire contract with no legacy fallback, automatic reissuance or offline replay after a lost response.
-
-The ADR 0045 browser boundary applies both choice and signal flags at controller
-and security matchers, with required real catalog and authority composition. A
-second issuance leaf shares the existing request quota; splitting routes must
-not amplify the account budget. Choice reads have their own bounded quota and
-cannot create grants. Minimize owner DTOs, redact nested diagnostics and keep
-labels plain text. Bound choice responses separately to support the maximum
-Unicode label set without widening all LIVE responses. Enforce exact fields,
-canonical IDs/decimal strings and returned tuple/freshness checks. Rejecting a
-late grant is not rollback and must never start an automatic retry.
-
 Moderation expiry uses the same bounded scheduling principles through a separate
 default-off flag and domain-owned audit/debit cleanup adapter. Auth maintenance
 must retain its own named scheduler even when only moderation cleanup is enabled;
@@ -568,39 +448,6 @@ Reporting remains gated by canonical evidence identity, reference authorization,
 revocation lock order and a useful bounded investigation lifecycle; see the intake
 proposal. Test-only reference providers cannot satisfy these trust boundaries.
 
-ADR 0046/0047 command stopping addresses delayed acceptance after a client abort:
-serialize receipt withdrawal or existing-grant consumption with acceptance using
-the same owned-journey/account authority. Require matching actor, journey and
-command on both storage results; reject future/expired receipts before mutation.
-Do not require current consent, context, catalog eligibility or unsuspended
-contributor status for revocation. Test both lock orders and rollback after real
-writes. No unknown-command tombstones, budget refunds or retention extension.
-A consumed grant without a receipt is not proof of no historical acceptance.
-Keep stop independent of the choice feature flag and new-submission account
-quotas. Reject active or foreign receipts in a stopped response; cancellation,
-failed responses and later cleanup remain uncertain, never a reason to reissue.
-
-The private browser contribution interface must resist stale route/consent
-closures, delayed CSRF completion, copied context acknowledgments, double clicks,
-account switches and late acceptance after Stop. Only a successful fresh bind
-publishes contribution authority; owner context reads do not. Workspace consent
-invalidation and planner selection invalidation synchronously notify pending
-issue/accept work before asynchronous continuations can post. Recheck the exact
-context/revision/consent and selection epochs at each await; issue once and accept
-at most once. A late or lost issuance cannot fabricate a recovery ID or justify
-automatic retry. Known uncertain acceptance blocks new issuance until explicit
-recovery; stopping has separate cancellation scope and rechecks account identity.
-
-Memory-only operation tickets are object-identity fenced, account scoped and
-phase checked so late acceptance cannot overwrite stopping/stopped state. Bounds
-and metadata expiry cannot silently evict the only stop handle or make absence
-look like revocation. Same-account refresh hides records; switch/logout clears
-them. Navigation protection must coexist with journal unsaved-edit protection,
-preserve router/foreign history fields and avoid accumulating duplicate entries
-or leaving a cancelled navigation unguarded. Browser unload warnings are best
-effort, not durable recovery. Component/integration tests cover these boundaries;
-none substitutes for current server authorization or public anti-Sybil policy.
-
 Journey history restoration (2026-09-20) addresses T13 delayed-response ordering
 without treating a history read as a write acknowledgement. A previously confirmed
 completed snapshot dominates a delayed active observation only when immutable ID,
@@ -609,17 +456,6 @@ identity still abort the entire transaction. The input batch is normalized befor
 asynchronous storage access; duplicate IDs are rejected. Current pending commands,
 account isolation, the one-active invariant and deletion retirement remain enforced.
 This does not establish current authentication or complete cross-device history.
-
-Native private LIVE consent (ADR 0059) applies T01/T02 bearer/account and ownership
-checks, T12 minimized bodyless errors/no consent logs, T13 exact string generations
-and revocation ordering, and T14 shared durable browser/native account quotas.
-The Android UI must not erase uncertainty during refresh, session renewal,
-background/focus loss or navigation within the same active journey. A cancelled
-enable can still commit; a read of off is not a revocation fence. Only a validated
-explicit stop can resolve that uncertainty. Completed journeys remain terminal.
-Client exposure is not authority, and a consent boolean does not authorize public
-presence, precise location or future traveller-derived output. No new publication
-or delivery surface is introduced by this native adapter.
 
 Native route planning (ADR 0060) adds explicit owner-account routing/search
 transport under T01/T02 and shared durable request budgets under T14. Precise
@@ -630,11 +466,3 @@ geometry/step bounds and bridge byte/deadline limits bound hostile provider outp
 Loaded directions retained offline are historical estimates, not fresh guidance,
 physical presence or authority for LIVE participation. No new location watcher,
 persistence, provider deployment or public output is introduced.
-
-Native private route preparation (ADR 0061) retains T01/T02 owner-account guards,
-T12 transient/minimized endpoint handling, T13 exact-context/newest-attempt and
-consent-generation fences, and T14 shared durable quotas. A Stop racing provider
-work must prevent a stale bind at the server; a client must also invalidate its
-local acknowledgement synchronously. Route input changes cannot reuse an unrelated
-context observation as proof of preparation. Recovery GET is not cancellation
-proof, and expired/private context is never a publication or physical-presence grant.
