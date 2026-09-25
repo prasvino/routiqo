@@ -288,6 +288,31 @@ export async function proxyBrowserCommunityShares(
     timeout: 12000,
   });
 }
+/** Account planning copy (ADR 0062). Explicit owner-only reads and writes behind a default-off flag. */
+export async function proxyBrowserPlanning(
+  request: Request,
+  path: string[],
+  config: BrowserAuthConfig | null,
+  upstreamFetch: typeof fetch = fetch,
+  planningBackupEnabled = false,
+): Promise<Response> {
+  if (!config) return failure(503);
+  if (!planningBackupEnabled) return failure(404);
+  const copy = path.length === 0;
+  const remove = path.length === 1 && path[0] === 'delete';
+  if (!copy && !remove) return failure(404);
+  if (copy ? !['GET', 'POST'].includes(request.method) : request.method !== 'POST')
+    return failure(405);
+  if (new URL(request.url).search) return failure(400);
+  return forwardBrowserRequest(
+    request,
+    copy ? 'planning' : 'planning/delete',
+    config,
+    upstreamFetch,
+    // Responses carry at most the 256 KiB stored document plus its small envelope.
+    { responseLimit: 320 * 1024, timeout: 12000, requestLimit: copy ? 264 * 1024 : 20 * 1024 },
+  );
+}
 export async function proxyBrowserPlaceSearch(
   request: Request,
   config: BrowserAuthConfig | null,
@@ -319,7 +344,7 @@ async function forwardBrowserRequest(
   path: string,
   config: BrowserAuthConfig,
   upstreamFetch: typeof fetch,
-  limits: { responseLimit: number; timeout: number } = {
+  limits: { responseLimit: number; timeout: number; requestLimit?: number } = {
     responseLimit: 64 * 1024,
     timeout: 8000,
   },
@@ -350,7 +375,7 @@ async function forwardBrowserRequest(
     if (headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json')
       return failure(415);
     try {
-      body = await boundedBody(request.body, 20 * 1024);
+      body = await boundedBody(request.body, limits.requestLimit ?? 20 * 1024);
     } catch {
       return failure(413);
     }

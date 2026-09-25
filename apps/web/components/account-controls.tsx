@@ -12,6 +12,9 @@ import { GoogleLogin } from './google-login';
 import { DeleteAccount } from './delete-account';
 import { retireBrowserJourneyPartition } from '../lib/journey-storage';
 import { retireBrowserJournalPartition } from '../lib/journal-storage';
+import { AccountPlanningCopyPanel } from './account-planning-copy';
+
+const planningCopyEnabled = process.env.NEXT_PUBLIC_ROUTIQO_PLANNING_BACKUP_UI_ENABLED === 'true';
 
 export function AccountControls() {
   const [config, setConfig] = useState<AuthAvailability | null>(null);
@@ -90,7 +93,11 @@ export function AccountControls() {
         </span>
         <div className="account-copy">
           <h2>{signedIn ? 'Signed in with Google' : 'Welcome, traveller.'}</h2>
-          <p>Plans and saved places stay on this device. Cloud sync isn’t available yet.</p>
+          <p>
+            {planningCopyEnabled
+              ? 'Plans and saved places stay on this device unless you save a copy to your account.'
+              : 'Plans and saved places stay on this device. Cloud sync isn’t available yet.'}
+          </p>
           <p className="account-availability" role="status">
             {checking
               ? 'Checking account status…'
@@ -132,6 +139,9 @@ export function AccountControls() {
           <ShieldCheck size={26} />
         )}
       </section>
+      {planningCopyEnabled && signedIn && accountId && (
+        <AccountPlanningCopyPanel key={accountId} accountId={accountId} />
+      )}
       {login && config?.clientId && (
         <GoogleLogin
           clientId={config.clientId}
