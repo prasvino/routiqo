@@ -3,6 +3,8 @@
 Status: implemented and locally verified, 2026-09-24. Configured-service and
 physical-device checks remain in `../../validation/NATIVE_ROUTING_PENDING.md`.
 
+> **Direction brief (2026-09-25):** Kept as Android route planning. References below to "after private consent", private route binding and public LIVE describe archived sequencing: per-journey consent is replaced by one Spot-passage opt-in plus Ghost Mode, and public LIVE is archived. The next Android step is the Journey map with the Spots ahead. See [PRODUCT.md](../../PRODUCT.md).
+
 Scope: the next complete Android utility feature after private consent. Reuse
 existing guarded routing/place providers and normalized shared models. This is
 explicit route planning and manual instruction review, not GPS navigation,

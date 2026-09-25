@@ -144,13 +144,30 @@ If there are no findings, state that directly but still report validation limits
 Never claim native-device, backend, provider, security, performance, or integration verification that was not actually performed.
 
 
-## Live feature review reference
+## Spots, posts and Ask Ahead review reference
 
-For planned Live changes, review against ROUTIQO_LIVE_SPEC.md, ADR 0022, the Live
-threat register and testing matrix. Explicitly distinguish route relevance from
-verified physical presence and artifact integrity from service readiness. Check
-that expiry, consent/block revocation, retry identity and no offline report replay
-hold across persistence and projections. Confirm that no exact counts, raw member
-lists or private evidence reach the client. Numerical privacy candidates are not
-approved release defaults. Report unresolved cohort/retention gates rather than
-silently implementing around them. Existing review/model-routing rules still apply.
+For Journey/Spots/Ask Ahead changes, review against `docs/PRODUCT.md`, the relevant
+feature spec and the testing matrix. Check that:
+
+- aliases are per room, never embed account identifiers and cannot be linked
+  across rooms through API, cache, log or ordering side channels;
+- expiry uses server time per content type; client clocks, retries and offline
+  replay cannot refresh content; offline items keep capture time and are rejected
+  once their lifetime has elapsed;
+- every post, voice note, answer and chat message has a report/hide path and Block,
+  and moderator hide propagates to caches and realtime delivery;
+- rate limits cover posts, voice uploads, signals, "Still true?", questions,
+  answers and reports, with stricter limits for new accounts;
+- business spam/fake reviews, false alarms and Tamil/Tanglish abuse have explicit
+  handling, not English-only filters;
+- Spot passage is opt-in, sent only with an answer or for Ask Ahead eligibility,
+  coarse in time, deleted within 24 hours, logged as outcome codes, and stopped
+  (with queued posts cleared) by Ghost Mode;
+- Ask Ahead never reveals recipients to the asker, respects blocks and does not
+  repeatedly target one person;
+- no traveller counts, presence, member lists or coordinates reach the client;
+  report counts are fine.
+
+Archived LIVE/cohort code stays default-off; changes that would enable it or
+aggregate traveller counts need a separate privacy review. Existing
+review/model-routing rules still apply.

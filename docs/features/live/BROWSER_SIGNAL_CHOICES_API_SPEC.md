@@ -3,6 +3,8 @@
 Status: implemented, tested and independently reviewed, 2026-09-19. No public
 LIVE output or UI is enabled; both server flags remain default off.
 
+> **Direction brief (2026-09-25):** Kept as a default-off transport for the Spot signal picker; web is secondary to Android. On-consent requirements and consent-version matching are retired (one Spot-passage opt-in plus Ghost Mode); the "private" and "no public output" framing no longer applies to Spot signals. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope and compatibility
 
 Expose ADR 0043's minimized owner choice reader and ADR 0044's mandatory

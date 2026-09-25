@@ -3,6 +3,8 @@
 Status: implemented and tested, disabled by default; production operation pending.
 Decision: ADR 0036.
 
+> **Direction brief (2026-09-25):** Kept. Expiry maintenance must extend to text posts, voice notes (including stored audio), Ask Ahead questions and answers, "Still true?" confirmations and Spot-passage records (deleted within 24 hours), using server time. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope and boundaries
 
 Operate the existing domain-owned expiry interfaces for private Live route

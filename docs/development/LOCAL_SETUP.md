@@ -81,6 +81,10 @@ GET /api/v1/auth/csrf sets its HttpOnly cookie and returns a masked token. Send 
 
 Rate limits use the socket peer, not forwarded headers. A reverse proxy therefore shares a peer bucket until trusted forwarding is explicitly configured. Cleanup runs in bounded batches; measure backlog/capacity before launch. Sessions expire after 15 minutes; bounded refresh rotation supports a maximum 12-hour lineage.
 
+> **Archived capability (direction brief 2026-09-25): code remains, default-off; kept for maintainers.**
+> Per-journey consent is replaced by one Spot-passage opt-in; see
+> [`PRODUCT.md`](../PRODUCT.md).
+
 The private journey consent transport is separately disabled by default. Set
 `ROUTIQO_LIVE_CONSENT_API_ENABLED=true` on the backend only after configuring the
 web-auth requirements above and reviewing the matching UI/reconciliation and
@@ -104,6 +108,13 @@ Live verification sequence: configure Google/web-auth and routing as above; sign
 The former Mapbox native navigation plan is superseded by ADR 0021. Future downloaded maps/navigation use the open-source target and still require Android Studio/SDK, a compatible development build, bounded region downloads, storage eviction/deletion, an on-device routing engine and real-device tests. The web app does not download tiles or persist temporary geocoding results. In-memory directions do not survive reload.
 
 The endpoint is POST `/api/v1/routes`, with mode `driving`, `walking` or `cycling`, and two longitude/latitude coordinate arrays named `origin` and `destination`. It requires the browser session, CSRF, exact origin and matching account header. It returns private Valhalla estimates without creating journeys or presence. POST `/api/v1/routes/places` accepts a `query` for temporary city/street/address lookup using Photon and the same authentication guards. Trips includes authenticated place selection, route alternatives, optional web map display and manual provider directions, with an optional one-time current-location origin. Live provider verification, GPS-following navigation and downloaded offline maps remain pending. No real regional provider request has been tested; automated tests use synthetic transport responses.
+
+> **Archived capability (direction brief 2026-09-25): code remains, default-off; kept for maintainers.**
+> Applies to the anchor resolver, route-binding, choice and private Quick Signal
+> flags below. The anchor catalog format, loader and route-anchor matching and the
+> signal storage behind these flags are reused for Spots in Phase 2 (see
+> [`BUILD_PLAN.md`](BUILD_PLAN.md)); the private route-preparation and Quick Signal
+> flows themselves are archived.
 
 The internal route-anchor resolver is separately disabled by default. Enabling it
 requires `ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED=true` and
@@ -141,19 +152,23 @@ hourly/category abuse controls, operated purge job or regional launch evidence.
 
 ## V3 community traffic staging evaluation (ADR 0055)
 
-Under [ADR 0065](../adr/0065-public-live-v1-policy.md), V3 is a closed,
-consented **staging experiment only**; V1 production uses official alerts and
-private Quick Signals. Community, public-intent and V3 admin switches enable
-only for the exact lowercase value `true`. `TRUE`, `True`, `1`, `yes`, `on`,
-padded, empty or missing values leave them off (`FeatureFlags`,
+> **Archived capability (direction brief 2026-09-25): code remains, default-off; kept for maintainers.**
+> V3 community traffic summaries are out of the pilot; revisit only if aggregate
+> counts return after a separate privacy review. Pilot moderation is in
+> [`PILOT_MODERATION_RUNBOOK.md`](PILOT_MODERATION_RUNBOOK.md).
+
+Flag safety (from [ADR 0065](../adr/0065-public-live-v1-policy.md), still
+applies to the archived code): community, public-intent and V3 admin switches
+enable only for the exact lowercase value `true`. `TRUE`, `True`, `1`, `yes`,
+`on`, padded, empty or missing values leave them off (`FeatureFlags`,
 `@ConditionalOnExactlyTrue`, and the web proxy's strict check).
 
 V3 implementation is authorized for staging evaluation; production activation
 and acceptance of its different privacy terms are **not approved**. The V3 path
 uses fresh `community-traffic-v3` Share requests for existing private traffic
 receipts. It never imports V18 public intent or V22 frozen Share records. Read
-[the V3 contract](../features/live/COMMUNITY_TRAFFIC_SUMMARY_SPEC.md) and
-[production decision checklist](../validation/V3_PRODUCTION_DECISION_CHECKLIST.md)
+[the V3 contract](../archive/features/live/COMMUNITY_TRAFFIC_SUMMARY_SPEC.md) and
+[production decision checklist](../archive/validation/V3_PRODUCTION_DECISION_CHECKLIST.md)
 before an evaluation with real accounts. The synthetic utility run is
 `node scripts/v3-community-utility.mjs` from the repository root; its results
 are not a measurement of Routiqo users or roads.
@@ -190,10 +205,10 @@ requires independent authentication and a finite `traffic_review` or
 `traffic_suppress` grant; suppression stays behind that boundary.
 
 The separately flagged V3 moderator implementation and its isolated staging
-preflight are documented in [the moderator runbook](V3_MODERATOR_STAGING_RUNBOOK.md).
+preflight are documented in [the moderator runbook](../archive/development/V3_MODERATOR_STAGING_RUNBOOK.md).
 ADR 0057 adds an independently disabled `ROUTIQO_V3_GRANT_ADMIN_ENABLED` admin
 boundary and `ROUTIQO_V3_GRANT_ADMIN_MAINTENANCE_ENABLED` cleanup; see the
-[grant administration runbook](V3_OPERATOR_GRANTS_STAGING_RUNBOOK.md). Neither
+[grant administration runbook](../archive/development/V3_OPERATOR_GRANTS_STAGING_RUNBOOK.md). Neither
 flag seeds its out-of-band administrator trust root. Until both workflows are
 verified with real admin OAuth, MFA policy, finite grants and named operators,
 do not treat a local UI or automated test as completed staging moderation.

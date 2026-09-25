@@ -3,6 +3,8 @@
 Status: implemented and reviewed private domain primitives. Durable contribution restrictions are implemented separately under ADR 0039; durable blocks and reports are separate slices.
 Related decision: ADR 0038. No public publication or operator API authorization.
 
+> **Direction brief (2026-09-25):** Kept. Report reasons must add business promotion (spam or fake reviews at Spots) and false alarm, and reports apply directly to posts, voice notes, chat and signals. Contributor assessment as a gate to "independent public evidence" is retired with threshold publication. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Contributor assessment and suspension
 
 Create a moderation-owned immutable state for an actor with monotonic revision.

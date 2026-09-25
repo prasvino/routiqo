@@ -1,189 +1,190 @@
 # Current implementation plan
 
-## September 24 continuation
+Updated 2026-09-25 for the direction reset. Product scope, phase goals and gates
+come from [`../PRODUCT.md`](../PRODUCT.md); the release checklist is
+[`../../todo.md`](../../todo.md); verified behaviour is recorded only in
+[`../quality/BUILD_STATUS.md`](../quality/BUILD_STATUS.md). The former LIVE
+execution queue and L0–L5 stages are archived verbatim in
+[`../archive/development/BUILD_PLAN_LIVE_QUEUE_2026-09.md`](../archive/development/BUILD_PLAN_LIVE_QUEUE_2026-09.md).
 
-Native account/journey integration (`49c2f4a`) and paginated account history
-(`17cae44`) are implemented. Their remaining OAuth, staging, map-hosting, signing
-and device requirements are in `docs/validation/NATIVE_ANDROID_PENDING.md` and
-`docs/validation/NATIVE_HISTORY_PENDING.md`; they are not missing native transport
-implementation. V3 moderator and grant administration implementation is also
-complete for isolated staging; use `docs/validation/V3_STAGING_TRIAL_PENDING.md`
-for current external requirements rather than the historical queue below.
+## Rules that apply to every phase
 
-The next bounded native implementation is private completed-trip journal reading.
-`docs/features/journey/NATIVE_JOURNAL_READ_SPEC.md` scopes the owner-only API and
-native transport phase. Native browsing, durable editing and real-service/device
-validation remain separately tracked in `docs/validation/NATIVE_JOURNAL_PENDING.md`.
-Production LIVE activation remains subject to its existing explicit decision gates.
+- The user's current instructions set task scope; this plan does not authorize
+  deployment, purchases or flag activation.
+- New capabilities ship default-off behind server and client flags until their
+  phase gate passes. Archived capabilities (per-journey consent, private route
+  preparation, private Quick Signal controls, V3 community traffic, public LIVE
+  prerequisites) stay in code, default-off; do not extend them. Removing any of
+  that code is a separate decision for the user.
+- Write a focused spec (data, authorization, privacy, offline and failure
+  boundaries) before building each new capability, and an ADR for significant
+  architecture or dependency choices.
+- Active input only: no continuous location on the server. **Traveller counts
+  are forbidden**; report counts ("3 reports in 20 min") are allowed. Short text
+  posts, voice notes and short temporary Spot chat are in scope; private DMs,
+  follower graphs and background prompts are not.
+- Ghost Mode stops all sending and outranks reconnect and outbox replay. Blocks
+  apply to REST, realtime, room subscription, Ask Ahead recipient selection and
+  replay.
+- Android on physical devices is the primary client. Emulator and synthetic
+  evidence does not close a phase gate. Cloud agent sessions have no Android SDK;
+  record device checks as pending.
+- Keep four tabs (Home, Explore → Guides when route guides ship, Trips, Profile)
+  and existing offline journey writes. The active Journey is a full-screen map
+  mode opened from Home with a "Back to journey" bar, not a tab; no chat tab.
+  Explore is demoted: keep it working, invest in route guides instead.
 
-Status reconciliation, 2026-09-23: reliability batch 01 tests and production
-batches 02–04 web fixes are committed (`54007b6`, `edfacc3`, `db622e6`,
-`14b73c9`). Their handoff queues are historical preparation notes, not open
-implementation items. See `docs/quality/BUILD_STATUS.md` for current verification
-and remaining release gates.
+## Timeline (decided 2026-09-25)
 
-## Next priority: Routiqo Live first release
+- **By about 1 November 2026:** Phase 1 gate plus the reduced Phase 2 scope for
+  the Diwali dry run: Spots ahead, one-tap signals, text posts, expiry with
+  "Still true?" / "No longer true", report/block/hide moderation, official alerts
+  on the corridor districts. Nothing else is started before Diwali.
+- **Diwali 2026 (outbound rush 5–7 November):** first dry run (Phase 4) on the trunk and
+  branches.
+- **November–December:** rest of Phase 2 (voice notes, Spot chat, festival room)
+  and Phase 3 (Spot passage, post-passing prompts, Ask Ahead, route guides),
+  then a December long-weekend dry run.
+- **Pongal 2027 (tentatively 8–14 January, to be finalised):** public launch (Phase 5), adding the Chennai →
+  Salem → Coimbatore trunk.
 
-The separate Chennai official-alert pilot (ADR 0050) now has a default-off
-active-journey API, NDMA CAP reader and web list. It provides district-wide
-provider context without exposing traveller contributions. Real authenticated
-staging/provider and device QA remain before activation; it does not close the
-traveller-derived publication and safety gates below.
+## Phases and gates
 
-Current browser slice (2026-09-19): private active-journey consent, route
-preparation and Quick Signal controls are implemented. Contribution requires a
-successful fresh bind and exact current account, journey, consent, route selection,
-context and revision. One deliberate issue/accept operation uses catalog-compatible
-values and explicit safe-interaction intent. Same-account recovery is memory-only,
-capped at five commands and retains Stop after Ghost Mode or journey completion.
-There are no automatic or offline writes, browser persistence, public publication
-or server feature activation. Navigation warning behavior composes with the journal
-guard. Current verification evidence and remaining authenticated/browser-device QA are
-in BUILD_STATUS.md.
+| Phase | Goal | Gate to move on |
+| --- | --- | --- |
+| 1. Foundations | Google sign-in, hosted maps and routing, Android tested on real devices | App installs and runs a full journey on 3+ physical Android phones |
+| 2. Spots and posts | Seeded Spots, signals, posts, voice notes, expiry, moderation | 10 testers complete a real highway trip on a corridor and post (the Diwali dry run can serve as this trip for the reduced scope) |
+| 3. Ask Ahead and route guides | Questions on Spots, post-passing prompts, publish a guide | Questions get answered on a test trip |
+| 4. Dry runs | Diwali 2026 on the reduced scope; a December long weekend for the rest | No blocking bugs; moderation works |
+| 5. Pongal pilot | Public launch on the trunk (Chennai incl. Kilambakkam → Trichy), branches (Thanjavur, Madurai → Tirunelveli, Tuticorin) and the Coimbatore trunk | Measured against PRODUCT.md success signals |
 
-Latest safety work (2026-09-19): ADR 0041 adds internal action-specific operator
-permissions, exact revision checks, transactional audit and deletion-resistant
-operator action debits. The unaudited production mutation service is removed;
-signal ingestion consumes read-only restriction state. Focused PostgreSQL tests
-and independent review pass; final integration evidence is in BUILD_STATUS.md.
-No grant is seeded and no administrative or public surface is enabled.
+## Engineering sequence
 
-The follow-on moderation maintenance slice reuses its audit/debit cleanup adapter
-behind an independent default-off flag and dedicated scheduler. Authentication
-maintenance owns its scheduler irrespective of cleanup flags. No retention horizon
-or database schema changes; staging activation and operations remain pending.
+### Phase 1 — Foundations
 
-Latest supporting reliability work (2026-09-19): browser auth, private LIVE,
-journal and journey transports enforce bounded streamed responses and whole-
-operation deadlines. Journal/journey mutations capture their exact inputs before
-CSRF and retain existing draft/outbox acknowledgement rules. Integrated validation
-passed 308 TypeScript tests, web production build and repository checks; current
-evidence and release gates are in BUILD_STATUS.md. No public LIVE UI is enabled.
+Reuse:
 
-### Execution queue
+- Native Android account/journey integration, redirect-safe transport, secure
+  vault, SQLite outbox and reconnect dispatch
+  (`../features/journey/NATIVE_ANDROID_JOURNEY_SPEC.md`,
+  `../features/journey/OUTBOX_SPEC.md`, `../features/journey/DISPATCH_SPEC.md`).
+- Native Google sign-in and `native-auth` HTTP
+  (`../features/auth/NATIVE_AUTH_HTTP_SPEC.md`, [OAuth setup](GOOGLE_OAUTH_SETUP.md)).
+- Valhalla/Photon adapters, routing runtime and coverage rules, MapLibre on web and
+  native (ADR 0021, ADR 0060, `../features/journey/ROUTING_RUNTIME_SPEC.md`,
+  `../features/journey/ROUTING_COVERAGE_SPEC.md`,
+  `../features/journey/MAP_DATASET_SPEC.md`,
+  `../features/journey/NATIVE_ROUTE_PLANNING_SPEC.md`).
+- Native history and journal (`NATIVE_ACCOUNT_HISTORY_SPEC.md`,
+  `NATIVE_JOURNAL_*_SPEC.md`).
 
-| Priority | Next concrete task | Completion evidence |
-|---|---|---|
-| P0 / L0.1 — complete | Immutable Quick Signal category/value and evidence lifecycle, contribution slot and replay matching primitives | 7 focused tests; full 141 Java tests, architecture/check/bootJar and independent review passed; no public output |
-| P0 / L0.2a — complete | ADR 0023 and internal route-context/admission policy | 9 focused tests; full 150 Java tests/check/bootJar and review passed; no public issuer |
-| P0 / L0.2b — next | Cohort publication and block-safe suppression design | Fixed partitions/windows, independent evidence, query limits and adversarial acceptance before projections |
-| P0 / L0.3 | Resolve storage/retention ADR and idempotent replacement/withdrawal lifecycle | Transaction and cleanup design, stale retry/delete/consent race tests |
-| P0 / L0.3a — complete | Internal context-linked receipt state, terminal withdrawal/supersession and exact replay comparison | 8 focused tests; full 158 Java tests/check/bootJar and review passed; no durable store or publication permission |
-| P0 / L0.3b — internal command policy and storage complete | Admission-bound grant consumption and retained retry decisions; ADR 0024 remains the storage contract | 15 pure-policy tests plus ADR 0028 transactional persistence; public issuance/ingestion remains closed |
-| P0 / L0.3c — account/journey transaction boundary complete | ADR 0025 domain-owned write authority, account-before-journey locks integrated with start/completion, redacted retryable failures | Full 184 Java tests/check/bootJar; 34 targeted database/HTTP tests, independent review; future Live persistence still pending |
-| P0 / L0.3d — durable consent and internal intent ordering complete | ADRs 0026/0029 privacy-owned latest state, legacy CAS compatibility, revocation-precedence explicit intents and saturating terminal revocation | 45 focused domain/PostgreSQL/composition tests and independent review passed; full verification recorded in build status; no HTTP, leases, cache publication or automatic enable retry |
-| P0 / L0.3e — durable route context complete, provider validation pending | ADR 0027 Route Update-owned latest context, post-lock time checks, exact-ID CAS, completion deletion and bounded leaf cleanup | 20 focused domain/PostgreSQL lifecycle/race/cleanup tests; full 218 Java tests/check/bootJar and independent review passed; no HTTP, provider anchor validation, scheduler or public output |
-| P0 / L0.3f — internal signal storage complete, public ingestion pending | ADR 0028 durable grants/receipts, partial-unique contribution slot, atomic acceptance/withdrawal, database budgets and bounded cleanup | 16 focused PostgreSQL transaction/race/cleanup tests; full 234 Java tests/check/bootJar and independent review passed; no HTTP, provider anchor validation, moderation, scheduler or public projection |
-| P0 / L0.3g — private browser consent transport complete, default off | ADR 0030 owner-only GET/explicit-intent POST with string generations, durable peer/account budgets and exact proxy allowlist | Real HTTP/PostgreSQL, default-deny, strict-input and failure tests; no UI, automatic enable retry, signal ingestion or public output |
-| P0 / L0.3h — provider-backed anchor resolution complete, default off | ADR 0031 strict curated catalog and fresh region-guarded Valhalla vertex matching with endpoint exclusion | 23 focused domain/loader/config/provider tests and full 273 Java tests passed; no journey binding, provider quality claim, HTTP, geometry persistence or public output |
-| P0 / L0.3i — internal route binding complete, default off | ADR 0032 two short authority transactions around fresh resolution, durable newest-attempt fencing and atomic context replacement | Focused PostgreSQL/domain/race tests and full backend verification; no HTTP, physical-presence claim, public grant issuer or Live output |
-| P0 / L0.3j — catalog-aware signal authority complete, default off | ADR 0033 catalog-provenance contexts and configured facade deriving issuance permissions and rechecking new acceptance | Focused PostgreSQL/configuration/architecture tests; no public signal transport, catalog activation, moderation or Live output |
-| P0 / L0.3k — private browser route-context transport complete, default off | ADR 0034 owner-only read/bind recovery using the real configured binder, exact proxy and minimal private DTOs | Real HTTP/PostgreSQL/Valhalla, strict-input, race, quota and default-deny tests; no signal transport, UI or public Live output |
-| P0 / L0.3l — private browser signal command transport complete, default off | ADR 0035 owner-only issue/accept/withdraw through the catalog-aware facade, exact proxy and minimal private DTOs | Real HTTP/PostgreSQL/catalog/binding, replay/withdrawal, race, strict-input, quota and default-deny tests; no UI or public Live output |
-| P0 / L0.3m — implemented, default off | Bounded context/grant/receipt expiry maintenance using existing domain adapters | 5 focused tests; full 328 Java tests/check/bootJar and independent review passed; production operation remains gated |
-| P0 / L0.3n — verified | ADR 0037 actor rolling-hour and anchor/category cooldown budgets, independent bounded ledger and cleanup | Full core check/bootJar: 351 tests; database/race checks and independent review passed |
-| P0 / L1.0 — verified | ADR 0038 private assessment/suspension, bilateral block and structured report-case primitives | Domain tests and review; no public output, durable block/report store or operator workflow |
-| P0 / L1.1 — verified | ADR 0039 durable contribution restrictions with grant revision fencing | Mandatory current authority on new issuance/acceptance; retained private replay preserved; database/race validation and independent review passed |
-| P0 / L1.2 — verified | ADR 0040 private durable directed blocks and ordered account-pair authority | 363 tests/50 suites, core check/bootJar and independent review passed; no public block API or output revocation |
-| P0 / L1.3 — internal prerequisite verified | ADR 0041 scoped finite operator grants and atomic audited contribution restriction commands | 16 focused PostgreSQL tests, three value-object tests, architecture gates and independent review; full core check/bootJar: 386 tests/52 suites; strong admin authentication, grant administration and case workflows remain pending |
-| P0 / L1.3 maintenance — verified, default off | Independent bounded moderation audit/debit expiry job; isolated auth/LIVE/moderation schedulers | 8 job/config tests including profile combinations and real scheduler thread selection; full core check/bootJar: 394 tests/54 suites; final strengthened job tests passed; staging operation pending |
-| P1 / L2 prerequisite — verified | Typed private browser consent, route-context and signal clients with strict response validation, exact revisions and bounded cancellation-safe transport | 18 focused tests and independent review; full 291 TypeScript tests, web build/types/contracts pass; UI and public publication remain pending |
-| P1 / L2 consent — verified | Explicit private active-journey consent controls, uncertain-write fencing and lifecycle cancellation | 32 focused React tests; full 329 TypeScript tests/43 files, web build and independent review; scoped visual/keyboard QA; real auth and public LIVE remain gated |
-| P1 / L2 private route preparation — verified | Explicit context check/fresh bind from copied route choices and confirmed consent; synchronous lifecycle/scope invalidation and expiring acknowledgements | Full 365 TypeScript tests/45 files, workspace checks and web build; independent review plus scoped rendered QA; routing/search transport also bounded across CSRF/headers/streams; real-provider verification pending |
-| P1 / L2 route-area metadata — verified internal prerequisite | ADR 0042 optional validated curated labels with strict backward-compatible catalog loading and redacted diagnostics | Full 398 Java tests/54 suites, core check/bootJar and independent review; no owner choice API or output changes |
-| P1 / L2 route-area choice reader — verified internal prerequisite | ADR 0043 current owned-journey consent/context/restriction and catalog checks, exact bounded labeled subset and immutable minimized snapshot | Full 403 Java tests/55 suites, core check/bootJar and independent review; no Spring wiring, endpoint, grants or budget debits |
-| P1 / L2 expected-context issuance — verified internal prerequisite | ADR 0044 exact context/revision/consent tuple checked under current authority before grant/budget mutation; legacy HTTP unchanged | Full 409 Java tests/56 suites, core check/bootJar, 13 targeted tests and independent review; extra expected-path rollback/consent-race evidence and browser contract remain pending |
-| P1 / L2 choice browser boundary — verified, default off | ADR 0045 owner choice GET and explicit expected-context POST, strict browser clients/proxy, shared issuance quota and bounded Unicode responses | Full 416 Java/57 suites, 400 TS/46 files, core/web builds, workspace checks and independent review; ADR 0044 race/rollback gaps closed; no UI/public output |
-| P1 / L2 terminal signal stop — verified, default off | ADRs 0046/0047 consume a known grant or withdraw its retained receipt under one owner transaction; strict browser stop client and separate request quota | 76 focused backend tests and full 431 Java/61 suites, core check/bootJar, 420 TS/48 files and web build; independent review; no UI/public output |
-| P1 / L2 private Quick Signal controls — verified locally, default off | ADR 0048: fresh-bind-only contribution authority, exact tuple/category checks, deliberate safe intent, single issue/accept, bounded workspace recovery and explicit terminal Stop | Full `pnpm check`: 483 TypeScript tests/52 files, contracts, formatting, types, lint and web build; independent review, scoped rendered/history/Next-router QA with synthetic transport; real auth/catalog/provider/native-confirmation verification and public output remain pending |
-| P1 / L1 | Protected structured ingestion, consent authority, quota/receipt persistence and operator moderation | Authenticated HTTP and concurrent multi-replica tests before enablement |
-| P1 / L2 | Privacy-reviewed moment projection and active-journey LIVE list around the implemented private controls | Pilot data, real login and complete public UI/privacy/offline acceptance |
-| Supporting | Regional routing/search/tile provisioning and real OAuth/native readiness checks | Required pilot dependencies; retain existing journey/offline reliability |
-| Later | Map Live overlay, Ask Ahead, rooms, Pulse, Travel Waves | Separate feature/privacy gates after first-list utility is validated |
+Sequence:
 
-The completed internal slices are specified in
-`docs/features/live/QUICK_SIGNAL_DOMAIN_SPEC.md`, `SIGNAL_ADMISSION_SPEC.md`,
-`QUICK_SIGNAL_RECEIPT_SPEC.md` and `SIGNAL_COMMAND_SPEC.md`.
-Durable consent, route context and internal signal storage are specified in
-`DURABLE_CONSENT_SPEC.md`, `DURABLE_ROUTE_CONTEXT_SPEC.md`,
-`SIGNAL_STORAGE_SPEC.md`, `CONSENT_INTENT_SPEC.md`, `BROWSER_CONSENT_API_SPEC.md`,
-`ROUTE_ANCHOR_RESOLUTION_SPEC.md`, `ROUTE_BINDING_SPEC.md`,
-`CATALOG_SIGNAL_AUTHORITY_SPEC.md`, `BROWSER_ROUTE_BINDING_API_SPEC.md`,
-`BROWSER_SIGNAL_API_SPEC.md`, `LIVE_EXPIRY_MAINTENANCE_SPEC.md`, and ADRs 0026–0036. The private consent,
-route-context and signal-command transports and internal anchor
-resolver are default off; these slices do not expose
-public signal publication, confidence, moderation or a publicly visible
-Live Moment. Complete and
-verify this slice before promoting the next queue item; do not advance status for
-future features based on their plans or primitive tests.
+1. Configure Google Web and Android OAuth clients and a staging HTTPS API; run a
+   real sign-in on Android.
+2. Import and host Valhalla, Photon and tiles/styles scoped to the trunk and
+   branch corridors (add Coimbatore before Pongal); set fixed origins, bounds and
+   redacted logs.
+3. New spec: **Android Journey map** (full-screen journey mode opened from Home
+   with a "Back to journey" bar; selected route on map, foreground-only "me"
+   during an active journey, a panel slot for Spots ahead, offline and permission
+   states). Implement behind a flag.
+4. Close the native Android, routing, history and journal ledgers on 3+ physical
+   phones with a signed internal build.
 
-Server journey creation accepts only an ID and kind; validated route association
-is established separately through ADR 0032 context binding. ADR 0032 binds a fresh
-ADR 0031 result to an active owned journey,
-current consent and exact context through a durable newest-attempt fence. This
-internal path remains default off. ADR 0033 adds a configured internal signal
-facade that derives and rechecks catalog categories. ADR 0034 adds the private
-owner route-context read/bind transport. ADR 0035 adds only private owner command
-issue/accept/withdraw transport and no UI or public output.
-Existing client-selected places, route estimates or active journey ownership alone
-are not admission authority.
+The native private route preparation checkpoint (ADR 0061, commit `f5c5d7e`) is
+paused and default-off; it is not part of Phase 1. See
+[`../validation/IMPLEMENTATION_RESUME.md`](../validation/IMPLEMENTATION_RESUME.md).
 
-Private browser clients implement these owner transports under
-`BROWSER_LIVE_CLIENT_SPEC.md`. The active-journey UI now provides explicit,
-account/journey-scoped route and contribution interactions with synchronous stale
-request cancellation, truthful uncertain-write recovery and offline submission
-disabled. Public list integration still requires the publication and safety gates;
-mounting the private controls enables no server feature flags. The existing browser
-authentication transport is bounded under
-`../features/auth/BROWSER_AUTH_TRANSPORT_SPEC.md`.
+### Phase 2 — Spots and posts
 
-`BROWSER_ROUTE_BINDING_UI_SPEC.md` scopes private preparation to immutable
-endpoint/mode/alternative snapshots and current confirmed consent. A context read
-is only an observed CAS expectation, never proof of a displayed-route association.
-Binding performs a fresh server calculation, which may differ from the estimate.
-No automatic refresh/retry or offline route submission is introduced. Synchronous
-authority and selection epochs invalidate pending work and displayed confirmations.
-The routing/search transport is bounded separately under
-`../features/journey/BROWSER_ROUTING_TRANSPORT_SPEC.md`.
+Reuse:
 
-ADRs 0042/0043 provide validated labels and an internal authorized choice reader.
-ADR 0045 adds guarded owner choice transport and expected-context issuance. The
-mounted controls display only validated labels and use exact grant/receipt handling;
-they do not expose opaque anchor IDs or invent a synthetic catalog fallback. Public
-eligibility still requires the separate publication and safety decisions; route
-preparation is not physical-presence proof.
-`EXACT_CONTEXT_SIGNAL_ISSUANCE_PLAN.md` tracks ADR 0044's internal transaction-local
-precondition and regression evidence. The internal precondition now has a guarded browser contract; new
-browser callers must use the guarded expected-context path without fallback.
-`BROWSER_QUICK_SIGNAL_UI_PLAN.md` records the implemented lifecycle boundary:
-fresh-bind route authority, workspace-scoped recovery, bounded commands and
-metadata expiry, explicit dismissal and separate cancellation scopes.
+- Curated anchor catalog, loader and route-anchor matching become seeded Spots
+  and "Spots ahead" (`../features/live/ROUTE_ANCHOR_RESOLUTION_SPEC.md`,
+  `ANCHOR_DISPLAY_METADATA_SPEC.md`, ADRs 0031/0042).
+- Signal storage, idempotent commands, abuse budgets, expiry maintenance and
+  stop/withdraw become Spot signal and post infrastructure
+  (`SIGNAL_STORAGE_SPEC.md`, `SIGNAL_COMMAND_SPEC.md`, `SIGNAL_ABUSE_BUDGET_SPEC.md`,
+  `LIVE_EXPIRY_MAINTENANCE_SPEC.md`, `SIGNAL_COMMAND_STOP_SPEC.md`; ADRs 0028,
+  0036, 0037, 0046/0047). Withdraw becomes "delete my post".
+- Restrictions, blocks, audited moderation, moderator queue and grant console
+  (ADRs 0039, 0040, 0041, 0056, 0057; `DURABLE_BLOCK_POLICY_SPEC.md`,
+  `AUDITED_CONTRIBUTION_MODERATION_SPEC.md`, `V3_MODERATOR_WORKFLOW_SPEC.md`,
+  `V3_OPERATOR_GRANT_ADMIN_SPEC.md`, `DURABLE_REPORT_INTAKE_PROPOSAL.md`),
+  re-scoped from traffic summaries to posts, voice notes and chat.
+- Journey outbox and idempotency for offline posts (PRODUCT.md *Offline rule*).
+- Official alert pilot, optional, shown on Spots and the Journey (ADR 0050).
+  Extend the fixed district list from the Chennai area to the corridor districts
+  before Diwali (north-east monsoon season).
 
-Cohort publication decision checkpoint: `COHORT_PUBLICATION_DESIGN.md` in the Live
-feature directory documents the remaining block/withdrawal/differencing issues.
-Do not replace that review with a threshold-only publisher. Receipt lifecycle work
-under `QUICK_SIGNAL_RECEIPT_SPEC.md` can proceed independently; public output stays
-closed until the cohort ADR and adversarial acceptance are complete.
+New specs, in order (1, 2 and 5 are needed for Diwali):
 
-Planning update, 2026-09-12; no new functionality is claimed. Canonical behavior:
-`docs/features/live/ROUTIQO_LIVE_SPEC.md`; architectural decision: ADR 0022.
-Verified implementation remains recorded separately in `docs/quality/BUILD_STATUS.md`.
+1. **Spots** — seeding about 150–200 Spots on the trunk and branches, catalog
+   versioning, live/fade, Spots-ahead ordering, honest empty states, bounded
+   refresh per ADR 0066.
+2. **Posts and signals** — public one-tap signals (from private Quick Signals),
+   text posts, the decided per-type lifetimes on server time, "Still true?"
+   (resets to half base life, capped), "No longer true" (two distinct accounts
+   expire early), highlights ranked by confirmations, report counts, rate
+   limits.
+3. **Voice notes** — signed direct S3 upload, limits, retention, deletion and
+   report/hide.
+4. **Aliases and rooms** — server-generated random per-room aliases from a
+   curated English/Tamil-friendly word list, numbered collisions, account-level
+   blocks without revealing identity, audited moderator lookup; Spot chat and
+   the festival route room over bounded HTTP refresh
+   ([ADR 0066](../adr/0066-bounded-http-refresh-for-spot-chat.md);
+   `backend/realtime` stays scaffold only).
+5. **Pilot moderation** — report intake for posts/voice/chat, content hide
+   action (follow-up to ADR 0041), simplified time-boxed grants; see
+   [PILOT_MODERATION_RUNBOOK.md](PILOT_MODERATION_RUNBOOK.md).
 
-| Stage | Deliverable | Gate |
-|---|---|---|
-| L0 — next implementation | Pure Live Moment/Quick Signal lifecycle, enums, expiry, retry and evidence policy tests; reuse Route Updates and consent interfaces | No public data or mock auth; cohort/admission and retention design before API/migrations |
-| L1 | Owned-journey admission, consent authority, bounded structured ingestion, quotas, idempotency, cleanup, blocking/reporting/operator moderation | Auth, multi-replica, abuse and deletion verification |
-| L2 — first release | Active-journey LIVE list, moments, freshness/conflict states and deliberate Quick Signals | Reviewed regional context, real sign-in, privacy/anti-correlation and UI/offline acceptance |
-| L3 | Map markers using the same authorized situation projection | No finer-grained privacy query surface |
-| L4 | Ask Ahead | Cohort probing, recipient consent and repeat-target prevention design |
-| L5+ | Temporary rooms, evidence-backed Pulse, Travel Waves | Moderation, realtime revocation, evidence quality and participation |
+Then implement Spots read path, signals and posts, voice, moderation, chat — each
+default-off, with Ghost Mode, block, deletion and offline tests.
 
-Continue enough regional mapping and journey work to support the pilot. Full
-downloaded maps/on-device navigation, media, broad social features and AI do not
-block the first LIVE list. Preserve four tabs and existing offline journey writes.
-No crowd counts, arbitrary nearby search, free-text chat or background prompts in
-the first release. ADR 0022 lists the decisions that remain gated; L0 can proceed
-without pretending those decisions or infrastructure are complete.
+### Phase 3 — Ask Ahead and route guides
+
+Reuse: Spot and post infrastructure from Phase 2; completed journeys, journals and
+history as route-guide source material (`../features/journey/TRIP_JOURNAL_SPEC.md`).
+
+New specs:
+
+1. **Spot passage** — per the PRODUCT.md decision: location foreground service
+   with visible notification only during an active journey, balanced accuracy
+   about every 100 m / 30 s, no background-location permission, on-device match
+   against the next ~20 Spots ahead with a ~150 m pass radius; one opt-in,
+   coarse time, 24-hour deletion, outcome-code logging; prompt waits for
+   stopped/slow (under ~10 km/h for 20 s) or the next app open and expires after
+   ~30 min; battery target ~3–4% per hour measured on the Phase 1 phones.
+2. **Ask Ahead** — bounded, non-deterministic recipient selection that respects
+   blocks and avoids repeat targeting; asker never learns recipients; honest
+   no-answer state; answer summaries.
+3. **Route guides** — publishing a completed journey with journal notes and Spot
+   tips; strip exact home, office and start/end addresses; web display for
+   planning. Rename Explore to Guides when this ships.
+
+### Phase 4 — Dry runs
+
+Diwali 2026 on the reduced scope, then a December long weekend for voice notes,
+chat, Ask Ahead, prompts and guides. No new product features beyond each
+run's scope. Set exact success targets; production database, secrets,
+networking, TLS and flags; migration/backup/rollback rehearsal (including the V13
+acceptance-writer quiet period); expiry throughput and alerts; redacted monitoring;
+on-call moderator rota; privacy disclosures and retention; authenticated release QA
+and load checks.
+
+### Phase 5 — Pongal pilot
+
+Signed Android release, remote CI on the release commit, Pongal capacity plan,
+festival room windows, on-call rota, then launch on the corridors with only
+gate-passed flags enabled and measure against the success targets.
+
+### Later, not pilot
+
+Pulse, aggregate traveller counts (separate privacy review), commute rooms,
+meetups, photos, push beyond journey essentials, GPS-following guidance and
+downloaded offline maps. See PRODUCT.md.
 
 ## Historical foundation plan
 
@@ -213,6 +214,10 @@ Explore: searchable/filterable destination collection.
 Trips: durable local plans, clear empty state, edit/remove flow.
 Profile: local preferences and privacy explanation; no pretend logged-in account.
 
+_2026-09-25:_ Explore is demoted. Keep it working; curated destinations are
+replaced over time by route guides (Phase 3). Home leads with the Journey and
+Spots ahead once they exist.
+
 ## Interaction thesis
 A focused journey-planning dialog, subtle image hover affordance, and short state transitions with reduced-motion support. No decorative map or fabricated traveller counts.
 
@@ -222,8 +227,8 @@ A focused journey-planning dialog, subtle image hover affordance, and short stat
   provider contracts and migrate web rendering/adapters, then verify regional data
   services and native downloads/navigation. Android development build/device and
   regional datasets are prerequisites; Mapbox credentials are not required.
-- Live presence/rooms: anonymity thresholds, retention, trust and geographic admission need feature decisions and tests before exposure.
-- Real Android/iOS validation: no device/emulator available yet.
+- Live presence/rooms: _archived 2026-09-25._ Presence, anonymity thresholds and cohorts are out of the pilot (see `../archive/README.md`). Short temporary Spot chat and the festival route room are Phase 2, with per-room aliases, expiry, blocks and moderation.
+- Real Android/iOS validation: _superseded._ An API 36 emulator exists; physical Android devices (3+ phones) are the Phase 1 gate. iOS is not in the pilot.
 - External AI, S3 production, push, cloud deployment: require provider configuration.
 
 Offline draft persistence is implemented alongside planning; it is not postponed to a late phase. Local planning does not claim a live server journey.

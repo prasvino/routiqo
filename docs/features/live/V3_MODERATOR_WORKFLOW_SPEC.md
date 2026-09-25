@@ -2,6 +2,8 @@
 
 Status: implemented behind disabled flags for isolated staging evaluation. Real staging evaluation, production V3 activation and the ADR 0055 privacy contract remain unapproved. This workflow concerns only V3 canonical traffic summaries; it does not connect the paused person-level research or the separate private report proposal.
 
+> **Direction brief (2026-09-25):** The V3 community-traffic target is retired and archived. The separate admin login, CSRF, short session and finite permission-grant boundary are kept and simplified for the pilot moderator rota; see [PILOT_MODERATION_RUNBOOK.md](../../development/PILOT_MODERATION_RUNBOOK.md). See [PRODUCT.md](../../PRODUCT.md).
+
 ## Purpose and boundary
 
 A moderator can review bounded reports against a canonical V3 summary, record a disposition, and suppress a still-serving summary when warranted. The workflow must not reveal candidates, contributors, receipt IDs, precise routes, or reporter identities. A report is a signal for human review, never an automatic takedown. Expired or deleted projection content is explicitly unavailable for investigation; report metadata cannot stand in for evidence.

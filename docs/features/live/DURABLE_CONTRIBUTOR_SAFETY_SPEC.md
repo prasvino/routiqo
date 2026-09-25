@@ -3,6 +3,8 @@
 Status: implemented private persistence and signal enforcement; no operator API.
 This slice persists contribution suspension only; assessments remain pure values.
 
+> **Direction brief (2026-09-25):** Kept: contribution suspension now applies to Spot posts, voice notes, signals, chat and Ask Ahead answers. The link to public-evidence eligibility is retired. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Bounded scope
 
 Persist the UNASSESSED/SUSPENDED subset of ContributorAssessment in moderation-owned

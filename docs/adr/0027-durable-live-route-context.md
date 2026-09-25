@@ -3,6 +3,8 @@
 Status: accepted and implemented for internal persistence. No public route
 registration, admission issuer, signal storage or Live projection is enabled.
 
+> **Status update (2026-09-25):** Accepted — role note by the direction brief. Durable route context is kept as the store for a Journey's Spots ahead. The consent step in the lock order is retired, and long highway trips need a longer context lifetime than the 15-minute binding. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Store one latest Live route context per account in PostgreSQL. Route Update owns

@@ -2,6 +2,8 @@
 
 Status: accepted and explicitly confirmed by user, 2026-09-12; migration in progress: provider identities, web MapLibre renderer, Photon/Valhalla adapters, regional guard and opt-in runtime wiring implemented; native renderer and regional services pending.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. MapLibre/Valhalla/Photon remain the maps direction and are required for Journey and Spots. Offline rerouting and a navigation SDK are demoted because Routiqo is not a navigation competitor; the Android map is primary, and the pilot corridor is GST Road from Chennai to Trichy and Madurai. See [PRODUCT.md](../PRODUCT.md).
+
 The user selected open-source maps and requested an assessment of
 map-alternate-discussion.txt. That attachment is a proposal, not verified technical
 documentation. This decision supersedes the Mapbox preference in earlier roadmap

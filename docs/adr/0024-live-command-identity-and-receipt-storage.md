@@ -4,6 +4,8 @@ Status: accepted and implemented for internal grants, receipts, contribution slo
 budgets and cleanup (SIGNAL_COMMAND_SPEC.md, SIGNAL_STORAGE_SPEC.md and ADR 0028).
 Public signal ingestion and moment publication remain disabled.
 
+> **Status update (2026-09-25):** Accepted — role note by the direction brief. Command identity and bounded receipts remain infrastructure for Spot signals and posts. The 15-minute evidence freshness becomes per-type lifetimes (about 1–2 hours traffic/queue, about 24 hours food/fuel/restroom) with "Still true?" renewal; consent-generation binding is retired. See [PRODUCT.md](../PRODUCT.md).
+
 ## Problem
 
 QuickSignalReceipt models retry comparison and terminal state, but an in-memory
@@ -115,5 +117,5 @@ before any cached/public output; Redis Pub/Sub alone is insufficient.
    authorized merely by passing storage tests.
 
 This decision does not resolve the separate cohort publication issues described
-in COHORT_PUBLICATION_DESIGN.md. The first LIVE UI remains gated on those decisions
+in `../archive/features/live/COHORT_PUBLICATION_DESIGN.md` (archived). The first LIVE UI remains gated on those decisions
 and appropriate end-to-end verification.

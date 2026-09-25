@@ -1,8 +1,19 @@
 # Build status — 2026-09-25
 
+> **Direction change, 2026-09-25.** Routiqo was reset to Journey, Spots and Ask
+> Ahead; product direction is [`docs/PRODUCT.md`](../PRODUCT.md). The rows and
+> phase reports below remain the verified record and are not rewritten. Rows for
+> LIVE consent, private route preparation, private Quick Signal controls, public
+> LIVE prerequisites and V3 community traffic describe capabilities that were
+> built but are now **archived**: their code stays default-off and they are not
+> pilot work. Infrastructure they rely on (signal storage, abuse budgets, expiry
+> maintenance, anchor catalog and matching, blocks, restrictions, audited
+> moderation) is reused for Spots. Archived specs, ledgers and QA evidence are
+> under [`docs/archive/`](../archive/README.md).
+
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. The September 23 audit reconciles the committed reliability batches with this status; release gates below remain open.
 
-The user has now authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag. The different production privacy contract is not accepted. Person-level research is paused with its existing code/docs preserved. Traveller-derived public LIVE remains disabled in production.
+_Archived 2026-09-25:_ the user had authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag; that work is now archived and is no longer authorized pilot work. The different production privacy contract is not accepted. Person-level research is archived with its code preserved. Traveller-derived public LIVE remains disabled in production.
 
 ## September 25 account planning copy (ADR 0062)
 
@@ -85,8 +96,8 @@ Independent security review passed after a credential-await dispatch race fix.
 Android build/install/startup passed (1m45s; 467 tasks, 21 executed); Home rendered
 with no fatal startup error in the captured log. Synthetic emulator QA covered
 uncertainty/recovery, lifecycle/account isolation and 360 dp/130% text. See
-[consent evidence](evidence/native-live-consent-2026-09-24/README.md) and the
-[native LIVE ledger](../validation/NATIVE_LIVE_PENDING.md). Real OAuth/staging and
+[consent evidence](../archive/quality/evidence/native-live-consent-2026-09-24/README.md) and the
+[native LIVE ledger](../archive/validation/NATIVE_LIVE_PENDING.md). Real OAuth/staging and
 physical-device checks remain pending. Native route planning/preparation and
 Quick Signal/list controls remain subsequent work.
 
@@ -190,16 +201,16 @@ September 23 native Android journey implementation:
 
 September 23 V3 operator grant administration:
 
-- Focused PostgreSQL and admin HTTP checks passed **42 tests**, including uniform denial before target lookup, queue/action versus revocation ordering, DB-time expiry, replay after root expiry/revocation, audit capacity and audit-insert rollback. Full `:core-api:check` passed **542 Java tests/88 suites**, zero failures/errors/skips. Full `pnpm check` passed **598 tests/71 files** with contracts, formatting, typecheck and lint; the admin production build and secret scan passed. A temporary mock-upstream browser pass inspected the grant panel at desktop and 320 px; fixtures were removed. Independent adversarial review's four Medium findings were corrected and re-reviewed with no remaining concrete issue in scope. See [implementation evidence](../validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) and [real trial handoff](../validation/V3_STAGING_TRIAL_PENDING.md). Real OAuth/MFA, root bootstrap and operator trial remain unverified.
+- Focused PostgreSQL and admin HTTP checks passed **42 tests**, including uniform denial before target lookup, queue/action versus revocation ordering, DB-time expiry, replay after root expiry/revocation, audit capacity and audit-insert rollback. Full `:core-api:check` passed **542 Java tests/88 suites**, zero failures/errors/skips. Full `pnpm check` passed **598 tests/71 files** with contracts, formatting, typecheck and lint; the admin production build and secret scan passed. A temporary mock-upstream browser pass inspected the grant panel at desktop and 320 px; fixtures were removed. Independent adversarial review's four Medium findings were corrected and re-reviewed with no remaining concrete issue in scope. See [implementation evidence](../archive/validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) and [real trial handoff](../archive/validation/V3_STAGING_TRIAL_PENDING.md). Real OAuth/MFA, root bootstrap and operator trial remain unverified.
 
 September 23 V3 moderator staging workflow:
 
-- Full `:core-api:check` passed **526 tests/86 suites** with PostgreSQL integration coverage and zero failures, errors or skips; the final focused admin HTTP test also passed after origin-equivalence hardening. Full `pnpm check` passed **594 tests/70 files**, including eight admin client/proxy tests, generated contracts, formatting, typecheck and lint. The admin production build and secret scan passed. A temporary browser fixture exercised desktop and 320 px layouts, unavailable evidence, suppression failure and exact retry, dismissal and empty pagination; the fixture was removed before build. An independent adversarial review's report/review race, session expiry, origin and queue-bound findings were corrected and re-reviewed. See [staging implementation evidence](../validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) and [real trial handoff](../validation/V3_STAGING_TRIAL_PENDING.md). No real admin OAuth, grant operation or regional pilot was exercised.
+- Full `:core-api:check` passed **526 tests/86 suites** with PostgreSQL integration coverage and zero failures, errors or skips; the final focused admin HTTP test also passed after origin-equivalence hardening. Full `pnpm check` passed **594 tests/70 files**, including eight admin client/proxy tests, generated contracts, formatting, typecheck and lint. The admin production build and secret scan passed. A temporary browser fixture exercised desktop and 320 px layouts, unavailable evidence, suppression failure and exact retry, dismissal and empty pagination; the fixture was removed before build. An independent adversarial review's report/review race, session expiry, origin and queue-bound findings were corrected and re-reviewed. See [staging implementation evidence](../archive/validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) and [real trial handoff](../archive/validation/V3_STAGING_TRIAL_PENDING.md). No real admin OAuth, grant operation or regional pilot was exercised.
 
 September 23 V3 community-summary implementation:
 
-- Proposed ADR 0055 and `COMMUNITY_TRAFFIC_SUMMARY_SPEC.md` describe a distinct consented aggregation option using an actual publication snapshot, account limits and a provisional 12/10/80% staging rule. They explicitly retain residual participation inference and do not claim DP, legal anonymity, approval or real utility. The owner-selected ADR 0053/0054 research path and its four public-protocol P1 findings remain open.
-- The owner subsequently authorized full V3 implementation and staging evaluation behind disabled production flags. Sequential `:core-api:check` passed **514 Java tests/85 suites**; `pnpm check` passed **586 TypeScript tests/68 files**, generated-contract drift, formatting, typecheck and lint; the web production build and secret scan passed. Browser Share/report/Stop/recovery/offline interactions and the final server-time feed were rendered with temporary simulated-transport fixtures, removed before build. See [staging implementation evidence](../validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) for exact coverage, synthetic utility and open release gates.
+- Proposed ADR 0055 and `COMMUNITY_TRAFFIC_SUMMARY_SPEC.md` (now archived) describe a distinct consented aggregation option using an actual publication snapshot, account limits and a provisional 12/10/80% staging rule. They explicitly retain residual participation inference and do not claim DP, legal anonymity, approval or real utility. The owner-selected ADR 0053/0054 research path and its four public-protocol P1 findings remain open.
+- The owner subsequently authorized full V3 implementation and staging evaluation behind disabled production flags. Sequential `:core-api:check` passed **514 Java tests/85 suites**; `pnpm check` passed **586 TypeScript tests/68 files**, generated-contract drift, formatting, typecheck and lint; the web production build and secret scan passed. Browser Share/report/Stop/recovery/offline interactions and the final server-time feed were rendered with temporary simulated-transport fixtures, removed before build. See [staging implementation evidence](../archive/validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) for exact coverage, synthetic utility and open release gates.
 
 September 23 internal frozen Share foundation:
 
@@ -209,7 +220,7 @@ September 23 internal frozen Share foundation:
 
 September 23 public LIVE protocol design pass:
 
-- ADR 0054 and the focused protocol spec now describe a candidate irreversible explicit Share input and fixed whole-pilot transcript. An independent engineering adversarial review did **not** approve implementation or public release. It found four open P1 areas: commit/window sealing and deadline dependence, stable person identity across deletion, consent/retention compatibility, and operational/delivery transcript rules. Two P2 document defects were corrected. See [review findings](../validation/PUBLIC_LIVE_PROTOCOL_REVIEW_2026-09-23.md).
+- ADR 0054 and the focused protocol spec now describe a candidate irreversible explicit Share input and fixed whole-pilot transcript. An independent engineering adversarial review did **not** approve implementation or public release. It found four open P1 areas: commit/window sealing and deadline dependence, stable person identity across deletion, consent/retention compatibility, and operational/delivery transcript rules. Two P2 document defects were corrected. See [review findings](../archive/validation/PUBLIC_LIVE_PROTOCOL_REVIEW_2026-09-23.md).
 - That earlier design pass changed documentation only. The subsequent disconnected V22 foundation is described separately above. No flag was enabled, no V18 intent was migrated, and no publisher/reader or real-density utility was established. Traveller-derived public LIVE remains disabled.
 
 September 23 status reconciliation:
@@ -260,7 +271,7 @@ Latest private Quick Signal UI pass, 2026-09-19:
   journal coexistence and fragment navigation. An isolated Next.js fixture verified
   Link/Back cancellation and confirmed SPA departure; native confirmation decisions
   and transport/account data were simulated. Independent review approved after
-  correcting history and hash navigation. See [scoped QA and limitations](PRIVATE_QUICK_SIGNAL_UI_QA.md)
+  correcting history and hash navigation. See [scoped QA and limitations](../archive/quality/PRIVATE_QUICK_SIGNAL_UI_QA.md)
   and [ADR 0048](../adr/0048-private-browser-signal-recovery.md).
 - Secret scan and diff checks passed. Backend code was unchanged; the prior
   **431 Java tests/61 suites** remain the latest backend evidence, not a rerun.
@@ -365,7 +376,7 @@ Latest private route UI and routing transport pass, 2026-09-19:
 - Actual components were exercised in a labelled simulated-transport fixture:
   desktop/390/320 layouts, keyboard focus, route choice, bound/empty/conflict,
   pending Stop and offline/reconnect behavior. This is not live-provider or OAuth
-  verification. See [QA evidence](PRIVATE_ROUTE_PREPARATION_UI_QA.md).
+  verification. See [QA evidence](../archive/quality/PRIVATE_ROUTE_PREPARATION_UI_QA.md).
 
 Latest moderation maintenance pass, 2026-09-19:
 
@@ -391,7 +402,7 @@ Latest private consent UI pass, 2026-09-19:
 - Independent review approved after strengthening foreground result acceptance.
   Desktop/390 px/320 px fixture rendering, 44 px targets, keyboard focus and
   check/allow/stop/offline states verified. This was simulated transport UI QA,
-  not real OAuth/end-to-end proof. See [QA evidence](PRIVATE_CONSENT_UI_QA.md).
+  not real OAuth/end-to-end proof. See [QA evidence](../archive/quality/PRIVATE_CONSENT_UI_QA.md).
 
 Latest moderation pass, 2026-09-19:
 
@@ -462,63 +473,34 @@ expired rows while retaining the future-debit protection assertion.
 The final complete run includes that correction and the added cleanup/writer race.
 This backend-only phase did not rerun the unchanged frontend checks above.
 Historical phase evidence is preserved in the
-[verification archive](BUILD_STATUS_HISTORY_2026-09-19.md).
+[verification archive](../archive/quality/BUILD_STATUS_HISTORY_2026-09-19.md).
 
 No public LIVE publishing, feature activation, real OAuth/provider/device QA,
 production deployment, user database migration, push or timer was performed.
 Default-off private endpoints remain default off. No synthetic data was presented
 as real LIVE activity.
 
-## Pending, in dependency order
+## Pending: path to the Pongal pilot
 
-1. **Public LIVE privacy contract.** ADR 0054 proposes an irreversible explicit
-   Share commit and frozen whole-pilot input under ADR 0053's candidate person-level
-   bound. It is not approved or implemented: current V18 Stop semantics, browser
-   disclosure and deletion behavior conflict with it. Stable person identity,
-   source-independent timing/failure behavior, real-density utility and independent
-   adversarial whole-transcript review remain required before any public projection.
-2. **Reporting, moderation and safe delivery.** Resolve canonical evidence
-   references, current authorization/lock ordering and useful investigation
-   retention before durable report intake. Internal scoped operator permissions
-   and atomic audited restriction actions now exist; add strong administrative
-   authentication, controlled grant administration, queue/case scope and revocation
-   propagation. Public targeting and operational operator workflows remain pending.
-3. **Actual LIVE interface.** Private consent, route preparation and private Quick
-   Signal contribution/recovery controls are implemented. Implement approved moment reads/list,
-   one foreground request in flight, stale/suppressed/conflicting/offline states,
-   account/journey clearing and exact explicit retry. Public output depends on the
-   first two gates; private controls are not a working public LIVE release.
-4. **Journey and UI release reliability.** The batch 01–04 local web regressions
-   and fixes above are complete. Broader cross-device restoration (refused actions can now be
-   explicitly discarded on web, ADR 0063); authenticated journal/history/backup QA; storage failures,
-   interrupted writes, account switches, large text, reduced motion and screen
-   readers still need release evidence. Existing local plans remain separate from
-   server journeys.
-5. **Native integration.** Redirect-safe network transport, Google UI/challenge and
-   vault coordination, authenticated resources/reconnect dispatch, native MapLibre
-   are implemented with debug APK and unconfigured-service emulator smoke evidence. Complete real OAuth/TLS/maps and physical-device verification. Run Android doctor to establish
-   current machine readiness; do not rely on historical missing-tool lists.
-6. **External configuration and operations.** Real Google OAuth and staging login;
-   controlled regional Valhalla/Photon/tiles and reviewed anchor catalog; production
-   databases/secrets/network/domain/TLS; migration/backup/rollback tests, operated
-   cleanup capacity, monitoring, remote CI and gradual pilot rollout. Mapbox tokens
-   are not required by the selected open-source direction.
-7. **Later product phases.** GPS-following guidance and downloaded offline maps,
-   rooms/realtime, map LIVE overlay, Ask Ahead, Pulse, reminders/push, media/sharing
-   and AI. Existing web route directions are memory-only, not offline navigation.
+Pending work follows the five phases in [`PRODUCT.md`](../PRODUCT.md). The
+checklist is [`todo.md`](../../todo.md); the engineering sequence, reused specs and
+specs still to write are in [`BUILD_PLAN.md`](../development/BUILD_PLAN.md).
 
-## Next implementation reference
+1. **Foundations.** Real Google sign-in (web and Android OAuth clients), staging
+   HTTPS, hosted corridor Valhalla/Photon/tiles, an Android Journey map, and the
+   native Android, routing, history and journal ledgers closed on 3+ physical
+   phones.
+2. **Spots and posts.** Seeded corridor Spots (from the anchor catalog), public
+   one-tap signals, text posts, voice notes, per-type expiry, per-room aliases,
+   Spot chat and festival room, report/hide moderation. Gate: 10 testers post
+   on a real highway trip.
+3. **Ask Ahead and route guides.** Spot-passage opt-in, post-passing prompt with
+   driver safety, Ask Ahead, route guides with address stripping.
+4. **Dry run.** Success targets, production operations, on-call moderation,
+   disclosures, release QA.
+5. **Pongal pilot.** Signed Android release and launch on GST Road (Chennai to
+   Trichy/Madurai, plus Kilambakkam).
 
-Start with the current task and load only the relevant documents:
-
-- [LIVE scope](../features/live/ROUTIQO_LIVE_SPEC.md),
-  [publication design](../features/live/COHORT_PUBLICATION_DESIGN.md) and
-  [report intake proposal](../features/live/DURABLE_REPORT_INTAKE_PROPOSAL.md).
-- [Private LIVE client contract](../features/live/BROWSER_LIVE_CLIENT_SPEC.md)
-  and the implemented [Quick Signal lifecycle checkpoint](../features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md).
-  Existing server ADRs and default-off gates still apply.
-- [Journey transport](../features/journey/BROWSER_JOURNEY_TRANSPORT_SPEC.md),
-  [journal transport](../features/journey/BROWSER_JOURNAL_TRANSPORT_SPEC.md) and
-  [dispatch](../features/journey/DISPATCH_SPEC.md) before extending recovery.
-- [Execution queue](../development/BUILD_PLAN.md) and the root
-  [status and completion requirements](../../todo.txt).
+Paused work: the native private route preparation checkpoint (ADR 0061) is
+described in [`IMPLEMENTATION_RESUME.md`](../validation/IMPLEMENTATION_RESUME.md).
+Nothing in this list is implemented until a dated report above records it.

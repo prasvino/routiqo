@@ -1,130 +1,241 @@
 # Routiqo TODO
 
-## First release — privacy and publication
+Release checklist for the Pongal pilot. Product scope, phase goals and gates come
+from [`docs/PRODUCT.md`](docs/PRODUCT.md); the engineering sequence per phase is in
+[`docs/development/BUILD_PLAN.md`](docs/development/BUILD_PLAN.md). Only
+[`docs/quality/BUILD_STATUS.md`](docs/quality/BUILD_STATUS.md) records verified
+behaviour: tick an item here only when its evidence is recorded there or in the
+matching `docs/validation/*_PENDING.md` ledger.
 
-Detailed traveller-derived public LIVE release ledger: [`docs/validation/PUBLIC_LIVE_PENDING.md`](docs/validation/PUBLIC_LIVE_PENDING.md). Keep validation evidence there as each gate closes.
+**Timeline (decided 2026-09-25):** Diwali 2026 (outbound rush 5–7 November) is the
+**dry run** on a reduced scope with friends and early testers;
+Pongal 2027 (tentatively 8–14 January, to be finalised) is the **public launch**. A second, smaller dry run on a December long
+weekend covers what Diwali leaves out. See PRODUCT.md *Pilot* and *Decisions*.
 
-The [V3 real staging trial handoff](docs/validation/V3_STAGING_TRIAL_PENDING.md) separates remaining engineering work from OAuth, regional-data, operator, pilot and review dependencies. The V3 moderator workflow and controlled operator grants under [ADR 0056](docs/adr/0056-v3-moderator-staging-boundary.md) and [ADR 0057](docs/adr/0057-v3-operator-grant-administration.md) are implemented behind disabled flags; real staging validation and production approval remain open.
+**Corridors (decided):** trunk Chennai (incl. Kilambakkam) → Chengalpattu →
+Tindivanam → Villupuram → Ulundurpet → Perambalur → Trichy on GST Road, with
+branches Trichy → Thanjavur, Trichy → Madurai → Tirunelveli and Madurai →
+Tuticorin, for both Diwali and Pongal. Chennai → Krishnagiri → Salem → Coimbatore
+is added for Pongal. Android on physical devices is the primary client; web
+serves route guides and planning.
 
-**Production Public LIVE policy decided ([ADR 0065](docs/adr/0065-public-live-v1-policy.md), 2026-09-25): provider/private-only for V1. ADR 0055 is authorized only for closed, consented staging experimentation. ADR 0054 research is paused.** Community-derived public LIVE is off and must fail closed; empty LIVE is acceptable, misleading or manipulable LIVE is not.
+## Diwali dry-run critical path (needed by about 1 November 2026)
 
-- [x] Implement private dual-review verified-person authority and an explicit per-receipt public-purpose intent ledger; neither is a public LIVE release.
-- [x] Add default-off purpose-specific share/Stop transport, account-wide retained Stop recovery, private candidate evaluation and bounded cleanup foundations; no traveller moment is public.
-- [x] ~~Independently approve a complete transcript-level privacy protocol (ADR 0054).~~ Paused as research by ADR 0065; retained, no further implementation effort unless reopened.
-- [x] Authorize end-to-end V3 community-summary implementation and staging evaluation behind a disabled production flag; pause and preserve the person-level research code/docs.
-- [x] Implement V3 candidate/debit, Share/Stop/recovery, snapshot publisher, canonical reader/report, internal audited suppression, cleanup, contracts and active-journey web controls. [Staging evidence](docs/validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md) records PostgreSQL, browser-fixture and full build checks; production flags remain off.
-- [x] Implement a separately flagged V3 moderator staging workflow: independent admin authentication, finite permission checks, bounded queue, audited dismissal/suppression, cleanup, generated contracts and UI. [Runbook](docs/development/V3_MODERATOR_STAGING_RUNBOOK.md) records the real trial prerequisites.
-- [x] Implement separately flagged V3 operator grant administration: exact-account finite issue/revoke, current grant-administrator authority, minimized audit, cleanup, contracts and admin UI. The [grant runbook](docs/development/V3_OPERATOR_GRANTS_STAGING_RUNBOOK.md) keeps root provisioning and real operation pending.
-- [ ] Finish authenticated regional staging, real moderator OAuth/MFA and named finite-grant operation, density/accuracy and output-age measurements, restore/failover/device QA and retention/backup operations before considering V3 production activation.
-- [x] Decide the V1 public LIVE policy: Option C in production, ADR 0055 as a closed staging experiment, ADR 0054 paused (ADR 0065; [decision document](docs/features/live/PUBLIC_LIVE_PRIVACY_DECISION.md)).
+Everything else waits until after Diwali. Items below are also listed in their
+phase.
 
-### ADR 0055 closed pilot (experimental; never production without a separate explicit decision)
+- [ ] Phase 1 gate: real Google sign-in, hosted maps/routing for the corridors, full journey on 3+ physical Android phones.
+- [ ] Android Journey map with Spots ahead (full-screen journey mode from Home).
+- [ ] ~150–200 seeded Spots on the trunk and branches, with a named curator.
+- [ ] Public one-tap signals and short text posts; per-type expiry; "Still true?" and "No longer true".
+- [ ] Bounded HTTP refresh for Spot content (ADR 0066); offline rule for queued signals and posts.
+- [ ] Ghost Mode stops all sending; delete my post; account deletion covers posts and signals.
+- [ ] Report/Block on every item; moderator hide; admin login and a named, time-boxed moderator rota for the dry run.
+- [ ] Rate limits, stricter for new accounts.
+- [ ] Official alerts shown on Spots and the Journey for the corridor districts (north-east monsoon season).
+- [ ] Minimal staging deployment, monitoring and rollback for the dry-run testers.
 
-- [x] P0: Prove community-derived public LIVE fails closed: every backend, publisher, maintenance, admin, proxy and UI flag is off when missing, malformed or ambiguous; no endpoint, job, fallback, debug route or tool exposes it while off. Automated tests. Done: `FeatureFlags`/`@ConditionalOnExactlyTrue` on all 13 gated beans, strict security-chain parsing, backend HTTP tests with `TRUE`/`1`/`yes`, web proxy test, ArchUnit guard.
-- [x] P1: Withdrawal suite at 100%: Stop, Ghost Mode, journey completion, account deletion and restriction/verification revocation before the snapshot exclude a candidate; after it they never redraw a summary. Copy says so truthfully. Automated suite passes in PostgreSQL (before and after snapshot for each action, plus verification revocation); real staging run pending.
-- [x] P1: Contribution isolation and daily quota enforced by database constraints under concurrency (one account per window; 12/day; retries never debit twice; UTC day boundary). Concurrency and UTC-day tests pass in PostgreSQL.
-- [x] P1: Publication threshold boundaries (11 accounts, 9 agreeing, 79% agreement) produce `NO_OUTPUT`; never below 12/10/80%. Boundary tests pass.
-- [x] P1: API and telemetry leakage checks: no contributor IDs, counts, coordinates, individual timestamps or raw metadata in responses, logs, analytics, traces or metrics. Exact field-set tests, redacted `Candidate`, and a log source scan; no analytics/tracing exists yet, so re-check when added.
-- [ ] P1: Adversarial/Sybil suite: coordinated accounts, repeated account creation, synchronized false signals, deletion/recreation, rapid identity switching, replay, concurrent submissions, quota bypass, verification deletion races and window-boundary attacks fail safe. No additional identity collection (ADR 0065). Partly covered: unverified-account flood, one active verification per person, concurrent submissions and quota races. Now also covered in PostgreSQL: verified collusion bounds, re-verification churn (one vote per person per window), late dissent and window-boundary timing. Still open: person-keyed daily quota (proposal in `docs/features/live/ADR0055_PILOT_MEASUREMENT_PROTOCOL.md`) and a staging red-team run.
-- [ ] P2: Pilot metrics without privacy leakage: coverage (target at least 20% of eligible peak windows), correctness (at least 95%), dangerous false reassurance (0%, separate from false congestion), freshness (at least 95%), plus Share/aggregation/publication/read/Stop/cleanup latency. Measurement protocol proposed (reference source, class bands, DFR/FC definitions, minimum evidence of 300 summaries): `docs/features/live/ADR0055_PILOT_MEASUREMENT_PROTOCOL.md`; awaiting owner approval.
-- [ ] P2: Pilot comprehension study: at least 90% understand optional sharing, Stop/Ghost semantics, aggregation, no public identity, no absolute anonymity and irreversibility of published summaries.
-- [ ] Future: privacy-preserving `ParticipationEligibility` (one legitimate traveller, bounded influence) without an identity database. Not built until needed.
-- [ ] Separate explicit production decision after reviewing privacy, correctness, false reassurance, abuse/red-team, Sybil, withdrawal, comprehension, performance, observability privacy and incident/rollback evidence.
-- [x] Choose the policy after ADR 0052's rejected immutable-window follow-up: user selected a measurable person-level guarantee. ADR 0053 is a proposed whole-pilot DP design; its isolated sampler and disconnected V21 person claim need full protocol integration and review. No public reader or flag is authorized.
-- [ ] Build independently authenticated operator case/grant provisioning, document-review operations, maintenance scheduling and retention review for verified contributors.
+New capabilities ship default-off behind flags until their phase gate passes.
+Cloud agent sessions have no Android SDK or device: record device checks as
+pending, never as passed.
 
-- [x] Implement the separate default-off Chennai district official-alert pilot: bounded NDMA CAP reader, owner-only active-journey API, browser list and explicit source/freshness states. This does not satisfy the traveller publication items below.
-- [ ] User-led staging validation of the official-alert pilot is deferred; follow the checklist and record results in `docs/features/live/PROVIDER_LIVE_PILOT_SPEC.md` before activation.
+## Phase 1 — Foundations
 
-Earlier generic publication items are superseded by the ADR 0055 pilot tasks above for community traffic. Live Moments beyond traffic summaries need their own future decision.
+Gate: the app installs and runs a full journey (sign in, plan, start, travel,
+complete, see history) on **3 or more physical Android phones** against the hosted
+staging services.
 
-## First release — reporting, moderation and abuse prevention
+Already done (engineering evidence in BUILD_STATUS and the native ledgers):
 
-- [x] Implement the V3-only default-off moderator queue and canonical report review/suppression workflow under ADR 0056; real operator trial remains pending.
-- [x] Implement the V3-only default-off controlled grant console under ADR 0057; out-of-band root bootstrap, supervision and real operator trial remain pending.
-- [ ] Define and implement evidence eligibility and anti-Sybil safeguards.
-- [x] Resolve canonical reporting evidence identity, reference authorization, exact retries after revocation and shared transaction lock order. Approved and implemented for V3 under ADR 0064 (receipt-first retry, 7/30-day retention split, 10-per-24h quota, UNSAFE-first queue).
-- [x] Define what moderators can investigate after source evidence expires, with explicit bounded retention: V3 groups close automatically as `CLOSED_EVIDENCE_UNAVAILABLE`; reporter-free counts stay 30 days (ADR 0064). Production retention/backup approval remains under operations.
-- [ ] Implement durable report intake after its authority and investigation contracts are approved.
-- [ ] Add strong administrative authentication, controlled grant administration, case/target scope and the operator queue around the internal audited restriction boundary.
-- [ ] Establish operator alerts, supervision, appeals and approved audit/backup retention; activate and verify bounded moderation cleanup in staging.
-- [ ] Connect private blocking to authorized public targets and safe delivery.
-- [ ] Propagate revocation across reads, derived data, caches and future delivery channels; deny access when authority is unavailable.
-- [ ] Verify multi-user, concurrent, replay, abuse and revocation scenarios and document the operator reporting workflow.
+- [x] Bounded, redirect-safe Android authenticated transport and owner-scoped native journey API.
+- [x] Google challenge binding and sign-in UI, secure-vault coordination, session renewal and coordinated logout/deletion.
+- [x] Authenticated journey resources, durable native reconnect dispatch and exact blocked-command recovery.
+- [x] MapLibre regional basemap preview in the Android development client (no GPS or route geometry yet).
+- [x] Android doctor prerequisites (API 36, build-tools, command-line tools, JDK 17) and API 36 emulator.
+- [x] x86_64 debug build and unconfigured-service emulator smoke test ([native Android ledger](docs/validation/NATIVE_ANDROID_PENDING.md)).
+- [x] Native account history: fixed 20-row owner history, strict transport, latest/earlier/retry and session-fenced pages.
+- [x] Native journal browsing and durable editing (synthetic emulator evidence only).
+- [x] Native place search, route alternatives and manual directions behind default-off flags.
 
-## First release — LIVE interface
+Google sign-in configuration:
 
-- [ ] Verify the private consent, route-preparation and Quick Signal controls through the real authenticated lifecycle with a reviewed catalog and provider configuration.
-- [ ] Build the active-journey LIVE list after publication and safety gates pass.
-- [ ] Add bounded foreground refresh with cancellation, backoff and one request in flight.
-- [ ] Provide loading, empty, error, suppressed, conflicting, stale and offline states with truthful source/freshness information.
-- [ ] Keep offline LIVE rows in memory, expire stale rows and disable offline submission.
-- [ ] Clear LIVE state on Ghost Mode, account changes and journey completion; reauthorize on reconnect.
-- [ ] Handle uncertain writes through exact explicit retries without automatically publishing old observations.
-- [ ] Verify authenticated lifecycle, account switching, expiry, revocation, accessibility and small-screen behavior.
+- [ ] Configure the Google project, consent screen, Web OAuth client (server audience) and approved web origins with account-owner access ([setup](docs/development/GOOGLE_OAUTH_SETUP.md)).
+- [ ] Register the Android OAuth client for `com.routiqo.app` with debug and release signing SHA-1 fingerprints; add staging test accounts.
+- [ ] Supply required secrets through local/deployment secret configuration; keep them out of client bundles.
+- [ ] Verify real sign-in, renewal, logout, expired sessions and recent-auth account deletion on Android and through the staging browser/proxy boundary.
 
-## First release — Google sign-in configuration
+Hosted maps and routing (corridor-scoped):
 
-- [ ] Configure the Google project, OAuth client/audience, consent screen and approved origins/redirects with account-owner access.
-- [ ] Supply required secrets through local/deployment secret configuration.
-- [ ] Verify real sign-in, renewal, logout, expired sessions and recent-auth account deletion through the staging browser/proxy boundary.
-
-## First release — regional maps and catalog
-
-- [ ] Select the pilot region/corridor and review dataset coverage, provenance, licensing, updates, storage and import requirements.
+- [ ] Review OSM/dataset coverage, provenance, licensing, update cadence, storage and import for the trunk and branch corridors (Chennai incl. Kilambakkam to Trichy, Thanjavur, Madurai, Tirunelveli and Tuticorin); add Chennai–Coimbatore before Pongal.
 - [ ] Provision controlled Valhalla, Photon and tile hosting, including MapLibre styles, sprites and glyphs.
-- [ ] Configure fixed service origins, geographic bounds, internal-service protection and redacted provider/proxy logs.
-- [ ] Build and review a versioned LIVE anchor/category catalog and endpoint-exclusion rules.
-- [ ] Validate real routing, alternatives, search, attribution, coverage failures, outages, egress behavior and regional updates.
+- [ ] Configure fixed service origins, corridor geographic bounds, internal-service protection and redacted provider/proxy logs.
+- [ ] Validate real routing, alternatives, search, attribution, coverage failures, outages, egress behaviour and regional updates.
+- [ ] Supply a reachable staging HTTPS API (`persistence,google-auth,native-auth`, database, rate secret, valid certificate, reviewed proxy).
 
-## First release — journey reliability and quality
+Android Journey map:
 
+- [ ] Author the Android Journey map spec (full-screen journey mode opened from Home with a persistent "Back to journey" bar; route on map, "me", Spots-ahead panel slot, offline and permission states).
+- [ ] Implement selected-route display and explicit, foreground-only location permission during an active journey; no background tracking and no real location requested in agent QA.
+
+Journey reliability (Android first):
+
+- [ ] Verify SQLite/SecureStore restart, account isolation, backup behaviour, location denial, accessibility, performance and unreliable networks on real devices.
 - [ ] Complete broader cross-device restoration and unresolved-conflict recovery without overwriting pending local work.
-- [x] Let travellers explicitly discard a server-refused journey start/finish after a fresh server check shows it cannot apply (ADR 0063, web). See `docs/features/journey/OUTBOX_CONFLICT_RESOLUTION_SPEC.md`; native Android controls and real two-device sign-in QA remain.
-- [x] Implement the explicit, default-off account planning copy (ADR 0062): owner-only save/check/add/remove of plans and saved places with CAS, exact retry and merge-only restore on web. See `docs/features/journey/ACCOUNT_PLANNING_BACKUP_SPEC.md`.
+- [x] Web: explicitly discard a server-refused journey start/finish after a fresh server check (ADR 0063; `docs/features/journey/OUTBOX_CONFLICT_RESOLUTION_SPEC.md`). Native Android controls and real two-device sign-in QA remain.
+- [x] Web: explicit, default-off account planning copy (ADR 0062; `docs/features/journey/ACCOUNT_PLANNING_BACKUP_SPEC.md`).
 - [ ] Validate the account planning copy with real Google sign-in across two devices on HTTPS staging, then add native Android controls on the same contract.
+- [x] Web journey sync scenario tests: lost/delayed responses, duplicate taps, competing tabs, network flap, account switch mid-request, storage failure (`tests/journey-network-resilience.test.ts`). Real-network, two-device and native runs remain.
+- [x] Web recovery flows across two simulated devices sharing one server (`tests/journey-recovery-flows.test.ts`). Native and real-sign-in runs remain.
 - [ ] Test delayed responses, duplicate commands, network flaps, interrupted writes and unavailable storage across accounts/devices.
-- [x] Cover web journey sync with deterministic scenario tests against the server's idempotency rules: lost and deadline-delayed responses, duplicate taps and competing tabs, a network flap with backoff and FIFO order, a delayed response across an account switch, and storage failing during acknowledgement (`tests/journey-network-resilience.test.ts`). Real-network, two-device and native runs remain.
-- [ ] Verify journal conflicts, navigation protection, older history, summary completeness and backup/restore with real sign-in.
-- [ ] Verify authenticated planning flows, keyboard/focus behavior, small screens, large text, reduced motion and storage-failure recovery.
-- [x] Signed-out web planning pass (synthetic API): keyboard/focus, 320 px reflow, 360 px at 130% zoom and 200% text, reduced motion and storage-failure recovery; fixed focus loss after removing a plan, the unannounced journey-type group and raw storage exception copy. See `docs/quality/evidence/planning-accessibility-2026-09-25/`. Authenticated flows, screen readers and native remain.
 - [ ] Confirm supported recovery flows preserve acknowledged work, account isolation and exact replay semantics.
-- [x] Confirm the web recovery flows end to end across two simulated devices sharing one server (`tests/journey-recovery-flows.test.ts`): history restore beside unsent work, exact finish replay after another device finished, discard of a start refused because another device started a journey, reconcile of an applied action (discard refused), re-authentication without cross-account release, and account isolation and deletion on a shared device. Native and real-sign-in runs remain.
+- [ ] Complete native history and journal checks with real sign-in on physical devices ([history ledger](docs/validation/NATIVE_HISTORY_PENDING.md), [journal ledger](docs/validation/NATIVE_JOURNAL_PENDING.md)).
+- [ ] Complete native routing checks against the hosted services ([routing ledger](docs/validation/NATIVE_ROUTING_PENDING.md)).
 
-## Android release
+Android builds and devices:
 
-- [x] Implement the bounded, redirect-safe Android authenticated transport and owner-scoped native journey API.
-- [x] Implement Google challenge binding and sign-in UI, secure-vault coordination, session renewal and coordinated logout/deletion.
-- [x] Mount authenticated journey resources, durable native reconnect dispatch and exact blocked-command recovery.
-- [x] Integrate MapLibre as an explicit regional basemap preview in the Android development client; GPS and route geometry are separate future work.
-- [x] Run `scripts/android-doctor.ps1` and resolve API 36, build-tools, command-line tools and JDK 17 prerequisites; API 36 emulator configured.
-- [x] Finish the x86_64 Android debug build and unconfigured-service emulator smoke test; APK/hash, screenshots and results are in [native pending ledger](docs/validation/NATIVE_ANDROID_PENDING.md). Real OAuth, staging, map resources and physical-device validation remain open there.
-- [ ] Supply the recommended staging Google OAuth registration, HTTPS API, regional map resources and test identities; complete the real authenticated trial.
-- [ ] Verify SQLite/SecureStore restart, account isolation, backup behavior, location denial, accessibility, performance and unreliable networks on real devices.
-- [ ] Produce a signed release candidate and complete device QA.
+- [ ] Produce a signed internal test build with the owner's release key; verify its fingerprint against the Android OAuth registration.
+- [ ] Run the full-journey gate on 3+ physical Android phones spanning low-end and mid-range devices, small screens and large text; record device, Android version, memory and latency.
 
-## First release — operations and deployment
+## Phase 2 — Spots and posts
 
-- [ ] Configure production PostgreSQL/PostGIS, required caches, secrets, networking, domain/TLS, runtime profiles and feature gates with operator access.
-- [ ] Validate migrations, backup restoration and rollback in staging, including the V13 acceptance-writer quiet-period requirement.
-- [ ] Validate expiry maintenance throughput and backlog before activation; establish failure and capacity alerts for the intended replica count.
-- [ ] Establish redacted monitoring, health checks, incident ownership and moderation procedures.
-- [ ] Finalize privacy disclosures, deletion policies and backup retention.
-- [ ] Verify remote CI on the actual release commit.
+Gate: **10 testers complete a real highway trip on the corridor and post.**
+
+Specs to author before building (each names data, authorization, privacy, offline
+and failure boundaries):
+
+- [ ] Spots: seeding, catalog versioning, "live" state and fade, Spots-ahead ordering.
+- [ ] Posts and one-tap signals: types, the decided lifetimes (60 min / 2 h traffic and queue signals; 90 min / 3 h traffic and incident posts; 24 h / 36 h food, fuel, restroom and Good/Avoid), "Still true?" (resets to half base life, one per account, not the author), "No longer true" (two distinct accounts expire early), highlights ranked by confirmations, delete-my-post.
+- [ ] Voice notes: signed direct S3 upload, size/duration limits, retention, deletion, report/hide.
+- [ ] Spot passage: on-device detection per the PRODUCT.md decision (foreground service during an active journey, balanced accuracy ~100 m / 30 s, next ~20 Spots ahead, ~150 m pass radius, no background-location permission), opt-in, coarse time, 24-hour deletion, outcome-code logging.
+- [ ] Aliases and rooms: server-generated random per-room aliases from a curated English/Tamil-friendly word list, numbered collisions, account-level blocks without revealing identity, audited moderator lookup; Spot chat and festival route room lifetime.
+- [x] Spot chat transport decided: bounded foreground HTTP refresh ([ADR 0066](docs/adr/0066-bounded-http-refresh-for-spot-chat.md)).
+
+Spots:
+
+- [ ] Seed about 150–200 Spots on the trunk and branches (tolls, major eateries, fuel, restrooms, bus stands, Kilambakkam), weighted to the trunk, by reusing the curated anchor catalog format, loader and route-anchor matching; record curator and provenance. Add Coimbatore-trunk Spots before Pongal.
+- [ ] Show Spots ahead on the Android Journey map, ordered by distance along the route, appearing automatically on journey start.
+- [ ] Spot reads: authenticated, authorized per object, bounded foreground refresh with cancellation, backoff and one request in flight.
+- [ ] Loading, empty, error, stale and offline states with truthful source and freshness; honest empty Spots, never faked activity.
+
+Contribution:
+
+- [ ] Public one-tap signals on Spots, evolved from private Quick Signals (reuse signal storage, idempotent commands, abuse budgets, expiry maintenance; withdraw becomes "delete my post").
+- [ ] Short text posts on Spots.
+- [ ] Voice notes via signed direct S3 uploads, recorded only by explicit action.
+- [ ] Per-type expiry on server time with the decided lifetimes, "Still true?" and "No longer true", and top tips becoming highlights after expiry.
+- [ ] Report counts allowed ("3 reports in 20 min"); traveller counts not shown.
+- [ ] Offline rule: posts, signals and answers queue in the journey outbox with capture time and idempotency key; the server rejects items past their lifetime; cached Spot content is labelled stale and dropped at expiry.
+- [ ] Rate-limit posts, voice uploads, signals, "Still true?" and reports; stricter limits for new accounts.
+
+Privacy and identity:
+
+- [ ] Per-room aliases; no follower graph, no private DMs; aliases never embed account identifiers.
+- [ ] Ghost Mode stops **all** sending (posts, signals, Spot passage, queued outbox items) and takes priority over reconnect and replay.
+- [ ] Clear Spot state on Ghost Mode, account changes, sign-out and journey completion; reauthorize on reconnect.
+- [ ] Account deletion removes the user's posts, voice notes, signals, answers and route guides; users can delete their own posts.
+- [ ] Spot chat for each Spot and a festival route room per corridor for the event window, over bounded HTTP refresh (ADR 0066). Not needed for Diwali.
+
+Moderation (re-scoped to posts, voice notes and chat; see the
+[pilot moderation runbook](docs/development/PILOT_MODERATION_RUNBOOK.md)):
+
+- [x] Default-off moderator queue, audited review/suppression and controlled grant console exist (ADRs 0056/0057); reuse them rather than rebuild.
+- [ ] Report and Block on every post, voice note and chat message; report reasons include business promotion, false alarm, abuse (Tamil/Tanglish) and personal data.
+- [x] Reporting protocol implemented for V3 under ADR 0064 (receipt-first retry, 7/30-day retention split, 10-per-24h quota, UNSAFE-first queue, groups close as `CLOSED_EVIDENCE_UNAVAILABLE` after expiry). Reuse it rather than rebuild.
+- [ ] Re-target the ADR 0064 reporting path from V3 summaries to posts, voice notes, chat and signals: evidence identity, reference authorization, exact retries after revocation, lock order and durable intake.
+- [ ] Confirm what moderators can see after content expires for posts, voice and chat, building on ADR 0064's retention split.
+- [ ] Moderator "hide content" action (follow-up to ADR 0041's restriction boundary).
+- [ ] Reuse the admin app login with real admin OAuth/MFA; lighter pilot access: a small named rota with time-boxed grants for the event window.
+- [ ] Blocks apply to REST and realtime delivery, room subscription, Ask Ahead recipient selection and replay.
+- [ ] Propagate hide/block/delete across reads, caches and delivery channels; deny when authority is unavailable.
+- [ ] Verify multi-user, concurrent, replay, abuse and revocation scenarios with two or more real accounts.
+
+Official alerts (optional):
+
+- [x] Default-off Chennai district official-alert pilot (NDMA CAP reader, owner-only API, web list).
+- [ ] Before Diwali: show alerts on Spots and the Journey, and extend coverage from the Chennai-area districts to the corridor districts (Villupuram, Kallakurichi, Perambalur, Trichy, Thanjavur, Madurai, Tirunelveli, Tuticorin and the districts between; add Coimbatore-trunk districts before Pongal — confirm the list against the routes when seeding). Run staging validation per `docs/features/live/PROVIDER_LIVE_PILOT_SPEC.md` before activation.
+
+## Phase 3 — Ask Ahead and route guides
+
+Gate: **questions get answered on a test trip.**
+
+Specs to author:
+
+- [ ] Ask Ahead: recipient selection (bounded, non-deterministic, no repeat targeting, respects blocks), asker never learns recipients, honest no-answer state, answer summaries.
+- [ ] Route guides: publishing from a completed journey plus journal notes and Spot tips, with address stripping.
+
+Build:
+
+- [ ] Post-passing prompt: quiet, dismissible card shown only when stopped/slow or to a declared passenger; expires if unanswered; never a blocking modal or sound while moving.
+- [ ] Spot-passage opt-in (one clear opt-in), detection on device during an active journey; only the answer or an Ask Ahead eligibility record is sent.
+- [ ] Ask Ahead questions pinned to a Spot ahead, offered to opted-in recent passers and posters; one-tap answers summarised ("5 replies: mostly 10–20 min").
+- [ ] Route guides published from completed journeys and journals; strip exact home, office and start/end addresses; web shows guides for planning.
+- [ ] Rename Explore to Guides on web and Android when route guides ship (tabs: Home, Guides, Trips, Profile).
+- [x] Signed-out web planning accessibility pass (synthetic API): keyboard/focus, 320 px reflow, 130% zoom and 200% text, reduced motion, storage-failure recovery (`docs/quality/evidence/planning-accessibility-2026-09-25/`).
+- [ ] Verify authenticated web planning flows used for guides, screen readers and native equivalents.
+- [ ] Verify journal conflicts, older history, summary completeness and backup/restore with real sign-in (route-guide source material).
+
+## Phase 4 — Dry runs
+
+Gate: **no blocking bugs, and moderation works**, with friends and early users.
+
+- **Diwali 2026 dry run** (reduced scope; see the critical path above).
+- **December long-weekend dry run** for voice notes, Ask Ahead, post-passing
+  prompts, Spot chat, the festival room and route guides.
+
+- [ ] Set exact success targets (share of journeys seeing a fresh Spot item, Ask Ahead answer rate within 15 minutes, prompt tap rate, return-journey reopen) before the Diwali dry run; measure with privacy-preserving aggregates.
+- [ ] Measure Spot-passage battery cost on the Phase 1 phones against the ~3–4% per hour target before the December dry run.
+- [ ] Configure production PostgreSQL/PostGIS, caches, secrets, networking, domain/TLS, runtime profiles and feature gates with operator access.
+- [ ] Validate migrations, backup restoration and rollback in staging, including the V13 acceptance-writer quiet period.
+- [ ] Validate expiry maintenance throughput and backlog; set failure and capacity alerts for the intended replica count.
+- [ ] Establish redacted monitoring, health checks and incident ownership.
+- [ ] Staff and exercise the on-call moderator rota; verify hide, block, grant expiry and escalation end to end.
+- [ ] Operator alerts, supervision, a lightweight appeal path and approved audit/backup retention; activate and verify bounded moderation cleanup in staging.
+- [ ] Finalize privacy disclosures (Spot passage, aliases, voice notes), deletion policies and backup retention.
 - [ ] Complete authenticated release QA, load/capacity checks and deployment smoke tests.
-- [ ] Perform a gradual web pilot rollout after all first-release gates pass.
 
-## Later navigation and product expansion
+## Phase 5 — Pongal pilot
 
-- [ ] Persist routes across reload with reviewed privacy, storage and deletion behavior.
-- [ ] Implement location guidance, bounded offline-map downloads, update integrity, eviction and on-device rerouting; validate device/region performance.
-- [ ] Add a map LIVE overlay using the same approved projection without finer-grained tracking.
-- [ ] Design and implement Ask Ahead, temporary rooms and realtime delivery with recipient consent, anti-targeting, expiry, blocking and reconnect revocation.
-- [ ] Implement reminders/push, media and AI workflows with permissions, bounded retention/jobs/uploads, fallbacks and feature-specific QA.
-- [ ] Implement Pulse and Travel Waves after evidence quality and participation justify them.
-- [ ] Expand journal media/sharing and administration workflows under separate reviewed specifications.
+Gate: measured against the success signals in PRODUCT.md.
 
-## Native account history
+- [ ] Produce the signed Android release and distribution channel; verify release fingerprint against OAuth.
+- [ ] Verify remote CI on the actual release commit.
+- [ ] Finalise the Pongal dates (tentatively 8–14 January 2027) and festival room windows.
+- [ ] Capacity plan for the Pongal rush on all corridors, including ADR 0066 refresh load; festival route room windows set.
+- [ ] On-call moderator rota for the full event window.
+- [ ] Launch publicly on the corridors, enabling only flags whose phase gates passed.
+- [ ] Measure against the success targets and record results.
 
-- [x] Implement fixed 20-row owner history, strict native transport/API contract, latest/earlier/retry controls and session-fenced in-memory pages.
-- [ ] Complete real authenticated staging and physical-device checks in [native history ledger](docs/validation/NATIVE_HISTORY_PENDING.md).
+## Later (not pilot)
+
+- [ ] Pulse: AI route summary behind adapters, never inventing conditions.
+- [ ] Aggregate traveller counts, travel waves and cohorts: only with density and a separate privacy review.
+- [ ] Daily commute rooms, meetups, bus-stop connect; monthly commute summaries as a retention feature.
+- [ ] Photos and journal media; push notifications beyond journey essentials; reminders.
+- [ ] Persist routes across reload with reviewed privacy, storage and deletion behaviour.
+- [ ] GPS-following guidance, bounded offline-map downloads, update integrity, eviction and on-device rerouting.
+- [ ] User-suggested Spots; curated Explore destinations replaced over time by route guides.
+
+## Archived
+
+The 2026-09-25 direction reset removed the public LIVE privacy-contract items
+(transcript protocol, fixed partitions and publication windows, collusion and
+distributed query budgets, cohort/threshold projection), differential-privacy and
+verified-person and verified-contributor authority and operations, evidence
+independence and anti-Sybil rules for aggregates, the V3 community traffic summary staging trial and
+production decision, per-journey consent / private route preparation / private
+Quick Signal lifecycle verification, and the active-journey LIVE list. Their code
+stays in the repository, default-off. The earlier list is in git history for this
+file; archived ledgers and the older roadmap (`todo.txt`) are under
+[`docs/archive/`](docs/archive/README.md).
+
+ADR 0065 (the V1 public LIVE policy, accepted earlier on 2026-09-25) set V1
+production to official alerts plus private Quick Signals and kept ADR 0055 as a
+closed staging experiment. The direction brief adopted later that day archives
+the ADR 0055 community summary and makes one-tap signals public on Spots; ADR
+0065's principles carry forward (see its status note). Its completed ADR 0055
+pilot work stays in code, default-off, and its fail-closed flag tests keep
+running: P0 fail-closed flags, P1 withdrawal suite, contribution isolation and
+quota, threshold boundaries, and API/telemetry leakage checks. Open ADR 0055
+pilot items (adversarial/Sybil red team, pilot metrics, comprehension study,
+`ParticipationEligibility`, production decision) are archived with it; see
+`docs/archive/features/live/ADR0055_PILOT_MEASUREMENT_PROTOCOL.md`.

@@ -2,6 +2,8 @@
 
 Status: implemented behind disabled staging flags on 2026-09-23; real staging evaluation remains pending. Production activation and ADR 0055's privacy contract remain unapproved.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. The V3 community-traffic target is retired and archived. The separate admin login, session and CSRF boundary is kept and simplified for the pilot moderator rota (see `../development/PILOT_MODERATION_RUNBOOK.md`). See [PRODUCT.md](../PRODUCT.md).
+
 ## Context
 
 ADR 0055 permits a canonical community traffic summary to receive bounded reports and an audited safety suppression. At the time of this decision, V3 stored report metadata and had an internal suppression command, while the admin application was a shell. A consumer session or a supplied operator identifier cannot safely invoke moderation. Reports may outlive their source projection, so their mere existence cannot prove a summary is still investigable.

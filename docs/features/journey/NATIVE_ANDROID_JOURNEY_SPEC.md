@@ -5,6 +5,8 @@ Real configured-service and physical-device validation remain in the pending led
 Native server access is opt-in through
 `native-auth`; production deployment remains a separate release decision.
 
+> **Direction brief (2026-09-25):** Kept, and Android is now the primary pilot client (web is secondary). The "no GPS watcher" rule still holds for this slice; opt-in, on-device Spot-passage detection during an active journey is the planned carve-out and needs its own spec. The Phase 1 gate is a full journey on 3+ physical Android phones. The V3 community traffic flag mentioned below belongs to archived work. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Acceptance
 
 - A fixed configured HTTPS API origin is required. Android native HTTP enforces TLS,

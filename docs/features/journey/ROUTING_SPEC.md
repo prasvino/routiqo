@@ -1,5 +1,7 @@
 # Route planning integration
 
+> **Direction brief (2026-09-25):** Kept; hosted Valhalla/Photon routing is required for Journey and Spots. "Social presence" below now means Spot activity (posts, signals, Ask Ahead); server-side presence is archived, and route requests still never publish anything or start a journey. See [PRODUCT.md](../../PRODUCT.md).
+
 Purpose: let a traveller deliberately request a route between selected places, independently of social presence. Route requests must never publish presence or start a journey. Precise coordinates belong only to the requesting traveller and the configured routing provider; do not place them in logs, analytics, public presence or backups by default.
 
 Configured provider: self-hosted Valhalla, as confirmed in ADR 0021. The opt-in

@@ -3,6 +3,8 @@
 Date: 2026-09-23
 Status: rejected as a release contract by independent privacy review; internal evaluation only
 
+> **Status update (2026-09-25):** Already rejected; the direction brief also removes the underlying need, since immutable traveller LIVE release transcripts are archived and posts are openly public under per-room aliases. See [PRODUCT.md](../PRODUCT.md).
+
 ## Review disposition
 
 The review found four release blockers. A Stop after the internal decision but before the fixed public release has no defined effect: preserving the snapshot allows a future release after Stop, while rechecking the source adds an observable participation-dependent decision. The eight-unknown-reports statement below is only a cohort count, not a person-level membership guarantee. Repeated windows, adjacent anchors and categories create an unbounded combined observation transcript; account read limits do not bound a coalition or previously delivered copies. Blocking, catalog changes, authority outages and emergency denial can still change availability and need one source-independent response contract. The current LIVE/privacy specifications require immediate suppression and have not been replaced. No public reader or activation flag may use this ADR.

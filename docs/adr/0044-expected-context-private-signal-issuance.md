@@ -4,6 +4,8 @@ Date: 2026-09-19
 
 Status: accepted; internal implementation tested and independently reviewed.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. Exact-context issuance still guards that a contribution lands on the Spot the user saw. Consent-generation matching is retired. See [PRODUCT.md](../PRODUCT.md).
+
 ## Context
 
 ADR 0043 returns observed owner choices. Existing issue-by-anchor deliberately

@@ -6,6 +6,8 @@ transaction service. No public API, moderation, projection, queue dispatch or
 scheduler is enabled by default. ADR 0036 specifies a separately gated bounded
 maintenance caller; its operational rollout remains pending.
 
+> **Direction brief (2026-09-25):** Kept as storage infrastructure for Spot signals and posts. The 15-minute evidence lifetime becomes per-type lifetimes (decided: 60 min base / 2 h max for traffic and queue signals, 24 h / 36 h for food, fuel and restroom) with "Still true?" extending and "No longer true" shortening life; the consent participant is retired; content is public under per-room aliases rather than private receipts. See [PRODUCT.md](../../PRODUCT.md).
+
 ADR 0035 adds a separately default-off private owner command transport through
 the catalog-aware facade. It does not expose raw receipt reads or public Live
 output and does not change these storage quotas or lifecycle rules.

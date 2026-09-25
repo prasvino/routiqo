@@ -2,13 +2,15 @@
 
 Status: implemented and independently reviewed, 2026-09-19; private clients only,
 no public projection or server flag activation. Private consent UI integration is
-specified separately in BROWSER_LIVE_CONSENT_UI_SPEC.md. Verification is recorded
+specified separately in `../../archive/features/live/BROWSER_LIVE_CONSENT_UI_SPEC.md` (archived). Verification is recorded
 in BUILD_STATUS.md.
+
+> **Direction brief (2026-09-25):** Partly retired. The route-context and signal clients remain useful for web (secondary to Android); the consent client and consent UI integration are archived. "LIVE" now means the Journey with Spots ahead, and 15-minute evidence becomes per-type lifetimes. See [PRODUCT.md](../../PRODUCT.md).
 
 ## Scope
 
 Implement typed browser clients for the real owner-only consent, route-context and
-Quick Signal endpoints documented in BROWSER_CONSENT_API_SPEC,
+Quick Signal endpoints documented in `../../archive/features/live/BROWSER_CONSENT_API_SPEC.md` (archived),
 BROWSER_ROUTE_BINDING_API_SPEC and BROWSER_SIGNAL_API_SPEC. Reuse generated
 OpenAPI types. These clients are prerequisites for an explicit consent/contribution
 interface; they do not authorize or enable public publication, infer presence or

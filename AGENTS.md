@@ -2,20 +2,22 @@
 
 ## Read before implementation
 
-1. `docs/product/ROUTIQO_MASTER_CONTEXT.md`
-2. `docs/development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`
+1. `docs/PRODUCT.md` (product source of truth, from the 2026-09-25 direction brief)
+2. `docs/development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md` and `docs/architecture/ENGINEERING_CONTEXT.md`
 3. `docs/design/ROUTIQO_UI_UX_SYSTEM.md` for user-facing work
-4. Relevant feature specifications and architecture decision records.
+4. Relevant feature specifications and architecture decision records. Material in `docs/archive/` is historical, not a requirement.
 
 The user's current instructions govern task scope. Documents describe requirements; do not interpret their suggested tasks as independent authorization to deploy, purchase services, or expand scope. Historical Wayfind references are lessons, not Routiqo architecture decisions.
 
 ## Product invariants
 
-- Product name: Routiqo. Utility before participation and community.
-- Next Live release: active-journey LIVE list with Live Moments and Quick Signals; scope and exposure gates live in `docs/features/live/ROUTIQO_LIVE_SPEC.md`. Do not treat planned capabilities as implemented.
-- Home, Explore, Trips, Profile. Conversation belongs to the active journey, not a permanent navigation tab.
+- Product name: Routiqo. It tells you what your journey is like right now, from people who were just there. It is not turn-by-turn navigation, a follower network or a tracker of people.
+- Three concepts: **Journey**, **Spots**, **Ask Ahead** (`docs/PRODUCT.md`). New features fit inside them or wait. Earlier names (LIVE, Live Moments, Quick Signals, Living Route, Same Situation, Route Chat/Updates) are merged into these; see the PRODUCT.md glossary. Do not treat planned capabilities as implemented.
+- Useful with few users, and effortless contribution: one tap beats typing, voice beats long text. Honest empty states; never fake activity.
+- The active Journey is a map-first experience with the Spots ahead. Explore is demoted and replaced over time by route guides. Conversation belongs to a Spot or a festival route room, never a permanent chat tab.
+- Pilot: Diwali 2026 dry run (reduced scope, early testers), then the Pongal 2027 public launch, on the GST Road trunk (Chennai incl. Kilambakkam to Trichy) with branches to Thanjavur, Madurai–Tirunelveli and Tuticorin; Chennai–Coimbatore is added for Pongal. Android on physical devices is the primary client; web serves route guides and planning.
 - Daily commutes and one-time trips are distinct. Rich trip journals and periodic commute summaries are distinct.
-- V1 excludes unrestricted DMs, permanent route groups, live group calls, and public individual location tracking. Voice snippets are deferred.
+- The pilot includes short text posts, voice notes, one-tap signals, temporary Spot chat and a festival route room for the event window. It excludes private DMs, permanent route groups, follower graphs, live group calls, photos, aggregate traveller counts and public individual location tracking.
 - Treat the Lovable mock as a visual/interaction reference, not production architecture.
 
 ## Stack and boundaries
@@ -27,7 +29,7 @@ The user's current instructions govern task scope. Documents describe requiremen
 - `backend/realtime` and `backend/workers`: independently deployable Java applications; scaffold only needed behavior.
 - TypeScript uses pnpm workspaces/Turbo; Java uses Gradle Kotlin DSL and a checked-in wrapper. Do not force Java builds into Turbo.
 - Backend domain modules use intentional interfaces and api/application/domain/infrastructure boundaries. No arbitrary cross-domain repository access.
-- PostgreSQL/PostGIS owns durable data; Redis owns ephemeral presence/cache with explicit TTLs.
+- PostgreSQL/PostGIS owns durable data; Redis owns ephemeral room, chat and cache state with explicit TTLs.
 - OpenAPI and event schemas belong in `contracts`; generate TypeScript transport models/clients.
 - Use versioned migrations, bounded/indexed queries, and explicit transaction boundaries. Never hold DB transactions open for external API/AI calls.
 - Signed direct S3 uploads; open-source maps direction in ADR 0021 (MapLibre/Valhalla/Photon), with migration pending; AWS target. Kafka, OpenSearch, ClickHouse, Kubernetes are not V1 defaults.
@@ -36,11 +38,11 @@ The user's current instructions govern task scope. Documents describe requiremen
 ## Security, privacy, and reliability
 
 - Authenticate protected HTTP/socket access and authorize each object, action, and subscription on the server.
-- Never expose precise stranger GPS, exact home/work endpoints, movement history, or enumerable presence lists.
-- Apply server-side privacy transformation and aggregation before social outputs. Specify thresholds and retention before implementation.
-- Ghost Mode stops publishing and removes discoverable presence across caches and channels; test it.
-- Rooms/membership/presence expire. Blocking applies to REST and realtime delivery.
-- Rate-limit communication, uploads, reports, and reactions. Combine rules, moderation, trust controls, reports, and human escalation.
+- Never expose precise stranger GPS, exact home/work endpoints, movement history, participant lists, or coordinate-based lookup of people.
+- Active input only: posts, voice notes and signals are tied to a Spot, not the poster's position. The server does not collect continuous location. Spot passage is opt-in, detected on the device, sent only as an answer with a coarse time, and deleted within 24 hours. Aggregate traveller counts need a separate privacy review before any build.
+- Ghost Mode stops all sending, including Spot passage and queued posts, across caches, channels and replicas; test it.
+- Content expires by type using server time; rooms and membership expire. Aliases are per room and never link posts across rooms. Blocking applies to REST, realtime delivery and Ask Ahead recipient selection.
+- Rate-limit posts, voice uploads, signals, questions, reports and reactions, with stricter limits for new accounts. Combine rules, moderation (quick hide), trust controls, reports, and human escalation. Cover business spam, false alarms and Tamil/Tanglish abuse.
 - Do not log secrets, tokens, or unnecessary precise location. Do not commit credentials or put secrets in client bundles.
 - Multi-replica correctness cannot depend on process-local shared state.
 - Preserve active journeys through network loss. Durable queues, idempotency, reconciliation, and reconnect behavior must be designed alongside writes; later offline hardening does not postpone these foundations.

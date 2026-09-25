@@ -1,5 +1,7 @@
 # Confirmed commute summaries — local first slice
 
+> **Direction brief (2026-09-25):** Kept, low priority: commute summaries become a retention feature for commuters after the Pongal pilot. Commutes and one-time trips, and summaries and rich journals, stay distinct. See [PRODUCT.md](../../PRODUCT.md).
+
 Summarize only confirmed completed COMMUTE records from the verified account's bounded journey snapshot partition. Trips, active journeys and pending commands are excluded. This is an on-demand read-only view: no new persistence, server endpoint, provider call, location collection or automatic journal.
 
 Group by the start instant's calendar month in the browser's resolved time zone. Display the zone and label the result as based on confirmed records saved on this device; it may omit older journeys or records from other devices. Do not imply complete account history. Sort newest months first. Count completed journeys and sum their exact elapsed microseconds before flooring the total to minutes; elapsed time uses UTC instants even across daylight-saving transitions. Describe it as recorded elapsed time, not measured driving time. No invented distance, route updates, saved places, efficiency or environmental metrics.

@@ -22,35 +22,53 @@ privacy and account-switch/account-deletion handling. Validate renderer and HTTP
 cache behavior; local route clearing must not claim to erase resources it cannot
 remove. Keep public basemap content separate from account-specific route records.
 
-## Private Live evidence lifecycle
+## Pilot content lifetimes
 
-Private route preparation uses the existing bounded latest-row context (ADRs
-0027/0032/0034): derived private anchor IDs and optional catalog provenance, not
-precise endpoint/geometry history. Browser observations and acknowledgements remain
-in memory only; clearing them does not delete server context. A failed, cancelled
-or empty bind is not a deletion. Logical expiry and journey completion invalidate
-the context under existing server authority; cleanup and account deletion retain
-their existing semantics. The browser integration adds no retention or backup.
+Planned for the pilot (see [`docs/PRODUCT.md`](../PRODUCT.md)); not implemented
+unless [`BUILD_STATUS.md`](../quality/BUILD_STATUS.md) says so. Lifetimes were
+decided on 2026-09-25 and are tuned after the dry runs.
 
-QUICK_SIGNAL_RECEIPT_SPEC.md defines explicit bounded retention and terminal
-withdrawal/supersession. ADR 0028 implements durable private grants and receipts;
-ADR 0035 adds a default-off owner command API with 15-minute evidence and 24-hour
-receipt retention. Withdrawal stops temporal evidence eligibility but retains the
-private immutable fingerprint until purge; it is not physical deletion. These
-private transport lifetimes do not approve public publication or moderation holds.
+| Content | Base life | Maximum with "Still true?" |
+| --- | --- | --- |
+| Traffic signal; toll or bus-stand queue signal | 60 min | 2 h |
+| Traffic or incident text/voice post | 90 min | 3 h |
+| Food, fuel, restroom posts; Good / Avoid | 24 h | 36 h |
+| Ask Ahead questions (answers inherit) | 45 min, or until the asker passes the Spot | not extended |
+| Festival route room and its aliases | the event window | not extended |
+| After expiry | top tips per Spot, ranked by confirmations, kept as highlights; no full chat archive | — |
+| Spot passage records | deleted within 24 hours; logged only as outcome codes |
+| Route guides | kept until the author deletes them |
 
-Logical expiry is enforced independently of cleanup. ADR 0036 specifies default-off
-bounded maintenance using the existing expiry adapters. Production activation,
-backlog capacity, failure alerting and physical database/backup lifecycle remain
-operational gates. A missing receipt never resets a consumed command grant.
-Proposed public signal/client lifetimes and unresolved moderation holds remain
-owned by ROUTIQO_LIVE_SPEC.md.
+- Expiry uses server time. Each "Still true?" confirmation resets remaining life
+  to half the base life, up to the maximum; "No longer true" from two distinct
+  accounts expires a post early; silence lets it expire. Aliases are deleted
+  when their room expires. Client clocks and retries cannot
+  refresh content, and nothing expired is shown as current.
+- Offline posts, signals and answers queue with capture time and an idempotency
+  key; the server rejects them once the type's lifetime has elapsed since capture
+  and shows accepted items with their capture time, never as new.
+- Highlights are a small curated subset per Spot, not a retained copy of every
+  post or chat line.
+- Route guides strip exact home, office and start/end addresses before
+  publishing; the author's private journey route stays private.
+- Authors can delete their own posts. Account deletion removes the account's
+  posts, voice notes, signals, Ask Ahead questions and answers, Spot-passage
+  records and route guides.
+- Voice notes are stored in S3 through signed direct uploads and deleted with
+  their post, by expiry, author deletion, moderation removal or account deletion.
+- Ghost Mode, sign-out and account deletion clear queued social items on the
+  device.
+- Do not claim remote erasure of copies already delivered to other devices,
+  including disconnected ones; local expiry limits their display.
+
+## Moderation, restriction and block retention
+
 ADR 0037 specifies an independent abuse ledger bounded to 20 slots per account,
 containing acceptance times, opaque anchors and categories. Charges expire
 logically after one hour and are removed by bounded maintenance; physical cleanup
 may lag. Withdrawal, journey completion and receipt purge must not reset this
 budget. Account deletion cascades the ledger. No precise route/GPS or device
-fingerprint is added. Publication trust remains unresolved (ADR 0038).
+fingerprint is added.
 ADR 0039 retains one latest contribution-restriction revision/boolean per account
 until account deletion. That monotonic state prevents old grants regaining authority
 after restoration; it contains no assessment reference, evidence body or action
@@ -73,65 +91,41 @@ and survive subject deletion. Logical expiry does not claim physical erasure.
 Operator deletion cascades them. Finite action-specific operator grants last at
 most 24 hours; stored expired grants are inert and may remain until replacement
 or operator deletion. No account-owner role is provisioned by migrations.
-Expiry, Ghost withdrawal, block changes and deletion invalidate current private
-evidence, discoverable presence and viewer-local rows. A future ADR 0054 frozen
-public input would be an explicit, disclosed exception: it cannot be retracted
-or cause a source-dependent published-row change. This is not enabled and needs
-approved retention and deletion terms. Do not retain raw location history
-or put Live evidence into journals, backups, analytics or journey outboxes.
 
-ADR 0055's distinct V3 community traffic summary is authorized for staging
-implementation only. Its database design logically expires source candidates
-24 hours after their five-minute window ends, stops serving a projection at
-window end plus ten minutes, and schedules bounded removal of expired projection
-content within another 24 hours. Daily debit rows have a short cleanup window;
-report and suppression-audit rows have a 30-day staging expiry; terminal
-decision tombstones remain durable to prevent reopening.
-These are implementation settings, **not approved production retention or legal
-deletion terms**. Account-bound retry, decision/audit and backup horizons need
-separate review and operating procedures. Source cleanup and account deletion
-must not cascade-delete a canonical summary. A Stop, Ghost Mode or deletion
-committed after the publication snapshot may be too late to exclude that
-candidate, and previously captured output cannot be erased. This V3 contract
-does not reuse V18 intent or V22 frozen input as consent, and no V3 production
-flag is approved for activation.
+Moderation of posts, voice notes and chat (hide, remove, restrict) must define
+report and hidden-content retention before the pilot; hiding is not deletion,
+and a moderation hold must not extend a content lifetime silently.
+
+## Delivered copies
 
 Memory-only rows expire locally; remote changes cannot erase previously delivered
 information from disconnected clients immediately. Clear on local account/Ghost/
 journey-end transitions and reauthorize on reconnect. Document physical deletion,
-backup retention and lawful moderation exceptions explicitly before release.
+backup retention and lawful moderation exceptions explicitly before release. Do
+not retain raw location history or put Spot-passage records into journals,
+backups, analytics or journey outboxes.
 
-ADR 0045's private choice snapshot adds no durable browser or server copy. Its
-bounded owner response is no-store and validated for current expiry; labels,
-versions and category sets remain request-scoped. Existing catalog retention,
-route-context expiry, grant lifetime, receipt retention and deletion rules remain
-unchanged. Choice reads reserve only an existing durable request-rate row;
-expected issuance shares legacy issuance budgets and adds no new grant lifetime.
+## Archived private LIVE retention (default-off code)
 
-ADRs 0046/0047 reuse existing consumed grants and terminal receipts for command
-stopping. No extra tombstone, receipt, evidence copy, budget refund or new
-retention interval is created. Original receipt/grant timestamps and terminal
-supersession are preserved. An expired retained receipt is not renewed by stop;
-cleanup may make later retries generically unknown. A consumed grant without a
-receipt cannot be treated as proof that no past acceptance occurred. Existing
-account deletion cascades and bounded expiry rules continue to apply.
-
-The private Quick Signal browser interface keeps at most five command recovery
-records in JourneyWorkspace memory, including terminal notices. Uncertain commands
-retain only account/journey/command identity, phase and operation authority;
-confirmed receipts add minimized status/timestamps. No route labels, observation
-values, exact endpoints or fingerprints enter this collection, browser storage,
-journey outbox, journal, backup or analytics. Confirmed receipt metadata expires
-at the server retainUntil or 24 hours of local elapsed time from capture, whichever
-comes first; elapsed-time checks prevent wall-clock rollback extending that bound.
-Expiry removes metadata, not the only known stop handle, and never proves server
-deletion. Capacity blocks issuance rather than silently evicting recovery.
-
-Same-account identity refresh temporarily hides controls while preserving memory.
-Ghost, route changes and journey completion invalidate contribution choices but
-preserve known stop handles. Account change, logout and workspace departure clear
-the collection. Explicit removal requires acknowledging that it only removes
-local recovery and does not stop server work. Navigation/unload warnings are best
-effort; no cross-page or reload recovery is promised. An empty collection does
-not prove there are no outstanding server commands. See
-`../features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md` for the lifecycle contract.
+The private LIVE code stays in the repository, default-off, and its retention
+rules still describe that code:
+private route context is a bounded latest row of opaque anchor IDs (ADRs
+[0027](../adr/0027-durable-live-route-context.md)/[0032](../adr/0032-two-transaction-route-binding.md)/[0034](../adr/0034-default-off-browser-route-context-api.md));
+grants and receipts use 15-minute evidence and 24-hour receipt retention, and
+withdrawal is not physical deletion (ADRs [0028](../adr/0028-transactional-signal-storage.md)/[0035](../adr/0035-default-off-browser-quick-signal-api.md),
+[`QUICK_SIGNAL_RECEIPT_SPEC.md`](../features/live/QUICK_SIGNAL_RECEIPT_SPEC.md));
+logical expiry is enforced independently of default-off bounded maintenance
+(ADR [0036](../adr/0036-default-off-live-expiry-maintenance.md)); a missing
+receipt never resets a consumed command grant. Choice snapshots add no durable
+copy, and command stopping reuses existing grants and receipts with no new
+retention interval (ADRs [0045](../adr/0045-private-browser-signal-choice-boundary.md)–[0047](../adr/0047-private-browser-command-stop-boundary.md)).
+Browser command recovery keeps at most five memory-only records bounded by
+retainUntil or 24 hours of elapsed time (ADR [0048](../adr/0048-private-browser-signal-recovery.md)).
+The unapproved ADR [0054](../adr/0054-irreversible-share-traveller-live-pilot-protocol.md)
+frozen public input and the ADR [0055](../adr/0055-consented-community-traffic-summary-proposal.md)
+V3 summary settings (24-hour source expiry, 30-day staging report/audit expiry,
+durable decision tombstones) are staging implementation settings, not approved
+production retention or legal deletion terms; no V3 production flag is approved.
+Full detail is in the ADRs and in [`docs/archive/`](../archive/README.md). Reusing
+signal storage, receipts, budgets and expiry maintenance for Spot signals requires
+the pilot lifetimes above, not these private lifetimes.

@@ -3,6 +3,8 @@
 Date: 2026-09-23
 Status: accepted implementation direction; runtime activation requires pilot verification
 
+> **Status update (2026-09-25):** Accepted — role note by the direction brief. Official alerts are kept as an optional source shown on Spots when available. Coverage is to be extended from the Chennai-area districts to the corridor districts before the Diwali 2026 dry run (decision 2026-09-25). See [PRODUCT.md](../PRODUCT.md).
+
 Routiqo will introduce a narrow active-journey provider-alert list before traveller-derived public Live Moments. The initial source is NDMA SACHET CAP alerts for the Chennai district area. This route presents district-wide official warnings with issuer, validity and source link; it makes no assertion about a specific road, traveller presence or Quick Signal corroboration.
 
 The core API owns source retrieval, validation, attribution and authorization. The web app reads through its existing authenticated journey proxy. The feed goes through a fixed outbound host, bounded XML parser and conditional ETag cache. Only opted-in `web-auth` persistence deployments with an explicit provider flag expose the endpoint. Default preview remains closed. Read authorization is current on every request; provider access does not require private contribution consent. No private signal or location data is transmitted to NDMA.

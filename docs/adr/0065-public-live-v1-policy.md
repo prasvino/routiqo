@@ -3,9 +3,11 @@
 Date: 2026-09-25
 Status: **accepted by the owner, 2026-09-25**
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief adopted later the same day. Still holds: no traveller-derived aggregate public output in the pilot; empty is better than wrong, privacy-invasive or manipulable information; no UI, document or code may claim anonymity; Sybil resistance must not collect more identity data (no government ID or Aadhaar, device fingerprints or location history); community flags fail closed on anything but exact `true`. Superseded: ADR 0055 continuing as a staging experiment (now archived) and private-only Quick Signals in V1 (one-tap signals become public on Spots under per-room aliases). See [PRODUCT.md](../PRODUCT.md).
+
 ## Context
 
-[PUBLIC_LIVE_PRIVACY_DECISION.md](../features/live/PUBLIC_LIVE_PRIVACY_DECISION.md) compared three options for traveller-derived public LIVE:
+[PUBLIC_LIVE_PRIVACY_DECISION.md](../archive/features/live/PUBLIC_LIVE_PRIVACY_DECISION.md) compared three options for traveller-derived public LIVE:
 - person-level differential privacy (ADR 0054);
 - the consented community traffic summary (ADR 0055, "V3");
 - no traveller-derived public output.

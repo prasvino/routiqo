@@ -1,5 +1,7 @@
 # Private completed-trip journal — first slice
 
+> **Direction brief (2026-09-25):** Kept. Completed-trip journals are now source material for published route guides (Journey). The private-only boundary here still holds: publishing a guide needs its own sharing contract with visibility, revocation and stripping of exact home, office and start/end addresses before any public read exists. See [PRODUCT.md](../../PRODUCT.md).
+
 Scope: derive a private journal view from an owned completed TRIP journey, with an optional traveller-written title and plain-text notes. Daily COMMUTE journeys remain separate and do not produce rich journals. No invented distance, route, photos, stops or AI summary: the current lifecycle only provides start/completion timestamps. Media, sharing and automatic enrichment are future phases.
 
 The default journal is derived on read, so every eligible completed trip has a journal without background writes. Annotation version0 means no saved annotation. Title and notes default to empty strings, letting the UI use a neutral trip heading. Saving both empty strings clears the personal annotation; lifecycle metadata remains part of the journey. Account deletion cascades annotations; no other public read, listing or sharing endpoint is introduced.

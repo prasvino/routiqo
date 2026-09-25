@@ -3,6 +3,8 @@
 Date: 2026-09-18
 Status: accepted safety direction; public publication remains unapproved
 
+> **Status update (2026-09-25):** Superseded by the direction brief. Its threshold, cohort and publication-oracle reasoning protected hidden contributors behind aggregates; posts and signals are now openly public under per-room aliases, author-deletable and expiring. Aggregate traveller counts need a separate privacy review before any build. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Do not implement an automatically publishing threshold-only traveller projection.

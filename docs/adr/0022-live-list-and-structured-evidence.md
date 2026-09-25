@@ -2,9 +2,11 @@
 
 Status: accepted planning direction; implementation pending.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. PostgreSQL ownership and bounded authenticated HTTP refresh still hold. The LIVE list is replaced by the Journey map with Spots ahead; "no chat, photos or voice" is superseded (voice notes and short Spot chat are in the pilot, photos later), and Live Moment cohort gating is archived. See [PRODUCT.md](../PRODUCT.md).
+
 The first Routiqo Live release is an active-journey list with Live Moments and
 Quick Signals, composed from existing journey, presence and Route Update concepts.
-Product details belong in `docs/features/live/ROUTIQO_LIVE_SPEC.md`.
+Product details belong in `docs/archive/features/live/ROUTIQO_LIVE_SPEC.md`.
 
 ## Decision
 

@@ -12,67 +12,33 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
 - Authorization is enforced server-side for every object and action; possession of an identifier is never sufficient.
 - Ownership and tenant boundaries apply to reads, writes, search, exports, notifications, caches, and realtime events.
 - Deny by default when identity, permission, privacy state, or policy evaluation is missing, stale, ambiguous, or fails.
-- Live contribution restrictions (ADR 0039) must serialize with signal writes
-  under current account authority; capture restriction revision on grants and
-  reject stale grants after suspension/restoration. Private receipt replay and
-  withdrawal do not authorize new evidence. Trusted internal restriction mutation
-  interfaces must not be callable from API packages. ADR 0041 adds internal scoped
-  database permissions, exact-revision commands and atomic minimized audit; strong
-  operator authentication and administration remain separate prerequisites. Signal
-  ingestion uses read-only restriction access. No public projection is approved
-  by ADR 0038.
-- Journey/Live database authority follows ADR 0025: account before journey locks,
-  domain-owned application interfaces, one synchronous transaction, and no ambient
-  transaction joining that can reverse the lock order. Database unavailability is
-  distinct from authentication denial; redact persistence errors and retain safe
-  retry behavior. Durable consent and route context use this boundary with
-  journey-scoped CAS and ordered atomic completion handling. ADR 0028 composes
-  them with durable grants and receipts plus database budgets; public ingestion
-  remains gated. ADR 0029 applies explicit consent intents under the same locks:
-  enable requires an exact generation while stale or current disable takes
-  precedence. Expiry cleanup paths are bounded leaf-only operations.
+- Contribution restrictions serialize with signal writes under current account
+  authority, and stale grants are rejected after suspension/restoration
+  ([ADR 0039](../adr/0039-durable-private-contribution-restrictions.md)).
+  Restriction mutation is internal, scoped, exact-revision and atomically
+  audited ([ADR 0041](../adr/0041-internal-audited-contribution-moderation.md));
+  signal ingestion has read-only restriction access.
+- Journey database authority takes account before journey locks in one
+  synchronous transaction with no ambient transaction joining; database
+  unavailability is distinct from authentication denial
+  ([ADR 0025](../adr/0025-account-and-journey-write-authority.md)).
 - Raw stranger GPS and unnecessary precise-location data are never exposed.
-- ADR 0031 route-anchor resolution accepts only an operator-selected bounded local
-  catalog and fresh region-guarded Valhalla geometry. Geometry and endpoints remain
-  in memory; output contains opaque anchor/category mappings only. Relevance is not
-  presence proof or publication permission, and the resolver is default off.
-- ADR 0032 binds that private result through two short account/owned-journey
-  transactions separated by provider work. A durable newest-attempt row, shared
-  account budget, exact consent/context/catalog rechecks and post-lock expiry stop
-  stale provider responses. Context replacement and completion invalidate pending
-  work atomically. Requests and provider geometry are never persisted.
-- ADR 0033 requires bound catalog provenance for configured signal issuance and
-  rechecks current catalog anchor/category eligibility inside the existing new-
-  acceptance transaction before budgets or mutations. Ordinary context writes
-  clear provenance. API packages cannot depend on the trusted low-level signal
-  storage service; exact retained private replay remains independent of current
-  publication eligibility.
-- ADR 0034 exposes only a separately default-off private browser context leaf.
-  Existing session/account/origin/CSRF/body controls, database peer and stable-
-  account budgets, exact owner checks and post-provider authority revalidation
-  apply. API code has a read-only context boundary and cannot invoke trusted raw
-  replacement. Minimal no-store output contains opaque anchors but remains
-  sensitive route intent, not physical presence or publication authority.
-- ADR 0035 exposes only separately default-off private browser signal-command
-  leaves through the catalog-aware facade. Exact session/account/origin/CSRF/JSON
-  checks and separate durable issue, acceptance and withdrawal request budgets
-  precede transactional storage. Retained private replay never renews evidence;
-  an accepted receipt is not permission for public output.
-- ADR 0045 requires both choice and signal API flags for private owner choices
-  and exact-context issuance, with real configured authority/catalog dependencies.
-  Choice reads return a bounded complete subset and never create grants. New
-  issuance shares the legacy request quota and must compare the full expected
-  tuple under current authority; no optional-precondition or legacy fallback.
-  Clients validate freshness and exact returned identity and preserve uncertainty
-  after a lost or rejected issuance response. No public publication is enabled.
+- Private LIVE code (consent, route context and binding, anchor resolution,
+  catalog-aware signal authority, browser command APIs; ADRs
+  [0026](../adr/0026-durable-journey-consent.md)–[0035](../adr/0035-default-off-browser-quick-signal-api.md),
+  [0045](../adr/0045-private-browser-signal-choice-boundary.md)) stays
+  default-off and its controls stay in force: exact session/account/origin/CSRF
+  and body checks, durable budgets, post-provider authority rechecks, no raw
+  context replacement from API packages, and no persisted endpoints or provider
+  geometry. Route relevance, consent and receipts are never presence proof or
+  publication permission; no public projection is approved
+  ([ADR 0038](../adr/0038-publication-threat-boundary-and-safety-prerequisites.md)).
 - Home/work endpoints and sensitive repeated-location patterns are protected from direct and inferred disclosure.
-- Presence is privacy-transformed server-side before distribution.
+- The pilot keeps no server-side presence: no continuous location is collected and no traveller counts are published. Any future presence or aggregate count needs server-side privacy transformation and a separate privacy review before distribution.
 - Discoverability is consent-based; Ghost Mode, block, visibility, expiry, and deletion rules apply across every delivery channel.
-- Persisted consent is necessary authority, not publication permission. Future
-  mutations must use ADR 0029's explicit-intent path; they must not expose or
-  auto-retry the legacy same-state transition contract. ADR 0030's owner-only
-  browser adapter is separately default off, encodes generations as strings and
-  retains cookie/account/origin/CSRF/body plus database peer/account limits.
+- Persisted private consent is necessary authority, not publication permission
+  ([ADRs 0029](../adr/0029-explicit-consent-intent-ordering.md)/[0030](../adr/0030-default-off-browser-consent-api.md));
+  the pilot's Spot-passage opt-in is separate and is not satisfied by it.
 - Blocked, hidden, expired, or deleted information must not reappear through search, caches, exports, logs, notifications, analytics, or realtime replay.
 - Tokens, credentials, secrets, and precise location are absent from fixtures, source control, logs, analytics, error payloads, and screenshots.
 - Inputs, payloads, queries, fan-out, retries, subscriptions, uploads, and expensive operations are bounded.
@@ -80,8 +46,7 @@ Use `THREAT_MODEL.md` for attacker analysis and abuse scenarios. Use `CODE_REVIE
   redirects, bound streamed response bytes and cover the entire operation with a
   deadline, including internal CSRF acquisition. Cancel unused bodies without
   reading their error details. Client validation supplements server authority;
-  it cannot grant publication permission. LIVE request identities and decimal
-  revisions remain exact, and submission fingerprints are captured before awaits.
+  it cannot grant publication permission.
 
 Foundation environments must have no consumer-authentication bypass: protected paths are denied, and administrative surfaces reveal no records without explicit authorization.
 
@@ -207,27 +172,47 @@ CI must enforce applicable:
 - migration and rollback checks;
 - multi-replica/realtime tests where relevant.
 
-High-risk changes require manual adversarial review and, when justified, a separate independent Astra review. The root Astra resolves findings and owns final verification. Automated scanners are supporting evidence, not the security decision-maker.
+High-risk changes require manual adversarial review and, when justified, a separate independent coding-agent review. The root coding agent resolves findings and owns final verification. Automated scanners are supporting evidence, not the security decision-maker.
 
 No security or privacy control may be silently weakened to make a test pass, simplify implementation, or meet a deadline.
 
-## Routiqo Live implementation gate
+## Spots and Ask Ahead release gate
 
-The first LIVE list and structured contribution scope is defined in
-`docs/features/live/ROUTIQO_LIVE_SPEC.md`; architecture is ADR 0022. Before public
-projections, require authoritative journey admission, consent,
-expiry, distributed budgets, idempotency, report/block/moderation and server-side
-privacy transformation. Never trust client-supplied route membership or infer
-physical presence from authentication. Unknown authority fails closed.
+Scope is [`docs/PRODUCT.md`](../PRODUCT.md). Spot posts, voice notes, signals,
+Spot chat, the festival route room and Ask Ahead ship default-off and must not
+be exposed until each of these holds and is tested:
 
-No recipient/member enumeration, raw report exports or client-side filtering of
-private presence. Recheck all delivery paths, retries, caches and future sockets
-for revocation. No permanent collection of live coordinates or independent AI
-assertions. Keep freshness and source semantics honest; expired or offline evidence
-must not be republished as new. The cohort/privacy ADR and retention decisions are
-mandatory gates before exposure/migrations, not permission to choose convenient
-unsafe defaults. Apply existing high-risk review criteria; no new model-routing
-policy is introduced here.
+- report and quick moderator hide for posts, voice notes and chat items, with
+  audited moderator actions and account restriction;
+- rate limits on posts, voice uploads, signals, "Still true?", questions,
+  answers and reports, by account and resource, with stricter limits for new
+  accounts;
+- server-time expiry by content type; offline items are accepted only within
+  their lifetime since capture and never shown as new;
+- per-room aliases that other users cannot link across rooms and that embed no
+  account identifier; no private DMs;
+- Ask Ahead anti-targeting: recipients only from opted-in recent passers,
+  bounded non-deterministic selection, no repeated targeting of one person,
+  blocks respected, and no recipient identity or count revealed to the asker;
+- Spot passage behind one explicit opt-in, detected on device during an active
+  journey, sent as answer plus coarse time only, deleted within 24 hours and
+  logged only as outcome codes;
+- Ghost Mode stops all sending, including Spot passage and queued posts, and
+  takes priority over reconnect and outbox replay;
+- voice notes via signed direct S3 uploads with size, duration and type limits,
+  scanning or isolation before delivery, and deletion with their post;
+- handling for business spam, fake reviews and false alarms ("Still true?",
+  expiry, report thresholds for review, moderation).
+
+Never trust client-supplied Spot, room or passage claims as authority. No
+recipient/member enumeration, raw report exports or client-side filtering of
+private state. Recheck all delivery paths, retries, caches and sockets for
+block, Ghost Mode, hide and expiry. No collection of continuous live coordinates
+or independent AI assertions. Keep freshness and source semantics honest;
+expired or offline content must not be republished as new. Unknown authority
+fails closed.
+
+## Block authority (ADR 0040)
 
 ADR 0040's internal block authority validates and locks both current enabled
 accounts in PostgreSQL UUID order before inspecting any directed edge. Blocking
@@ -238,16 +223,7 @@ unblocked revisions cannot be deleted merely to free slots. API packages must no
 access this trusted internal mutation/participant authority. Account existence is
 not public target authorization; a pair snapshot is not a reusable delivery grant.
 
-## Private command stopping
-
-ADR 0061's native private route preparation must use existing owned read/bind
-authority, never raw context replacement. Keep native exposure, resolver and
-catalog configuration gates distinct. Endpoint inputs are transient; minimized
-contexts remain private and are not presence proof or publication authority.
-Synchronous client consent/selection invalidation must precede asynchronous work;
-server consent/context/attempt checks after provider I/O remain authoritative.
-Unknown, expired or cancelled client acknowledgements cannot grant readiness.
-Neither abort nor GET proves a prior write did not commit; recovery is explicit.
+## Native routing endpoint rules
 
 ADR 0060's native route planning uses separately default-off exact POST leaves,
 native bearer/account guards and shared durable browser/native request budgets.
@@ -257,27 +233,19 @@ retain strict byte/UTF-8/JSON/deadline bounds. Abort and session changes must fe
 late dispatch/results. Routing remains independent of contribution consent and
 cannot grant physical-presence authority, route membership or public discovery.
 
-ADR 0059's native private consent boundary must retain the separate default-off
-server and client exposure gates. Bearer authority and one exact account header
-are required; browser cookies/origin headers cannot supply fallback authority.
-Consent generations remain canonical decimal strings, and browser/native adapters
-share the same durable per-account consent budgets. A successful Stop response
-must represent revocation precedence, not a same-generation no-op. Native request
-abort, offline state and a subsequent read do not prove an uncertain write failed.
-Preserve uncertainty across temporary same-scope lifecycle changes; never label
-these private controls as public Ghost enforcement. No publication, coordinates,
-presence enumeration, new retention or cross-channel delivery is authorized.
+## Archived private command stopping and consent
 
-ADRs 0046/0047 define terminal stopping of a known issued command under current
-owner/account and journey serialization. Stop consumes an existing unused grant
-or withdraws a retained receipt in one transaction. It does not require current
-sharing, an active route context or contribution eligibility: those conditions
-must not prevent an owner from stopping earlier work. Unknown identifiers cannot
-create tombstones. A stopped command cannot newly accept; a missing receipt does
-not prove it was never accepted. Superseded commands do not affect replacements.
-
-The guarded browser leaf uses the signal flag independently of the choice flag,
-a separate durable stop-request quota and existing peer/browser guards. Never
-interpret transport cancellation or a lost stop response as confirmed stopping.
-Recovery uses an explicit exact-command stop retry, never a new grant or a replay
-of acceptance merely to manufacture a receipt. No public delivery is enabled.
+The private LIVE command, consent and route-preparation boundaries remain in
+code, default-off, and their rules still apply to that code: native private
+consent keeps separate server/client exposure gates, bearer-only authority and
+revocation precedence ([ADR 0059](../adr/0059-native-private-live-consent.md));
+native route preparation uses owned read/bind authority, never raw context
+replacement ([ADR 0061](../adr/0061-native-private-route-preparation.md));
+terminal command stopping consumes an unused grant or withdraws a retained
+receipt in one transaction, independent of current sharing or eligibility, and
+never treats cancellation or a lost response as a confirmed stop
+([ADRs 0046](../adr/0046-terminal-private-signal-command-stop.md)/[0047](../adr/0047-private-browser-command-stop-boundary.md)).
+The earlier Routiqo Live implementation gate (LIVE list, admission, cohort and
+publication prerequisites; [ADR 0022](../adr/0022-live-list-and-structured-evidence.md))
+and the product flows these boundaries served are archived; see
+[`docs/archive/`](../archive/README.md).

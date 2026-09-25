@@ -5,6 +5,8 @@ durable transactional receipts and catalog-aware authority; ADR 0035 exposes onl
 a separately default-off private browser command transport. Public Live output
 remains gated. See BUILD_STATUS.md for verification.
 
+> **Direction brief (2026-09-25):** Kept as idempotent receipt infrastructure for public Spot signals and posts. Receipts no longer gate a private-to-public transition: signals are public on a Spot under a per-room alias, expire by type, and the author can delete them. See [PRODUCT.md](../../PRODUCT.md).
+
 ADR 0024 defines the command/grant and persistence direction, including atomic
 grant consumption and replay denial after receipt purge. ADR 0028 implements that
 durable idempotency contract; SIGNAL_COMMAND_SPEC.md retains the pure decision

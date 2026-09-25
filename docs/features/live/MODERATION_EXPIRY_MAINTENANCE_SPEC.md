@@ -4,6 +4,8 @@ Status: implemented and independently reviewed, 2026-09-19; disabled by default.
 Extends ADR 0041's
 callable retention boundary without changing its retention or authorization policy.
 
+> **Direction brief (2026-09-25):** Kept unchanged in role: it cleans moderation audit receipts and operator debit slots, and will cover audit rows for hiding posts and voice notes once that action exists. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope
 
 Schedule existing `ContributionRestrictionAuditCleanup` methods only. Delete

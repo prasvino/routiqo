@@ -3,6 +3,8 @@
 Status: accepted and implemented for the internal application boundary. No public
 consent endpoint, UI, offline queue or presence publication is enabled.
 
+> **Status update (2026-09-25):** Superseded by the direction brief. Consent intent ordering is retired with per-journey consent (one Spot-passage opt-in plus Ghost Mode). Its revocation-precedence ideas may be reused for the Spot-passage opt-in. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Keep ADR 0026's trusted `change` operation and same-state transition behavior for

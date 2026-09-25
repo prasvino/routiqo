@@ -3,12 +3,14 @@
 Date: 2026-09-23
 Status: **experimental candidate architecture under [ADR 0065](0065-public-live-v1-policy.md) (2026-09-25): closed, explicitly consented, disabled-by-default staging experiment only.** Production activation requires a separate explicit decision after the pilot evidence listed there. Previously: V3 implementation and staging evaluation authorized on 2026-09-23.
 
+> **Status update (2026-09-25):** Superseded by the direction brief. The V3 community traffic summary (12/10/80% rules) is archived and its flags stay off. Its report and moderation lessons carry into the pilot moderation plan. See [PRODUCT.md](../PRODUCT.md).
+
 Implementation record, 2026-09-23: V23/V24, guarded Share/Stop/recovery,
 catalog-versioned snapshot publisher, canonical reader/report, internal audited
 suppression, independent maintenance, generated contracts and active-journey web
 controls are integrated behind disabled production flags. The feed carries a
 server-time sample so clients can expire delivered rows conservatively without
-trusting the device wall clock. [Staging evidence](../validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md)
+trusting the device wall clock. [Staging evidence](../archive/validation/V3_STAGING_IMPLEMENTATION_EVIDENCE_2026-09-23.md)
 records test coverage, synthetic utility and missing real-environment gates.
 This implementation record does not accept the V3 terms for production.
 
@@ -48,7 +50,7 @@ Reporting targets only an authorized visible canonical moment. Bounded report in
 
 Proposed staging defaults are source-candidate logical expiry 24 hours after window end and removal of expired projection content within 24 hours; idempotency/debit, report/audit, backup and legal retention need separate justified schedules. These are engineering proposals, not approved deletion terms. No raw identity document, precise route or GPS trail belongs in publication storage. Public output may still be copied indefinitely by observers.
 
-Draft disclosure and owner recovery states belong in [the focused feature spec](../features/live/COMMUNITY_TRAFFIC_SUMMARY_SPEC.md). Product/privacy review must accept the participation-inference risk, after-snapshot withdrawal limit, moderation takedown behavior, block semantics, retention and absence of a person-level guarantee before any user-facing Share or public result is enabled.
+Draft disclosure and owner recovery states belong in [the focused feature spec](../archive/features/live/COMMUNITY_TRAFFIC_SUMMARY_SPEC.md). Product/privacy review must accept the participation-inference risk, after-snapshot withdrawal limit, moderation takedown behavior, block semantics, retention and absence of a person-level guarantee before any user-facing Share or public result is enabled.
 
 ## Relationship to the prior blockers
 

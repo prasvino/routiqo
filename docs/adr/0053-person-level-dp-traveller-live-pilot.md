@@ -3,6 +3,8 @@
 Date: 2026-09-23
 Status: **paused as research by [ADR 0065](0065-public-live-v1-policy.md) (2026-09-25)**; retained. Previously: proposed for mathematical, security and product review; public output prohibited
 
+> **Status update (2026-09-25):** Superseded by the direction brief. The person-level differential-privacy pilot is archived; the pilot runs on openly public, alias-attributed, expiring posts instead. Revisit only if aggregate traveller counts return after a separate privacy review. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision under evaluation
 
 Use a finite 30-day Chennai/OMR pilot with one public-purpose contribution per independently verified person for the entire pilot. A Stop never refunds the slot. A later pilot requires a new privacy-budget decision; this ADR grants no automatic reset. Private Quick Signals remain available outside this public budget. The privacy unit is one verified person, not one account, report, window or journey. Neighboring pilot datasets differ by adding or removing all public input from one person. Enforcement must survive account deletion and re-verification until the pilot and retention period end.

@@ -4,6 +4,8 @@ Status: implemented internally. ADR 0034 adds a private owner-only browser bindi
 and recovery transport behind a separate default-off flag; no signal endpoint,
 UI or public Live output exists.
 
+> **Direction brief (2026-09-25):** Kept as the mechanism behind "Spots ahead", but Spots should appear automatically on journey start rather than through a "prepare private route" step. The consent lock and "current sharing/active consent" requirement are retired (one Spot-passage opt-in plus Ghost Mode replaces them); the 15-minute context is too short for long trips. See [PRODUCT.md](../../PRODUCT.md).
+
 Implement a synchronous internal service accepting independently authenticated
 actor ID, owned journey ID, RouteRequest, alternative index and optional expected
 current context ID. Never accept client geometry, anchor sets or resolver results.

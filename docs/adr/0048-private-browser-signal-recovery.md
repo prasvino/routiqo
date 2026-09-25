@@ -3,6 +3,8 @@
 Status: accepted for the private browser integration, 2026-09-19. No public
 publication approval or backend feature activation.
 
+> **Status update (2026-09-25):** Superseded by the direction brief. The private browser contribution UI is archived; the Android Spot signal UI is primary. Its recovery lessons (an uncertain write is not stopped by aborting transport) still apply. See [PRODUCT.md](../PRODUCT.md).
+
 ## Context
 
 ADRs 0045–0047 provide exact-context choices/issuance and terminal stopping.
@@ -43,7 +45,7 @@ The first private interface offers explicit Stop/Retry Stop rather than replayin
 an uncertain observation. Existing server authorization, quotas, expiry and feature
 flags remain authoritative. No native or public LIVE capability is added.
 The lifecycle contract and acceptance cases are maintained in
-`../features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md`; rendered evidence and limitations
-belong in `../quality/PRIVATE_QUICK_SIGNAL_UI_QA.md`, with final suite/build evidence
+`../archive/features/live/BROWSER_QUICK_SIGNAL_UI_PLAN.md`; rendered evidence and limitations
+belong in `../archive/quality/PRIVATE_QUICK_SIGNAL_UI_QA.md`, with final suite/build evidence
 in `../quality/BUILD_STATUS.md`. Real OAuth, regional services/catalog, assistive
 technology and device verification remain release dependencies.

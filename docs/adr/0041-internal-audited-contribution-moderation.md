@@ -3,6 +3,8 @@
 Date: 2026-09-19
 Status: implemented and independently reviewed for the bounded internal scope
 
+> **Status update (2026-09-25):** Accepted — role note by the direction brief. The audited moderation boundary is kept for posts, voice notes and chat. Follow-up: add a content-hide action so moderators can hide an item quickly, not only restrict an account. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Replace the unaudited production restriction mutation service with one internal

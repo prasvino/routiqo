@@ -3,6 +3,8 @@
 Status: accepted and implemented as a default-off internal boundary. No public
 registration, journey binding, signal grant or presence output is enabled.
 
+> **Status update (2026-09-25):** Accepted — role note by the direction brief. The curated anchor catalog and route matching are kept: anchors are Spot seeds for the pilot corridor, and the resolver produces "Spots ahead". See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Route Update owns an immutable, operator-curated anchor catalog loaded from one

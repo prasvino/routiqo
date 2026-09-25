@@ -5,6 +5,8 @@ Status: internal implementation tested and independently reviewed,
 `SignalIssuanceExpectation`. ADRs 0033/0035's legacy paths and current wire contract
 remain unchanged. No browser caller uses the new path yet.
 
+> **Direction brief (2026-09-25):** Kept as a correctness guarantee that a contribution lands on the Spot the user saw. Consent-generation matching in the expected tuple is retired with per-journey consent; the private-choice UI it was built for is archived. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Problem and selected direction
 
 The ADR 0043 choice snapshot identifies the context and consent the owner saw.

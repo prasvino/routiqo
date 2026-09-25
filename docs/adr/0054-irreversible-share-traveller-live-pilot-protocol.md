@@ -3,6 +3,8 @@
 Date: 2026-09-23
 Status: **paused as research by [ADR 0065](0065-public-live-v1-policy.md) (2026-09-25).** Research, documentation and disconnected code are retained; no further implementation effort unless a future decision reopens it. Previously: user-selected implementation direction, protocol review pending; public traveller output remains prohibited.
 
+> **Status update (2026-09-25):** Superseded by the direction brief. Irreversible Share and the traveller LIVE pilot protocol are archived; signals are public on Spots from the moment they are posted, and the author can delete them. See [PRODUCT.md](../PRODUCT.md).
+
 ADR 0055 records a later user-supplied community-summary alternative for review. It does not supersede this candidate or close its person-level privacy findings; it would require explicit approval of a different product/privacy contract.
 
 ## Context and disposition

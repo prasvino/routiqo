@@ -6,10 +6,10 @@ The user's request controls scope. This document does not authorize extra featur
 
 ## Read and scope
 
-1. Read `AGENTS.md`, `docs/product/ROUTIQO_MASTER_CONTEXT.md`, and `docs/development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`. Read the UI system for user-facing work.
+1. Read `AGENTS.md`, `docs/PRODUCT.md` (product source of truth), `docs/architecture/ENGINEERING_CONTEXT.md` (engineering context), and `docs/development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`. Read the UI system for user-facing work.
 2. Inspect the affected code and load only relevant feature specs, ADRs, contracts, and tests. Check `docs/quality/BUILD_STATUS.md` for known verification limits.
 3. Write concise acceptance criteria and a focused feature spec before substantial implementation. Identify the data, authorization, privacy, offline, and failure boundaries affected.
-4. Keep planned capabilities distinct from implemented behavior. Do not turn historical Wayfind material or old handoffs into current requirements.
+4. Keep planned capabilities distinct from implemented behavior. Do not turn historical Wayfind material, old handoffs or `docs/archive/` into current requirements.
 
 ## Model responsibilities
 
@@ -38,9 +38,9 @@ Astra reviews every substantial Sol implementation against the acceptance criter
 
 ## Risk and review gates
 
-For authentication, authorization, location, presence, Live publication, blocking, moderation, retention, or cross-user data, read `docs/security/SECURITY.md`, `docs/security/THREAT_MODEL.md`, and `docs/quality/CODE_REVIEW.md`. Apply their current gates. Critical and High findings block completion; Medium findings need correction or an explicit root disposition.
+For authentication, authorization, location, Spot passage, posts and voice notes, Spot chat, Ask Ahead, route guides, blocking, moderation, retention, or cross-user data, read `docs/security/SECURITY.md`, `docs/security/THREAT_MODEL.md`, and `docs/quality/CODE_REVIEW.md`. Apply their current gates. Critical and High findings block completion; Medium findings need correction or an explicit root disposition.
 
-For privacy-sensitive social and location changes, the root explicitly checks server-side transformation, consent and Ghost Mode, endpoint protection, expiry, anti-enumeration, authorization, blocking, and multi-replica correctness. For journey writes, check durable recovery, idempotency, reconciliation, and reconnect behavior. Add meaningful tests at the affected boundary.
+For privacy-sensitive social and location changes (Spots, posts, Ask Ahead), the root explicitly checks active input only (no continuous server location, no traveller counts), server-side transformation before publishing, Spot-passage opt-in, Ghost Mode stopping all sending including queued items, per-room aliases, Ask Ahead recipient privacy, report/hide moderation, endpoint protection, expiry, anti-enumeration, authorization, blocking, and multi-replica correctness. For journey writes, check durable recovery, idempotency, reconciliation, and reconnect behavior. Add meaningful tests at the affected boundary.
 
 For UI, follow `docs/design/ROUTIQO_UI_UX_SYSTEM.md`; inspect the rendered result, interactions, accessibility, small screens, and relevant empty/error/offline states. Do not skip a failing security, privacy, or architecture check to finish a task.
 

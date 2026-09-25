@@ -1,5 +1,7 @@
 # Account deletion
 
+> **Direction brief (2026-09-25):** Kept, to finish before the pilot. When built, the deletion cascade must also remove the user's Spot posts, voice notes, one-tap signals, Ask Ahead questions and answers, Spot-passage records and route guides, and clear queued social items; remote erasure of copies already delivered to disconnected devices is still not claimed. See [PRODUCT.md](../../PRODUCT.md).
+
 An authenticated user may explicitly delete their Routiqo server account. Require exact confirmation DELETE and Google authentication within the previous five minutes. Renewal retains the original authentication timestamp and cannot satisfy this requirement. Older authentication returns 428; the user signs in again and explicitly reconfirms. Never automatically delete after a Google callback.
 
 The transaction locks the valid current session and enabled account, checks recent authentication, then deletes the account. Foreign keys cascade all its sessions and server journey records. Other accounts remain untouched. Adding the journey owner foreign key must fail on orphaned legacy rows; do not silently erase or remap data. This migration has only been exercised in disposable databases until explicitly run against a configured environment.

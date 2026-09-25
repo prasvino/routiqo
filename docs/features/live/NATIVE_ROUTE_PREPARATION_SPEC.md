@@ -1,11 +1,13 @@
 # Native private route preparation and recovery
 
+> **Direction brief (2026-09-25):** The explicit "check / prepare private route" ceremony is archived; on Android the Journey map should show Spots ahead automatically on journey start. The two-transaction binding transport it reuses is kept, while the consent rechecks and native consent prerequisite are retired. See [PRODUCT.md](../../PRODUCT.md).
+
 Scope: complete the next private LIVE prerequisite after native consent and route
 planning. Explicitly check/prepare a selected route for the verified active journey.
 Reuse existing two-transaction binding authority; no new public output, GPS,
 presence grant, signal issuance, provider/catalog deployment or persistence model.
 Browser contracts in BROWSER_ROUTE_BINDING_API_SPEC.md and
-BROWSER_ROUTE_BINDING_UI_SPEC.md remain the protocol reference.
+`../../archive/features/live/BROWSER_ROUTE_BINDING_UI_SPEC.md` (archived) remain the protocol reference.
 
 ## Backend boundary
 
@@ -106,5 +108,5 @@ and Stop invalidation before effects, route edits/alternative/recalculation chan
 late results/session changes, expiry and no implicit requests. Mounted emulator
 fixtures exercise actual composition/recovery/offline/background/account and small
 large-text UI; remove fixtures before final APK/build/startup inspection. Run full
-TS/core checks, format/types/lint/contracts/secrets and update NATIVE_LIVE_PENDING.md.
+TS/core checks, format/types/lint/contracts/secrets and update `../../archive/validation/NATIVE_LIVE_PENDING.md` (archived).
 Real OAuth, regional catalog/provider and physical-device validation stay pending.

@@ -2,6 +2,8 @@
 
 Status: accepted and implemented behind the existing default-off V3 flags, 2026-09-25. Production activation still follows the ADR 0055 decision.
 
+> **Status update (2026-09-25):** Accepted — role note by the direction brief. The protocol is reused for pilot moderation: Spot posts, voice notes, chat messages and signals are published outputs with opaque references, so the receipt-first retry, retention split, per-reporter quota and severity-first queue apply to them. Re-targeting from V3 summaries to Spot content is Phase 2 work; production activation now follows the pilot phase gates, not the ADR 0055 decision. See [PRODUCT.md](../PRODUCT.md).
+
 ## Context
 
 The durable report intake proposal left four questions open: evidence identity, exact retry after revocation, shared lock order and investigation after evidence expires. V3 community traffic already had a working report path for canonical projections. [REPORTING_PROTOCOL_PROPOSAL.md](../features/live/REPORTING_PROTOCOL_PROPOSAL.md) proposed generalizing that path. The owner approved all six recommendations on 2026-09-25.

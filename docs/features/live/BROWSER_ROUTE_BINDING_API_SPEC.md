@@ -2,6 +2,8 @@
 
 Status: implemented and tested. Private owner-only transport, default off.
 
+> **Direction brief (2026-09-25):** Kept as an owner-only transport, but web is secondary to Android and the archived route-binding UI is not rebuilt; Spots ahead should load automatically on journey start. "No offline queue" is replaced by the PRODUCT.md offline rule for posts, signals and answers. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope and contract
 
 Add GET and POST /api/v1/journeys/{id}/route-context behind the independent

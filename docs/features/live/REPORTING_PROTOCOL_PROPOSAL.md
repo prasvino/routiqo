@@ -2,6 +2,8 @@
 
 Status: **approved by the owner on 2026-09-25 (all six recommendations) and implemented for V3 behind the existing default-off flags; see [ADR 0064](../../adr/0064-v1-reporting-protocol.md).** The rest of this section keeps the original proposal text; where implementation refined it, a note says so.
 
+> **Direction brief (2026-09-25):** Approved protocol (ADR 0064) is kept and re-targeted from V3 summaries to Spot posts, voice notes, chat and signals for the pilot; references to the ADR 0055 decision as the activation gate are replaced by the pilot phase gates. See [PRODUCT.md](../../PRODUCT.md).
+
 Original status: proposed for owner review. This proposal answers the open questions in [DURABLE_REPORT_INTAKE_PROPOSAL.md](DURABLE_REPORT_INTAKE_PROPOSAL.md) ("Independent review disposition", items 1–4) and the `todo.md` item "Resolve canonical reporting evidence identity, reference authorization, exact retries after revocation and shared transaction lock order". It changes no code, flag or retention setting. Production activation of anything below still needs the ADR 0055 privacy-contract decision.
 
 ## Summary

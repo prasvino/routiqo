@@ -1,8 +1,8 @@
 # Location privacy
 A displayed city is an explicit discovery context, not detected GPS. Optional route planning now accepts deliberate typed searches and a one-time browser location reading only after an explicit button action. When configured, search text is sent to the controlled Photon service on submit; selected endpoints go to Valhalla on Calculate. No watch, background tracking, persistence, analytics or social disclosure is implemented. Temporary place results and route geometry stay in the current view. Clearing or changing an account discards the mounted form; cancellation ignores late responses. Do not request actual user location during agent QA.
-Future raw GPS must pass restricted ingestion, route matching, privacy transformation and aggregation before social outputs.
+The pilot runs on active input only (see [`docs/PRODUCT.md`](../PRODUCT.md)). Posts, voice notes and one-tap signals are tied to a Spot, not to the sender's position, and expire by type. The server collects no continuous user location, derives no presence and publishes no traveller counts. Report and reply counts are allowed; traveller counts return only after a separate privacy review.
 No individual stranger dots, exact endpoints, stable trackable identifiers or coordinate-based enumeration.
-Pure domain policy can enforce expiry, Ghost Mode exclusion, and configurable minimum crowd size; an isolated policy is not proof of end-to-end anonymity. Production thresholds, query budgets and smoothing require a dedicated presence specification before enabling exposure.
+Earlier raw-GPS ingestion, minimum-crowd-size and aggregation rules protected passive presence, which the pilot does not collect. They are archived under [`docs/archive/`](../archive/README.md) and revisited only if aggregate counts return. The existing pure domain policy for expiry, Ghost exclusion and minimum crowd size remains in code but is not a pilot control; an isolated policy is not proof of end-to-end anonymity.
 
 ## Open-source migration target (ADR 0021)
 
@@ -18,95 +18,54 @@ Photon is selected by the opt-in routing configuration with matching browser
 disclosures. Verify internal request-URL logging controls and service ownership
 before accepting real search text.
 
-## Routiqo Live planned boundary
+## Spot passage
 
-The first release displays situations through a journey LIVE list, not live people.
-Canonical scope and gates: ROUTIQO_LIVE_SPEC.md and PRESENCE_SPEC.md. No counts,
-member lists or precise traveller markers. Route admission establishes relevance,
-not physical presence. Read access must not implicitly publish presence. Ghost
-withdrawal stops new private/public contributions and removes discoverable
-individual presence. The selected but unapproved ADR 0054 direction would retain
-an input already frozen by a separate, explicit, irreversible Share; later Ghost
-withdrawal cannot change public aggregate bytes. This exception requires truthful
-disclosure, bounded retention and independent protocol review before activation.
-Current private evidence remains withdrawable under its own contract.
-Moment existence/freshness can also reveal people, so the proposed one-person
-pilot budget, randomized release, fixed partitions/windows and repeated-query
-controls require adversarial validation. A minimum cohort is not established.
-ADR 0055 proposes a separate consented community traffic summary using a
-committed publication snapshot and account-level thresholds. It would allow
-participation inference from collusion, repeated windows, timing or outside
-knowledge; a snapshot and hidden names do not provide person-level privacy.
-Under that proposal, a Stop/Ghost/deletion committed before the snapshot excludes
-pending input, while one committed afterward may be too late for the summary.
-The owner authorized V3 implementation and staging evaluation, not production
-acceptance of this disclosure or retention policy. Product/privacy review and
-an explicit production decision remain required. No V18 or V22 record authorizes
-V3 participation.
-No automatic nearby/location discovery is authorized by this plan.
+Planned for the pilot; not implemented unless
+[`BUILD_STATUS.md`](../quality/BUILD_STATUS.md) says so.
 
-## Private journey contribution choice
+Spot passage ("I passed Spot X") is opt-in. One clear opt-in covers it; Ghost
+Mode and sign-out stop it. Detection runs on the device, in the foreground, only
+during an active journey. This is the one carve-out from "no watch or background
+tracking" above: no location is watched outside an active journey, and no trail,
+coordinates or distance are uploaded. The device sends only the answer (or a
+request to receive Ask Ahead questions for that Spot) with a coarse time. The
+server deletes Spot-passage records within 24 hours and logs them only as outcome
+codes. Other users never see who passed a Spot; see
+[`ANTI_STALKING.md`](ANTI_STALKING.md) for Ask Ahead recipient rules.
 
-The active-journey consent controls concern private contribution preparation only.
-They neither publish a location nor make the account discoverable. Future public
-participation requires a separately reviewed purpose, disclosure and authorization;
-an existing private sharing boolean is insufficient. Stopping contribution
-preparation does not delete retained private receipts. A cancelled or failed write
-is uncertain even after a later read: the UI retains that warning until an explicit
-stop is acknowledged. See `BROWSER_LIVE_CONSENT_UI_SPEC.md` for lifecycle rules.
+Android mechanism (decided 2026-09-25): a location foreground service with its
+required visible notification, started while the app is in use and stopped when
+the journey ends, at balanced accuracy about every 100 m or 30 s. No
+"allow all the time" background-location permission is requested. The phone
+matches locally against the next ~20 Spots ahead on the planned route; a pass is
+entering about 150 m of a Spot and then continuing past it. Location readings
+stay on the device and are not persisted beyond what matching needs. Battery
+target about 3–4% extra per hour, measured on the Phase 1 phones.
 
-## Private route preparation
+Ghost Mode stops all sending, including Spot passage and queued posts, and takes
+priority over reconnect and outbox replay.
 
-`BROWSER_ROUTE_BINDING_UI_SPEC.md` defines the private browser integration.
-Preparing a route is a separate explicit action after confirmed private consent;
-ordinary route planning does not require participation. Preparation sends the
-selected endpoints and mode to the configured routing service again and may
-resolve different geometry from the displayed estimate. It never establishes
-physical presence, public visibility or a right to contribute to a public feed.
+## Driver safety
 
-The browser keeps only a memory-scoped observation and acknowledgement. A context
-read contains no input fingerprint and cannot prove that the displayed route was
-prepared. Cancellation cannot undo a server write; a later read is not a fence
-against a delayed earlier write. Empty preparation results preserve any previous
-server context. Consent, identity, route-choice and foreground changes invalidate
-local readiness immediately; reconnect and expiry never trigger automatic traffic.
-No opaque context or anchor identifiers become public labels or location choices.
+A contribution prompt is not a safety assurance. The post-passing prompt is a
+quiet, dismissible card that expires if unanswered; it is shown only when the
+phone reports the vehicle stopped or slow, or to a user who said they are a
+passenger. Never show a blocking modal or sound while moving. Contributions are
+never required, and voice notes are recorded only by explicit action. The earlier
+per-send stopped/passenger acknowledgement is retired with the private LIVE flows.
 
-## Private contribution choices
+## Archived private LIVE boundary
 
-ADR 0045's separately gated owner transport returns only current authorized
-route-area labels/categories and exact context/consent versions. Labels are
-operator-curated public place names, never traveller-derived addresses. The
-snapshot still reveals private route intent to its owner and must remain no-store,
-bounded and absent from logs, analytics, backups and other-user surfaces.
-
-Reading choices does not create grants or publish information. An explicit
-expected-context issuance rechecks current authority; its tuple is not proof of
-presence or independent evidence. Cancellation or rejecting an expired response
-cannot undo a server-side issuance. Clients must not silently refresh/reissue or
-fall back to the legacy anchor-only contract. Public eligibility and disclosure
-remain governed by the separate cohort and safety gates.
-
-## Stopping a private command
-
-ADRs 0046/0047 allow an owner to stop a known issued command even after sharing
-is disabled, the route changes, contribution eligibility is revoked or the
-journey ends. The server atomically consumes the unused grant or withdraws its
-retained receipt. This prevents future new acceptance of that command, without
-asserting that it was never accepted or deleting retained private history.
-A null stopped receipt has no historical meaning. Stopping an older superseded
-command does not stop its replacement. Failed or cancelled transport is not a
-confirmed stop; the caller must preserve uncertainty and use explicit recovery.
-This private boundary does not implement public revocation or publication.
-
-The mounted private browser controls require a fresh successful bind for the
-current copied route, confirmed account/journey and current consent. A context GET
-cannot authorize contribution. Choice snapshots must match the exact context,
-revision and consent generation; only server-authorized categories are offered.
-Every send requires a new stopped/passenger acknowledgment. This acknowledgment
-is an interaction safeguard, not proof of physical presence or driving safety.
-Foreground/route/consent changes cancel new work synchronously; no background,
-offline or reconnect submission occurs. Known commands remain separately available
-for explicit stopping after sharing or journey changes. Only bounded minimized
-recovery metadata survives those transitions within the workspace; route labels
-and observations do not. Local recovery expiry/removal is not public revocation.
+ADRs [0022](../adr/0022-live-list-and-structured-evidence.md)–[0061](../adr/0061-native-private-route-preparation.md)
+defined the LIVE list, private journey contribution consent (ADRs 0026, 0029,
+0030, 0059), private route preparation (ADRs 0032, 0034, 0061), private
+contribution choices (ADRs 0043–0045), private command stopping (ADRs 0046/0047),
+the ADR 0054 irreversible Share and the ADR 0055 V3 community traffic summary.
+Their product, consent and publication specifications are archived under
+[`docs/archive/features/live/`](../archive/README.md); infrastructure specs
+stay in [`docs/features/live/`](../features/live/) with a status note. That code remains in the
+repository, default-off, and its private boundaries still hold if it runs: route
+preparation and consent never establish physical presence, public visibility or a
+right to contribute to a public feed; opaque context or anchor identifiers never
+become public labels. No stored private report, consent or receipt becomes public
+through a migration. No automatic nearby or location discovery is authorized.

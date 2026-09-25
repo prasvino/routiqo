@@ -1,7 +1,9 @@
 # ADR 0059: Native private LIVE consent
 
 Status: accepted for implementation; no production activation or public privacy
-contract is approved. Feature contract: `../features/live/NATIVE_LIVE_CONSENT_SPEC.md`.
+contract is approved. Feature contract: `../archive/features/live/NATIVE_LIVE_CONSENT_SPEC.md`.
+
+> **Status update (2026-09-25):** Superseded by the direction brief. Native per-journey consent is retired and replaced by one Spot-passage opt-in plus Ghost Mode; the Android client is primary. Its transport hardening may be reused for the opt-in. See [PRODUCT.md](../PRODUCT.md).
 
 ## Decision
 

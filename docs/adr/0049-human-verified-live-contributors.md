@@ -3,6 +3,8 @@
 Date: 2026-09-23
 Status: accepted eligibility direction; public publication remains closed
 
+> **Status update (2026-09-25):** Superseded by the direction brief. Human-verified person authority existed for the public-LIVE/DP protocol, which is archived. The open question of whether Spot passage requires sign-in may later want a lighter version. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Traveller evidence is eligible for a future public LIVE protocol only after a human review has established one active pseudonymous person reference for the contributor. Verification is an explicit, revocable and expiring authority, separate from Google login, journey ownership, route matching, private consent, and the current durable suspension state. No missing or stale verification state defaults to eligible.

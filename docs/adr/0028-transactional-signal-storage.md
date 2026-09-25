@@ -3,6 +3,8 @@
 Status: accepted and implemented for internal persistence. No public ingestion,
 provider anchor registration, moderation or projection is enabled.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. Transactional grants, receipts and budgets remain infrastructure for Spot signals and posts. The sharing-consent requirement is retired, and signals become public on Spots under per-room aliases with per-type lifetimes. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Route Update owns server-issued command grants, private receipts and fixed-minute
