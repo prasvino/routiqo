@@ -1,11 +1,11 @@
 # Claude working method for Routiqo
 
-This replaces the earlier Codex orchestration and workflow guides.
-The user's request controls scope. This document does not authorize extra features, deployment, purchases, flag activation or outside communication. Product, architecture, privacy and security requirements stay in their canonical documents (see `CLAUDE.md`).
+This is Claude's counterpart to `CODEX_ORCHESTRATION.md`. Both files are maintained side by side, and the review and verification gates are the same.
+The user's request controls scope. This document does not authorize extra features, deployment, purchases, flag activation or outside communication. Product, architecture, privacy and security requirements stay in their canonical documents (see `AGENTS.md`).
 
 ## 1. Read and scope
 
-1. Read `CLAUDE.md`, `docs/product/ROUTIQO_MASTER_CONTEXT.md` and `docs/development/ENGINEERING_GUARDRAILS.md`. For user-facing work, also read `docs/design/ROUTIQO_UI_UX_SYSTEM.md`.
+1. Read `AGENTS.md` / `CLAUDE.md`, `docs/product/ROUTIQO_MASTER_CONTEXT.md` and `docs/development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`. The guardrails apply to every agent despite the filename. For user-facing work, also read `docs/design/ROUTIQO_UI_UX_SYSTEM.md`.
 2. Check `docs/quality/BUILD_STATUS.md`, the relevant `docs/validation/*_PENDING.md` ledger and `docs/validation/IMPLEMENTATION_RESUME.md` (if it exists) for current state and known limits.
 3. Inspect the affected code. Load only the feature specs, ADRs, contracts and tests that apply.
 4. For substantial work, write concise acceptance criteria and a focused spec (`docs/features/<area>/<NAME>_SPEC.md`) before implementing. The guardrails §23 template lists the sections to consider. Name the data, authorization, privacy, offline and failure boundaries the change touches.
@@ -63,6 +63,5 @@ Report what passed, what failed and what was not run, with the real command resu
 
 - Confirm the acceptance criteria. Review the diff for unrelated edits, secrets and precise location data.
 - Update ADRs and contracts where required. Update `docs/quality/BUILD_STATUS.md` and the relevant `*_PENDING.md` ledger with actual results. Update `todo.md` only for items that are genuinely closed.
-- Claude-specific files (`CLAUDE.md`, this workflow doc, `.claude/`) stay on `feature-claude` and are never pushed or merged to `main` (see the branch policy in `CLAUDE.md`).
 - Commit on the designated branch with a clear message. Do not push to other branches, deploy or enable flags unless the user asks.
 - If you pause mid-feature, update `docs/validation/IMPLEMENTATION_RESUME.md` with what is done, what was verified, and the exact resume steps.

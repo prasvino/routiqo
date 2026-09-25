@@ -1,8 +1,8 @@
-# Routiqo --- Engineering Guardrails
+# Routiqo --- Codex Engineering Guardrails
 
 > **Purpose:** This document complements `ROUTIQO_MASTER_CONTEXT.md`.
 > The master context explains **what Routiqo is and what to build**.
-> This document defines **how it must be built** so architecture,
+> This document defines **how Codex must build it** so architecture,
 > security, privacy, reliability, performance, and maintainability do
 > not gradually degrade during implementation.
 >
@@ -21,7 +21,7 @@ Use three levels of engineering documentation.
 Maintain these before substantial feature implementation:
 
 ``` text
-CLAUDE.md
+AGENTS.md
 
 docs/
 ├── architecture/
@@ -46,7 +46,7 @@ docs/
 │   ├── OBSERVABILITY.md
 │   └── CODE_REVIEW.md
 └── development/
-    └── CLAUDE_WORKFLOW.md
+    └── CODEX_WORKFLOW.md
 ```
 
 These documents define long-lived system invariants.
@@ -121,11 +121,11 @@ plans should be written close to implementation time.
 
 ------------------------------------------------------------------------
 
-# 2. Working Contract
+# 2. Codex Working Contract
 
-For every non-trivial task, the implementer (human or Claude) must:
+For every non-trivial task, Codex must:
 
-1.  Read root `CLAUDE.md`.
+1.  Read root `AGENTS.md`.
 2.  Read `ROUTIQO_MASTER_CONTEXT.md`.
 3.  Read the relevant architecture/security/privacy documents.
 4.  Inspect existing implementation before proposing structural changes.
@@ -995,7 +995,7 @@ An ADR should record:
 
 ------------------------------------------------------------------------
 
-# 22. What Not To Do
+# 22. What Codex Must Not Do
 
 Unless explicitly approved:
 
@@ -1023,7 +1023,7 @@ Unless explicitly approved:
 
 # 23. Feature Implementation Template
 
-For each substantial feature, use a specification
+For each substantial feature, Codex should use a specification
 resembling:
 
 ``` markdown
@@ -1095,12 +1095,12 @@ section should be consciously considered.
 
 ------------------------------------------------------------------------
 
-# 24. Initial Engineering Documents
+# 24. Initial Documents Codex Should Produce
 
 Before substantial Routiqo feature development, create concise first
 versions of:
 
-1.  `CLAUDE.md`
+1.  `AGENTS.md`
 2.  `docs/architecture/ARCHITECTURE.md`
 3.  `docs/architecture/BACKEND_ARCHITECTURE.md`
 4.  `docs/architecture/FRONTEND_ARCHITECTURE.md`
@@ -1116,7 +1116,7 @@ versions of:
 14. `docs/quality/TESTING_STRATEGY.md`
 15. `docs/quality/PERFORMANCE.md`
 16. `docs/quality/OBSERVABILITY.md`
-17. `docs/development/CLAUDE_WORKFLOW.md`
+17. `docs/development/CODEX_WORKFLOW.md`
 
 Keep them concise and executable. Expand them when implementation
 exposes real decisions.
@@ -1125,7 +1125,7 @@ exposes real decisions.
 
 # 25. Final Engineering Principle
 
-The master product context describes **what Routiqo should become**.
+The master product context tells Codex **what Routiqo should become**.
 
 These guardrails ensure that as implementation grows, Routiqo remains:
 

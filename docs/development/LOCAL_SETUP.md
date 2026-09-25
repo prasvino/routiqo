@@ -228,7 +228,7 @@ staging, inspect backlog growth with operator-only aggregate queries, wire failu
 alerts, and measure database load with the intended enabled replica count. A full
 batch indicates possible backlog; repeated failures require operator attention.
 Disable the flag and restart to stop future ticks. This cannot undo prior deletes.
-The code does not enable a deployment, create an AI-agent scheduled task, configure alerts,
+The code does not enable a deployment, create a Codex timer, configure alerts,
 erase backups or satisfy public Live revocation requirements.
 
 ## Open-source maps target setup

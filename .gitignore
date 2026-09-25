@@ -57,10 +57,10 @@ secrets/
 docs/development/WORK_CHECKPOINT.md
 map-data/
 
-# Claude Code per-developer settings
-.claude/settings.local.json
-
-# Impeccable project-local executable and machine/session state (if installed)
-.claude/skills/impeccable/scripts/bin/
+# Impeccable project-local executable and machine/session state
+.agents/skills/impeccable/scripts/bin/
 .impeccable/config.local.json
 .impeccable/hook.cache.json
+
+# Claude Code per-developer settings
+.claude/settings.local.json

@@ -9,9 +9,9 @@ This skill adds Routiqo-specific checks to UI work. It is not a second design sy
 
 ## Context
 
-1. Read `CLAUDE.md` and `docs/design/ROUTIQO_UI_UX_SYSTEM.md`.
+1. Read `AGENTS.md` / `CLAUDE.md` and `docs/design/ROUTIQO_UI_UX_SYSTEM.md`. That document addresses Codex, but its rules apply to Claude unchanged.
 2. Read the relevant feature spec and the current tokens (`packages/design-tokens/src`) and components only as needed.
-3. If a project-scoped Impeccable skill is installed under `.claude/skills/impeccable/`, you may use its `audit`, `critique`, `polish` or `distill` playbook. Choose the one that matches the request; do not run all four. Without it, apply the modes below directly.
+3. If Impeccable is installed for Claude under `.claude/skills/impeccable/` (`npx --yes impeccable install -y --providers=claude --scope=project --no-hooks`; the existing `.agents/` copy is the Codex install), you may use its `audit`, `critique`, `polish` or `distill` playbook. Choose the one that matches the request; do not run all four. Without it, apply the modes below directly.
 
 | Intent | Result |
 |---|---|
