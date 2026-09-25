@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ActiveProfiles("persistence")
 class JdbcCommunityTrafficV3IntegrationTest {
     private static final PostgreSQLContainer DATABASE = new PostgreSQLContainer("postgres:16-alpine");
-    private static final Instant WINDOW = Instant.parse("2026-09-23T10:00:00Z");
+    private static final Instant WINDOW = com.routiqo.core.publiclive.RecentTrafficWindow.now();
     private static final UUID ANCHOR = UUID.randomUUID();
     private static final UUID CATALOG_VERSION = UUID.randomUUID();
     static { DATABASE.start(); }
@@ -840,6 +840,425 @@ class JdbcCommunityTrafficV3IntegrationTest {
         return new RouteAnchorCatalog(CATALOG_VERSION, List.of(new RouteAnchor(ANCHOR,
                 new RouteRequest.Coordinate(12.9, 80.2), Set.of(QuickSignalValue.Category.TRAFFIC),
                 Optional.of("Reviewed road area"))));
+    }
+
+    // --- ADR 0065 pilot suites: withdrawal and publication threshold ---
+
+    private void withdraw(String action, Owner owner, Instant at) {
+        switch (action) {
+            case "STOP" -> jdbc.update("""
+                    UPDATE community_traffic_candidate_v3
+                    SET state = 'STOPPED', stopped_at = ? WHERE actor_id = ?
+                    """, Timestamp.from(at), owner.actor());
+            case "GHOST" -> jdbc.update("UPDATE presence_consent SET sharing = FALSE WHERE actor_id = ?", owner.actor());
+            case "COMPLETE" -> jdbc.update("UPDATE journey SET status = 'COMPLETED', completed_at = ? WHERE id = ?",
+                    Timestamp.from(at), owner.journey());
+            case "RESTRICT" -> jdbc.update("""
+                    INSERT INTO live_contribution_restriction(actor_id, revision, restricted) VALUES (?, 1, TRUE)
+                    """, owner.actor());
+            case "DELETE" -> jdbc.update("DELETE FROM routiqo_account WHERE id = ?", owner.actor());
+            case "UNVERIFY" -> jdbc.update("UPDATE live_verified_contributor SET state = 'revoked' WHERE account_id = ?",
+                    owner.actor());
+            default -> throw new IllegalStateException(action);
+        }
+    }
+
+    private String outcome() {
+        return jdbc.queryForObject("SELECT outcome FROM community_traffic_decision_v3 WHERE window_start = ?",
+                String.class, Timestamp.from(WINDOW));
+    }
+
+    @Test void verificationRevokedBeforeSnapshotExcludesTheCandidate() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        withdraw("UNVERIFY", owners.getFirst(), WINDOW.plusSeconds(300));
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_projection_v3", Integer.class)).isZero();
+    }
+
+    @Test void everyWithdrawalCommittedAfterTheSnapshotLeavesTheInProgressSummaryUnchanged() throws Exception {
+        for (String action : List.of("GHOST", "COMPLETE", "RESTRICT", "DELETE", "UNVERIFY")) {
+            clear();
+            for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+            CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+            var publisher = new JdbcCommunityTrafficPublisherV3(dataSource, catalog(),
+                    Clock.fixed(WINDOW.plusSeconds(301), ZoneOffset.UTC), () -> {}, () -> {
+                        entered.countDown();
+                        try {
+                            if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Barrier timed out");
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(interrupted);
+                        }
+                    });
+            try (var pool = Executors.newSingleThreadExecutor()) {
+                var result = pool.submit(() -> publisher.publish(20));
+                assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+                withdraw(action, owners.getFirst(), WINDOW.plusSeconds(301));
+                release.countDown();
+                assertThat(result.get()).isEqualTo(2);
+            }
+            // The snapshot fixed the input; a later withdrawal cannot redraw or remove the summary.
+            assertThat(outcome()).as(action).isEqualTo("PUBLISHED");
+            // A new publisher run never reopens the terminal decision.
+            publisher(WINDOW.plusSeconds(302)).publish(20);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_decision_v3 WHERE window_start = ?",
+                    Integer.class, Timestamp.from(WINDOW))).as(action).isEqualTo(1);
+        }
+    }
+
+    @Test void publicationThresholdBoundaries() {
+        record Case(String name, int agreeing, int other, String expected) {}
+        for (var example : List.of(
+                new Case("11 accounts all agreeing", 11, 0, "NO_OUTPUT"),
+                new Case("12 accounts, 9 agreeing", 9, 3, "NO_OUTPUT"),
+                new Case("14 accounts, 11 agreeing (78.6%)", 11, 3, "NO_OUTPUT"),
+                new Case("15 accounts, 12 agreeing (exactly 80%)", 12, 3, "PUBLISHED"),
+                new Case("12 accounts, 10 agreeing (83%)", 10, 2, "PUBLISHED"))) {
+            clear();
+            for (int i = 0; i < example.agreeing(); i++) seed("TRAFFIC_SLOW");
+            for (int i = 0; i < example.other(); i++) seed("TRAFFIC_STOPPED");
+            publisher(WINDOW.plusSeconds(301)).publish(20);
+            assertThat(outcome()).as(example.name()).isEqualTo(example.expected());
+            int projections = jdbc.queryForObject("SELECT count(*) FROM community_traffic_projection_v3", Integer.class);
+            assertThat(projections).as(example.name()).isEqualTo(example.expected().equals("PUBLISHED") ? 1 : 0);
+            if (projections == 1)
+                assertThat(jdbc.queryForObject("SELECT traffic_value FROM community_traffic_projection_v3", String.class))
+                        .isEqualTo("TRAFFIC_SLOW");
+        }
+    }
+
+    @Test void unverifiedAccountsCannotManufactureASummaryHoweverManyAgree() {
+        for (int i = 0; i < 20; i++) seed("TRAFFIC_MOVING");
+        jdbc.update("UPDATE live_verified_contributor SET state = 'revoked'");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void onePersonCannotHoldTwoActiveVerifiedAccounts() {
+        seed("TRAFFIC_SLOW");
+        var first = owners.getFirst();
+        UUID person = jdbc.queryForObject("SELECT person_ref FROM live_verified_contributor WHERE account_id = ?",
+                UUID.class, first.actor());
+        UUID second = UUID.randomUUID(), caseId = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", second, "sybil-" + second);
+        jdbc.update("INSERT INTO live_verification_case(id, account_id, person_ref, expires_at) VALUES (?, ?, ?, ?)",
+                caseId, second, person, Timestamp.from(WINDOW.plusSeconds(3600)));
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO live_verified_contributor(account_id, case_id, person_ref, revision,
+                    state, first_reviewer_id, second_reviewer_id, expires_at)
+                VALUES (?, ?, ?, 2, 'active', ?, ?, ?)
+                """, second, caseId, person, UUID.randomUUID(), UUID.randomUUID(),
+                Timestamp.from(WINDOW.plusSeconds(3600))))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    // --- ADR 0065 adversarial pilot suite (real PostgreSQL; not a staging red-team run) ---
+
+    @Test void colludingVerifiedAccountsNeedTheFullThresholdAndAreBlockedByHonestDissent() {
+        // Residual risk documented in ADR 0065: ten colluding verified people in a window with only
+        // two honest reports can publish a false condition. The guard is that the coalition can never
+        // be smaller than 10 agreeing accounts at >= 80%, so three honest dissenters stop it.
+        for (int i = 0; i < 10; i++) seed("TRAFFIC_MOVING");
+        for (int i = 0; i < 3; i++) seed("TRAFFIC_STOPPED");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+
+        clear();
+        for (int i = 0; i < 9; i++) seed("TRAFFIC_MOVING");
+        for (int i = 0; i < 3; i++) seed("TRAFFIC_MOVING");
+        jdbc.update("UPDATE live_verified_contributor SET state = 'revoked' WHERE account_id = ANY(?)",
+                (Object) owners.subList(9, 12).stream().map(Owner::actor).toArray(UUID[]::new));
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        // Nine verified colluders plus three unverified sock puppets are nine eligible accounts.
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void reVerificationChurnGivesOnePersonAtMostOneVoteInAWindow() {
+        // Eleven people agree; person P also re-verified a second account and shared from both.
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        var original = owners.getFirst();
+        var churned = owners.get(11);
+        UUID person = jdbc.queryForObject("SELECT person_ref FROM live_verified_contributor WHERE account_id = ?",
+                UUID.class, original.actor());
+        jdbc.update("UPDATE live_verified_contributor SET state = 'revoked' WHERE account_id = ?", original.actor());
+        jdbc.update("UPDATE live_verification_case SET person_ref = ? WHERE account_id = ?", person, churned.actor());
+        jdbc.update("UPDATE live_verified_contributor SET person_ref = ? WHERE account_id = ?", person, churned.actor());
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        // Twelve accounts shared, but only eleven distinct active verified people remain.
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void aLateDissentingCandidateCannotReopenOrFlipAPublishedWindow() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        String ref = jdbc.queryForObject("SELECT ref::text FROM community_traffic_projection_v3", String.class);
+        for (int i = 0; i < 5; i++) seed("TRAFFIC_MOVING");
+        publisher(WINDOW.plusSeconds(302)).publish(20);
+        assertThat(outcome()).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_decision_v3 WHERE window_start = ?",
+                Integer.class, Timestamp.from(WINDOW))).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT ref::text || traffic_value FROM community_traffic_projection_v3",
+                String.class)).isEqualTo(ref + "TRAFFIC_SLOW");
+    }
+
+    @Test void reportsFromTheNextWindowNeverCountTowardTheClosingWindow() {
+        for (int i = 0; i < 11; i++) seed("TRAFFIC_SLOW");
+        seedAt("TRAFFIC_SLOW", WINDOW.plusSeconds(300));
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void theDatabaseRejectsACandidateTimedOutsideItsWindow() {
+        seed("TRAFFIC_SLOW");
+        var owner = owners.getFirst();
+        for (long offset : new long[] { -1, 300 })
+            assertThatThrownBy(() -> jdbc.update("""
+                    INSERT INTO community_traffic_candidate_v3(candidate_id, actor_id, command_id,
+                        request_id, journey_id, anchor_id, traffic_value, window_start, catalog_version,
+                        consent_generation, state, received_at, created_at, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'TRAFFIC_SLOW', ?, ?, 7, 'ACTIVE', ?, ?, ?)
+                    """, UUID.randomUUID(), owner.actor(), UUID.randomUUID(), UUID.randomUUID(), owner.journey(),
+                    ANCHOR, Timestamp.from(WINDOW.plusSeconds(300)), CATALOG_VERSION,
+                    Timestamp.from(WINDOW.plusSeconds(300 + offset)), Timestamp.from(WINDOW.plusSeconds(310)),
+                    Timestamp.from(WINDOW.plusSeconds(300 + 24 * 3600 + 300))))
+                    .as("received %+d s from the window start", offset)
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    // --- Reporting protocol (ADR 0064) ---
+
+    private UUID publishOne() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        var owner = owners.getFirst();
+        return store(WINDOW.plusSeconds(302)).read(owner.actor(), owner.journey()).moments().getFirst().ref();
+    }
+
+    /** Another published moment in the same window at a new anchor that every seeded owner can see. */
+    private UUID extraProjection() {
+        UUID ref = UUID.randomUUID(), anchor = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO community_traffic_decision_v3
+                (catalog_version, anchor_id, window_start, outcome, traffic_value, decided_at, expires_at)
+                VALUES (?, ?, ?, 'PUBLISHED', 'TRAFFIC_SLOW', ?, ?)
+                """, CATALOG_VERSION, anchor, Timestamp.from(WINDOW),
+                Timestamp.from(WINDOW.plusSeconds(301)), Timestamp.from(WINDOW.plusSeconds(900)));
+        jdbc.update("""
+                INSERT INTO community_traffic_projection_v3
+                (ref, catalog_version, anchor_id, window_start, area_label, traffic_value, expires_at)
+                VALUES (?, ?, ?, ?, 'Test area', 'TRAFFIC_SLOW', ?)
+                """, ref, CATALOG_VERSION, anchor, Timestamp.from(WINDOW), Timestamp.from(WINDOW.plusSeconds(900)));
+        jdbc.update("UPDATE live_route_context SET anchor_ids = anchor_ids || ?::uuid", anchor);
+        return ref;
+    }
+
+    private UUID operator(String permission) {
+        UUID operator = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", operator, "protocol-" + operator);
+        jdbc.update("""
+                INSERT INTO moderation_operator_grant(operator_id, permission, issued_at, expires_at)
+                VALUES (?, ?, ?, ?)
+                """, operator, permission, Timestamp.from(WINDOW.plusSeconds(280)),
+                Timestamp.from(Instant.now().plusSeconds(600)));
+        return operator;
+    }
+
+    private void priorReports(UUID actor, int count, Instant createdAt) {
+        for (int i = 0; i < count; i++)
+            jdbc.update("""
+                    INSERT INTO community_traffic_report_v3 (actor_id, request_id, ref, reason, created_at, expires_at)
+                    VALUES (?, ?, ?, 'SPAM', ?, ?)
+                    """, actor, UUID.randomUUID(), UUID.randomUUID(), Timestamp.from(createdAt),
+                    Timestamp.from(createdAt.plusSeconds(168L * 3600)));
+    }
+
+    @Test void exactRetryReturnsMinimizedReceiptAfterMomentExpiresOrJourneyEnds() {
+        UUID ref = publishOne();
+        var owner = owners.getFirst();
+        UUID request = UUID.randomUUID();
+        var receipt = store(WINDOW.plusSeconds(302)).report(owner.actor(), owner.journey(), ref, request, "UNSAFE");
+        assertThat(receipt).isEqualTo(new JdbcCommunityTrafficV3.Receipt(
+                WINDOW.plusSeconds(302), WINDOW.plusSeconds(302 + 168L * 3600)));
+        assertThat(jdbc.queryForObject("SELECT expires_at FROM community_traffic_report_group_v3 WHERE ref = ?",
+                Timestamp.class, ref).toInstant()).isEqualTo(WINDOW.plusSeconds(302 + 720L * 3600));
+
+        // The moment has stopped serving: the exact retry still recovers the original receipt.
+        var late = store(WINDOW.plusSeconds(901));
+        assertThat(late.report(owner.actor(), owner.journey(), ref, request, "UNSAFE")).isEqualTo(receipt);
+        jdbc.update("UPDATE journey SET status = 'COMPLETED', completed_at = ? WHERE id = ?",
+                Timestamp.from(WINDOW.plusSeconds(400)), owner.journey());
+        jdbc.update("UPDATE presence_consent SET sharing = FALSE WHERE journey_id = ?", owner.journey());
+        assertThat(late.report(owner.actor(), owner.journey(), ref, request, "UNSAFE")).isEqualTo(receipt);
+
+        // A changed retry conflicts; a new request needs current visibility; nothing new is recorded.
+        assertThatThrownBy(() -> late.report(owner.actor(), owner.journey(), ref, request, "SPAM"))
+                .isInstanceOf(JdbcCommunityTrafficV3.Conflict.class);
+        assertThatThrownBy(() -> late.report(owner.actor(), owner.journey(), ref, UUID.randomUUID(), "UNSAFE"))
+                .isInstanceOf(JdbcCommunityTrafficV3.Missing.class);
+        assertThat(jdbc.queryForObject("SELECT unsafe FROM community_traffic_report_group_v3 WHERE ref = ?",
+                Integer.class, ref)).isEqualTo(1);
+
+        // A disabled reporter cannot read the receipt; a logically expired row cannot establish replay.
+        jdbc.update("UPDATE routiqo_account SET enabled = FALSE WHERE id = ?", owner.actor());
+        assertThatThrownBy(() -> late.report(owner.actor(), owner.journey(), ref, request, "UNSAFE"))
+                .isInstanceOf(JdbcCommunityTrafficV3.Missing.class);
+        jdbc.update("UPDATE routiqo_account SET enabled = TRUE WHERE id = ?", owner.actor());
+        assertThatThrownBy(() -> store(WINDOW.plusSeconds(302 + 168L * 3600))
+                .report(owner.actor(), owner.journey(), ref, request, "UNSAFE"))
+                .isInstanceOf(JdbcCommunityTrafficV3.Missing.class);
+    }
+
+    @Test void durableRollingQuotaLimitsNewReportsButNeverExactRetries() {
+        UUID ref = publishOne();
+        var owner = owners.getFirst();
+        Instant now = WINDOW.plusSeconds(302);
+        priorReports(owner.actor(), 1, now.minusSeconds(24L * 3600));
+        priorReports(owner.actor(), 10, now.minusSeconds(3600));
+        var store = store(now);
+        UUID request = UUID.randomUUID();
+        assertThatThrownBy(() -> store.report(owner.actor(), owner.journey(), ref, request, "INACCURATE"))
+                .isInstanceOf(JdbcCommunityTrafficV3.Limited.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_report_group_v3", Integer.class)).isZero();
+
+        // The row exactly 24 hours old is outside the rolling window, so nine recent rows admit one more.
+        jdbc.update("""
+                DELETE FROM community_traffic_report_v3 WHERE ctid IN (SELECT ctid FROM community_traffic_report_v3
+                WHERE actor_id = ? AND created_at = ? LIMIT 1)
+                """, owner.actor(), Timestamp.from(now.minusSeconds(3600)));
+        var receipt = store.report(owner.actor(), owner.journey(), ref, request, "INACCURATE");
+        // At the limit again, the exact retry is still answered and debits nothing.
+        assertThat(store.report(owner.actor(), owner.journey(), ref, request, "INACCURATE")).isEqualTo(receipt);
+        UUID other = extraProjection();
+        assertThatThrownBy(() -> store.report(owner.actor(), owner.journey(), other, UUID.randomUUID(), "SPAM"))
+                .isInstanceOf(JdbcCommunityTrafficV3.Limited.class);
+        // Another reporter has an independent quota.
+        var second = owners.get(1);
+        store.report(second.actor(), second.journey(), other, UUID.randomUUID(), "SPAM");
+    }
+
+    @Test void concurrentNewReportsAtTheQuotaBoundaryAdmitExactlyOne() throws Exception {
+        UUID first = publishOne();
+        UUID second = extraProjection();
+        var owner = owners.getFirst();
+        priorReports(owner.actor(), 9, WINDOW.plusSeconds(302 - 3600));
+        var store = store(WINDOW.plusSeconds(302));
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var results = new ArrayList<java.util.concurrent.Future<String>>();
+            for (UUID ref : List.of(first, second))
+                results.add(pool.submit(() -> {
+                    start.await(5, TimeUnit.SECONDS);
+                    try {
+                        store.report(owner.actor(), owner.journey(), ref, UUID.randomUUID(), "SPAM");
+                        return "accepted";
+                    } catch (JdbcCommunityTrafficV3.Limited limited) { return "limited"; }
+                }));
+            start.countDown();
+            List<String> outcomes = new ArrayList<>();
+            for (var result : results) outcomes.add(result.get(15, TimeUnit.SECONDS));
+            assertThat(outcomes).containsExactlyInAnyOrder("accepted", "limited");
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_report_v3 WHERE actor_id = ?",
+                Integer.class, owner.actor())).isEqualTo(10);
+    }
+
+    @Test void reportIntakeRejectsAnAmbientTransaction() {
+        UUID ref = publishOne();
+        var owner = owners.getFirst();
+        var store = store(WINDOW.plusSeconds(302));
+        assertThatThrownBy(() -> new org.springframework.transaction.support.TransactionTemplate(manager)
+                .executeWithoutResult(status -> store.report(owner.actor(), owner.journey(), ref,
+                        UUID.randomUUID(), "SPAM")))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_report_v3", Integer.class)).isZero();
+    }
+
+    @Test void retentionPurgeKeepsReporterFreeCountsWhileAccountDeletionRemovesAContribution() {
+        UUID ref = publishOne();
+        var first = owners.getFirst();
+        var second = owners.get(1);
+        var third = owners.get(2);
+        var store = store(WINDOW.plusSeconds(302));
+        store.report(first.actor(), first.journey(), ref, UUID.randomUUID(), "UNSAFE");
+        store.report(second.actor(), second.journey(), ref, UUID.randomUUID(), "INACCURATE");
+        store.report(third.actor(), third.journey(), ref, UUID.randomUUID(), "INACCURATE");
+        jdbc.update("DELETE FROM routiqo_account WHERE id = ?", third.actor());
+        assertThat(jdbc.queryForMap("SELECT inaccurate, unsafe FROM community_traffic_report_group_v3 WHERE ref = ?", ref))
+                .containsEntry("inaccurate", 1).containsEntry("unsafe", 1);
+
+        new JdbcCommunityTrafficV3Cleanup(jdbc, manager,
+                Clock.fixed(WINDOW.plusSeconds(302 + 168L * 3600), ZoneOffset.UTC)).cleanup(100);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_report_v3", Integer.class)).isZero();
+        assertThat(jdbc.queryForMap("SELECT inaccurate, unsafe FROM community_traffic_report_group_v3 WHERE ref = ?", ref))
+                .containsEntry("inaccurate", 1).containsEntry("unsafe", 1);
+
+        new JdbcCommunityTrafficV3Cleanup(jdbc, manager,
+                Clock.fixed(WINDOW.plusSeconds(302 + 720L * 3600), ZoneOffset.UTC)).cleanup(100);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_report_group_v3", Integer.class)).isZero();
+    }
+
+    @Test void purgedEvidenceClosesOpenGroupsButNeverRewritesSuppressionOrCurrentDismissal() {
+        UUID open = publishOne();
+        UUID suppressed = extraProjection();
+        UUID dismissed = extraProjection();
+        UUID reopened = extraProjection();
+        var first = owners.getFirst();
+        var second = owners.get(1);
+        var reporting = store(WINDOW.plusSeconds(302));
+        for (UUID ref : List.of(open, suppressed, dismissed, reopened))
+            reporting.report(first.actor(), first.journey(), ref, UUID.randomUUID(), "SPAM");
+        UUID moderator = operator("traffic_suppress");
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(303), ZoneOffset.UTC));
+        reviewer.decide(moderator, UUID.randomUUID(), suppressed, "SUPPRESS", "SPAM", () -> {});
+        reviewer.decide(moderator, UUID.randomUUID(), dismissed, "DISMISS", "SPAM", () -> {});
+        reviewer.decide(moderator, UUID.randomUUID(), reopened, "DISMISS", "SPAM", () -> {});
+        store(WINDOW.plusSeconds(304)).report(second.actor(), second.journey(), reopened, UUID.randomUUID(), "INACCURATE");
+
+        var beforePurge = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(901), ZoneOffset.UTC))
+                .queue(moderator, null, 20, () -> {}).items();
+        assertThat(beforePurge).extracting(JdbcTrafficReview.Item::ref).containsExactlyInAnyOrder(open, reopened);
+        assertThat(beforePurge).allSatisfy(item -> assertThat(item.evidenceStatus()).isEqualTo("EVIDENCE_UNAVAILABLE"));
+
+        new JdbcCommunityTrafficV3Cleanup(jdbc, manager,
+                Clock.fixed(WINDOW.plusSeconds(900 + 24 * 3600), ZoneOffset.UTC)).cleanup(100);
+        var dispositions = new java.util.HashMap<UUID, String>();
+        jdbc.query("SELECT ref, action, operator_id FROM community_traffic_review_disposition_v3", row -> {
+            dispositions.put(row.getObject(1, UUID.class), row.getString(2)
+                    + (row.getObject(3) == null ? ":system" : ":operator"));
+        });
+        assertThat(dispositions).containsEntry(open, "CLOSED_EVIDENCE_UNAVAILABLE:system")
+                .containsEntry(reopened, "CLOSED_EVIDENCE_UNAVAILABLE:system")
+                .containsEntry(suppressed, "SUPPRESS:operator")
+                .containsEntry(dismissed, "DISMISS:operator");
+        assertThat(new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(900 + 24 * 3600), ZoneOffset.UTC))
+                .queue(moderator, null, 20, () -> {}).items()).isEmpty();
+        // Counts remain for the retention period without any reporter identity.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_report_group_v3", Integer.class)).isEqualTo(4);
+    }
+
+    @Test void queueListsSafetyReportsFirstAcrossCursorPages() {
+        UUID older = publishOne();
+        UUID newer = extraProjection();
+        UUID newest = extraProjection();
+        var owner = owners.getFirst();
+        store(WINDOW.plusSeconds(302)).report(owner.actor(), owner.journey(), older, UUID.randomUUID(), "UNSAFE");
+        store(WINDOW.plusSeconds(303)).report(owner.actor(), owner.journey(), newer, UUID.randomUUID(), "SPAM");
+        store(WINDOW.plusSeconds(304)).report(owner.actor(), owner.journey(), newest, UUID.randomUUID(), "INACCURATE");
+        UUID moderator = operator("traffic_review");
+        var reviewer = new JdbcTrafficReview(jdbc, manager, Clock.fixed(WINDOW.plusSeconds(305), ZoneOffset.UTC));
+        List<UUID> order = new ArrayList<>();
+        String cursor = null;
+        do {
+            var page = reviewer.queue(moderator, cursor, 1, () -> {});
+            page.items().forEach(item -> order.add(item.ref()));
+            cursor = page.nextCursor();
+        } while (cursor != null);
+        assertThat(order).containsExactly(older, newest, newer);
+        String legacyCursor = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                (WINDOW + "|" + older).getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+        assertThatThrownBy(() -> reviewer.queue(moderator, legacyCursor, 1, () -> {}))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private void seed(String value) {

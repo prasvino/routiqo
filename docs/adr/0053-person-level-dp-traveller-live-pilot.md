@@ -1,7 +1,7 @@
 # ADR 0053: Person-level private traveller LIVE pilot candidate
 
 Date: 2026-09-23
-Status: proposed for mathematical, security and product review; public output prohibited
+Status: **paused as research by [ADR 0065](0065-public-live-v1-policy.md) (2026-09-25)**; retained. Previously: proposed for mathematical, security and product review; public output prohibited
 
 > **Status update (2026-09-25):** Superseded by the direction brief. The person-level differential-privacy pilot is archived; the pilot runs on openly public, alias-attributed, expiring posts instead. Revisit only if aggregate traveller counts return after a separate privacy review. See [PRODUCT.md](../PRODUCT.md).
 

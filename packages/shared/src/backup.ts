@@ -30,6 +30,8 @@ function cleanState(state: PlanningState): PlanningState {
   const valid = readPlanningState(JSON.stringify(state));
   return { version: 1, plans: valid.plans.map(knownPlan), saved: [...valid.saved] };
 }
+/** Validated copy containing only known plan fields, suitable for export or account storage. */
+export const canonicalPlanningState = cleanState;
 
 export function createPlanningBackup(state: PlanningState, now = new Date()): string {
   const backup: PlanningBackup = {

@@ -1,4 +1,4 @@
-# ADR 0062: Bounded HTTP refresh for Spot chat and festival rooms
+# ADR 0066: Bounded HTTP refresh for Spot chat and festival rooms
 
 Date: 2026-09-25
 Status: accepted direction for the pilot; not implemented

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Route,
   Plus,
@@ -24,6 +24,13 @@ export function Trips() {
   const [edit, setEdit] = useState<JourneyPlan | 'new' | null>(null);
   const [remove, setRemove] = useState<JourneyPlan | null>(null);
   const [error, setError] = useState('');
+  const [removals, setRemovals] = useState(0);
+  const newPlanRef = useRef<HTMLButtonElement>(null);
+  // The removed plan's button no longer exists, so return focus to a stable control once the
+  // confirmation dialog has closed (its own cleanup cannot restore focus to a removed element).
+  useEffect(() => {
+    if (removals > 0) newPlanRef.current?.focus();
+  }, [removals]);
   function closeRemove() {
     setRemove(null);
     setError('');
@@ -36,7 +43,7 @@ export function Trips() {
           <h1>Journeys to look forward to.</h1>
           <p>Small plans for the everyday. Big ideas for the weekend.</p>
         </div>
-        <button className="button primary" onClick={() => setEdit('new')}>
+        <button ref={newPlanRef} className="button primary" onClick={() => setEdit('new')}>
           <Plus size={18} /> New plan
         </button>
       </section>
@@ -156,6 +163,7 @@ export function Trips() {
                 try {
                   removePlan(remove.id);
                   closeRemove();
+                  setRemovals((count) => count + 1);
                 } catch (e) {
                   setError(e instanceof Error ? e.message : 'Could not remove plan.');
                 }

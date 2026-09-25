@@ -1,5 +1,6 @@
 package com.routiqo.core.publiclive.api;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.identity.application.GoogleSessionService;
 import com.routiqo.core.publiclive.infrastructure.JdbcCommunityTrafficV3;
@@ -23,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/journeys/{id}/community-traffic")
 @Profile("web-auth & routing & persistence")
-@ConditionalOnProperty(name = "ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED", havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED"})
 public final class BrowserCommunityTrafficV3Controller {
     private final JdbcCommunityTrafficV3 store;
     private final GoogleSessionService sessions;
@@ -38,7 +39,8 @@ public final class BrowserCommunityTrafficV3Controller {
         this.rates = rates;
     }
 
-    public record ReportResponse(String status) {}
+    public record ReportResponse(String status, java.time.Instant receivedAt,
+            java.time.Instant receiptExpiresAt) {}
 
     @GetMapping ResponseEntity<JdbcCommunityTrafficV3.Feed> read(@PathVariable String id,
             HttpServletRequest request) {
@@ -58,9 +60,9 @@ public final class BrowserCommunityTrafficV3Controller {
         UUID reference = id(ref);
         var body = BrowserCommunityTrafficV3Json.parse(request);
         allow(actor, "community-traffic-v3-report", 5);
-        store.report(actor, journey, reference, body.requestId(), body.reason());
+        var receipt = store.report(actor, journey, reference, body.requestId(), body.reason());
         return ResponseEntity.accepted().header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(new ReportResponse("received"));
+                .body(new ReportResponse("received", receipt.receivedAt(), receipt.receiptExpiresAt()));
     }
 
     private UUID actor(HttpServletRequest request) {
@@ -97,6 +99,9 @@ public final class BrowserCommunityTrafficV3Controller {
     }
     @ExceptionHandler(JdbcCommunityTrafficV3.Conflict.class) ResponseEntity<Void> conflict() {
         return ResponseEntity.status(409).build();
+    }
+    @ExceptionHandler(JdbcCommunityTrafficV3.Limited.class) ResponseEntity<Void> quotaReached() {
+        return ResponseEntity.status(429).header("Retry-After", "3600").build();
     }
     @ExceptionHandler(Limited.class) ResponseEntity<Void> limited() {
         return ResponseEntity.status(429).header("Retry-After", "60").build();

@@ -122,7 +122,7 @@ New specs, in order (1, 2 and 5 are needed for Diwali):
 
 1. **Spots** — seeding about 150–200 Spots on the trunk and branches, catalog
    versioning, live/fade, Spots-ahead ordering, honest empty states, bounded
-   refresh per ADR 0062.
+   refresh per ADR 0066.
 2. **Posts and signals** — public one-tap signals (from private Quick Signals),
    text posts, the decided per-type lifetimes on server time, "Still true?"
    (resets to half base life, capped), "No longer true" (two distinct accounts
@@ -134,7 +134,7 @@ New specs, in order (1, 2 and 5 are needed for Diwali):
    curated English/Tamil-friendly word list, numbered collisions, account-level
    blocks without revealing identity, audited moderator lookup; Spot chat and
    the festival route room over bounded HTTP refresh
-   ([ADR 0062](../adr/0062-bounded-http-refresh-for-spot-chat.md);
+   ([ADR 0066](../adr/0066-bounded-http-refresh-for-spot-chat.md);
    `backend/realtime` stays scaffold only).
 5. **Pilot moderation** — report intake for posts/voice/chat, content hide
    action (follow-up to ADR 0041), simplified time-boxed grants; see

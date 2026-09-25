@@ -219,6 +219,14 @@ plates, faces later).
   **Traveller counts** ("128 travellers on this route") are not, until aggregate
   counts pass their own review.
 - Agents do not request a real user location during QA.
+- Never claim anonymity. Per-room aliases reduce linkability; they do not make
+  people anonymous, and copy must say so plainly (from ADR 0065).
+- Abuse and Sybil resistance must not collect more identity data: no government
+  ID or Aadhaar, permanent device fingerprints, long-term location history or
+  hidden cross-session tracking (from ADR 0065).
+- Default-off flags fail closed: anything other than an exact `true` leaves a
+  capability off, with tests proving it (from ADR 0065).
+- Empty is acceptable; wrong, privacy-invasive or manipulable information is not.
 - No security or privacy control may be silently weakened; a change needs an
   explicit decision recorded in an ADR or this document.
 
@@ -390,7 +398,7 @@ evidence from the dry runs.
    flight, cursor-based. Highway connectivity is patchy and the pattern already
    exists (ADR 0022, official alerts). Revisit WebSockets only if the festival
    room behaves like a live group chat. See
-   [ADR 0062](adr/0062-bounded-http-refresh-for-spot-chat.md).
+   [ADR 0066](adr/0066-bounded-http-refresh-for-spot-chat.md).
 2. **Spot-passage detection on Android:** only during an active journey, a
    location foreground service with its visible notification, balanced
    accuracy, about every 100 m or 30 s. Started while the app is in use, so no

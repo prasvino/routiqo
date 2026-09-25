@@ -4,6 +4,8 @@ Temporary Photon place results and calculated route geometry are not persisted o
 
 Explicit web map display uses MapLibre and the configured same-origin `/maps/` resources. Browser HTTP caches can retain viewed resources; earlier Mapbox versions may have left CacheStorage tiles or localStorage event metadata. Account deletion does not clear browser map caches. Map display discloses this before loading. Clear browser site data for local removal, preserving desired planning backups first. Do not claim zero browser persistence or downloaded/offline navigation from browser caches.
 Browser and native local planning storage must validate shape/version and expose storage failures. No silent cloud upload.
+
+Account planning copy (ADR 0062, default off): when a traveller explicitly saves, one owner-only copy of their plans and saved destination IDs is stored in `account_planning_copy`. It is kept until they remove it in Profile or delete the account (database cascade). Signing out keeps it. It is never read by other accounts, LIVE, discovery or AI, and its content is never logged. Adding it to a device merges into local storage and never deletes local plans. Operational database backups follow the open backup-retention gate.
 Before public launch define category-specific retention for raw GPS, presence, messages, reports, media, journals, AI outputs, sessions, backups and providers. No default indefinite precise movement retention.
 Account deletion must revoke sessions promptly and be tested end to end; do not reuse the contradictory Wayfind reactivation specification.
 

@@ -20,17 +20,22 @@ public class BrowserAuthConfiguration {
             @Value("${ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED:false}") boolean routeBindingEnabled,
             @Value("${ROUTIQO_LIVE_SIGNAL_API_ENABLED:false}") boolean signalEnabled,
             @Value("${ROUTIQO_LIVE_CHOICE_API_ENABLED:false}") boolean choiceEnabled,
-            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED:false}") boolean publicIntentEnabled,
-            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_SHARE_ENABLED:false}") boolean publicIntentShareEnabled,
-            @Value("${ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED:false}") boolean communityTrafficEnabled) throws Exception {
+            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED:false}") String publicIntentEnabledFlag,
+            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_SHARE_ENABLED:false}") String publicIntentShareEnabledFlag,
+            @Value("${ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED:false}") String communityTrafficEnabledFlag,
+            @Value("${ROUTIQO_PLANNING_BACKUP_API_ENABLED:false}") boolean planningBackupEnabled) throws Exception {
+        // Public and community LIVE paths open only for the exact value "true" (ADR 0065, fail closed).
+        boolean publicIntentEnabled = FeatureFlags.enabled(publicIntentEnabledFlag);
+        boolean publicIntentShareEnabled = FeatureFlags.enabled(publicIntentShareEnabledFlag);
+        boolean communityTrafficEnabled = FeatureFlags.enabled(communityTrafficEnabledFlag);
         var csrf = new CookieCsrfTokenRepository();
         csrf.setCookieName(policy.cookieName("routiqo_csrf")); csrf.setCookiePath("/");
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(policy.secureCookies()).sameSite("Strict"));
-        return http.securityMatcher("/api/v1/auth/**", "/api/v1/journeys", "/api/v1/journeys/**", "/api/v1/routes", "/api/v1/routes/**", "/api/v1/public-intents", "/api/v1/community-shares")
+        return http.securityMatcher("/api/v1/auth/**", "/api/v1/journeys", "/api/v1/journeys/**", "/api/v1/routes", "/api/v1/routes/**", "/api/v1/public-intents", "/api/v1/community-shares", "/api/v1/planning", "/api/v1/planning/**")
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.csrfTokenRepository(csrf))
-                .addFilterBefore(new BrowserAuthGuard(policy, rates), CsrfFilter.class)
+                .addFilterBefore(new BrowserAuthGuard(policy, rates, planningBackupEnabled), CsrfFilter.class)
                 .authorizeHttpRequests(a -> {
                     a.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/routes", "/api/v1/routes/places").permitAll();
                     a.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/auth/csrf", "/api/v1/auth/session").permitAll();
@@ -79,6 +84,11 @@ public class BrowserAuthConfiguration {
                                 "/api/v1/journeys/*/signals/*/community-share",
                                 "/api/v1/journeys/*/signals/*/community-share/stop",
                                 "/api/v1/journeys/*/community-traffic/*/reports").permitAll();
+                    }
+                    if (planningBackupEnabled) {
+                        a.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/planning").permitAll();
+                        a.requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/v1/planning", "/api/v1/planning/delete").permitAll();
                     }
                     a.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/google/challenge", "/api/v1/auth/google/exchange", "/api/v1/auth/logout", "/api/v1/auth/session/renew", "/api/v1/auth/account/delete").permitAll();
                     a.anyRequest().denyAll();

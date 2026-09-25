@@ -157,6 +157,12 @@ hourly/category abuse controls, operated purge job or regional launch evidence.
 > counts return after a separate privacy review. Pilot moderation is in
 > [`PILOT_MODERATION_RUNBOOK.md`](PILOT_MODERATION_RUNBOOK.md).
 
+Flag safety (from [ADR 0065](../adr/0065-public-live-v1-policy.md), still
+applies to the archived code): community, public-intent and V3 admin switches
+enable only for the exact lowercase value `true`. `TRUE`, `True`, `1`, `yes`,
+`on`, padded, empty or missing values leave them off (`FeatureFlags`,
+`@ConditionalOnExactlyTrue`, and the web proxy's strict check).
+
 V3 implementation is authorized for staging evaluation; production activation
 and acceptance of its different privacy terms are **not approved**. The V3 path
 uses fresh `community-traffic-v3` Share requests for existing private traffic

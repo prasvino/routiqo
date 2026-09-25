@@ -4,6 +4,8 @@ Status: proposed for review, not implemented or production-approved.
 
 > **Direction brief (2026-09-25):** Still a proposal, now simpler: posts, voice notes, chat and signals are public and directly reportable, so most blockers about reporting aggregate or hidden evidence without a reference authority dissolve. Minimized reporter data, bounded intake and rate limits still apply. See [PRODUCT.md](../../PRODUCT.md).
 
+Update 2026-09-25: [REPORTING_PROTOCOL_PROPOSAL.md](REPORTING_PROTOCOL_PROPOSAL.md) proposes answers to the four review questions below, based on the implemented V3 canonical-report path, and recommends retiring this separate store for V1.
+
 ## Scope and authority
 
 Persist minimized structured-report/case metadata independently of public output.

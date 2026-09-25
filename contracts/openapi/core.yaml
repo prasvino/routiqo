@@ -1230,6 +1230,73 @@ paths:
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Place provider unavailable }
+  /api/v1/planning:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    get:
+      operationId: getAccountPlanning
+      security: [{ browserSession: [] }]
+      description: 'Owner-only account copy of planning state (ADR 0062). present=false means no copy exists; the version still counts removals so it never repeats. Enabled only by the default-off server planning backup flag. Explicit reads only; no background sync.'
+      responses:
+        '200':
+          description: The account planning copy, or an absent state carrying the latest version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountPlanning' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+    post:
+      operationId: saveAccountPlanning
+      security: [{ browserSession: [] }]
+      description: 'Replace the account copy with compare-and-swap on expectedVersion and exact latest-mutation replay. Request bodies up to 264 KiB are accepted on this path only; the stored canonical document may not exceed 256 KiB. Twenty planning writes (saves and deletes) per account per minute.'
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountPlanningWrite' }
+      responses:
+        '200':
+          description: Saved account copy or exact latest-mutation replay
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountPlanning' }
+        '400': { description: 'Invalid plans, saved places, version or mutation identifier. Empty response body.' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '409': { description: 'Stale expected version or conflicting mutation reuse. Empty response body.' }
+        '413': { description: 'Request body over 264 KiB or canonical document over 256 KiB. Empty response body.' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/planning/delete:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+    post:
+      operationId: deleteAccountPlanning
+      security: [{ browserSession: [] }]
+      description: 'Remove the account copy when its version matches, keeping a content-free record of the next version so a stale device can never match a later copy. Succeeds without change when no copy is present. Local device data is unaffected. Shares the planning write budget.'
+      parameters:
+        - { $ref: '#/components/parameters/AuthOrigin' }
+        - { $ref: '#/components/parameters/AuthCsrf' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountPlanningDelete' }
+      responses:
+        '200':
+          description: The resulting absent state with its version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountPlanning' }
+        '400': { description: 'Invalid expected version. Empty response body.' }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { $ref: '#/components/responses/AuthForbidden' }
+        '409': { description: 'The account copy changed since it was checked. Empty response body.' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/routes:
     post:
       operationId: calculatePrivateRoute
@@ -1390,7 +1457,7 @@ paths:
     post:
       operationId: reportVisibleCommunityTrafficV3
       security: [{ browserSession: [] }]
-      description: Bounded report of one authorized visible canonical moment. Report does not automatically suppress the row.
+      description: Bounded report of one authorized visible canonical moment. Report does not automatically suppress the row. An exact retry of this reporter's retained request returns the original receipt even after the moment expires; a new report needs current visibility and counts against a rolling limit of 10 per 24 hours.
       parameters:
         - { $ref: '#/components/parameters/AuthOrigin' }
         - { $ref: '#/components/parameters/AuthCsrf' }
@@ -1408,6 +1475,7 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Moment not visible to this journey; no existence disclosure }
+        '409': { description: 'Changed retry of this request, or this account already reported the moment' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Intake unavailable }
   /api/v1/admin/auth/csrf:
@@ -1855,7 +1923,7 @@ components:
         journeyId: { $ref: '#/components/schemas/PrivateSignalUuid' }
         commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
         requestId: { $ref: '#/components/schemas/PrivateSignalUuid' }
-        status: { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing] }
+        status: { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing, expired] }
         acceptedAt: { type: string, format: date-time }
         windowEndsAt: { type: string, format: date-time }
     CommunityTrafficShareRecoveryV3:
@@ -1895,9 +1963,12 @@ components:
     CommunityTrafficReportResponseV3:
       type: object
       additionalProperties: false
-      required: [status]
+      required: [status, receivedAt, receiptExpiresAt]
+      description: Minimized owner receipt. It proves only that this reporter's request was received; it carries no summary content, case state or outcome.
       properties:
         status: { type: string, enum: [received] }
+        receivedAt: { type: string, format: date-time }
+        receiptExpiresAt: { type: string, format: date-time }
     BrowserPublicSignalShareRequest:
       type: object
       additionalProperties: false
@@ -2050,6 +2121,68 @@ components:
           maximum: 9007199254740990
           description: Exact integer JSON number; no string coercion or fraction truncation. Numeric token at most 64 characters and absolute exponent at most 100.
         mutationId: { type: string, format: uuid }
+    AccountPlanningPlan:
+      type: object
+      additionalProperties: false
+      required: [id, kind, origin, destination, date, time, days, notes, createdAt]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 100 }
+        kind: { type: string, enum: [trip, commute] }
+        origin: { type: string, minLength: 1, maxLength: 100, description: Not blank after ECMAScript trim; no control characters }
+        destination: { type: string, minLength: 1, maxLength: 100, description: Not blank after ECMAScript trim; no control characters }
+        date: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$', description: Real calendar date }
+        time: { type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$' }
+        days:
+          type: array
+          maxItems: 7
+          uniqueItems: true
+          description: Weekdays 0 (Sunday) to 6. A commute needs at least one.
+          items: { type: integer, minimum: 0, maximum: 6 }
+        notes: { type: string, maxLength: 500, description: Tab, newline and carriage return are the only permitted control characters }
+        createdAt: { type: string, minLength: 1, maxLength: 64 }
+    AccountPlanning:
+      type: object
+      required: [present, version, updatedAt, plans, saved]
+      properties:
+        present: { type: boolean, description: False when the account has no copy; plans and saved are then empty and updatedAt is null }
+        version: { type: integer, minimum: 0, maximum: 9007199254740991, description: 'Compare-and-swap version. Counts saves and removals, so it never repeats; 0 means never saved.' }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        plans:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/AccountPlanningPlan' }
+        saved:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, pattern: '^[a-z0-9-]{1,80}$' }
+    AccountPlanningWrite:
+      type: object
+      additionalProperties: false
+      required: [plans, saved, expectedVersion, mutationId]
+      properties:
+        plans:
+          type: array
+          maxItems: 100
+          description: Plan ids must be unique.
+          items: { $ref: '#/components/schemas/AccountPlanningPlan' }
+        saved:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, pattern: '^[a-z0-9-]{1,80}$' }
+        expectedVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740990
+          description: Exact integer JSON token; fractions, exponents and strings are rejected.
+        mutationId: { type: string, format: uuid, description: Lowercase canonical UUID }
+    AccountPlanningDelete:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, minimum: 1, maximum: 9007199254740991 }
     RouteCoordinate:
       type: array
       description: Longitude then latitude. Longitude must be between -180 and180, latitude between -90 and90. Endpoints must differ.

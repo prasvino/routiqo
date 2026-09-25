@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserAccount } from '../lib/browser-auth';
+import { BrowserLiveError } from '../lib/browser-live-private';
 import {
   readBrowserCommunityTraffic,
   reportBrowserCommunityTraffic,
@@ -166,11 +167,14 @@ export function CommunityTrafficPanel({ accountId, journeyId, online, available 
           [row.ref]:
             'Report received for review. This summary remains visible unless a moderator suppresses it.',
         }));
-    } catch {
+    } catch (failure) {
       if (!run.signal.aborted)
         setReported((previous) => ({
           ...previous,
-          [row.ref]: 'Report not confirmed. Try again if this summary is still visible.',
+          [row.ref]:
+            failure instanceof BrowserLiveError && failure.kind === 'rate_limited'
+              ? 'Report not sent. You can send up to 10 new reports in 24 hours; try again later.'
+              : 'Report not confirmed. Try again if this summary is still visible.',
         }));
     } finally {
       if (reportPending.current === run) reportPending.current = null;

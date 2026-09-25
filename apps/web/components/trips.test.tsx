@@ -170,4 +170,24 @@ describe('Trips plan removal error lifecycle', () => {
     // Alert must not be present
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  it('moves focus to New plan after a successful removal, since the removed control is gone', () => {
+    vi.mocked(usePlanning).mockReturnValue(createPlanningMock());
+    render(<Trips />);
+    const trigger = screen.getByRole('button', { name: 'Remove plan to Pondicherry' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove plan' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'New plan' }));
+  });
+
+  it('returns focus to the remove control when the removal is kept', () => {
+    vi.mocked(usePlanning).mockReturnValue(createPlanningMock());
+    render(<Trips />);
+    const trigger = screen.getByRole('button', { name: 'Remove plan to Mysuru' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Keep plan' }));
+    expect(document.activeElement).toBe(trigger);
+  });
 });

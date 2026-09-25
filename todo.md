@@ -28,7 +28,7 @@ phase.
 - [ ] Android Journey map with Spots ahead (full-screen journey mode from Home).
 - [ ] ~150–200 seeded Spots on the trunk and branches, with a named curator.
 - [ ] Public one-tap signals and short text posts; per-type expiry; "Still true?" and "No longer true".
-- [ ] Bounded HTTP refresh for Spot content (ADR 0062); offline rule for queued signals and posts.
+- [ ] Bounded HTTP refresh for Spot content (ADR 0066); offline rule for queued signals and posts.
 - [ ] Ghost Mode stops all sending; delete my post; account deletion covers posts and signals.
 - [ ] Report/Block on every item; moderator hide; admin login and a named, time-boxed moderator rota for the dry run.
 - [ ] Rate limits, stricter for new accounts.
@@ -81,6 +81,11 @@ Journey reliability (Android first):
 
 - [ ] Verify SQLite/SecureStore restart, account isolation, backup behaviour, location denial, accessibility, performance and unreliable networks on real devices.
 - [ ] Complete broader cross-device restoration and unresolved-conflict recovery without overwriting pending local work.
+- [x] Web: explicitly discard a server-refused journey start/finish after a fresh server check (ADR 0063; `docs/features/journey/OUTBOX_CONFLICT_RESOLUTION_SPEC.md`). Native Android controls and real two-device sign-in QA remain.
+- [x] Web: explicit, default-off account planning copy (ADR 0062; `docs/features/journey/ACCOUNT_PLANNING_BACKUP_SPEC.md`).
+- [ ] Validate the account planning copy with real Google sign-in across two devices on HTTPS staging, then add native Android controls on the same contract.
+- [x] Web journey sync scenario tests: lost/delayed responses, duplicate taps, competing tabs, network flap, account switch mid-request, storage failure (`tests/journey-network-resilience.test.ts`). Real-network, two-device and native runs remain.
+- [x] Web recovery flows across two simulated devices sharing one server (`tests/journey-recovery-flows.test.ts`). Native and real-sign-in runs remain.
 - [ ] Test delayed responses, duplicate commands, network flaps, interrupted writes and unavailable storage across accounts/devices.
 - [ ] Confirm supported recovery flows preserve acknowledged work, account isolation and exact replay semantics.
 - [ ] Complete native history and journal checks with real sign-in on physical devices ([history ledger](docs/validation/NATIVE_HISTORY_PENDING.md), [journal ledger](docs/validation/NATIVE_JOURNAL_PENDING.md)).
@@ -103,7 +108,7 @@ and failure boundaries):
 - [ ] Voice notes: signed direct S3 upload, size/duration limits, retention, deletion, report/hide.
 - [ ] Spot passage: on-device detection per the PRODUCT.md decision (foreground service during an active journey, balanced accuracy ~100 m / 30 s, next ~20 Spots ahead, ~150 m pass radius, no background-location permission), opt-in, coarse time, 24-hour deletion, outcome-code logging.
 - [ ] Aliases and rooms: server-generated random per-room aliases from a curated English/Tamil-friendly word list, numbered collisions, account-level blocks without revealing identity, audited moderator lookup; Spot chat and festival route room lifetime.
-- [x] Spot chat transport decided: bounded foreground HTTP refresh ([ADR 0062](docs/adr/0062-bounded-http-refresh-for-spot-chat.md)).
+- [x] Spot chat transport decided: bounded foreground HTTP refresh ([ADR 0066](docs/adr/0066-bounded-http-refresh-for-spot-chat.md)).
 
 Spots:
 
@@ -128,15 +133,16 @@ Privacy and identity:
 - [ ] Ghost Mode stops **all** sending (posts, signals, Spot passage, queued outbox items) and takes priority over reconnect and replay.
 - [ ] Clear Spot state on Ghost Mode, account changes, sign-out and journey completion; reauthorize on reconnect.
 - [ ] Account deletion removes the user's posts, voice notes, signals, answers and route guides; users can delete their own posts.
-- [ ] Spot chat for each Spot and a festival route room per corridor for the event window, over bounded HTTP refresh (ADR 0062). Not needed for Diwali.
+- [ ] Spot chat for each Spot and a festival route room per corridor for the event window, over bounded HTTP refresh (ADR 0066). Not needed for Diwali.
 
 Moderation (re-scoped to posts, voice notes and chat; see the
 [pilot moderation runbook](docs/development/PILOT_MODERATION_RUNBOOK.md)):
 
 - [x] Default-off moderator queue, audited review/suppression and controlled grant console exist (ADRs 0056/0057); reuse them rather than rebuild.
 - [ ] Report and Block on every post, voice note and chat message; report reasons include business promotion, false alarm, abuse (Tamil/Tanglish) and personal data.
-- [ ] Resolve report evidence identity, reference authorization, exact retries after revocation and transaction lock order; implement durable report intake for posts, voice and chat.
-- [ ] Define what moderators can see after content expires, with explicit bounded retention.
+- [x] Reporting protocol implemented for V3 under ADR 0064 (receipt-first retry, 7/30-day retention split, 10-per-24h quota, UNSAFE-first queue, groups close as `CLOSED_EVIDENCE_UNAVAILABLE` after expiry). Reuse it rather than rebuild.
+- [ ] Re-target the ADR 0064 reporting path from V3 summaries to posts, voice notes, chat and signals: evidence identity, reference authorization, exact retries after revocation, lock order and durable intake.
+- [ ] Confirm what moderators can see after content expires for posts, voice and chat, building on ADR 0064's retention split.
 - [ ] Moderator "hide content" action (follow-up to ADR 0041's restriction boundary).
 - [ ] Reuse the admin app login with real admin OAuth/MFA; lighter pilot access: a small named rota with time-boxed grants for the event window.
 - [ ] Blocks apply to REST and realtime delivery, room subscription, Ask Ahead recipient selection and replay.
@@ -164,7 +170,8 @@ Build:
 - [ ] Ask Ahead questions pinned to a Spot ahead, offered to opted-in recent passers and posters; one-tap answers summarised ("5 replies: mostly 10–20 min").
 - [ ] Route guides published from completed journeys and journals; strip exact home, office and start/end addresses; web shows guides for planning.
 - [ ] Rename Explore to Guides on web and Android when route guides ship (tabs: Home, Guides, Trips, Profile).
-- [ ] Verify web planning flows used for guides: keyboard/focus, small screens, large text, reduced motion and storage-failure recovery.
+- [x] Signed-out web planning accessibility pass (synthetic API): keyboard/focus, 320 px reflow, 130% zoom and 200% text, reduced motion, storage-failure recovery (`docs/quality/evidence/planning-accessibility-2026-09-25/`).
+- [ ] Verify authenticated web planning flows used for guides, screen readers and native equivalents.
 - [ ] Verify journal conflicts, older history, summary completeness and backup/restore with real sign-in (route-guide source material).
 
 ## Phase 4 — Dry runs
@@ -193,7 +200,7 @@ Gate: measured against the success signals in PRODUCT.md.
 - [ ] Produce the signed Android release and distribution channel; verify release fingerprint against OAuth.
 - [ ] Verify remote CI on the actual release commit.
 - [ ] Finalise the Pongal dates (tentatively 8–14 January 2027) and festival room windows.
-- [ ] Capacity plan for the Pongal rush on all corridors, including ADR 0062 refresh load; festival route room windows set.
+- [ ] Capacity plan for the Pongal rush on all corridors, including ADR 0066 refresh load; festival route room windows set.
 - [ ] On-call moderator rota for the full event window.
 - [ ] Launch publicly on the corridors, enabling only flags whose phase gates passed.
 - [ ] Measure against the success targets and record results.
@@ -220,3 +227,15 @@ Quick Signal lifecycle verification, and the active-journey LIVE list. Their cod
 stays in the repository, default-off. The earlier list is in git history for this
 file; archived ledgers and the older roadmap (`todo.txt`) are under
 [`docs/archive/`](docs/archive/README.md).
+
+ADR 0065 (the V1 public LIVE policy, accepted earlier on 2026-09-25) set V1
+production to official alerts plus private Quick Signals and kept ADR 0055 as a
+closed staging experiment. The direction brief adopted later that day archives
+the ADR 0055 community summary and makes one-tap signals public on Spots; ADR
+0065's principles carry forward (see its status note). Its completed ADR 0055
+pilot work stays in code, default-off, and its fail-closed flag tests keep
+running: P0 fail-closed flags, P1 withdrawal suite, contribution isolation and
+quota, threshold boundaries, and API/telemetry leakage checks. Open ADR 0055
+pilot items (adversarial/Sybil red team, pilot metrics, comprehension study,
+`ParticipationEligibility`, production decision) are archived with it; see
+`docs/archive/features/live/ADR0055_PILOT_MEASUREMENT_PROTOCOL.md`.

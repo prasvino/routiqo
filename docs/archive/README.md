@@ -42,6 +42,7 @@ per-room alias, author-deletable and expiring.
 | `features/live/PUBLIC_LIVE_PRIVACY_PROTOCOL_SPEC.md` | Person-level differential-privacy protocol (threshold 22) |
 | `features/live/TRAVELLER_PUBLIC_LIVE_SPEC.md` | Traveller-derived public LIVE |
 | `features/live/BROWSER_PUBLIC_SHARE_V2_SPEC.md` | Irreversible Share |
+| `features/live/PUBLIC_LIVE_PRIVACY_DECISION.md`, `features/live/ADR0055_PILOT_MEASUREMENT_PROTOCOL.md` | ADR 0054 vs 0055 decision document (recorded as ADR 0065) and the ADR 0055 pilot measurement protocol, both merged from main the same day and overtaken by the brief. ADR 0065 stays in `docs/adr/` as partly superseded; its no-anonymity-claims, no-identity-collection and fail-closed principles carry into PRODUCT.md |
 | `features/live/COMMUNITY_TRAFFIC_SUMMARY_SPEC.md` | V3 12/10/80% community traffic summary (brief: archive) |
 | `features/live/PILOT_PERSON_IDENTITY_SPEC.md` | Person registry supporting the DP person bound |
 | `features/live/VERIFIED_CONTRIBUTOR_AUTHORITY_SPEC.md` | Dual-review verified-person authority for publication. Open question "should Spot passage require sign-in" may want a lighter version later |

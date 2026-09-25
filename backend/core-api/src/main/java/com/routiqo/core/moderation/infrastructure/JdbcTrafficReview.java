@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -29,8 +30,8 @@ public final class JdbcTrafficReview {
     public record Item(UUID ref, Map<String, Integer> reasonCounts, String evidenceStatus,
             String areaLabel, String trafficValue, String observationPeriod, Instant expiresAt) {}
     public record Queue(List<Item> items, String nextCursor) {}
-    private record Row(UUID ref, Item item, Instant latest) {}
-    private record Cursor(Instant latest, UUID ref) {}
+    private record Row(UUID ref, Item item, boolean urgent, Instant latest) {}
+    private record Cursor(boolean urgent, Instant latest, UUID ref) {}
 
     public Queue queue(UUID operator, String rawCursor, int limit, Runnable sessionRecheck) {
         if (limit < 1 || limit > 50) throw new IllegalArgumentException("Invalid page size");
@@ -39,45 +40,44 @@ public final class JdbcTrafficReview {
             sessionRecheck.run();
             Instant now = clock.instant();
             grant(operator, false, now);
+            // Reporter-free group counts (ADR 0064): groups with an UNSAFE report come first, then
+            // newest. Closed groups (suppressed, or dismissed/closed through their latest report) stay
+            // in the page scan so cursors advance, but are not returned.
             List<Row> rows = jdbc.query("""
                     WITH candidates AS MATERIALIZED (
-                      SELECT g.ref, g.latest FROM community_traffic_report_group_v3 g
-                      WHERE (?::timestamptz IS NULL OR (g.latest, g.ref) < (?, ?))
-                      ORDER BY g.latest DESC, g.ref DESC LIMIT ?
+                      SELECT g.ref, g.unsafe > 0 AS urgent, g.latest FROM community_traffic_report_group_v3 g
+                      WHERE g.expires_at > ?
+                        AND (?::boolean IS NULL OR (g.unsafe > 0, g.latest, g.ref) < (?, ?, ?))
+                      ORDER BY g.unsafe > 0 DESC, g.latest DESC, g.ref DESC LIMIT ?
                     )
-                    SELECT c.ref, c.latest, live.latest_sequence, live.inaccurate, live.unsafe, live.spam,
+                    SELECT c.ref, c.urgent, c.latest, g.latest_sequence, g.inaccurate, g.unsafe, g.spam,
                       d.action, d.closed_through,
                       p.area_label, p.traffic_value, p.window_start, p.expires_at
                     FROM candidates c
-                    LEFT JOIN LATERAL (
-                      SELECT max(r.review_sequence) latest_sequence,
-                        count(*) FILTER (WHERE r.reason = 'INACCURATE') inaccurate,
-                        count(*) FILTER (WHERE r.reason = 'UNSAFE') unsafe,
-                        count(*) FILTER (WHERE r.reason = 'SPAM') spam
-                      FROM community_traffic_report_v3 r WHERE r.ref = c.ref AND r.expires_at > ?
-                    ) live ON TRUE
+                    JOIN community_traffic_report_group_v3 g ON g.ref = c.ref
                     LEFT JOIN community_traffic_review_disposition_v3 d ON d.ref = c.ref
                     LEFT JOIN community_traffic_projection_v3 p ON p.ref = c.ref
                       AND p.expires_at > ? AND p.suppressed_at IS NULL
-                    ORDER BY c.latest DESC, c.ref DESC
+                    ORDER BY c.urgent DESC, c.latest DESC, c.ref DESC
                     """, (rs, n) -> {
                         UUID ref = rs.getObject(1, UUID.class);
-                        Instant latest = rs.getTimestamp(2).toInstant();
-                        Long sequence = rs.getObject(3, Long.class);
-                        String action = rs.getString(7);
-                        if (sequence == null || "SUPPRESS".equals(action)
-                                || "DISMISS".equals(action) && sequence <= rs.getLong(8))
-                            return new Row(ref, null, latest);
-                        Instant start = rs.getTimestamp(11) == null ? null : rs.getTimestamp(11).toInstant();
-                        var item = new Item(ref, Map.of("INACCURATE", rs.getInt(4), "UNSAFE", rs.getInt(5), "SPAM", rs.getInt(6)),
+                        boolean urgent = rs.getBoolean(2);
+                        Instant latest = rs.getTimestamp(3).toInstant();
+                        long sequence = rs.getLong(4);
+                        String action = rs.getString(8);
+                        if ("SUPPRESS".equals(action) || action != null && sequence <= rs.getLong(9))
+                            return new Row(ref, null, urgent, latest);
+                        Instant start = rs.getTimestamp(12) == null ? null : rs.getTimestamp(12).toInstant();
+                        var item = new Item(ref, Map.of("INACCURATE", rs.getInt(5), "UNSAFE", rs.getInt(6), "SPAM", rs.getInt(7)),
                                 start == null ? "EVIDENCE_UNAVAILABLE" : "AVAILABLE",
-                                start == null ? null : rs.getString(9), start == null ? null : rs.getString(10),
+                                start == null ? null : rs.getString(10), start == null ? null : rs.getString(11),
                                 start == null ? null : PERIOD.format(start) + "–" + PERIOD.format(start.plusSeconds(300)) + " UTC",
-                                start == null ? null : rs.getTimestamp(12).toInstant());
-                        return new Row(ref, item, latest);
-                    }, cursor == null ? null : Timestamp.from(cursor.latest()),
+                                start == null ? null : rs.getTimestamp(13).toInstant());
+                        return new Row(ref, item, urgent, latest);
+                    }, Timestamp.from(now), cursor == null ? null : cursor.urgent(),
+                    cursor == null ? null : cursor.urgent(),
                     cursor == null ? null : Timestamp.from(cursor.latest()), cursor == null ? null : cursor.ref(),
-                    limit + 1, Timestamp.from(now), Timestamp.from(now));
+                    limit + 1, Timestamp.from(now));
             int examined = Math.min(rows.size(), limit);
             var items = rows.subList(0, examined).stream().map(Row::item)
                     .filter(java.util.Objects::nonNull).toList();
@@ -140,8 +140,9 @@ public final class JdbcTrafficReview {
             now = clock.instant();
             sessionRecheck.run();
             grant(operator, action.equals("SUPPRESS"), now);
+            // The queue and decisions share one notion of "open": the group's latest report sequence.
             var latest = jdbc.query("""
-                    SELECT max(review_sequence) FROM community_traffic_report_v3
+                    SELECT latest_sequence FROM community_traffic_report_group_v3
                     WHERE ref = ? AND expires_at > ?
                     """, (rs, n) -> rs.getObject(1, Long.class),
                     ref, Timestamp.from(now));
@@ -203,15 +204,16 @@ public final class JdbcTrafficReview {
     private Instant databaseNow() { return jdbc.queryForObject("SELECT clock_timestamp()", Timestamp.class).toInstant(); }
     private static String encode(Row row) {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(
-                (row.latest() + "|" + row.ref()).getBytes(StandardCharsets.US_ASCII));
+                ("2|" + row.urgent() + "|" + row.latest() + "|" + row.ref()).getBytes(StandardCharsets.US_ASCII));
     }
     private static Cursor decode(String raw) {
         if (raw == null) return null;
         if (raw.length() > 128 || !raw.matches("[A-Za-z0-9_-]+")) throw new IllegalArgumentException("Invalid cursor");
         try {
             String[] parts = new String(Base64.getUrlDecoder().decode(raw), StandardCharsets.US_ASCII).split("\\|", -1);
-            if (parts.length != 2) throw new IllegalArgumentException();
-            return new Cursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
+            if (parts.length != 4 || !parts[0].equals("2") || !Set.of("true", "false").contains(parts[1]))
+                throw new IllegalArgumentException();
+            return new Cursor(Boolean.parseBoolean(parts[1]), Instant.parse(parts[2]), UUID.fromString(parts[3]));
         } catch (RuntimeException invalid) { throw new IllegalArgumentException("Invalid cursor"); }
     }
     public static final class Missing extends RuntimeException {}

@@ -5,7 +5,12 @@ import { JourneyWorkspace } from './journey-workspace';
 import { restoreRecentBrowserJourneyHistory } from '../lib/journey-restoration';
 import { authAvailability, browserAccount } from '../lib/browser-auth';
 import { listBrowserJournals } from '../lib/journal-storage';
-import { readBrowserJourneyPartition, queueBrowserJourneyAction } from '../lib/journey-storage';
+import {
+  readBrowserJourneyPartition,
+  queueBrowserJourneyAction,
+  discardBrowserJourneyAction,
+} from '../lib/journey-storage';
+import { readBrowserJourney } from '../lib/browser-journeys';
 import {
   restoreBrowserJourneyAuthentication,
   dispatchBrowserJourneyBatch,
@@ -14,6 +19,10 @@ vi.mock('../lib/browser-auth');
 vi.mock('../lib/journey-storage');
 vi.mock('../lib/journey-dispatch');
 vi.mock('../lib/journey-restoration');
+vi.mock('../lib/browser-journeys', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/browser-journeys')>()),
+  readBrowserJourney: vi.fn(),
+}));
 vi.mock('../lib/journal-storage', () => ({ listBrowserJournals: vi.fn(async () => []) }));
 vi.mock('./journal-editor', () => ({
   JournalEditor: ({ account, journeyId }: { account: string; journeyId: string }) => (
@@ -451,4 +460,132 @@ it('ignores a delayed journal library result after switching accounts', async ()
 
   expect(listBrowserJournals).toHaveBeenCalledWith(accountA);
   expect(listBrowserJournals).toHaveBeenCalledWith(accountB);
+});
+
+it('gives sibling panels unique keys so unmounting clears every panel timer', async () => {
+  vi.stubEnv('NEXT_PUBLIC_ROUTIQO_PUBLIC_SIGNAL_INTENT_UI_ENABLED', 'true');
+  const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const started = new Set<unknown>();
+  const cleared = new Set<unknown>();
+  const setInterval = window.setInterval.bind(window);
+  const clearInterval = window.clearInterval.bind(window);
+  vi.spyOn(window, 'setInterval').mockImplementation(((handler: TimerHandler, timeout?: number) => {
+    const handle = setInterval(handler, timeout);
+    started.add(handle);
+    return handle;
+  }) as typeof window.setInterval);
+  vi.spyOn(window, 'clearInterval').mockImplementation(((handle?: number) => {
+    cleared.add(handle);
+    clearInterval(handle);
+  }) as typeof window.clearInterval);
+  try {
+    vi.mocked(readBrowserJourneyPartition).mockResolvedValue(active());
+    render(<JourneyWorkspace />);
+    await screen.findByRole('heading', { name: 'Contribution settings' });
+    await screen.findByText(
+      /Recently completed|Journals saved on this device|Start a journey|Finish journey/,
+    );
+    expect(started.size).toBeGreaterThan(0);
+    cleanup();
+    expect([...started].filter((handle) => !cleared.has(handle))).toEqual([]);
+    expect(errors.mock.calls.filter(([message]) => String(message).includes('same key'))).toEqual(
+      [],
+    );
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+const blockedJourneyId = '00000000-0000-4000-8000-000000000021';
+const blockedStart = () => ({
+  ...empty(),
+  outbox: {
+    version: 1 as const,
+    accountId,
+    entries: [
+      {
+        command: { action: 'start' as const, kind: 'trip' as const, journeyId: blockedJourneyId },
+        attempts: 1,
+        nextAttemptAt: 0,
+        blocked: 'conflict' as const,
+        lease: null,
+      },
+      {
+        command: { action: 'complete' as const, journeyId: blockedJourneyId },
+        attempts: 0,
+        nextAttemptAt: 0,
+        blocked: null,
+        lease: null,
+      },
+    ],
+  },
+});
+
+it('offers an explicit, confirmed discard after the server check shows a refused start cannot apply', async () => {
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(blockedStart());
+  vi.mocked(readBrowserJourney).mockResolvedValue(null);
+  vi.mocked(discardBrowserJourneyAction).mockResolvedValue(empty());
+  vi.mocked(restoreRecentBrowserJourneyHistory).mockResolvedValue({
+    partition: empty(),
+    recentCount: 0,
+  } as Awaited<ReturnType<typeof restoreRecentBrowserJourneyHistory>>);
+  render(<JourneyWorkspace />);
+  expect(screen.queryByRole('button', { name: 'Discard unsent start' })).toBeNull();
+  fireEvent.click(await screen.findByRole('button', { name: 'Check server status' }));
+  await screen.findByText(/was not found for your account/);
+  fireEvent.click(screen.getByRole('button', { name: 'Discard unsent start' }));
+  expect(screen.getByText(/removes the start and its queued finish/)).toBeTruthy();
+  expect(discardBrowserJourneyAction).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+  await screen.findByText(/unsent action was discarded. Recent journeys were refreshed/);
+  expect(discardBrowserJourneyAction).toHaveBeenCalledWith(
+    accountId,
+    { action: 'start', kind: 'trip', journeyId: blockedJourneyId },
+    null,
+  );
+  expect(restoreRecentBrowserJourneyHistory).toHaveBeenCalledWith(accountId);
+  await waitFor(() =>
+    expect(screen.queryByRole('button', { name: 'Check server status' })).toBeNull(),
+  );
+});
+
+it('passes the observed server state and lets the traveller keep the paused action', async () => {
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(blockedStart());
+  vi.mocked(readBrowserJourney).mockResolvedValue({
+    id: blockedJourneyId,
+    kind: 'commute',
+    status: 'active',
+    startedAt: '2026-09-25T06:00:00.000000Z',
+    completedAt: null,
+  });
+  render(<JourneyWorkspace />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Check server status' }));
+  await screen.findByText(/shows this journey as an active commute/);
+  fireEvent.click(screen.getByRole('button', { name: 'Discard unsent start' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+  expect(screen.getByRole('button', { name: 'Discard unsent start' })).toBeTruthy();
+  expect(discardBrowserJourneyAction).not.toHaveBeenCalled();
+});
+
+it('never offers a discard after a failed server check', async () => {
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(blockedStart());
+  vi.mocked(readBrowserJourney).mockRejectedValue(new Error('offline'));
+  render(<JourneyWorkspace />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Check server status' }));
+  await screen.findByText(/could not be checked/);
+  expect(screen.queryByRole('button', { name: /Discard unsent/ })).toBeNull();
+});
+
+it('keeps saved work and asks for a new check when the discard is refused', async () => {
+  vi.mocked(readBrowserJourneyPartition).mockResolvedValue(blockedStart());
+  vi.mocked(readBrowserJourney).mockResolvedValue(null);
+  vi.mocked(discardBrowserJourneyAction).mockRejectedValue(new Error('changed'));
+  render(<JourneyWorkspace />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Check server status' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Discard unsent start' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+  await screen.findByText(/changed or couldn’t be discarded/);
+  expect(restoreRecentBrowserJourneyHistory).not.toHaveBeenCalled();
+  expect(screen.queryByRole('button', { name: /Discard unsent/ })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Check server status' })).toBeTruthy();
 });

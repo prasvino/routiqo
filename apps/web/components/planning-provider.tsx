@@ -26,6 +26,12 @@ interface PlanningContextValue {
   restoreBackup: (data: PlanningState) => RestoreSummary;
 }
 const PlanningContext = createContext<PlanningContextValue | null>(null);
+// Browser storage failures (blocked, full or unavailable) surface as DOMExceptions whose messages
+// are browser-specific. Planning rule errors are plain Errors with user-facing copy.
+function storageMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && !(error instanceof DOMException)) return error.message;
+  return fallback;
+}
 export function PlanningProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PlanningState>(emptyPlanningState);
   const [ready, setReady] = useState(false);
@@ -37,7 +43,12 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
         setState(readPlanningState(localStorage.getItem(KEY)));
         setError('');
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Local storage is unavailable.');
+        setError(
+          storageMessage(
+            e,
+            'Saved plans can’t be read because browser storage is unavailable. Check that this site may store data.',
+          ),
+        );
         setMessage('');
       } finally {
         setReady(true);
@@ -58,8 +69,10 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
       setError('');
       setMessage(notice);
     } catch (e) {
-      const detail =
-        e instanceof Error ? e.message : 'Your changes could not be saved on this device.';
+      const detail = storageMessage(
+        e,
+        'Your changes couldn’t be saved on this device. Check that this site may store data and that your browser has space.',
+      );
       setError(detail);
       setMessage('');
       throw new Error(detail);

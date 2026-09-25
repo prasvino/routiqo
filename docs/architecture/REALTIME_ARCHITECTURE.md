@@ -2,7 +2,7 @@
 
 Short temporary Spot chat and the festival route room (see
 [`../PRODUCT.md`](../PRODUCT.md)) use bounded authenticated foreground HTTP refresh in the pilot, not WebSockets
-([ADR 0062](../adr/0062-bounded-http-refresh-for-spot-chat.md)): every 15–20 s
+([ADR 0066](../adr/0066-bounded-http-refresh-for-spot-chat.md)): every 15–20 s
 while a Spot panel or room is open, about once a minute otherwise, never in the
 background, one request in flight, cursor-based. `backend/realtime` stays
 scaffold only; WebSockets are revisited after Pongal only if the festival room

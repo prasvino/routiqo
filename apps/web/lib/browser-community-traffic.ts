@@ -106,7 +106,8 @@ function shareHandle(value: unknown): CommunityShareHandle {
     'acceptedAt',
     'windowEndsAt',
   ]);
-  if (!statuses.has(String(item.status))) throw new BrowserLiveError('unavailable');
+  // The server reports a handle past its candidate lifetime as expired until cleanup removes it.
+  if (!shareStatuses.has(String(item.status))) throw new BrowserLiveError('unavailable');
   return {
     candidateId: readUuid(item.candidateId),
     journeyId: readUuid(item.journeyId),
@@ -232,9 +233,13 @@ export function reportBrowserCommunityTraffic(
     expectedStatus: 202,
     signal,
     validate: (value) => {
-      const item = record(value, ['status']);
+      const item = record(value, ['status', 'receivedAt', 'receiptExpiresAt']);
       if (item.status !== 'received') throw new BrowserLiveError('unavailable');
-      return { status: 'received' as const };
+      return {
+        status: 'received' as const,
+        receivedAt: readInstant(item.receivedAt).raw,
+        receiptExpiresAt: readInstant(item.receiptExpiresAt).raw,
+      };
     },
   });
 }
