@@ -2,7 +2,7 @@
 
 Status: accepted and implemented behind the existing default-off V3 flags, 2026-09-25. Production activation still follows the ADR 0055 decision.
 
-> **Status update (2026-09-25):** Accepted — role note by the direction brief. The protocol is reused for pilot moderation: Spot posts, voice notes, chat messages and signals are published outputs with opaque references, so the receipt-first retry, retention split, per-reporter quota and severity-first queue apply to them. Re-targeting from V3 summaries to Spot content is Phase 2 work; production activation now follows the pilot phase gates, not the ADR 0055 decision. See [PRODUCT.md](../PRODUCT.md).
+> **Status update (2026-09-25):** Accepted — role note by the direction brief. The protocol is reused for pilot moderation: Spot posts, voice notes, chat messages and signals are published outputs with opaque references, so the receipt-first retry, retention split, per-reporter quota and severity-first queue apply to them. Re-targeting from V3 summaries to Spot content is Phase 2 work; production activation now follows the pilot phase gates, not the ADR 0055 decision. For Spot posts at Pongal, [ADR 0068](0068-report-collapse-pending-review.md) amends the "reports never hide automatically" rule. See [PRODUCT.md](../PRODUCT.md).
 
 ## Context
 

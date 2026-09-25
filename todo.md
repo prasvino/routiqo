@@ -113,6 +113,8 @@ and failure boundaries):
 Spots:
 
 - [ ] Seed about 150–200 Spots on the trunk and branches (tolls, major eateries, fuel, restrooms, bus stands, Kilambakkam), weighted to the trunk, by reusing the curated anchor catalog format, loader and route-anchor matching; record curator and provenance. Add Coimbatore-trunk Spots before Pongal.
+- [ ] English and Tamil names for every Spot, checked by a Tamil speaker; rest areas with facilities seeded; temples only where they slow the highway (e.g. Samayapuram) for Diwali, revisited for Pongal.
+- [ ] Alias word list (about 100 adjectives × 100 nouns) approved by the product owner and reviewed by a Tamil speaker; excludes insults, caste, religion, gender, bodies, politics and politically or religiously loaded colours.
 - [ ] Show Spots ahead on the Android Journey map, ordered by distance along the route, appearing automatically on journey start.
 - [ ] Spot reads: authenticated, authorized per object, bounded foreground refresh with cancellation, backoff and one request in flight.
 - [ ] Loading, empty, error, stale and offline states with truthful source and freshness; honest empty Spots, never faked activity.
@@ -200,6 +202,8 @@ Gate: measured against the success signals in PRODUCT.md.
 - [ ] Produce the signed Android release and distribution channel; verify release fingerprint against OAuth.
 - [ ] Verify remote CI on the actual release commit.
 - [ ] Finalise the Pongal dates (tentatively 8–14 January 2027) and festival room windows.
+- [ ] Move Spot activity reads to ~25 km corridor sections with a shared cached part and a per-reader overlay, if Diwali load measurements confirm the need (SPOTS_SPEC).
+- [ ] Build and enable report collapse pending review for posts (ADR 0068), off for Diwali.
 - [ ] Capacity plan for the Pongal rush on all corridors, including ADR 0066 refresh load; festival route room windows set.
 - [ ] On-call moderator rota for the full event window.
 - [ ] Launch publicly on the corridors, enabling only flags whose phase gates passed.

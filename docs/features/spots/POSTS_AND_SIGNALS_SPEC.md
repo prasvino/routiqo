@@ -38,7 +38,7 @@ the proven patterns, not the archived tables:
 | Category | Values | Spot kinds (default) | Base life | Max with "Still true?" |
 | --- | --- | --- | --- | --- |
 | `traffic` | `moving`, `slow`, `stopped` | toll, junction, rest_area | 60 min | 2 h |
-| `queue` | `under_5`, `5_to_15`, `over_15` (minutes) | toll, bus_stand, fuel, temple | 60 min | 2 h |
+| `queue` | `under_5`, `5_to_15`, `15_to_30`, `over_30` (minutes) | toll, bus_stand, fuel, temple | 60 min | 2 h |
 | `food` | `good`, `avoid` | eatery | 24 h | 36 h |
 | `fuel` | `available`, `long_queue`, `none` | fuel | 24 h | 36 h |
 | `restroom` | `usable`, `busy`, `avoid` | restroom, eatery, fuel, rest_area | 24 h | 36 h |
@@ -76,11 +76,20 @@ the proven patterns, not the archived tables:
 - For posts, a **room** is a Spot on one calendar day (Asia/Kolkata). The
   festival room, when built, is its own room.
 - The server assigns an alias the first time an account posts in a room: a
-  random adjective and noun from a curated word list reviewed for English and
-  Tamil offence (for example "Blue Auto"), never derived from the account ID.
+  random adjective and noun from the alias word list (for example "Blue Auto"),
+  never derived from the account ID.
   If the pair is taken in that room, a random number from 2 to 99 is added. The
   alias is stable for that room and deleted when the room's last post has
   expired and no report or moderation record needs it.
+- **Alias word list:** a versioned file in the repository, about 100
+  adjectives and 100 nouns (about 10,000 pairs), with travel-friendly nouns
+  (Auto, Bus, Lorry, Mango, Kite). The product owner approves it and a Tamil
+  speaker reviews every change, which goes through a pull request. It excludes
+  words that are offensive or insulting in English, Tamil or Tanglish (including
+  animals used as insults, such as donkey or monkey); anything about caste,
+  religion, gender, bodies or politics; and colours with political or religious
+  meaning in Tamil Nadu (such as saffron, black, or red-and-black pairings).
+  Neutral colours and nature words are preferred.
 - Aliases are stored as `(room, account) → alias` on the server only. Other users
   see only the alias; they cannot link aliases across rooms. Moderators can look
   up the account behind an alias; every lookup is audited with a reason.
@@ -150,7 +159,17 @@ the proven patterns, not the archived tables:
   mechanics: the reportable identity is the item's opaque random reference,
   receipt-first retry, per-reporter de-duplication, 10 per 24 h, 7/30-day
   retention, `unsafe` and `abuse` first in the queue. Report counts are not
-  shown publicly and never hide an item automatically.
+  shown publicly.
+- **Collapse pending review (Pongal only;
+  [ADR 0068](../../adr/0068-report-collapse-pending-review.md)):** a post is
+  hidden pending review once 3 different accounts report it as `unsafe`,
+  `abuse` or `personal_data`, counting only accounts at least 7 days old with at
+  least one completed journey. The author sees "Hidden pending review". A
+  moderator confirms (hide) or restores it; restoring records the reports as not
+  upheld, and accounts with repeated not-upheld reports are restricted. Posts
+  only; signals rely on "No longer true". Flag
+  `ROUTIQO_SPOTS_REPORT_COLLAPSE_ENABLED`, off for the Diwali dry run, where the
+  on-call rota handles reports.
 - **Block** from any post: the server maps the post to its author and records an
   account-level block edge (ADR 0040) without revealing the account. Activity
   reads then omit that author's posts and votes for the blocker everywhere.
@@ -239,6 +258,12 @@ updated when this is built.
   tests); alias uniqueness per room and no cross-room reuse by construction.
 - **Moderation:** report reasons and queue order, hide removes from reads,
   audited alias lookup, block omits the author's content for the blocker.
+- **Collapse (Pongal):** exactly 3 qualifying reports collapse a post; reports
+  from accounts under 7 days old or without a completed journey, duplicates and
+  `false_alarm` or `spam` reasons do not count; restore and not-upheld tracking;
+  flag off keeps ADR 0064 behaviour.
+- **Alias word list:** every pair is on the approved list; the list file is
+  versioned and a test rejects entries outside it.
 - **App:** contribution controls per Spot category, Ghost Mode clears and blocks
   the queue, offline queue behaviour and messages, "Waiting to send",
   "Too old to post", large text and screen reader labels.
@@ -247,9 +272,6 @@ updated when this is built.
 
 ## Open questions
 
-- Should a small number of `unsafe` or `abuse` reports from established accounts
-  collapse an item pending review, for the festival rush? The current rule is
-  that reports never hide automatically (ADR 0064).
-- Are the three queue bands right for tolls and bus stands at festival peak, or
-  is a 30-minute band needed?
-- Word list ownership for aliases (English and Tamil review).
+- None open. Resolved 2026-09-25: collapse pending review for Pongal only
+  (ADR 0068); four queue bands (under 5, 5–15, 15–30, over 30 minutes); the
+  alias word list is owned by the product owner with Tamil-speaker review.

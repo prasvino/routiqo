@@ -31,7 +31,7 @@ each dry run and the launch.
     {
       "id": "<lowercase UUID>",
       "name": "Example Toll Plaza",
-      "nameTa": "<Tamil name, optional>",
+      "nameTa": "<Tamil name>",
       "kind": "toll",
       "longitude": 79.9,
       "latitude": 12.7,
@@ -44,7 +44,8 @@ each dry run and the launch.
 }
 ```
 
-- `name` and optional `nameTa` follow the existing display-label rules (1–80 code
+- `name` (English) and `nameTa` (Tamil) are both required and follow the
+  existing display-label rules (1–80 code
   points, letters, marks, numbers, punctuation, symbols and single spaces).
 - `kind`: `toll`, `eatery`, `fuel`, `restroom`, `bus_stand`, `temple`,
   `junction`, `rest_area`.
@@ -71,6 +72,17 @@ route-binding code.
 (Kilambakkam, tolls, major eateries, fuel, restrooms, bus stands); branch Spots
 cover major tolls, bus stands and highway eateries only. A named curator owns the
 file; a second person reviews each version against a map before it is deployed.
+Decided 2026-09-25:
+
+- **Names:** every Spot has an English and a Tamil name, matching bilingual road
+  signs where they exist. A Tamil speaker writes and checks the Tamil names in
+  the same review. The app's own interface text stays English for Diwali; a
+  Tamil interface is decided before Pongal (PRODUCT.md open question).
+- **Rest areas:** seeded when they have restrooms, food or fuel.
+- **Temples:** not seeded for Diwali, which is homeward traffic, except temples
+  that slow the highway itself (for example Samayapuram near Trichy), seeded with
+  the `traffic` and `queue` categories. Temple Spots are revisited for Pongal,
+  which overlaps the Sabarimala pilgrimage season.
 
 ## Catalog delivery
 
@@ -126,6 +138,22 @@ cached catalog. The route, endpoints and position are never sent to the server.
   "Last updated 14 min ago"; items past their `expiresAt` are removed on the
   device clock and on the next response. Nothing is shown as current when stale.
 
+### Planned for Pongal: corridor sections
+
+Decided 2026-09-25; confirmed or dropped after measuring load at the Diwali dry
+run. Before Pongal, activity reads move from per-Spot IDs to fixed corridor
+sections of about 25 km, defined in the catalog:
+
+- The app asks for the sections covering the Spots ahead (usually one or two),
+  so the server learns only which stretch of road a traveller is on, not the
+  next 20 Spots.
+- The shared part of each section's response (signal summaries, posts,
+  highlights, alerts) is identical for every reader, so it is built once and
+  cached for a few seconds, which keeps festival-peak load flat.
+- A small per-reader part (the reader's own votes and posts, and removal of
+  content from accounts the reader blocked) is applied on top and never cached
+  across accounts.
+
 ## Spot state
 
 Computed on the server from unexpired, visible items (signals and posts):
@@ -141,7 +169,8 @@ An official alert adds an alert badge in any state. State never implies safety:
 
 ## Panel and Spot detail
 
-- **Panel rows:** Spot name (Tamil name when the app language is Tamil), kind
+- **Panel rows:** Spot name in English with the Tamil name beneath it (Tamil
+  first when a Tamil interface exists), kind
   icon, "12 km ahead" or "Here", state chip, the most useful summary for the
   kind (e.g. "Slow · 3 reports in 20 min", "Good · 2 in the last hour"), and an
   alert badge. Everything on a row is available as text to screen readers.
@@ -181,7 +210,8 @@ An official alert adds an alert badge in any state. State never implies safety:
 
 ## Acceptance and evidence
 
-- **Loader:** valid file; every rejection (unknown key, duplicate id, bad label,
+- **Loader:** valid file; every rejection (unknown key, duplicate id, bad or
+  missing English or Tamil name,
   unknown kind, district or corridor, outside region, too many Spots, oversize,
   missing provenance).
 - **Endpoints:** auth, account header, flag off, ETag/304, rate limits, active
@@ -199,7 +229,7 @@ An official alert adds an alert badge in any state. State never implies safety:
 
 ## Open questions
 
-- Tamil names for all Spots at Diwali, or English only with Tamil later?
-- Should temples and rest areas be seeded for Diwali or left for Pongal?
-- Per-corridor activity requests instead of per-Spot IDs, to blur the route
-  further (ADR 0067 consequence).
+- None open. Resolved 2026-09-25: bilingual Spot names with an English
+  interface for Diwali; rest areas with facilities seeded, temples only where
+  they slow the highway; per-Spot activity requests for Diwali, with corridor
+  sections planned for Pongal (see *Planned for Pongal: corridor sections*).
