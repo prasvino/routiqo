@@ -96,7 +96,11 @@ const routeFor = (id: string): JourneyRoute =>
       ] as RouteCoordinate[],
     },
   });
-const start = (id = journeyId) => ({ journeyId: id, action: 'start' as const, kind: 'trip' as const });
+const start = (id = journeyId) => ({
+  journeyId: id,
+  action: 'start' as const,
+  kind: 'trip' as const,
+});
 const complete = (id = journeyId) => ({ journeyId: id, action: 'complete' as const });
 
 describe('device-only journey route record', () => {
@@ -141,7 +145,13 @@ describe('device-only journey route record', () => {
       adapter,
       owner,
       lease,
-      { id: journeyId, kind: 'trip', status: 'active', startedAt: '2026-09-25T10:00:00Z', completedAt: null },
+      {
+        id: journeyId,
+        kind: 'trip',
+        status: 'active',
+        startedAt: '2026-09-25T10:00:00Z',
+        completedAt: null,
+      },
       1,
     );
     expect(await readMobileJourneyRoute(adapter, owner)).not.toBeNull();
