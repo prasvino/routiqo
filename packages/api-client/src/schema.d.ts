@@ -983,7 +983,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Bounded report of one authorized visible canonical moment. Report does not automatically suppress the row. */
+        /** @description Bounded report of one authorized visible canonical moment. Report does not automatically suppress the row. An exact retry of this reporter's retained request returns the original receipt even after the moment expires; a new report needs current visibility and counts against a rolling limit of 10 per 24 hours. */
         post: operations["reportVisibleCommunityTrafficV3"];
         delete?: never;
         options?: never;
@@ -1390,9 +1390,14 @@ export interface components {
             reason: "INACCURATE" | "UNSAFE" | "SPAM";
             clientRequestId: components["schemas"]["PrivateSignalUuid"];
         };
+        /** @description Minimized owner receipt. It proves only that this reporter's request was received; it carries no summary content, case state or outcome. */
         CommunityTrafficReportResponseV3: {
             /** @enum {string} */
             status: "received";
+            /** Format: date-time */
+            receivedAt: string;
+            /** Format: date-time */
+            receiptExpiresAt: string;
         };
         BrowserPublicSignalShareRequest: {
             requestId: components["schemas"]["PrivateSignalUuid"];
@@ -4531,6 +4536,13 @@ export interface operations {
             403: components["responses"]["AuthForbidden"];
             /** @description Moment not visible to this journey; no existence disclosure */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Changed retry of this request, or this account already reported the moment */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

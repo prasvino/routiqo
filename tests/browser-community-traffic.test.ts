@@ -74,7 +74,18 @@ it('rejects contributor fields in canonical output and accepts 202 report respon
     )
     .mockResolvedValueOnce(Response.json({ schemaVersion: 3, serverTime, moments: [moment] }))
     .mockResolvedValueOnce(Response.json({ token: csrf }))
-    .mockResolvedValueOnce(Response.json({ status: 'received' }, { status: 202 }));
+    .mockResolvedValueOnce(Response.json({ status: 'received' }, { status: 202 }))
+    .mockResolvedValueOnce(Response.json({ token: csrf }))
+    .mockResolvedValueOnce(
+      Response.json(
+        {
+          status: 'received',
+          receivedAt: '2026-09-25T10:00:00Z',
+          receiptExpiresAt: '2026-10-02T10:00:00Z',
+        },
+        { status: 202 },
+      ),
+    );
   vi.stubGlobal('fetch', fetcher);
   await expect(readBrowserCommunityTraffic(account, journey)).rejects.toMatchObject({
     kind: 'unavailable',
@@ -82,9 +93,17 @@ it('rejects contributor fields in canonical output and accepts 202 report respon
   await expect(readBrowserCommunityTraffic(account, journey)).resolves.toMatchObject({
     moments: [expect.objectContaining(moment)],
   });
+  // A receipt without its times is rejected rather than trusted.
   await expect(
     reportBrowserCommunityTraffic(account, journey, ref, 'UNSAFE', request),
-  ).resolves.toEqual({ status: 'received' });
+  ).rejects.toMatchObject({ kind: 'unavailable' });
+  await expect(
+    reportBrowserCommunityTraffic(account, journey, ref, 'UNSAFE', request),
+  ).resolves.toEqual({
+    status: 'received',
+    receivedAt: '2026-09-25T10:00:00Z',
+    receiptExpiresAt: '2026-10-02T10:00:00Z',
+  });
   expect(fetcher.mock.calls[3]?.[0]).toBe(
     `/api/v1/journeys/${journey}/community-traffic/${ref}/reports`,
   );

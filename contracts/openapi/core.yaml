@@ -1457,7 +1457,7 @@ paths:
     post:
       operationId: reportVisibleCommunityTrafficV3
       security: [{ browserSession: [] }]
-      description: Bounded report of one authorized visible canonical moment. Report does not automatically suppress the row.
+      description: Bounded report of one authorized visible canonical moment. Report does not automatically suppress the row. An exact retry of this reporter's retained request returns the original receipt even after the moment expires; a new report needs current visibility and counts against a rolling limit of 10 per 24 hours.
       parameters:
         - { $ref: '#/components/parameters/AuthOrigin' }
         - { $ref: '#/components/parameters/AuthCsrf' }
@@ -1475,6 +1475,7 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Moment not visible to this journey; no existence disclosure }
+        '409': { description: 'Changed retry of this request, or this account already reported the moment' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Intake unavailable }
   /api/v1/admin/auth/csrf:
@@ -1962,9 +1963,12 @@ components:
     CommunityTrafficReportResponseV3:
       type: object
       additionalProperties: false
-      required: [status]
+      required: [status, receivedAt, receiptExpiresAt]
+      description: Minimized owner receipt. It proves only that this reporter's request was received; it carries no summary content, case state or outcome.
       properties:
         status: { type: string, enum: [received] }
+        receivedAt: { type: string, format: date-time }
+        receiptExpiresAt: { type: string, format: date-time }
     BrowserPublicSignalShareRequest:
       type: object
       additionalProperties: false

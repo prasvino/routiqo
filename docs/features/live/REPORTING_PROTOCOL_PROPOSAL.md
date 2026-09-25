@@ -1,6 +1,8 @@
 # Reporting protocol proposal
 
-Status: **proposed for owner review, 2026-09-25. Not implemented, not approved.** This proposal answers the open questions in [DURABLE_REPORT_INTAKE_PROPOSAL.md](DURABLE_REPORT_INTAKE_PROPOSAL.md) ("Independent review disposition", items 1–4) and the `todo.md` item "Resolve canonical reporting evidence identity, reference authorization, exact retries after revocation and shared transaction lock order". It changes no code, flag or retention setting. Production activation of anything below still needs the ADR 0055 privacy-contract decision.
+Status: **approved by the owner on 2026-09-25 (all six recommendations) and implemented for V3 behind the existing default-off flags; see [ADR 0064](../../adr/0064-v1-reporting-protocol.md).** The rest of this section keeps the original proposal text; where implementation refined it, a note says so.
+
+Original status: proposed for owner review. This proposal answers the open questions in [DURABLE_REPORT_INTAKE_PROPOSAL.md](DURABLE_REPORT_INTAKE_PROPOSAL.md) ("Independent review disposition", items 1–4) and the `todo.md` item "Resolve canonical reporting evidence identity, reference authorization, exact retries after revocation and shared transaction lock order". It changes no code, flag or retention setting. Production activation of anything below still needs the ADR 0055 privacy-contract decision.
 
 ## Summary
 
@@ -51,7 +53,9 @@ This closes a real gap: today a phone that lost the response to a report, then r
 
 ### 3. Shared transaction lock order
 
-**Proposal:** for reports on aggregate canonical outputs, **no account locks are needed**, and the existing order becomes the documented rule:
+**Proposal:** for reports on aggregate canonical outputs, no *other* account is locked, and the existing order becomes the documented rule.
+
+> Implementation note: the approved durable quota (R4) needs one reporter's concurrent new reports to be serialized, so intake first takes the reporter's **own** account row (`FOR NO KEY UPDATE`, which does not block other tables' foreign-key checks). That matches the account-first order every other account-bound write uses. The implemented order is: reporter account → projection → report → group; moderation remains projection → report → group → grant.
 
 ```
 projection (FOR SHARE by intake, FOR UPDATE by moderation)
@@ -74,7 +78,9 @@ The earlier constraint (discover participants, lock accounts in UUID order, then
 
 - A group whose projection content is gone shows `EVIDENCE_UNAVAILABLE` with no road or value detail. It can neither be dismissed as unfounded nor suppressed (current behaviour).
 - Add a terminal disposition `CLOSED_EVIDENCE_UNAVAILABLE`, applied automatically when the projection content is purged and the group has no decision. It is distinct from `DISMISSED` and never rewrites an earlier `SUPPRESSED`/actioned outcome. It needs no operator action and serializes on the group lock like any disposition.
-- Operators can still see aggregate counts for unavailable groups until retention ends, so repeated reports against the same area/period pattern stay visible as a signal for catalog or abuse review. That is the only investigation possible without an evidence copy, and the proposal says so plainly.
+- Reporter-free aggregate counts are retained until the group expires, so repeated reports against the same area/period pattern remain available for catalog or abuse review in the database. That is the only investigation possible without an evidence copy, and the proposal says so plainly.
+
+> Implementation note: closed groups leave the operator queue; their counts remain in storage for the 30-day retention. Deleting a reporter's account still removes that reporter's contribution from the counts; only the 7-day retention purge leaves counts unchanged.
 - No source content is copied, no lifetime is extended, and report count alone never justifies a restriction.
 
 ## Recommendations that suit Routiqo

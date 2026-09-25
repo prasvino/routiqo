@@ -35,8 +35,8 @@ ADR 0055's community traffic summary is authorized for V3 implementation and sta
 - [x] Implement the V3-only default-off moderator queue and canonical report review/suppression workflow under ADR 0056; real operator trial remains pending.
 - [x] Implement the V3-only default-off controlled grant console under ADR 0057; out-of-band root bootstrap, supervision and real operator trial remain pending.
 - [ ] Define and implement evidence eligibility and anti-Sybil safeguards.
-- [ ] Resolve canonical reporting evidence identity, reference authorization, exact retries after revocation and shared transaction lock order. Proposal awaiting owner review: `docs/features/live/REPORTING_PROTOCOL_PROPOSAL.md`.
-- [ ] Define what moderators can investigate after source evidence expires, with explicit bounded retention.
+- [x] Resolve canonical reporting evidence identity, reference authorization, exact retries after revocation and shared transaction lock order. Approved and implemented for V3 under ADR 0064 (receipt-first retry, 7/30-day retention split, 10-per-24h quota, UNSAFE-first queue).
+- [x] Define what moderators can investigate after source evidence expires, with explicit bounded retention: V3 groups close automatically as `CLOSED_EVIDENCE_UNAVAILABLE`; reporter-free counts stay 30 days (ADR 0064). Production retention/backup approval remains under operations.
 - [ ] Implement durable report intake after its authority and investigation contracts are approved.
 - [ ] Add strong administrative authentication, controlled grant administration, case/target scope and the operator queue around the internal audited restriction boundary.
 - [ ] Establish operator alerts, supervision, appeals and approved audit/backup retention; activate and verify bounded moderation cleanup in staging.

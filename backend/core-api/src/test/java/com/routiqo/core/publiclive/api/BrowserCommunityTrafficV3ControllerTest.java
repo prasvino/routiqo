@@ -49,10 +49,16 @@ class BrowserCommunityTrafficV3ControllerTest {
     @Test void reportHasExactBoundedPayloadAndNeverAcceptsClientAnchor() {
         when(sessions.authenticate(any())).thenReturn(ACTOR);
         when(rates.allow(ACTOR.toString(), "community-traffic-v3-report", 5)).thenReturn(true);
+        var received = java.time.Instant.parse("2026-09-25T10:00:00Z");
+        when(store.report(ACTOR, JOURNEY, REF, REQUEST, "INACCURATE")).thenReturn(
+                new com.routiqo.core.publiclive.infrastructure.JdbcCommunityTrafficV3.Receipt(
+                        received, received.plusSeconds(168L * 3600)));
         var controller = controller();
         var body = "{\"reason\":\"INACCURATE\",\"clientRequestId\":\"" + REQUEST + "\"}";
-        assertThat(controller.report(JOURNEY.toString(), REF.toString(), request(ACTOR, body))
-                .getStatusCode().value()).isEqualTo(202);
+        var response = controller.report(JOURNEY.toString(), REF.toString(), request(ACTOR, body));
+        assertThat(response.getStatusCode().value()).isEqualTo(202);
+        assertThat(response.getBody()).isEqualTo(new BrowserCommunityTrafficV3Controller.ReportResponse(
+                "received", received, received.plusSeconds(168L * 3600)));
         verify(store).report(ACTOR, JOURNEY, REF, REQUEST, "INACCURATE");
         String extra = body.replace("}", ",\"anchor\":\"" + UUID.randomUUID() + "\"}");
         assertThatThrownBy(() -> controller.report(JOURNEY.toString(), REF.toString(),

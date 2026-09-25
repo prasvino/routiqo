@@ -14,6 +14,7 @@ import {
 import { CommunityShareControl } from './community-share-control';
 import { CommunityShareRecoveryPanel } from './community-share-recovery-panel';
 import { CommunityTrafficPanel } from './community-traffic-panel';
+import { BrowserLiveError } from '../lib/browser-live-private';
 
 vi.mock('../lib/browser-auth', () => ({ browserAccount: vi.fn() }));
 vi.mock('../lib/browser-community-traffic', () => ({
@@ -51,6 +52,12 @@ afterEach(() => {
   vi.resetAllMocks();
   vi.useRealTimers();
 });
+
+const receipt = {
+  status: 'received' as const,
+  receivedAt: '2026-09-25T10:00:00Z',
+  receiptExpiresAt: '2026-10-02T10:00:00Z',
+};
 
 it('requires fresh per-report consent and safe interaction, then states candidate acceptance without publication', async () => {
   vi.mocked(shareBrowserCommunityTraffic).mockResolvedValue({
@@ -180,7 +187,7 @@ it('shows honest empty/offline states and sends a report only for a visible cano
   vi.mocked(readBrowserCommunityTraffic)
     .mockResolvedValueOnce(snapshot([]))
     .mockResolvedValueOnce(snapshot([row]));
-  vi.mocked(reportBrowserCommunityTraffic).mockResolvedValue({ status: 'received' });
+  vi.mocked(reportBrowserCommunityTraffic).mockResolvedValue(receipt);
   const view = render(<CommunityTrafficPanel accountId={accountId} journeyId={journeyId} online />);
   expect(await screen.findByText(/No recent community update/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Check traffic' }));
@@ -217,7 +224,7 @@ it('retries an uncertain report with its exact reason and request id', async () 
   vi.mocked(readBrowserCommunityTraffic).mockResolvedValue(snapshot([row]));
   vi.mocked(reportBrowserCommunityTraffic)
     .mockRejectedValueOnce(new Error('response lost'))
-    .mockResolvedValueOnce({ status: 'received' });
+    .mockResolvedValueOnce(receipt);
   render(<CommunityTrafficPanel accountId={accountId} journeyId={journeyId} online />);
   expect(await screen.findByText('Slow traffic reported')).toBeTruthy();
   fireEvent.change(screen.getByLabelText('Report this summary'), { target: { value: 'SPAM' } });
@@ -281,4 +288,25 @@ it('hides a server-timed row at expiry with a device clock five minutes slow', a
   });
   expect(screen.queryByText('Slow traffic reported')).toBeNull();
   expect(screen.getByText(/Previous community summaries expired/)).toBeTruthy();
+});
+
+it('explains the rolling report limit instead of implying the report may have been lost', async () => {
+  const row = {
+    ref,
+    areaLabel: 'Reviewed road area',
+    trafficValue: 'traffic_slow' as const,
+    observationPeriod: '10:00–10:05 UTC',
+    expiresAt: future(),
+    source: 'community' as const,
+    schemaVersion: 3 as const,
+  };
+  vi.mocked(readBrowserCommunityTraffic).mockResolvedValue(snapshot([row]));
+  vi.mocked(reportBrowserCommunityTraffic).mockRejectedValueOnce(
+    new BrowserLiveError('rate_limited'),
+  );
+  render(<CommunityTrafficPanel accountId={accountId} journeyId={journeyId} online />);
+  expect(await screen.findByText('Slow traffic reported')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Report this summary'), { target: { value: 'SPAM' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send report' }));
+  expect(await screen.findByText(/up to 10 new reports in 24 hours/)).toBeTruthy();
 });
