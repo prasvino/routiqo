@@ -9,10 +9,10 @@ import {
   readBrowserJourneyPartition,
   updateBrowserJourneyOutbox,
 } from '../apps/web/lib/journey-storage';
+import { SyntheticJourneyServer } from './fixtures/synthetic-journey-server';
 
 // End-to-end browser outbox scenarios against a synthetic server that follows the core API's
-// journey rules: a start is idempotent for the same id and kind and conflicts (409) for another
-// kind; a finish is idempotent once completed and 404 for a journey the account does not have.
+// journey rules (see the fixture for the exact rules).
 
 const accountA = '00000000-0000-4000-8000-00000000000a';
 const accountB = '00000000-0000-4000-8000-00000000000b';
@@ -20,99 +20,7 @@ const first = '00000000-0000-4000-8000-000000000101';
 const second = '00000000-0000-4000-8000-000000000102';
 const other = '00000000-0000-4000-8000-000000000201';
 
-/** How the network treats one journey write. "after" faults happen once the server has applied it. */
-type Fault =
-  | 'ok'
-  | 'drop-before'
-  | 'drop-after'
-  | 'unavailable'
-  | 'throttled'
-  | 'malformed-after'
-  | 'hold-after'
-  | 'storage-fails-after';
-
-type Stored = { kind: 'trip' | 'commute'; status: 'active' | 'completed' };
-
-class SyntheticServer {
-  readonly journeys = new Map<string, Map<string, Stored>>();
-  /** Every write the server actually applied or replayed, in arrival order. */
-  readonly applied: string[] = [];
-  /** Every write the client attempted, with the client clock at send time. */
-  readonly attempts: { account: string; operation: string; at: number }[] = [];
-  readonly faults: Fault[] = [];
-  readonly held: Array<() => void> = [];
-  session: string | null = accountA;
-  now = 1_780_000_000_000;
-
-  fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = String(input);
-    if (url.endsWith('/auth/session')) {
-      return this.session
-        ? Response.json({ accountId: this.session })
-        : new Response(null, { status: 401 });
-    }
-    if (url.endsWith('/auth/csrf'))
-      return Response.json({ token: 'synthetic-csrf-value-for-test' });
-    const headers = (init?.headers ?? {}) as Record<string, string>;
-    const account = headers['X-Routiqo-Account'] ?? '';
-    const complete = /^\/api\/v1\/journeys\/([0-9a-f-]{36})\/complete$/.exec(url);
-    const body = JSON.parse(String(init?.body ?? '{}')) as {
-      id?: string;
-      kind?: 'trip' | 'commute';
-    };
-    const operation = complete ? `complete:${complete[1]}` : `start:${body.id}:${body.kind}`;
-    this.attempts.push({ account, operation, at: this.now });
-    const fault = this.faults.shift() ?? 'ok';
-    if (fault === 'drop-before') throw new TypeError('Failed to fetch');
-    if (fault === 'unavailable') return new Response(null, { status: 503 });
-    if (fault === 'throttled') return new Response(null, { status: 429 });
-    const response = complete ? this.complete(account, complete[1]!) : this.start(account, body);
-    if (response.status === 200) this.applied.push(`${account}:${operation}`);
-    if (fault === 'drop-after') throw new TypeError('Failed to fetch');
-    if (fault === 'malformed-after') return new Response('{"id":', { status: 200 });
-    if (fault === 'storage-fails-after')
-      vi.stubGlobal('indexedDB', {
-        open: () => {
-          throw new Error('storage unavailable');
-        },
-      });
-    if (fault === 'hold-after') {
-      await new Promise<void>((release) => this.held.push(release));
-    }
-    return response;
-  });
-
-  private owned(account: string) {
-    let journeys = this.journeys.get(account);
-    if (!journeys) this.journeys.set(account, (journeys = new Map()));
-    return journeys;
-  }
-  private start(account: string, body: { id?: string; kind?: 'trip' | 'commute' }) {
-    const journeys = this.owned(account);
-    const existing = journeys.get(body.id!);
-    if (existing && existing.kind !== body.kind) return new Response(null, { status: 409 });
-    const journey = existing ?? { kind: body.kind!, status: 'active' as const };
-    journeys.set(body.id!, journey);
-    return this.render(body.id!, journey);
-  }
-  private complete(account: string, id: string) {
-    const journey = this.owned(account).get(id);
-    if (!journey) return new Response(null, { status: 404 });
-    journey.status = 'completed';
-    return this.render(id, journey);
-  }
-  private render(id: string, journey: Stored) {
-    return Response.json({
-      id,
-      kind: journey.kind,
-      status: journey.status,
-      startedAt: '2026-09-25T08:00:00Z',
-      completedAt: journey.status === 'completed' ? '2026-09-25T09:00:00Z' : null,
-    });
-  }
-}
-
-let server: SyntheticServer;
+let server: SyntheticJourneyServer;
 
 async function queue(account: string, ...commands: JourneyCommand[]) {
   for (const command of commands)
@@ -132,7 +40,7 @@ async function untilHeld(count: number) {
 }
 
 beforeEach(() => {
-  server = new SyntheticServer();
+  server = new SyntheticJourneyServer(accountA);
   vi.stubGlobal('indexedDB', new IDBFactory());
   vi.stubGlobal('fetch', server.fetch);
   vi.spyOn(Date, 'now').mockImplementation(() => server.now);
@@ -158,7 +66,10 @@ describe('journey sync under delayed, duplicated and flapping networks', () => {
     expect(await dispatchBrowserJourneyOnce(accountA)).toBe('deferred');
     const deferred = await head(accountA);
     expect(deferred).toMatchObject({ attempts: 1, lease: null, blocked: null });
-    expect(server.journeys.get(accountA)?.get(first)).toEqual({ kind: 'trip', status: 'active' });
+    expect(server.journeys.get(accountA)?.get(first)).toMatchObject({
+      kind: 'trip',
+      status: 'active',
+    });
 
     server.now = deferred!.nextAttemptAt;
     expect(await dispatchBrowserJourneyBatch(accountA)).toEqual({
@@ -234,7 +145,7 @@ describe('journey sync under delayed, duplicated and flapping networks', () => {
       `start:${first}:commute`,
       `complete:${first}`,
     ]);
-    expect(server.journeys.get(accountA)?.get(first)).toEqual({
+    expect(server.journeys.get(accountA)?.get(first)).toMatchObject({
       kind: 'commute',
       status: 'completed',
     });
@@ -327,7 +238,10 @@ describe('journey sync under delayed, duplicated and flapping networks', () => {
     server.faults.push('storage-fails-after');
 
     await expect(dispatchBrowserJourneyOnce(accountA)).rejects.toThrow();
-    expect(server.journeys.get(accountA)?.get(first)).toEqual({ kind: 'trip', status: 'active' });
+    expect(server.journeys.get(accountA)?.get(first)).toMatchObject({
+      kind: 'trip',
+      status: 'active',
+    });
 
     vi.stubGlobal('indexedDB', storage);
     const leased = await head(accountA);
