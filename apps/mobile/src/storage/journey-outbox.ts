@@ -7,8 +7,11 @@ import {
   recordJourneyResult,
   resumeJourneyAuthentication,
   settleJourneyCommand,
+  readJourneyRoute,
   type JourneyCommand,
   type JourneyOutbox,
+  type JourneyRoute,
+  type JourneySnapshots,
 } from '@routiqo/shared';
 
 // Structural subset also permits verification of these exact queries against file-backed SQLite.
@@ -35,6 +38,29 @@ export async function initializeJourneyOutbox(db: Pick<OutboxDatabase, 'execAsyn
     account_id TEXT PRIMARY KEY NOT NULL,
     payload TEXT NOT NULL
   );`);
+  // Device-only route of the active journey (ADR 0067). Never sent, backed up or logged.
+  await db.execAsync(`CREATE TABLE IF NOT EXISTS journey_route_v1 (
+    account_id TEXT PRIMARY KEY NOT NULL,
+    journey_id TEXT NOT NULL,
+    payload TEXT NOT NULL
+  );`);
+}
+
+/** A journey is current while the server shows it active or its start is still queued. */
+function isCurrentJourney(
+  journeyId: string,
+  queue: JourneyOutbox,
+  snapshots: JourneySnapshots,
+): boolean {
+  const completing = queue.entries.some(
+    (item) => item.command.journeyId === journeyId && item.command.action === 'complete',
+  );
+  if (completing) return false;
+  const known = snapshots.journeys.find((item) => item.id === journeyId);
+  if (known) return known.status === 'active';
+  return queue.entries.some(
+    (item) => item.command.journeyId === journeyId && item.command.action === 'start',
+  );
 }
 
 /** No network inside change. Return only after SQLite commits the new queue. */
@@ -161,6 +187,7 @@ export async function clearJourneyPartition(db: OutboxDatabase, accountId: strin
     await tx.runAsync('DELETE FROM journey_outbox_v1 WHERE account_id = ?', accountId);
     await tx.runAsync('DELETE FROM journey_snapshots_v1 WHERE account_id = ?', accountId);
     await tx.runAsync('DELETE FROM journal_partitions_v1 WHERE account_id = ?', accountId);
+    await tx.runAsync('DELETE FROM journey_route_v1 WHERE account_id = ?', accountId);
   });
 }
 
@@ -179,14 +206,24 @@ export async function readMobileJourneyPartition(db: SQLiteDatabase, accountId: 
   };
 }
 
-/** The command is committed before any network send; plans are never promoted implicitly. */
+/**
+ * The command is committed before any network send; plans are never promoted implicitly.
+ * A start may carry the device-only journey route, written in the same transaction.
+ * Completing a journey deletes its route in the same transaction.
+ */
 export async function queueMobileJourney(
   db: OutboxDatabase,
   accountId: string,
   command: JourneyCommand,
   now: number,
+  route: JourneyRoute | null = null,
 ): Promise<void> {
   readJourneyOutbox(null, accountId);
+  if (route) {
+    if (command.action !== 'start') throw new Error('Only a journey start carries a route.');
+    const valid = readJourneyRoute(route);
+    if (valid.journeyId !== command.journeyId) throw new Error('Route belongs to another journey.');
+  }
   await db.withExclusiveTransactionAsync(async (tx) => {
     const retired = await tx.getFirstAsync<{ account_id: string }>(
       'SELECT account_id FROM journey_retired_accounts_v1 WHERE account_id = ?',
@@ -215,6 +252,11 @@ export async function queueMobileJourney(
       )
         throw new Error('Finish or resolve the current journey first.');
     } else {
+      await tx.runAsync(
+        'DELETE FROM journey_route_v1 WHERE account_id = ? AND journey_id = ?',
+        accountId,
+        command.journeyId,
+      );
       if (known?.status === 'completed') return;
       if (
         !known &&
@@ -231,6 +273,78 @@ export async function queueMobileJourney(
       accountId,
       JSON.stringify(next),
     );
+    if (route)
+      await tx.runAsync(
+        `INSERT INTO journey_route_v1 (account_id, journey_id, payload) VALUES (?, ?, ?)
+        ON CONFLICT(account_id) DO UPDATE SET
+          journey_id = excluded.journey_id, payload = excluded.payload`,
+        accountId,
+        route.journeyId,
+        JSON.stringify(readJourneyRoute(route)),
+      );
+  });
+}
+
+/**
+ * The stored route of the account's current journey, or null.
+ * A record whose journey is no longer current, or that fails validation, is deleted.
+ */
+export async function readMobileJourneyRoute(
+  db: OutboxDatabase,
+  accountId: string,
+): Promise<JourneyRoute | null> {
+  readJourneyOutbox(null, accountId);
+  let route: JourneyRoute | null = null;
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    const row = await tx.getFirstAsync<{ journey_id: string; payload: string }>(
+      'SELECT journey_id, payload FROM journey_route_v1 WHERE account_id = ?',
+      accountId,
+    );
+    if (!row) return;
+    const queueRow = await tx.getFirstAsync<{ payload: string }>(
+      'SELECT payload FROM journey_outbox_v1 WHERE account_id = ?',
+      accountId,
+    );
+    const snapshotRow = await tx.getFirstAsync<{ payload: string }>(
+      'SELECT payload FROM journey_snapshots_v1 WHERE account_id = ?',
+      accountId,
+    );
+    let candidate: JourneyRoute | null = null;
+    try {
+      candidate = readJourneyRoute(JSON.parse(row.payload));
+    } catch {
+      candidate = null;
+    }
+    const current =
+      candidate !== null &&
+      candidate.journeyId === row.journey_id &&
+      isCurrentJourney(
+        candidate.journeyId,
+        readJourneyOutbox(queueRow?.payload ?? null, accountId),
+        readJourneySnapshots(snapshotRow?.payload ?? null, accountId),
+      );
+    if (current) {
+      route = candidate;
+      return;
+    }
+    await tx.runAsync('DELETE FROM journey_route_v1 WHERE account_id = ?', accountId);
+  });
+  return route;
+}
+
+/**
+ * Delete stored journey routes: for one account (sign-out), for every account except the
+ * signed-in one (account change), or all (clear local data).
+ */
+export async function clearMobileJourneyRoutes(
+  db: Pick<OutboxDatabase, 'execAsync' | 'withExclusiveTransactionAsync'>,
+  scope: { only: string } | { except: string } | 'all',
+): Promise<void> {
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    if (scope === 'all') await tx.runAsync('DELETE FROM journey_route_v1');
+    else if ('only' in scope)
+      await tx.runAsync('DELETE FROM journey_route_v1 WHERE account_id = ?', scope.only);
+    else await tx.runAsync('DELETE FROM journey_route_v1 WHERE account_id <> ?', scope.except);
   });
 }
 
