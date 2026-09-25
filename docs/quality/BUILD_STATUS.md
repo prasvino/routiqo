@@ -137,6 +137,7 @@ sharing and full native LIVE remain separate pending features.
 |---|---|
 | Web | Home, Explore, Trips, Profile; curated destination search/filter/details, bookmarks, editable trip and recurring commute drafts |
 | Recent web reliability | Batch 01 added storage, journal and transport regression coverage. Batches 02–04 implemented bounded Explore query handling, minute-boundary departure refresh, planning/backup/save error recovery, accessible category grouping, commute/plan feedback fixes, resumed time-zone grouping, and history response cleanup and explicit latest-page refresh. These are local web improvements, not authenticated cross-device or public LIVE verification. |
+| Blocked journey actions | Web: after "Check server status" confirms a refused start/finish cannot apply (journey absent, start kind differs, or finish journey still active), the traveller can explicitly discard it with inline confirmation. A discarded start drops its queued finish; the rule is shared (`discardBlockedJourneyCommand`) and runs in one storage transaction with head re-validation, then recent history is re-read. Applied actions still use reconcile. Synthetic-API rendered QA at desktop and 360 px/130% text; see [evidence](evidence/journey-blocked-discard-2026-09-25/README.md). Native controls and real two-device sign-in QA pending. |
 | Scheduling | Shared next-departure calculation, weekday recurrence, upcoming ordering, foreground refresh, DST-gap handling; no automatic journey completion or reminders |
 | Commute summaries | Monthly counts and exact recorded elapsed minutes from the verified account's confirmed completed commutes saved on this device; time-zone-aware start-month grouping and explicit incomplete-history disclosure. Read-only, no invented distance or new persistence |
 | Local storage | Validated web localStorage with write-error handling and cross-tab refresh; native SQLite adapter; local-plan restart passed on the API 36 emulator; authenticated restoration still needs configured-device testing |
@@ -482,8 +483,8 @@ as real LIVE activity.
    account/journey clearing and exact explicit retry. Public output depends on the
    first two gates; private controls are not a working public LIVE release.
 4. **Journey and UI release reliability.** The batch 01–04 local web regressions
-   and fixes above are complete. Broader cross-device restoration and unresolved
-   conflicts; authenticated journal/history/backup QA; storage failures,
+   and fixes above are complete. Broader cross-device restoration (refused actions can now be
+   explicitly discarded on web, ADR 0063); authenticated journal/history/backup QA; storage failures,
    interrupted writes, account switches, large text, reduced motion and screen
    readers still need release evidence. Existing local plans remain separate from
    server journeys.

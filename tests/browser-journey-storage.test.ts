@@ -7,6 +7,7 @@ import {
   updateBrowserJourneyOutbox,
   queueBrowserJourneyAction,
   reconcileBrowserJourney,
+  discardBrowserJourneyAction,
   mergeBrowserJourneyHistory,
   retireBrowserJourneyPartition,
 } from '../apps/web/lib/journey-storage';
@@ -181,6 +182,41 @@ describe('browser IndexedDB journey partitions', () => {
     expect(saved.snapshots.journeys[0]?.id).toBe(id);
     expect(saved.outbox.entries[0]?.command.action).toBe('complete');
     expect(await reconcileBrowserJourney(account, command, response)).toBe(false);
+  });
+  it('explicitly discards a refused start with its dependent finish in one transaction', async () => {
+    const command = { action: 'start' as const, kind: 'trip' as const, journeyId: id };
+    await queueBrowserJourneyAction(account, command, 0);
+    await queueBrowserJourneyAction(account, { action: 'complete', journeyId: id }, 1);
+    await updateBrowserJourneyOutbox(account, (queue) => ({
+      ...queue,
+      entries: queue.entries.map((entry, index) =>
+        index === 0 ? { ...entry, blocked: 'conflict' } : entry,
+      ),
+    }));
+    const before = await readBrowserJourneyPartition(account);
+    await expect(
+      discardBrowserJourneyAction(account, command, { kind: 'trip', status: 'active' }),
+    ).rejects.toThrow(/Reconcile/);
+    await expect(
+      discardBrowserJourneyAction(account, { action: 'complete', journeyId: id }, null),
+    ).rejects.toThrow(/changed/);
+    await expect(discardBrowserJourneyAction(other, command, null)).rejects.toThrow();
+    expect(await readBrowserJourneyPartition(account)).toEqual(before);
+
+    const after = await discardBrowserJourneyAction(account, command, null);
+    expect(after.outbox.entries).toEqual([]);
+    expect(after.snapshots).toEqual(before.snapshots);
+    expect(await readBrowserJourneyPartition(account)).toEqual(after);
+  });
+  it('does not discard into a retired account partition', async () => {
+    const command = { action: 'start' as const, kind: 'trip' as const, journeyId: id };
+    await queueBrowserJourneyAction(account, command, 0);
+    await updateBrowserJourneyOutbox(account, (queue) => ({
+      ...queue,
+      entries: queue.entries.map((entry) => ({ ...entry, blocked: 'rejected' as const })),
+    }));
+    await retireBrowserJourneyPartition(account);
+    await expect(discardBrowserJourneyAction(account, command, null)).rejects.toThrow();
   });
   it('allows only one competing explicit start across tabs', async () => {
     const results = await Promise.allSettled(

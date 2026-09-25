@@ -1953,6 +1953,24 @@ textarea::placeholder {
   flex-wrap: wrap;
   margin-top: 16px;
 }
+.journey-discard {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--soft);
+  max-width: 640px;
+}
+.journey-discard p {
+  margin: 0;
+  font-size: 13px;
+}
+.journey-discard .detail-actions {
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
 .journey-note {
   margin-top: 16px;
   font-size: 13px;
