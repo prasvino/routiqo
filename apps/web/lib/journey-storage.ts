@@ -5,6 +5,8 @@ import {
   recordJourneyResult,
   settleJourneyCommand,
   enqueueJourneyCommand,
+  discardBlockedJourneyCommand,
+  type BlockedJourneyObservation,
   type JourneyCommand,
   type JourneyOutbox,
   type JourneySnapshots,
@@ -263,5 +265,23 @@ export function reconcileBrowserJourney(
     const snapshots = recordJourneyResult(partition.snapshots, head.command, response);
     const outbox = { ...partition.outbox, entries: partition.outbox.entries.slice(1) };
     return { value: stored({ outbox, snapshots }, account), result: true };
+  });
+}
+
+/**
+ * Explicitly discard a refused head action after a fresh server read (ADR 0063). Re-validates the head
+ * inside the transaction; throws without changes if it moved, was retired, or the observation shows the
+ * action already applied. Confirmed snapshots are never edited here.
+ */
+export function discardBrowserJourneyAction(
+  account: string,
+  expected: JourneyCommand,
+  observation: BlockedJourneyObservation,
+): Promise<BrowserJourneyPartition> {
+  return transaction(account, (value) => {
+    const partition = read(value, account);
+    const { outbox } = discardBlockedJourneyCommand(partition.outbox, expected, observation);
+    const next = { outbox, snapshots: partition.snapshots };
+    return { value: stored(next, account), result: next };
   });
 }

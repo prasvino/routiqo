@@ -204,3 +204,56 @@ export function resumeJourneyAuthentication(
     entries: [{ ...first, blocked: null, nextAttemptAt: now }, ...state.entries.slice(1)],
   };
 }
+
+/** Server state observed for the blocked command's journey; `null` means not found for this account. */
+export type BlockedJourneyObservation = {
+  kind: JourneyKind;
+  status: 'active' | 'completed';
+} | null;
+
+/**
+ * Explicitly discard a blocked head command after a fresh server read shows the action was not applied
+ * and cannot apply as queued (ADR 0063). A discarded start also drops the queued finish for the same
+ * journey. Throws without changes when the head differs, is not blocked by a conflict or rejection, is
+ * leased, or the observation shows the action already applied (use reconciliation for that case).
+ */
+export function discardBlockedJourneyCommand(
+  state: JourneyOutbox,
+  expected: JourneyCommand,
+  observation: BlockedJourneyObservation,
+): { outbox: JourneyOutbox; discarded: JourneyCommand[] } {
+  const command = commandFrom(expected);
+  const head = state.entries[0];
+  if (
+    !head ||
+    journeyCommandKey(head.command) !== journeyCommandKey(command) ||
+    (head.command.action === 'start' &&
+      command.action === 'start' &&
+      head.command.kind !== command.kind)
+  )
+    throw new Error('The saved action changed. Check the server status again.');
+  if ((head.blocked !== 'conflict' && head.blocked !== 'rejected') || head.lease)
+    throw new Error('Only a paused action that the server refused can be discarded.');
+  if (observation !== null) {
+    if (
+      (observation.kind !== 'trip' && observation.kind !== 'commute') ||
+      (observation.status !== 'active' && observation.status !== 'completed')
+    )
+      throw new Error('Invalid server observation.');
+    const applied =
+      head.command.action === 'start'
+        ? observation.kind === head.command.kind
+        : observation.status === 'completed';
+    if (applied) throw new Error('The server already has this action. Reconcile it instead.');
+  }
+  const discarded = [head.command];
+  const rest = state.entries.slice(1).filter((entry) => {
+    const dependent =
+      head.command.action === 'start' &&
+      entry.command.action === 'complete' &&
+      entry.command.journeyId === head.command.journeyId;
+    if (dependent) discarded.push(entry.command);
+    return !dependent;
+  });
+  return { outbox: { ...state, entries: rest }, discarded };
+}

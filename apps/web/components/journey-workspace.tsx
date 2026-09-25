@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { JourneyCommand } from '@routiqo/shared';
+import type { BlockedJourneyObservation, JourneyCommand } from '@routiqo/shared';
 import { authAvailability, browserAccount } from '../lib/browser-auth';
 import {
   dispatchBrowserJourneyBatch,
@@ -10,6 +10,7 @@ import {
 import {
   queueBrowserJourneyAction,
   reconcileBrowserJourney,
+  discardBrowserJourneyAction,
   readBrowserJourneyPartition,
   type BrowserJourneyPartition,
 } from '../lib/journey-storage';
@@ -118,6 +119,13 @@ export function JourneyWorkspace() {
   const [partition, setPartition] = useState<BrowserJourneyPartition | null>(null);
   const [error, setError] = useState('');
   const [review, setReview] = useState('');
+  // A fresh server check that showed the blocked head cannot apply (ADR 0063). Never persisted.
+  const [resolution, setResolution] = useState<{
+    account: string;
+    command: JourneyCommand;
+    observation: BlockedJourneyObservation;
+    confirming: boolean;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [start, setStart] = useState(false);
   const [journal, setJournal] = useState<string | null>(null);
@@ -249,6 +257,22 @@ export function JourneyWorkspace() {
     [account, invalidateConsentAuthority],
   );
   const head = partition?.outbox.entries[0];
+  const resolvable =
+    resolution !== null &&
+    resolution.account === account &&
+    head !== undefined &&
+    !head.lease &&
+    (head.blocked === 'conflict' || head.blocked === 'rejected') &&
+    head.command.journeyId === resolution.command.journeyId &&
+    head.command.action === resolution.command.action;
+  const discardDependents =
+    resolvable && resolution.command.action === 'start'
+      ? (partition?.outbox.entries.filter(
+          (entry) =>
+            entry.command.action === 'complete' &&
+            entry.command.journeyId === resolution.command.journeyId,
+        ).length ?? 0)
+      : 0;
   async function restoreRecent() {
     if (!account || locked.current || !navigator.onLine) return;
     invalidateConsentAuthority();
@@ -272,12 +296,58 @@ export function JourneyWorkspace() {
       if (current === revision.current) setBusy(false);
     }
   }
+  async function discardAction() {
+    if (!account || !resolution || resolution.account !== account || locked.current) return;
+    if (!navigator.onLine) return;
+    invalidateConsentAuthority();
+    locked.current = true;
+    setBusy(true);
+    setReview('');
+    const current = ++revision.current;
+    const { command, observation } = resolution;
+    try {
+      await discardBrowserJourneyAction(account, command, observation);
+      if (current === revision.current) setResolution(null);
+      let refreshed = true;
+      let saved: BrowserJourneyPartition;
+      try {
+        saved = (await restoreRecentBrowserJourneyHistory(account)).partition;
+      } catch {
+        refreshed = false;
+        saved = await readBrowserJourneyPartition(account);
+      }
+      if (current === revision.current) {
+        setPartition(saved);
+        setReview(
+          refreshed
+            ? 'The unsent action was discarded. Recent journeys were refreshed from the server.'
+            : 'The unsent action was discarded. Recent journeys couldn’t be refreshed; choose Restore recent journeys when you’re connected.',
+        );
+      }
+    } catch {
+      if (current === revision.current) {
+        setResolution(null);
+        setReview(
+          'The saved action changed or couldn’t be discarded. Check the server status again.',
+        );
+        try {
+          setPartition(await readBrowserJourneyPartition(account));
+        } catch {
+          setError('Journey status is unavailable. Saved actions stay on this device.');
+        }
+      }
+    } finally {
+      locked.current = false;
+      if (current === revision.current) setBusy(false);
+    }
+  }
   async function reviewConflict() {
     if (!account || !head || locked.current || !navigator.onLine) return;
     invalidateConsentAuthority();
     locked.current = true;
     setBusy(true);
     setReview('');
+    setResolution(null);
     const current = ++revision.current;
     try {
       const journey = await readBrowserJourney(account, head.command.journeyId);
@@ -299,12 +369,19 @@ export function JourneyWorkspace() {
         }
         return;
       }
-      if (current === revision.current)
+      if (current === revision.current) {
+        setResolution({
+          account,
+          command: head.command,
+          observation: journey ? { kind: journey.kind, status: journey.status } : null,
+          confirming: false,
+        });
         setReview(
           journey
-            ? `Server status: ${journey.status}. Your saved action remains paused until reconciliation is available.`
-            : 'This journey was not found for your account. Your saved action has been preserved.',
+            ? `The server shows this journey as ${journey.status === 'active' ? 'an active' : 'a completed'} ${journey.kind}, so your saved action can’t be applied. It stays paused until you discard it.`
+            : 'This journey was not found for your account, so your saved action can’t be applied. It stays paused until you discard it.',
         );
+      }
     } catch {
       if (current === revision.current)
         setReview('Server status could not be checked. Your saved action has been preserved.');
@@ -439,6 +516,55 @@ export function JourneyWorkspace() {
             )}
           </div>
           {review && <p role="status">{review}</p>}
+          {resolvable && !resolution.confirming && (
+            <div className="detail-actions">
+              <button
+                className="button secondary"
+                disabled={busy || offline}
+                onClick={() => setResolution({ ...resolution, confirming: true })}
+              >
+                {resolution.command.action === 'start'
+                  ? 'Discard unsent start'
+                  : 'Discard unsent finish'}
+              </button>
+            </div>
+          )}
+          {resolvable && resolution.confirming && (
+            <div className="journey-discard" role="group" aria-labelledby="journey-discard-title">
+              <p id="journey-discard-title">
+                <strong>
+                  {resolution.command.action === 'start'
+                    ? 'Discard the unsent start?'
+                    : 'Discard the unsent finish?'}
+                </strong>
+              </p>
+              <p>
+                {resolution.command.action === 'start'
+                  ? discardDependents
+                    ? 'This removes the start and its queued finish from this device. '
+                    : 'This removes the start from this device. '
+                  : 'This removes the finish from this device. '}
+                The server’s journeys and your planning notes aren’t changed. Other saved actions
+                stay queued.
+              </p>
+              <div className="detail-actions">
+                <button
+                  className="button secondary"
+                  disabled={busy}
+                  onClick={() => setResolution({ ...resolution, confirming: false })}
+                >
+                  Keep it
+                </button>
+                <button
+                  className="button danger"
+                  disabled={busy || offline}
+                  onClick={() => void discardAction()}
+                >
+                  {busy ? 'Discarding…' : 'Discard'}
+                </button>
+              </div>
+            </div>
+          )}
           <p className="journey-note">
             Journey controls send type and start/finish records. Planning notes and places stay on
             this device; trip journal notes are saved separately when you choose.
