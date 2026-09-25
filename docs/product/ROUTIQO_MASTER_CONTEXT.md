@@ -1,12 +1,12 @@
 # Routiqo --- Product & Engineering Master Context
 
-> **Purpose:** This document is the master starting context for Codex.
+> **Purpose:** This document is the master starting context for Claude and human contributors.
 > It describes the product vision, V1 scope, UX principles,
 > privacy/safety model, AI strategy, architecture, technology stack,
 > source-code organization, engineering rules, and implementation
 > sequence for **Routiqo**.
 >
-> Codex should treat this document as the high-level source of truth.
+> Treat this document as the high-level source of truth.
 > Where a detail is not specified, prefer the simplest
 > production-quality implementation that preserves the principles in
 > this document. Do not introduce major architecture, infrastructure,
@@ -954,7 +954,7 @@ Reasons:
 -   API contract changes often affect several applications.
 -   Easier atomic changes.
 -   Easier integration testing.
--   Better whole-system context for Codex.
+-   Better whole-system context for AI coding agents.
 -   Shared engineering documentation and contracts.
 -   Simpler early-stage ownership.
 
@@ -1054,7 +1054,7 @@ routiqo/
 ├── .github/
 │   └── workflows/
 │
-├── AGENTS.md
+├── CLAUDE.md
 ├── README.md
 ├── Makefile
 ├── pnpm-workspace.yaml
@@ -1444,7 +1444,7 @@ Do not mix admin capabilities into the consumer web application.
 The existing Lovable prototype is a **visual/UX reference**, not
 production source code.
 
-Codex should recreate the design cleanly rather than attempting to
+Recreate the design cleanly rather than attempting to
 reverse-engineer minified Lovable bundles.
 
 Create design tokens:
@@ -1628,7 +1628,7 @@ reasons.
 
 ## 31. CI/CD and Developer Experience
 
-The repository should be easy for a new developer or Codex to run.
+The repository should be easy for a new developer or Claude to run.
 
 Target:
 
@@ -1666,9 +1666,9 @@ Before merging:
 
 ------------------------------------------------------------------------
 
-## 32. Engineering Rules for `AGENTS.md`
+## 32. Engineering Rules for `CLAUDE.md`
 
-Create a root `AGENTS.md` containing at least these invariants:
+Keep a root `CLAUDE.md` containing at least these invariants:
 
 1.  Product name is **Routiqo**.
 2.  Mobile is React Native + Expo + TypeScript.
@@ -1716,7 +1716,7 @@ Create a root `AGENTS.md` containing at least these invariants:
 
 ## 33. Recommended Build Sequence
 
-Codex should **not** attempt to build the entire product in one giant
+Do **not** attempt to build the entire product in one giant
 change.
 
 ### Phase 0 --- Foundation
@@ -1725,7 +1725,7 @@ Create:
 
 -   Monorepo.
 -   Tooling.
--   `AGENTS.md`.
+-   `CLAUDE.md`.
 -   Architecture docs.
 -   ADR structure.
 -   OpenAPI setup.
@@ -1980,13 +1980,13 @@ managed through corridor/event-focused launches.
 
 ------------------------------------------------------------------------
 
-## 37. Codex Working Method
+## 37. Working Method
 
-Codex should work incrementally.
+Work incrementally.
 
 For each substantial task:
 
-1.  Read `AGENTS.md` and relevant docs.
+1.  Read `CLAUDE.md` and relevant docs.
 2.  Inspect existing code before changing architecture.
 3.  State/record acceptance criteria.
 4.  Implement the smallest coherent change.
@@ -2003,37 +2003,14 @@ to make a feature easier to implement.
 
 ------------------------------------------------------------------------
 
-## 38. Immediate Codex Starting Task
+## 38. Repository Bootstrap (completed)
 
-After reading this document, Codex should **not immediately implement
-every feature**.
-
-The first task should be to create or validate:
-
-1.  The target monorepo structure.
-2.  Root `AGENTS.md`.
-3.  `README.md`.
-4.  Architecture overview.
-5.  Initial ADRs:
-    -   Monorepo.
-    -   Java/Spring Boot backend.
-    -   Modular monolith.
-    -   Separate realtime gateway.
-    -   PostgreSQL/PostGIS.
-    -   Redis presence.
-    -   Privacy-safe location architecture.
-    -   OpenAPI contract-first boundary.
-6.  TypeScript workspace with pnpm/Turborepo.
-7.  Java Gradle workspace.
-8.  Local Docker Compose with PostGIS + Redis + object-storage emulator.
-9.  Skeleton mobile/web/admin applications.
-10. Skeleton core-api/realtime/workers applications.
-11. Initial CI.
-12. A staged implementation plan based on Section 33.
-
-Before adding production functionality, ensure the repository can be
-cloned, bootstrapped, built, tested, and run locally with simple
-documented commands.
+The original bootstrap task (monorepo structure, root agent guide,
+README, foundation ADRs, pnpm/Turborepo and Gradle workspaces, Docker
+Compose with PostGIS/Redis/object storage, skeleton applications and
+initial CI) is complete. Current verified state lives in
+`docs/quality/BUILD_STATUS.md`; the Claude working method lives in
+`CLAUDE.md` and `docs/development/CLAUDE_WORKFLOW.md`.
 
 ------------------------------------------------------------------------
 

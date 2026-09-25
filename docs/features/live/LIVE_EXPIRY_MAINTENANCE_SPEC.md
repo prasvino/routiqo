@@ -20,7 +20,7 @@ budgets. Account deletion continues to use its established cascades.
 Require the persistence profile and the explicit, default-false
 `routiqo.live.expiry-maintenance-enabled` property, configurable through
 `ROUTIQO_LIVE_EXPIRY_MAINTENANCE_ENABLED`. No operator activation is part of
-implementation. This application maintenance job is unrelated to Codex timers.
+implementation. This application maintenance job is unrelated to AI-agent scheduled tasks.
 
 After a 60-second initial delay, run with a 60-second delay after each completed
 tick. Each tick attempts exactly one batch of at most 100 contexts, 100 grants

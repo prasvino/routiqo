@@ -1,10 +1,10 @@
-# Routiqo --- UI/UX & Performance System for Codex
+# Routiqo --- UI/UX & Performance System
 
 > **Purpose:** This document is the permanent UI/UX constitution for
 > Routiqo. It complements `ROUTIQO_MASTER_CONTEXT.md` and
-> `ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`.
+> `docs/development/ENGINEERING_GUARDRAILS.md`.
 >
-> Codex must use these principles when implementing or reviewing any
+> Claude and human contributors must use these principles when implementing or reviewing any
 > user-facing experience. The objective is a **world-class consumer
 > product that feels calm, premium, intuitive, accessible, and
 > exceptionally fast**---not a generic AI-generated interface.
@@ -83,7 +83,7 @@ expense of usability.
 
 ## 3. Design-System-First Development
 
-Codex must not independently invent styling for every screen.
+Do not independently invent styling for every screen.
 
 Use this hierarchy:
 
@@ -334,7 +334,7 @@ The map should remain interactive while realtime updates arrive.
 
 Performance is a design requirement, not only an engineering concern.
 
-Codex must avoid:
+Avoid:
 
 -   Unnecessary rerenders.
 -   Large global state updates.
@@ -639,7 +639,7 @@ The user should always understand:
 
 ## 21. Visual QA Is Mandatory
 
-Codex must not declare a substantial UI feature complete based only on
+Do not declare a substantial UI feature complete based only on
 compilation/tests.
 
 Required loop:
@@ -687,59 +687,22 @@ A UI feature is incomplete until visual QA has passed.
 
 ------------------------------------------------------------------------
 
-## 22. Recommended Codex Skills
+## 22. Recommended Claude Code Skills and Tools
 
 Keep the UI skill set small and purposeful.
 
-Recommended:
-
-### 1. Playwright
-
-Use for:
-
--   Browser functional QA.
--   User-flow testing.
--   Responsive validation.
--   Screenshot-based visual review.
--   Interaction verification.
-
-### 2. Screenshot capability/skill
-
-Use for:
-
--   Capturing rendered states.
--   Visual comparison.
--   Layout inspection.
-
-### 3. One high-quality UI/design-system skill
-
-Use one---not many overlapping design skills---to reinforce:
-
--   Visual hierarchy.
--   Design-system discipline.
--   Accessibility.
--   Responsive design.
--   Component consistency.
-
-### 4. Routiqo-specific UI skill
-
-Create a project-specific skill such as:
-
-``` text
-.codex/
-└── skills/
-    └── routiqo-ui/
-        ├── SKILL.md
-        └── references/
-            ├── DESIGN_SYSTEM.md
-            ├── UX_PRINCIPLES.md
-            ├── MOBILE_PERFORMANCE.md
-            ├── MAP_UX.md
-            └── VISUAL_QA.md
-```
-
-The custom skill should direct Codex to this document and the approved
-Routiqo visual references.
+-   **Playwright (pre-installed Chromium):** browser functional QA,
+    user-flow testing, responsive validation, screenshot capture and
+    interaction verification.
+-   **Screenshots:** capture rendered states for visual comparison and
+    layout inspection; retain evidence under `docs/quality/evidence/`.
+-   **One UI/design-system skill at most** (for example Impeccable,
+    installed with `--providers=claude`; see
+    `docs/development/UI_QUALITY_TOOLING.md`) to reinforce hierarchy,
+    design-system discipline, accessibility and consistency.
+-   **Routiqo-specific UI skill:** `.claude/skills/routiqo-ui-quality/SKILL.md`
+    directs Claude to this document, shared tokens and the Routiqo
+    product checks.
 
 Avoid installing many overlapping UI skills because conflicting
 instructions can reduce consistency.
@@ -764,7 +727,7 @@ docs/design/reference/
 The existing Lovable prototype should be treated as **visual/UX
 reference**, not production architecture or source code.
 
-Instruction to Codex:
+Instruction to implementers:
 
 > Preserve the approved Routiqo design language and interaction intent.
 > Recreate it using production-quality components and architecture; do
@@ -899,7 +862,7 @@ Concrete functional + visual + performance definition of done.
 
 ------------------------------------------------------------------------
 
-## 28. Codex UI Definition of Done
+## 28. UI Definition of Done
 
 A UI task is complete only when:
 
@@ -951,7 +914,7 @@ Mandatory visual QA
 Continuous iteration
 ```
 
-Do not ask Codex merely to "make it beautiful." Give it these
+Do not ask an AI coding agent merely to "make it beautiful." Give it these
 constraints, make it run the real product, inspect what it built,
 measure performance, and iterate until both the visual and interaction
 quality meet Routiqo standards.

@@ -17,7 +17,7 @@ Require the persistence profile and a separate explicit default-false
 `routiqo.moderation.expiry-maintenance-enabled` property, exposed as
 `ROUTIQO_MODERATION_EXPIRY_MAINTENANCE_ENABLED`. Enabling LIVE expiry alone must
 not enable moderation cleanup. Implementation does not activate either flag.
-This application job is unrelated to Codex task timers.
+This application job is unrelated to AI-agent scheduled tasks.
 
 ## Scheduling and failure isolation
 

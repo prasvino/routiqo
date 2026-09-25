@@ -115,7 +115,7 @@ Critical and High findings block completion. Medium findings require correction 
 
 ## 5. Independent review
 
-GPT-6 Astra reviews every substantial Sol implementation as defined in `CODEX_ORCHESTRATION.md`. For high-risk changes, add a separate independent Astra review when available and justified. The root Astra owns the disposition of findings and final verification.
+The root Claude session reviews every substantial implementation, including work delegated to subagents, as defined in `docs/development/CLAUDE_WORKFLOW.md`. For high-risk changes, add a separate independent review (a fresh subagent, `/code-review` or `/security-review`) when justified. The root session owns the disposition of findings and final verification.
 
 Provide the reviewer:
 

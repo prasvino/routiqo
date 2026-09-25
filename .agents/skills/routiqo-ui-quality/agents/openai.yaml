@@ -1,4 +1,0 @@
-interface:
-  display_name: "Routiqo UI Quality"
-  short_description: "Review and refine Routiqo UI with Impeccable"
-  default_prompt: "Use $routiqo-ui-quality to assess and improve the specified Routiqo interface."

@@ -40,4 +40,4 @@ Private trip journal title/notes and browser editing exist, but authenticated de
 
 Backend verification requires Docker for disposable PostgreSQL tests. Default API preview remains database-independent; see [database profile setup](docs/development/LOCAL_SETUP.md) for opt-in persistence and protected endpoints. Private LIVE and official-alert endpoints remain default off; no traveller-derived public LIVE publication is enabled.
 
-Start with [AGENTS.md](AGENTS.md), [build plan](docs/development/BUILD_PLAN.md), and [verification notes](docs/quality/BUILD_STATUS.md). Source requirements remain unchanged under docs/product, docs/design and docs/development; previous Wayfind references are historical.
+Start with [CLAUDE.md](CLAUDE.md), [Claude workflow](docs/development/CLAUDE_WORKFLOW.md), [build plan](docs/development/BUILD_PLAN.md), and [verification notes](docs/quality/BUILD_STATUS.md). Source requirements remain unchanged under docs/product, docs/design and docs/development; previous Wayfind references are historical.
