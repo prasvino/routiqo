@@ -1,5 +1,6 @@
 package com.routiqo.core.publiclive.api;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.identity.application.GoogleSessionService;
 import com.routiqo.core.publiclive.infrastructure.JdbcCommunityTrafficV3;
@@ -23,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/journeys/{id}/community-traffic")
 @Profile("web-auth & routing & persistence")
-@ConditionalOnProperty(name = "ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED", havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED"})
 public final class BrowserCommunityTrafficV3Controller {
     private final JdbcCommunityTrafficV3 store;
     private final GoogleSessionService sessions;

@@ -1,5 +1,7 @@
 package com.routiqo.core.moderation.api;
 
+import com.routiqo.core.security.FeatureFlags;
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.identity.infrastructure.GoogleTokenVerifier;
 import com.routiqo.core.moderation.infrastructure.AdminSessionService;
@@ -27,7 +29,7 @@ import org.springframework.web.client.RestTemplate;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("web-auth & persistence & google-auth")
-@ConditionalOnProperty(name = "ROUTIQO_V3_ADMIN_ENABLED", havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_V3_ADMIN_ENABLED"})
 public class AdminTrafficConfiguration {
     @Bean AdminSessionService adminSessionService(JdbcTemplate jdbc, PlatformTransactionManager manager,
             @Value("${ROUTIQO_ADMIN_GOOGLE_CLIENT_ID}") String clientId,
@@ -63,7 +65,8 @@ public class AdminTrafficConfiguration {
         return uri.getPort() == -1 ? ("https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80) : uri.getPort();
     }
     @Bean @Order(0) SecurityFilterChain adminSecurity(HttpSecurity http, AdminTrafficSettings settings,
-            AuthRateGate rates, @Value("${ROUTIQO_V3_GRANT_ADMIN_ENABLED:false}") boolean grantAdminEnabled) throws Exception {
+            AuthRateGate rates, @Value("${ROUTIQO_V3_GRANT_ADMIN_ENABLED:false}") String grantAdminEnabledFlag) throws Exception {
+        boolean grantAdminEnabled = FeatureFlags.enabled(grantAdminEnabledFlag);
         BrowserAuthPolicy adminBrowserAuthPolicy = settings.policy();
         var csrf = new CookieCsrfTokenRepository();
         csrf.setCookieName(adminBrowserAuthPolicy.cookieName("routiqo_admin_csrf"));

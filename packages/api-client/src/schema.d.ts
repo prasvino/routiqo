@@ -1355,7 +1355,7 @@ export interface components {
             commandId: components["schemas"]["PrivateSignalUuid"];
             requestId: components["schemas"]["PrivateSignalUuid"];
             /** @enum {string} */
-            status: "accepted_for_consideration" | "stopped_for_future_sharing";
+            status: "accepted_for_consideration" | "stopped_for_future_sharing" | "expired";
             /** Format: date-time */
             acceptedAt: string;
             /** Format: date-time */

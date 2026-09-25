@@ -1,5 +1,6 @@
 package com.routiqo.core.moderation.api;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.moderation.infrastructure.AdminSessionService;
 import com.routiqo.core.moderation.infrastructure.JdbcTrafficGrantAdmin;
@@ -30,7 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RestController
 @RequestMapping("/api/v1/admin/traffic-grants")
 @Profile("web-auth & persistence & google-auth")
-@ConditionalOnProperty(name = {"ROUTIQO_V3_ADMIN_ENABLED", "ROUTIQO_V3_GRANT_ADMIN_ENABLED"}, havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_V3_ADMIN_ENABLED", "ROUTIQO_V3_GRANT_ADMIN_ENABLED"})
 public final class AdminTrafficGrantController {
     private static final JsonMapper JSON = JsonMapper.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)

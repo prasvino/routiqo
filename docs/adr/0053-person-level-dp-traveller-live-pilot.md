@@ -1,7 +1,7 @@
 # ADR 0053: Person-level private traveller LIVE pilot candidate
 
 Date: 2026-09-23
-Status: proposed for mathematical, security and product review; public output prohibited
+Status: **paused as research by [ADR 0065](0065-public-live-v1-policy.md) (2026-09-25)**; retained. Previously: proposed for mathematical, security and product review; public output prohibited
 
 ## Decision under evaluation
 

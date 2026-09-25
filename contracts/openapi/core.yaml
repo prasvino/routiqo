@@ -1923,7 +1923,7 @@ components:
         journeyId: { $ref: '#/components/schemas/PrivateSignalUuid' }
         commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
         requestId: { $ref: '#/components/schemas/PrivateSignalUuid' }
-        status: { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing] }
+        status: { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing, expired] }
         acceptedAt: { type: string, format: date-time }
         windowEndsAt: { type: string, format: date-time }
     CommunityTrafficShareRecoveryV3:

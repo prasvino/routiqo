@@ -1,5 +1,6 @@
 package com.routiqo.core.publiclive.api;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.identity.application.AccountWriteUnavailable;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.identity.application.GoogleSessionService;
@@ -28,8 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 /** Owner V3 command and recovery transport; never exposes contributor lists or source rows. */
 @RestController
 @Profile("web-auth & routing & persistence")
-@ConditionalOnProperty(name = {"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED",
-        "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED"}, havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED",
+        "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED"})
 public final class BrowserCommunityTrafficController {
     private final CommunityTrafficShareService service;
     private final GoogleSessionService sessions;

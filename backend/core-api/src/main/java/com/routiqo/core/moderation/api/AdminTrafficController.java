@@ -1,5 +1,6 @@
 package com.routiqo.core.moderation.api;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.moderation.infrastructure.AdminSessionService;
 import com.routiqo.core.moderation.infrastructure.JdbcTrafficReview;
@@ -26,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin")
 @Profile("web-auth & persistence & google-auth")
-@ConditionalOnProperty(name = "ROUTIQO_V3_ADMIN_ENABLED", havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_V3_ADMIN_ENABLED"})
 public final class AdminTrafficController {
     private final AdminSessionService sessions;
     private final JdbcTrafficReview review;

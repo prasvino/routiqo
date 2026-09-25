@@ -1,5 +1,6 @@
 package com.routiqo.core.publiclive.infrastructure;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.identity.application.AccountWriteAuthority;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.moderation.application.ContributionRestrictionReader;
@@ -19,8 +20,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("web-auth & routing & persistence")
-@ConditionalOnProperty(name = {"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED",
-        "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED"}, havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED",
+        "ROUTIQO_LIVE_ANCHOR_RESOLVER_ENABLED"})
 public class CommunityTrafficShareConfiguration {
     @Bean CommunityTrafficCandidateStore communityTrafficCandidateStore(JdbcTemplate jdbc) {
         return new JdbcCommunityTrafficCandidateStore(jdbc);

@@ -1,5 +1,6 @@
 package com.routiqo.core.publiclive.infrastructure;
 
+import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,8 +10,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("web-auth & routing & persistence")
-@ConditionalOnProperty(name = {"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED",
-        "ROUTIQO_COMMUNITY_TRAFFIC_V3_PUBLISHER_ENABLED"}, havingValue = "true")
+@ConditionalOnExactlyTrue({"ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED",
+        "ROUTIQO_COMMUNITY_TRAFFIC_V3_PUBLISHER_ENABLED"})
 @EnableScheduling
 public class CommunityTrafficV3JobConfiguration {
     @Bean ThreadPoolTaskScheduler communityTrafficV3TaskScheduler() {

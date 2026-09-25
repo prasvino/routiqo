@@ -842,6 +842,190 @@ class JdbcCommunityTrafficV3IntegrationTest {
                 Optional.of("Reviewed road area"))));
     }
 
+    // --- ADR 0065 pilot suites: withdrawal and publication threshold ---
+
+    private void withdraw(String action, Owner owner, Instant at) {
+        switch (action) {
+            case "STOP" -> jdbc.update("""
+                    UPDATE community_traffic_candidate_v3
+                    SET state = 'STOPPED', stopped_at = ? WHERE actor_id = ?
+                    """, Timestamp.from(at), owner.actor());
+            case "GHOST" -> jdbc.update("UPDATE presence_consent SET sharing = FALSE WHERE actor_id = ?", owner.actor());
+            case "COMPLETE" -> jdbc.update("UPDATE journey SET status = 'COMPLETED', completed_at = ? WHERE id = ?",
+                    Timestamp.from(at), owner.journey());
+            case "RESTRICT" -> jdbc.update("""
+                    INSERT INTO live_contribution_restriction(actor_id, revision, restricted) VALUES (?, 1, TRUE)
+                    """, owner.actor());
+            case "DELETE" -> jdbc.update("DELETE FROM routiqo_account WHERE id = ?", owner.actor());
+            case "UNVERIFY" -> jdbc.update("UPDATE live_verified_contributor SET state = 'revoked' WHERE account_id = ?",
+                    owner.actor());
+            default -> throw new IllegalStateException(action);
+        }
+    }
+
+    private String outcome() {
+        return jdbc.queryForObject("SELECT outcome FROM community_traffic_decision_v3 WHERE window_start = ?",
+                String.class, Timestamp.from(WINDOW));
+    }
+
+    @Test void verificationRevokedBeforeSnapshotExcludesTheCandidate() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        withdraw("UNVERIFY", owners.getFirst(), WINDOW.plusSeconds(300));
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_projection_v3", Integer.class)).isZero();
+    }
+
+    @Test void everyWithdrawalCommittedAfterTheSnapshotLeavesTheInProgressSummaryUnchanged() throws Exception {
+        for (String action : List.of("GHOST", "COMPLETE", "RESTRICT", "DELETE", "UNVERIFY")) {
+            clear();
+            for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+            CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+            var publisher = new JdbcCommunityTrafficPublisherV3(dataSource, catalog(),
+                    Clock.fixed(WINDOW.plusSeconds(301), ZoneOffset.UTC), () -> {}, () -> {
+                        entered.countDown();
+                        try {
+                            if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Barrier timed out");
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(interrupted);
+                        }
+                    });
+            try (var pool = Executors.newSingleThreadExecutor()) {
+                var result = pool.submit(() -> publisher.publish(20));
+                assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+                withdraw(action, owners.getFirst(), WINDOW.plusSeconds(301));
+                release.countDown();
+                assertThat(result.get()).isEqualTo(2);
+            }
+            // The snapshot fixed the input; a later withdrawal cannot redraw or remove the summary.
+            assertThat(outcome()).as(action).isEqualTo("PUBLISHED");
+            // A new publisher run never reopens the terminal decision.
+            publisher(WINDOW.plusSeconds(302)).publish(20);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_decision_v3 WHERE window_start = ?",
+                    Integer.class, Timestamp.from(WINDOW))).as(action).isEqualTo(1);
+        }
+    }
+
+    @Test void publicationThresholdBoundaries() {
+        record Case(String name, int agreeing, int other, String expected) {}
+        for (var example : List.of(
+                new Case("11 accounts all agreeing", 11, 0, "NO_OUTPUT"),
+                new Case("12 accounts, 9 agreeing", 9, 3, "NO_OUTPUT"),
+                new Case("14 accounts, 11 agreeing (78.6%)", 11, 3, "NO_OUTPUT"),
+                new Case("15 accounts, 12 agreeing (exactly 80%)", 12, 3, "PUBLISHED"),
+                new Case("12 accounts, 10 agreeing (83%)", 10, 2, "PUBLISHED"))) {
+            clear();
+            for (int i = 0; i < example.agreeing(); i++) seed("TRAFFIC_SLOW");
+            for (int i = 0; i < example.other(); i++) seed("TRAFFIC_STOPPED");
+            publisher(WINDOW.plusSeconds(301)).publish(20);
+            assertThat(outcome()).as(example.name()).isEqualTo(example.expected());
+            int projections = jdbc.queryForObject("SELECT count(*) FROM community_traffic_projection_v3", Integer.class);
+            assertThat(projections).as(example.name()).isEqualTo(example.expected().equals("PUBLISHED") ? 1 : 0);
+            if (projections == 1)
+                assertThat(jdbc.queryForObject("SELECT traffic_value FROM community_traffic_projection_v3", String.class))
+                        .isEqualTo("TRAFFIC_SLOW");
+        }
+    }
+
+    @Test void unverifiedAccountsCannotManufactureASummaryHoweverManyAgree() {
+        for (int i = 0; i < 20; i++) seed("TRAFFIC_MOVING");
+        jdbc.update("UPDATE live_verified_contributor SET state = 'revoked'");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void onePersonCannotHoldTwoActiveVerifiedAccounts() {
+        seed("TRAFFIC_SLOW");
+        var first = owners.getFirst();
+        UUID person = jdbc.queryForObject("SELECT person_ref FROM live_verified_contributor WHERE account_id = ?",
+                UUID.class, first.actor());
+        UUID second = UUID.randomUUID(), caseId = UUID.randomUUID();
+        jdbc.update("INSERT INTO routiqo_account(id, google_subject) VALUES (?, ?)", second, "sybil-" + second);
+        jdbc.update("INSERT INTO live_verification_case(id, account_id, person_ref, expires_at) VALUES (?, ?, ?, ?)",
+                caseId, second, person, Timestamp.from(WINDOW.plusSeconds(3600)));
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO live_verified_contributor(account_id, case_id, person_ref, revision,
+                    state, first_reviewer_id, second_reviewer_id, expires_at)
+                VALUES (?, ?, ?, 2, 'active', ?, ?, ?)
+                """, second, caseId, person, UUID.randomUUID(), UUID.randomUUID(),
+                Timestamp.from(WINDOW.plusSeconds(3600))))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    // --- ADR 0065 adversarial pilot suite (real PostgreSQL; not a staging red-team run) ---
+
+    @Test void colludingVerifiedAccountsNeedTheFullThresholdAndAreBlockedByHonestDissent() {
+        // Residual risk documented in ADR 0065: ten colluding verified people in a window with only
+        // two honest reports can publish a false condition. The guard is that the coalition can never
+        // be smaller than 10 agreeing accounts at >= 80%, so three honest dissenters stop it.
+        for (int i = 0; i < 10; i++) seed("TRAFFIC_MOVING");
+        for (int i = 0; i < 3; i++) seed("TRAFFIC_STOPPED");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+
+        clear();
+        for (int i = 0; i < 9; i++) seed("TRAFFIC_MOVING");
+        for (int i = 0; i < 3; i++) seed("TRAFFIC_MOVING");
+        jdbc.update("UPDATE live_verified_contributor SET state = 'revoked' WHERE account_id = ANY(?)",
+                (Object) owners.subList(9, 12).stream().map(Owner::actor).toArray(UUID[]::new));
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        // Nine verified colluders plus three unverified sock puppets are nine eligible accounts.
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void reVerificationChurnGivesOnePersonAtMostOneVoteInAWindow() {
+        // Eleven people agree; person P also re-verified a second account and shared from both.
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        var original = owners.getFirst();
+        var churned = owners.get(11);
+        UUID person = jdbc.queryForObject("SELECT person_ref FROM live_verified_contributor WHERE account_id = ?",
+                UUID.class, original.actor());
+        jdbc.update("UPDATE live_verified_contributor SET state = 'revoked' WHERE account_id = ?", original.actor());
+        jdbc.update("UPDATE live_verification_case SET person_ref = ? WHERE account_id = ?", person, churned.actor());
+        jdbc.update("UPDATE live_verified_contributor SET person_ref = ? WHERE account_id = ?", person, churned.actor());
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        // Twelve accounts shared, but only eleven distinct active verified people remain.
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void aLateDissentingCandidateCannotReopenOrFlipAPublishedWindow() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        String ref = jdbc.queryForObject("SELECT ref::text FROM community_traffic_projection_v3", String.class);
+        for (int i = 0; i < 5; i++) seed("TRAFFIC_MOVING");
+        publisher(WINDOW.plusSeconds(302)).publish(20);
+        assertThat(outcome()).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_decision_v3 WHERE window_start = ?",
+                Integer.class, Timestamp.from(WINDOW))).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT ref::text || traffic_value FROM community_traffic_projection_v3",
+                String.class)).isEqualTo(ref + "TRAFFIC_SLOW");
+    }
+
+    @Test void reportsFromTheNextWindowNeverCountTowardTheClosingWindow() {
+        for (int i = 0; i < 11; i++) seed("TRAFFIC_SLOW");
+        seedAt("TRAFFIC_SLOW", WINDOW.plusSeconds(300));
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void theDatabaseRejectsACandidateTimedOutsideItsWindow() {
+        seed("TRAFFIC_SLOW");
+        var owner = owners.getFirst();
+        for (long offset : new long[] { -1, 300 })
+            assertThatThrownBy(() -> jdbc.update("""
+                    INSERT INTO community_traffic_candidate_v3(candidate_id, actor_id, command_id,
+                        request_id, journey_id, anchor_id, traffic_value, window_start, catalog_version,
+                        consent_generation, state, received_at, created_at, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'TRAFFIC_SLOW', ?, ?, 7, 'ACTIVE', ?, ?, ?)
+                    """, UUID.randomUUID(), owner.actor(), UUID.randomUUID(), UUID.randomUUID(), owner.journey(),
+                    ANCHOR, Timestamp.from(WINDOW.plusSeconds(300)), CATALOG_VERSION,
+                    Timestamp.from(WINDOW.plusSeconds(300 + offset)), Timestamp.from(WINDOW.plusSeconds(310)),
+                    Timestamp.from(WINDOW.plusSeconds(300 + 24 * 3600 + 300))))
+                    .as("received %+d s from the window start", offset)
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
     // --- Reporting protocol (ADR 0064) ---
 
     private UUID publishOne() {

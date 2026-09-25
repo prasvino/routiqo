@@ -20,10 +20,14 @@ public class BrowserAuthConfiguration {
             @Value("${ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED:false}") boolean routeBindingEnabled,
             @Value("${ROUTIQO_LIVE_SIGNAL_API_ENABLED:false}") boolean signalEnabled,
             @Value("${ROUTIQO_LIVE_CHOICE_API_ENABLED:false}") boolean choiceEnabled,
-            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED:false}") boolean publicIntentEnabled,
-            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_SHARE_ENABLED:false}") boolean publicIntentShareEnabled,
-            @Value("${ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED:false}") boolean communityTrafficEnabled,
+            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_API_ENABLED:false}") String publicIntentEnabledFlag,
+            @Value("${ROUTIQO_PUBLIC_SIGNAL_INTENT_SHARE_ENABLED:false}") String publicIntentShareEnabledFlag,
+            @Value("${ROUTIQO_COMMUNITY_TRAFFIC_V3_ENABLED:false}") String communityTrafficEnabledFlag,
             @Value("${ROUTIQO_PLANNING_BACKUP_API_ENABLED:false}") boolean planningBackupEnabled) throws Exception {
+        // Public and community LIVE paths open only for the exact value "true" (ADR 0065, fail closed).
+        boolean publicIntentEnabled = FeatureFlags.enabled(publicIntentEnabledFlag);
+        boolean publicIntentShareEnabled = FeatureFlags.enabled(publicIntentShareEnabledFlag);
+        boolean communityTrafficEnabled = FeatureFlags.enabled(communityTrafficEnabledFlag);
         var csrf = new CookieCsrfTokenRepository();
         csrf.setCookieName(policy.cookieName("routiqo_csrf")); csrf.setCookiePath("/");
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(policy.secureCookies()).sameSite("Strict"));
