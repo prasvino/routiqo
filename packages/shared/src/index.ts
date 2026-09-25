@@ -10,3 +10,4 @@ export * from './routing';
 export * from './place-search';
 export * from './trip-journal';
 export * from './commute-summaries';
+export * from './account-planning';

@@ -9,7 +9,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public final class BrowserAuthGuard extends OncePerRequestFilter {
     private final BrowserAuthPolicy policy;
     private final AuthRateGate rates;
-    public BrowserAuthGuard(BrowserAuthPolicy policy, AuthRateGate rates) { this.policy = policy; this.rates = rates; }
+    /** Default browser POST limit. Only the explicit account planning copy (ADR 0062) may be larger. */
+    static final int DEFAULT_BODY_LIMIT = 20 * 1024;
+    static final int PLANNING_BODY_LIMIT = 264 * 1024;
+    private final boolean planningBackupEnabled;
+    public BrowserAuthGuard(BrowserAuthPolicy policy, AuthRateGate rates, boolean planningBackupEnabled) {
+        this.policy = policy; this.rates = rates; this.planningBackupEnabled = planningBackupEnabled;
+    }
+    int bodyLimit(String path) {
+        return planningBackupEnabled && "/api/v1/planning".equals(path) ? PLANNING_BODY_LIMIT : DEFAULT_BODY_LIMIT;
+    }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         response.setHeader("Cache-Control", "no-store");
@@ -32,8 +41,9 @@ public final class BrowserAuthGuard extends OncePerRequestFilter {
             if (contentType == null || !contentType.split(";", 2)[0].trim().equalsIgnoreCase("application/json")) {
                 response.setStatus(415); return;
             }
-            byte[] body = request.getInputStream().readNBytes(20 * 1024 + 1);
-            if (body.length > 20 * 1024) { response.setStatus(413); return; }
+            int bodyLimit = bodyLimit(path);
+            byte[] body = request.getInputStream().readNBytes(bodyLimit + 1);
+            if (body.length > bodyLimit) { response.setStatus(413); return; }
             var wrapped = new HttpServletRequestWrapper(request) {
                 @Override public ServletInputStream getInputStream() {
                     var input = new ByteArrayInputStream(body);

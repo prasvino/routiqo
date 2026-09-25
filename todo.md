@@ -72,6 +72,8 @@ ADR 0055's community traffic summary is authorized for V3 implementation and sta
 ## First release — journey reliability and quality
 
 - [ ] Complete broader cross-device restoration and unresolved-conflict recovery without overwriting pending local work.
+- [x] Implement the explicit, default-off account planning copy (ADR 0062): owner-only save/check/add/remove of plans and saved places with CAS, exact retry and merge-only restore on web. See `docs/features/journey/ACCOUNT_PLANNING_BACKUP_SPEC.md`.
+- [ ] Validate the account planning copy with real Google sign-in across two devices on HTTPS staging, then add native Android controls on the same contract.
 - [ ] Test delayed responses, duplicate commands, network flaps, interrupted writes and unavailable storage across accounts/devices.
 - [ ] Verify journal conflicts, navigation protection, older history, summary completeness and backup/restore with real sign-in.
 - [ ] Verify authenticated planning flows, keyboard/focus behavior, small screens, large text, reduced motion and storage-failure recovery.

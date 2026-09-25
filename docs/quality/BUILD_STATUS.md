@@ -1,8 +1,29 @@
-# Build status — 2026-09-23
+# Build status — 2026-09-25
 
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. The September 23 audit reconciles the committed reliability batches with this status; release gates below remain open.
 
 The user has now authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag. The different production privacy contract is not accepted. Person-level research is paused with its existing code/docs preserved. Traveller-derived public LIVE remains disabled in production.
+
+## September 25 account planning copy (ADR 0062)
+
+A signed-in web traveller can keep one explicit, owner-only copy of their plans and saved places on their account. They can check it, save (replacing the copy only after confirmation), add it to another device (merge only, so local plans are never removed) or remove it. The feature sits behind default-off server, proxy and UI flags (`ROUTIQO_PLANNING_BACKUP_API_ENABLED`, `NEXT_PUBLIC_ROUTIQO_PLANNING_BACKUP_UI_ENABLED`). Details are in the [spec](../features/journey/ACCOUNT_PLANNING_BACKUP_SPEC.md).
+
+Backend behavior:
+- migration V28;
+- compare-and-swap writes with exact replay, and a concurrent-first-save reconcile;
+- deletion with the account (cascade);
+- a strict parser;
+- a 256 KiB document limit, with the 264 KiB body allowance applying only to this path and only when the flag is on;
+- a 20-per-minute account write budget.
+
+Checks (cloud container, JDK 25, Docker):
+- **Java:** 598 tests. The 30 new planning tests (domain, parser, PostgreSQL store, HTTP with the flag on and off) and the architecture rules pass. 16 tests in the community-traffic V3 classes fail identically on untouched `main`: their fixtures are fixed at 2026-09-23 while grant expiry uses the real clock, so the 24-hour grant constraint and expiry checks now fail. That is a date-dependent defect, not this change. `bootJar` passed.
+- **TypeScript:** 767 tests across 97 files pass under CI's Node 22.21.1. Under this container's Node 22.22.2 (ICU 78.2), 12 commute-summary tests fail on `main` too, because ICU 78 omits the `era` part for the `iso8601` calendar, which `commute-summaries.ts` depends on. That affects real runtimes with ICU 78 and needs a separate fix.
+- **Other checks:** all six typechecks, lint, formatting, the generated-contract check and the full `pnpm build` passed.
+- **Secrets:** the pinned gitleaks image could not be pulled (GHCR blobs are blocked here), so gitleaks v8.30.1 from Docker Hub was run with the repo's config: no leaks.
+- **Rendered QA:** Playwright against a synthetic API, recorded in the [evidence](evidence/account-planning-copy-2026-09-25/README.md): 1280 px and 360 px at 130% zoom, keyboard, offline, conflict, uncertain retry (exactly one new version), and flags-off absence.
+
+Still open: real OAuth on HTTPS staging with two devices, screen-reader verification, native Android controls, and backup-retention operations.
 
 ## September 24 native completion and history
 

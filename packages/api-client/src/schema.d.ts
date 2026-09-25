@@ -819,6 +819,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/planning": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Owner-only account copy of planning state (ADR 0062). Version 0 means no copy exists. Enabled only by the default-off server planning backup flag. Explicit reads only; no background sync. */
+        get: operations["getAccountPlanning"];
+        put?: never;
+        /** @description Replace the account copy with compare-and-swap on expectedVersion and exact latest-mutation replay. Request bodies up to 264 KiB are accepted on this path only; the stored canonical document may not exceed 256 KiB. Twenty planning writes (saves and deletes) per account per minute. */
+        post: operations["saveAccountPlanning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/planning/delete": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Delete the account copy when its version matches. Succeeds when no copy exists. Local device data is unaffected. Shares the planning write budget. */
+        post: operations["deleteAccountPlanning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/routes": {
         parameters: {
             query?: never;
@@ -1454,6 +1495,46 @@ export interface components {
             expectedVersion: number;
             /** Format: uuid */
             mutationId: string;
+        };
+        AccountPlanningPlan: {
+            id: string;
+            /** @enum {string} */
+            kind: "trip" | "commute";
+            /** @description Not blank after ECMAScript trim; no control characters */
+            origin: string;
+            /** @description Not blank after ECMAScript trim; no control characters */
+            destination: string;
+            /** @description Real calendar date */
+            date: string;
+            time: string;
+            /** @description Weekdays 0 (Sunday) to 6. A commute needs at least one. */
+            days: number[];
+            /** @description Tab */
+            notes: string;
+            createdAt: string;
+        };
+        AccountPlanning: {
+            /** @description 0 means no account copy */
+            version: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+            plans: components["schemas"]["AccountPlanningPlan"][];
+            saved: string[];
+        };
+        AccountPlanningWrite: {
+            /** @description Plan ids must be unique. */
+            plans: components["schemas"]["AccountPlanningPlan"][];
+            saved: string[];
+            /** @description Exact integer JSON token; fractions, exponents and strings are rejected. */
+            expectedVersion: number;
+            /**
+             * Format: uuid
+             * @description Lowercase canonical UUID
+             */
+            mutationId: string;
+        };
+        AccountPlanningDelete: {
+            expectedVersion: number;
         };
         /** @description Longitude then latitude. Longitude must be between -180 and180, latitude between -90 and90. Endpoints must differ. */
         RouteCoordinate: number[];
@@ -4009,6 +4090,134 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    getAccountPlanning: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account planning copy or the derived version 0 empty state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountPlanning"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+        };
+    };
+    saveAccountPlanning: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountPlanningWrite"];
+            };
+        };
+        responses: {
+            /** @description Saved account copy or exact latest-mutation replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountPlanning"];
+                };
+            };
+            /** @description Invalid plans, saved places, version or mutation identifier. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description Stale expected version or conflicting mutation reuse. Empty response body. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Request body over 264 KiB or canonical document over 256 KiB. Empty response body. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    deleteAccountPlanning: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Must exactly match the configured browser origin. */
+                Origin: components["parameters"]["AuthOrigin"];
+                /** @description Masked token returned by GET csrf; browser must also send its CSRF cookie. */
+                "X-XSRF-TOKEN": components["parameters"]["AuthCsrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountPlanningDelete"];
+            };
+        };
+        responses: {
+            /** @description Account copy deleted or already absent */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid expected version. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            403: components["responses"]["AuthForbidden"];
+            /** @description The account copy changed since it was checked. Empty response body. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
         };
     };
     calculatePrivateRoute: {
