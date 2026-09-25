@@ -6,7 +6,7 @@ import {
   journeyMapEnabled,
   journeyTitle,
 } from './journey-mode-model';
-import { useMinuteClock } from './journey-mode-screen';
+import { useMinuteClock } from './use-minute-clock';
 import { ActiveJourneyCard, JourneyReturnBar } from './journey-mode-view';
 
 const enabled = journeyMapEnabled();

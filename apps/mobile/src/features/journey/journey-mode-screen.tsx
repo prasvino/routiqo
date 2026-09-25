@@ -18,18 +18,9 @@ import {
   startNote,
 } from './journey-mode-model';
 import { JourneyModeView } from './journey-mode-view';
+import { useMinuteClock } from './use-minute-clock';
 
 const enabled = journeyMapEnabled();
-
-/** Elapsed labels refresh every 30 s; nothing here depends on position frequency. */
-export function useMinuteClock(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
 
 export function mapNotice(status: JourneyMapStatus): string | null {
   switch (status) {
