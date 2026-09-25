@@ -54,7 +54,7 @@ export function PlanDialog({
   return (
     <Modal title={plan ? 'Edit your journey' : 'Where are you heading?'} onClose={onClose}>
       <p className="modal-intro">A familiar road or somewhere new. Start with a plan.</p>
-      <div className="segmented" aria-label="Journey type">
+      <div className="segmented" role="group" aria-label="Journey type">
         <button
           type="button"
           aria-pressed={kind === 'trip'}

@@ -131,4 +131,40 @@ describe('PlanningProvider feedback recovery', () => {
     expect(screen.getByTestId('message').textContent).toBe('');
     expect(screen.getByTestId('error').textContent).toBe('Access denied');
   });
+
+  it('replaces browser storage exceptions with actionable copy on write and read', () => {
+    render(
+      <PlanningProvider>
+        <PlanningTestConsumer />
+      </PlanningProvider>,
+    );
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+    fireEvent.click(screen.getByText('Save Place 1'));
+    expect(screen.getByTestId('error').textContent).toBe(
+      'Your changes couldn’t be saved on this device. Check that this site may store data and that your browser has space.',
+    );
+    expect(screen.getByTestId('saved-count').textContent).toBe('0');
+
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Denied', 'SecurityError');
+    });
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'routiqo.planning.v1' }));
+    });
+    expect(screen.getByTestId('error').textContent).toBe(
+      'Saved plans can’t be read because browser storage is unavailable. Check that this site may store data.',
+    );
+  });
+
+  it('keeps planning rule messages such as corrupt saved data', () => {
+    localStorage.setItem('routiqo.planning.v1', '{not json');
+    render(
+      <PlanningProvider>
+        <PlanningTestConsumer />
+      </PlanningProvider>,
+    );
+    expect(screen.getByTestId('error').textContent).toMatch(/Saved (plans|data)/);
+  });
 });
