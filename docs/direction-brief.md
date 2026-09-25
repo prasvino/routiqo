@@ -1,5 +1,7 @@
 # Routiqo Direction Brief — for Claude Code
 
+> Adopted 2026-09-25. The maintained product source of truth derived from this brief is [PRODUCT.md](PRODUCT.md); this file is kept unchanged below as the dated input.
+
 Sep 25, 2026 · Prasanna
 
 ## How to use this in Claude Code

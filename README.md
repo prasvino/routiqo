@@ -1,6 +1,10 @@
 # Routiqo
 
-A privacy-first travel and commute app. The runnable web preview provides curated discovery, local trip/commute planning, private journey and journal flows, and default-off private LIVE controls. A separate default-off official-alert pilot shows Chennai district NDMA warnings during an authenticated active journey. It is not a traveller-derived public LIVE release or a production deployment.
+Routiqo tells you what your journey is like right now, from people who were just there: how bad the toll queue is, which highway eatery is good today, whether the bus is crowded. It is a live, human layer on top of the journey, built around three ideas — **Journey**, **Spots** and **Ask Ahead** — and it runs on what people choose to post or tap, not on tracking their movements. See [docs/PRODUCT.md](docs/PRODUCT.md).
+
+The first pilot is the Pongal 2027 exodus on GST Road (Chennai to Trichy and Madurai). Android is the primary client; web serves route guides and planning. Spots, posts, voice notes and Ask Ahead are **not built yet**.
+
+Today the repository contains a runnable web preview (curated discovery, local trip/commute planning, private journey and journal flows), an Android app with journeys, planning, explicit route planning, history and journals (emulator-verified; physical-device checks pending), and default-off backend foundations that the Spots model reuses. A separate default-off official-alert pilot shows Chennai district NDMA warnings during an authenticated active journey. It is not a production deployment.
 
 ## Run on Windows
 
@@ -29,15 +33,15 @@ npx.cmd --yes pnpm@10.34.4 backend:check
 
 ## Implemented and deferred
 
-- Web Home, Explore, Trips, Profile, privacy page, search, categories, destination details, bookmarks, editable local plans, next departures and JSON backup/restore.
+- Web Home, Explore (curated; demoted in favour of future route guides), Trips, Profile, privacy page, search, categories, destination details, bookmarks, editable local plans, next departures and JSON backup/restore.
 - Expo screens reuse catalog, planning validation, and tokens; SQLite stores local plans.
 - Shared lifecycle outbox handles durable pending actions and account partitions. Web dispatch is mounted on Trips; native authenticated transport and reconnect dispatch remain pending.
-- Java core/realtime/workers boot applications. Core API has opt-in authenticated journey and private LIVE prerequisites with PostgreSQL/Flyway ownership, retry and concurrency tests. Its default-off provider-alert endpoint is separate from private Quick Signals. Traveller-derived public LIVE publication, realtime messaging and administration workflows remain pending.
+- Java core/realtime/workers boot applications. Core API has opt-in authenticated journey endpoints and default-off signal, abuse-budget, expiry and moderation foundations (built for the archived private LIVE flow and reused for Spots) with PostgreSQL/Flyway ownership, retry and concurrency tests. Its default-off provider-alert endpoint is separate. Spots, posts, voice notes, Ask Ahead, Spot chat and route guides remain to be built.
 - Local PostGIS, Redis, and S3-compatible services; versioned OpenAPI and generated client.
 - Google verification, account mapping and revocable sessions plus opt-in browser auth endpoints are tested. Browser transport uses HttpOnly cookies, CSRF/origin checks and database rate limits. Web Google UI exists; real OAuth configuration, staging lifecycle verification and native transport are still pending.
 
-Private trip journal title/notes and browser editing exist, but authenticated device QA, media and sharing remain pending. Real Chennai alert coverage and authenticated staging QA, traveller-derived public LIVE, conversations, push reminders and deployment remain pending. Admin is a restricted foundation shell. Local drafts are not live journeys. Device testing requires Android tooling.
+Private trip journal title/notes and browser editing exist, but authenticated device QA, media and sharing remain pending. Real alert coverage for the pilot corridor, authenticated staging QA, route guides, Spot chat, push reminders and deployment remain pending. Admin is a restricted foundation shell. Local drafts are not live journeys. Device testing requires Android tooling.
 
-Backend verification requires Docker for disposable PostgreSQL tests. Default API preview remains database-independent; see [database profile setup](docs/development/LOCAL_SETUP.md) for opt-in persistence and protected endpoints. Private LIVE and official-alert endpoints remain default off; no traveller-derived public LIVE publication is enabled.
+Backend verification requires Docker for disposable PostgreSQL tests. Default API preview remains database-independent; see [database profile setup](docs/development/LOCAL_SETUP.md) for opt-in persistence and protected endpoints. Archived private LIVE, V3 summary and official-alert endpoints remain default off; nothing publishes traveller-derived output.
 
-Start with [AGENTS.md](AGENTS.md), [build plan](docs/development/BUILD_PLAN.md), and [verification notes](docs/quality/BUILD_STATUS.md). Source requirements remain unchanged under docs/product, docs/design and docs/development; previous Wayfind references are historical.
+Start with [PRODUCT.md](docs/PRODUCT.md), [AGENTS.md](AGENTS.md), the [release checklist](todo.md), the [build plan](docs/development/BUILD_PLAN.md) and [verification notes](docs/quality/BUILD_STATUS.md). Superseded material is in [docs/archive](docs/archive/README.md); previous Wayfind references are historical.
