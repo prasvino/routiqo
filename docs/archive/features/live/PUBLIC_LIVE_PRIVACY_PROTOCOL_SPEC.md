@@ -2,7 +2,7 @@
 
 # Public LIVE privacy protocol — implementation contract
 
-This is the ADR 0053/0054 person-level DP candidate only; further research is paused and its existing code/docs remain preserved. [ADR 0055](../../adr/0055-consented-community-traffic-summary-proposal.md) authorizes implementation and staging evaluation of a separate consented community-summary contract that does **not** satisfy this protocol or inherit its privacy claim. The owner has not accepted that change for production; neither path permits production traveller output today.
+This is the ADR 0053/0054 person-level DP candidate only; further research is paused and its existing code/docs remain preserved. [ADR 0055](../../../adr/0055-consented-community-traffic-summary-proposal.md) authorizes implementation and staging evaluation of a separate consented community-summary contract that does **not** satisfy this protocol or inherit its privacy claim. The owner has not accepted that change for production; neither path permits production traveller output today.
 
 Status: **user-selected implementation direction, independent protocol review pending; public output disabled**. ADR 0051's mutable suppression and ADR 0052's delayed decision were rejected. ADR 0053 supplies a candidate person-level noise mechanism, not a complete release protocol. ADR 0054 specifies immediate Share as the proposed input boundary. No existing receipt, intent, person claim or private evaluator is a publishable Live Moment.
 

@@ -12,7 +12,7 @@ Close item 1 in `todo.md` only when the complete person-level public LIVE protoc
 2. Natural-person identity assignment remains stable and auditable across deletion, account re-entry, correction and reviewer error for the pilot and approved retention. No claim of one-person sensitivity without that operated boundary.
 3. A specified and tested Share commit/window seal rule ensures one person's actions cannot change another person's admitted key or a fixed publication deadline. A data-dependent `NO_RELEASE` is a privacy failure, not a safe fallback.
 4. Fixed manifest and one-time sparse randomized projection produce at most one canonical condition per anchor/window. Every visible status, timing, reference, error, block, report, cache and offline behavior is included in the reviewed transcript. Source actions after Share cannot edit released bytes.
-5. Product/privacy/legal review approves the exact [V2 browser disclosure](../docs/features/live/BROWSER_PUBLIC_SHARE_V2_SPEC.md), Stop/Ghost/deletion wording and bounded retained person claim. Real consented density and accuracy establish useful output at threshold 22, including one-slot depletion.
+5. Product/privacy/legal review approves the exact [V2 browser disclosure](../features/live/BROWSER_PUBLIC_SHARE_V2_SPEC.md), Stop/Ghost/deletion wording and bounded retained person claim. Real consented density and accuracy establish useful output at threshold 22, including one-slot depletion.
 6. Independent privacy/security review of the final code, tests and staging transcript records a positive disposition. Until then, traveller publication and V2 Share remain disabled.
 
 ## Phases and affected boundaries

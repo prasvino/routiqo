@@ -2,13 +2,13 @@
 
 # V3 moderator workflow — isolated staging runbook
 
-Status: implemented for isolated staging evaluation under [ADR 0056](../adr/0056-v3-moderator-staging-boundary.md). V3 production publication and moderator access remain disabled pending the [decision checklist](../validation/V3_PRODUCTION_DECISION_CHECKLIST.md).
+Status: implemented for isolated staging evaluation under [ADR 0056](../../adr/0056-v3-moderator-staging-boundary.md). V3 production publication and moderator access remain disabled pending the [decision checklist](../validation/V3_PRODUCTION_DECISION_CHECKLIST.md).
 
 ## Prerequisites
 
 Use a separate HTTPS admin origin and Google OAuth client audience from the consumer site. The Google project owner must authorize that origin and enforce the reviewed operator MFA policy. The operator must already have an enabled Routiqo account under the same Google subject; admin sign-in never creates one. Configure the backend `persistence`, `web-auth` and `google-auth` profiles and apply migrations through V26 to the verified isolated staging database. Keep consumer and admin sessions on different origins and cookie namespaces.
 
-The backend requires `ROUTIQO_V3_ADMIN_ENABLED=true`, `ROUTIQO_ADMIN_ORIGIN` and `ROUTIQO_ADMIN_GOOGLE_CLIENT_ID`. The admin Next.js process separately requires those three values plus `ROUTIQO_ADMIN_API_ORIGIN`, a fixed backend origin. Review these values before enabling; `.env.example` files keep the flag false. The V3 consumer API, publisher, maintenance and web flags remain independent as described in [local setup](LOCAL_SETUP.md#v3-community-traffic-staging-evaluation-adr-0055). No flag is changed by this runbook.
+The backend requires `ROUTIQO_V3_ADMIN_ENABLED=true`, `ROUTIQO_ADMIN_ORIGIN` and `ROUTIQO_ADMIN_GOOGLE_CLIENT_ID`. The admin Next.js process separately requires those three values plus `ROUTIQO_ADMIN_API_ORIGIN`, a fixed backend origin. Review these values before enabling; `.env.example` files keep the flag false. The V3 consumer API, publisher, maintenance and web flags remain independent as described in [local setup](../../development/LOCAL_SETUP.md#v3-community-traffic-staging-evaluation-adr-0055). No flag is changed by this runbook.
 
 ## Finite operator grants
 

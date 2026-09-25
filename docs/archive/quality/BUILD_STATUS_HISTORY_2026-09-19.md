@@ -4,7 +4,7 @@
 
 Historical snapshot preserved before consolidating BUILD_STATUS.md. The entries
 below mix phases and dates; old pending items, totals and provider/setup notes may
-be superseded. Use [BUILD_STATUS.md](BUILD_STATUS.md) for current implementation,
+be superseded. Use [BUILD_STATUS.md](../../quality/BUILD_STATUS.md) for current implementation,
 latest validation and next priorities. Read this archive only for specific older
 evidence. No historical entry authorizes activation, deployment or timers.
 

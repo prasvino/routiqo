@@ -71,6 +71,7 @@ consent ceremony.
 | File | Why |
 | --- | --- |
 | `quality/BUILD_STATUS_HISTORY_2026-09-19.md` | Already a historical snapshot; `quality/BUILD_STATUS.md` is current |
+| `development/BUILD_PLAN_LIVE_QUEUE_2026-09.md` | The LIVE-first execution queue and L0–L5 stages removed from `development/BUILD_PLAN.md`, which now follows the five pilot phases |
 
 ## Kept, not archived
 

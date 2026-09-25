@@ -2,7 +2,7 @@
 
 # Community-reported traffic summary — V3 staging feature contract
 
-Status: **V3 implementation and staging evaluation authorized on 2026-09-23; production activation not approved**. This contract originated in the user-supplied handoff and [ADR 0055](../../adr/0055-consented-community-traffic-summary-proposal.md). The existing ADR 0053/0054 person-level DP research code and documentation remain preserved but disconnected; further research is paused. Public traveller output stays disabled in production.
+Status: **V3 implementation and staging evaluation authorized on 2026-09-23; production activation not approved**. This contract originated in the user-supplied handoff and [ADR 0055](../../../adr/0055-consented-community-traffic-summary-proposal.md). The existing ADR 0053/0054 person-level DP research code and documentation remain preserved but disconnected; further research is paused. Public traveller output stays disabled in production.
 
 ## Purpose and scope
 

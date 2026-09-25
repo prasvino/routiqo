@@ -5,16 +5,16 @@ The user's request controls scope. This document does not authorize extra featur
 
 ## 1. Read and scope
 
-1. Read `AGENTS.md` / `CLAUDE.md`, `docs/product/ROUTIQO_MASTER_CONTEXT.md` and `docs/development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`. The guardrails apply to every agent despite the filename. For user-facing work, also read `docs/design/ROUTIQO_UI_UX_SYSTEM.md`.
+1. Read `AGENTS.md` / `CLAUDE.md`, `docs/PRODUCT.md` (product source of truth), `docs/architecture/ENGINEERING_CONTEXT.md` (engineering context) and `docs/development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`. The guardrails apply to every agent despite the filename. For user-facing work, also read `docs/design/ROUTIQO_UI_UX_SYSTEM.md`.
 2. Check `docs/quality/BUILD_STATUS.md`, the relevant `docs/validation/*_PENDING.md` ledger and `docs/validation/IMPLEMENTATION_RESUME.md` (if it exists) for current state and known limits.
 3. Inspect the affected code. Load only the feature specs, ADRs, contracts and tests that apply.
 4. For substantial work, write concise acceptance criteria and a focused spec (`docs/features/<area>/<NAME>_SPEC.md`) before implementing. The guardrails §23 template lists the sections to consider. Name the data, authorization, privacy, offline and failure boundaries the change touches.
 5. For a complex change, an optional short-lived plan can go in `instructions/YYYY-MM-<change>.md`. Delete it, or mark it complete, once the work is committed.
-6. Keep planned capabilities separate from implemented behavior.
+6. Keep planned capabilities separate from implemented behavior. Do not implement from `docs/archive/`; archived capabilities stay default-off.
 
 ## 2. Using Claude Code features
 
-- **Plan mode / Plan subagent:** use for cross-domain design, migrations, new LIVE or privacy boundaries, or anything with an ambiguous architecture choice.
+- **Plan mode / Plan subagent:** use for cross-domain design, migrations, new Spot, post, Ask Ahead or privacy boundaries, or anything with an ambiguous architecture choice.
 - **Explore subagent:** use for broad read-only searches across many modules, so that file dumps stay out of the main context.
 - **General-purpose subagents:** use for a bounded implementation or test slice with an exact scope, the affected files, acceptance criteria and the relevant invariants. Keep the agent tree shallow and avoid overlapping edits. Run independent slices in parallel only when their files do not overlap.
 - **Worktree isolation:** use it when a delegated slice might conflict with uncommitted work in the main tree.
@@ -33,11 +33,16 @@ Do not present scaffolding, fixtures, disabled integrations or an untested UI sh
 
 ## 4. Risk and review gates
 
-For authentication, authorization, location, presence, LIVE publication, blocking, moderation, retention or cross-user data, read `docs/security/SECURITY.md`, `docs/security/THREAT_MODEL.md` and `docs/quality/CODE_REVIEW.md` and apply their gates. Critical and High findings block completion. Medium findings need a fix or an explicit disposition.
+For authentication, authorization, location, Spot passage, posts and voice notes, Spot chat, Ask Ahead, route guides, blocking, moderation, retention or cross-user data, read `docs/security/SECURITY.md`, `docs/security/THREAT_MODEL.md` and `docs/quality/CODE_REVIEW.md` and apply their gates. Critical and High findings block completion. Medium findings need a fix or an explicit disposition.
 
-For privacy-sensitive social or location changes, explicitly check:
-- the server-side transformation;
-- consent and Ghost Mode;
+For privacy-sensitive social or location changes (Spots, posts, Ask Ahead), explicitly check:
+- active input only: no continuous location on the server, no traveller counts;
+- server-side transformation before publishing (for example route-guide address stripping);
+- Spot-passage opt-in, coarse time and 24-hour deletion;
+- Ghost Mode stops all sending, including queued outbox items, and outranks replay;
+- per-room aliases that cannot be linked across rooms or to accounts;
+- Ask Ahead recipients are never revealed to the asker;
+- report, hide and moderation paths for text, voice and chat;
 - endpoint protection;
 - expiry;
 - anti-enumeration;
@@ -55,7 +60,7 @@ For high-risk changes, run an independent review before completion: a fresh suba
 - Java: `cd backend && ./gradlew check` (PostgreSQL integration tests need Docker). Run a focused `--tests` filter first.
 - Secrets: `pnpm secrets:check` before any commit.
 - UI: run the app and inspect it with Playwright/Chromium at desktop and narrow widths, with large text and reduced motion. Exercise loading, empty, error, offline and permission states. Use the `routiqo-ui-quality` skill (`.claude/skills/`).
-- Android: device and emulator checks need the Android SDK, which the cloud container lacks. Record them as pending in the ledger instead of claiming them.
+- Android: Android is the primary pilot client, and phase gates require **physical Android devices** (Phase 1: a full journey on 3+ phones). Emulator or synthetic evidence never closes a gate. The cloud container has no Android SDK or emulator, so record device checks as pending in the ledger instead of claiming them.
 
 Report what passed, what failed and what was not run, with the real command results.
 
