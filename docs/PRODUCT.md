@@ -266,7 +266,7 @@ Decided 2026-09-25:
 - **Diwali 2026 (outbound rush 5–7 November) is the dry run (Phase 4)** with friends and early testers, Android
   only, on a reduced scope (below). Six weeks is not enough to launch publicly
   with working moderation.
-- **Pongal 2027 (mid-January) is the public launch (Phase 5)** with the full
+- **Pongal 2027 (tentatively 8–14 January; to be finalised) is the public launch (Phase 5)** with the full
   pilot scope.
 
 **Corridors.** Most southbound Chennai festival traffic shares one trunk, so
@@ -377,7 +377,7 @@ aggregates; do not optimise time spent, message volume or notification count.
 - [ ] When, if ever, do aggregate counts come back, and under what privacy
       review?
 - [ ] Who seeds and verifies ~150–200 Spots before 1 November?
-- [ ] Exact Pongal travel dates and the festival room windows.
+- [ ] Finalise Pongal travel dates (tentatively 8–14 January 2027) and the festival room windows.
 
 ## Decisions (2026-09-25)
 

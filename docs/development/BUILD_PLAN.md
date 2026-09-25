@@ -45,7 +45,7 @@ execution queue and L0–L5 stages are archived verbatim in
 - **November–December:** rest of Phase 2 (voice notes, Spot chat, festival room)
   and Phase 3 (Spot passage, post-passing prompts, Ask Ahead, route guides),
   then a December long-weekend dry run.
-- **Pongal 2027 (mid-January):** public launch (Phase 5), adding the Chennai →
+- **Pongal 2027 (tentatively 8–14 January, to be finalised):** public launch (Phase 5), adding the Chennai →
   Salem → Coimbatore trunk.
 
 ## Phases and gates

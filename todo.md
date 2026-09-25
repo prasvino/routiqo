@@ -9,7 +9,7 @@ matching `docs/validation/*_PENDING.md` ledger.
 
 **Timeline (decided 2026-09-25):** Diwali 2026 (outbound rush 5–7 November) is the
 **dry run** on a reduced scope with friends and early testers;
-Pongal 2027 is the **public launch**. A second, smaller dry run on a December long
+Pongal 2027 (tentatively 8–14 January, to be finalised) is the **public launch**. A second, smaller dry run on a December long
 weekend covers what Diwali leaves out. See PRODUCT.md *Pilot* and *Decisions*.
 
 **Corridors (decided):** trunk Chennai (incl. Kilambakkam) → Chengalpattu →
@@ -192,6 +192,7 @@ Gate: measured against the success signals in PRODUCT.md.
 
 - [ ] Produce the signed Android release and distribution channel; verify release fingerprint against OAuth.
 - [ ] Verify remote CI on the actual release commit.
+- [ ] Finalise the Pongal dates (tentatively 8–14 January 2027) and festival room windows.
 - [ ] Capacity plan for the Pongal rush on all corridors, including ADR 0062 refresh load; festival route room windows set.
 - [ ] On-call moderator rota for the full event window.
 - [ ] Launch publicly on the corridors, enabling only flags whose phase gates passed.
