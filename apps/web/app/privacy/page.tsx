@@ -47,14 +47,20 @@ export default function Page() {
       <div className="privacy-section">
         <HardDrive size={24} />
         <div>
-          <h2>Your plans stay on this device.</h2>
+          <h2>
+            {process.env.NEXT_PUBLIC_ROUTIQO_PLANNING_BACKUP_UI_ENABLED === 'true'
+              ? 'Your plans stay on this device unless you save a copy.'
+              : 'Your plans stay on this device.'}
+          </h2>
           {process.env.NEXT_PUBLIC_ROUTIQO_PLANNING_BACKUP_UI_ENABLED === 'true' ? (
             <p>
               Planning drafts and saved destination IDs are stored in your browser. If you choose
               “Save this device’s plans” in Profile, a private copy is kept on your Routiqo account
               until you remove it there or delete your account. Only you can read it; it is never
-              shared with other travellers or used for recommendations. Signing out keeps it. Avoid
-              entering private addresses or sensitive information in plan notes.
+              shared with other travellers or used for recommendations. Signing out keeps it.
+              Removing it clears its content right away; operational database backups follow
+              Routiqo’s backup retention period. Avoid entering private addresses or sensitive
+              information in plan notes.
             </p>
           ) : (
             <p>

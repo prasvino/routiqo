@@ -26,9 +26,10 @@ public final class PlanningBackupService {
                 clock.instant().truncatedTo(ChronoUnit.MICROS));
     }
 
-    public void delete(UUID accountId, long expectedVersion) {
+    public AccountPlanningCopy delete(UUID accountId, long expectedVersion) {
         if (expectedVersion < 1 || expectedVersion > AccountPlanningCopy.MAX_VERSION)
             throw new IllegalArgumentException("Invalid expected planning version");
-        store.delete(Objects.requireNonNull(accountId), expectedVersion);
+        return store.delete(Objects.requireNonNull(accountId), expectedVersion,
+                clock.instant().truncatedTo(ChronoUnit.MICROS));
     }
 }

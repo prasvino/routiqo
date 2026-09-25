@@ -1,5 +1,7 @@
 import {
+  ACCOUNT_PLANNING_MAX_BYTES,
   ACCOUNT_PLANNING_MAX_REQUEST_BYTES,
+  accountPlanningDocumentBytes,
   readAccountPlanning,
   samePlanningContent,
   utf8ByteLength,
@@ -195,7 +197,10 @@ export function saveBrowserAccountPlanning(
   signal?: AbortSignal,
 ): Promise<AccountPlanningCopy> {
   const body = JSON.stringify(write);
-  if (utf8ByteLength(body) > ACCOUNT_PLANNING_MAX_REQUEST_BYTES)
+  if (
+    utf8ByteLength(body) > ACCOUNT_PLANNING_MAX_REQUEST_BYTES ||
+    accountPlanningDocumentBytes(write) > ACCOUNT_PLANNING_MAX_BYTES
+  )
     return Promise.reject(new BrowserPlanningError('too-large'));
   return send(
     accountId,
@@ -210,27 +215,40 @@ export function saveBrowserAccountPlanning(
         throw new BrowserPlanningError('uncertain');
       }
       const sent = { version: 1 as const, plans: write.plans, saved: write.saved };
-      if (copy.version !== write.expectedVersion + 1 || !samePlanningContent(copy.state, sent))
+      if (
+        !copy.present ||
+        copy.version !== write.expectedVersion + 1 ||
+        !samePlanningContent(copy.state, sent)
+      )
         throw new BrowserPlanningError('uncertain');
       return copy;
     },
   );
 }
 
+/** Removes the account copy at the checked version and returns the resulting absent state. */
 export function deleteBrowserAccountPlanning(
   accountId: string,
   expectedVersion: number,
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<AccountPlanningCopy> {
   if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1)
     return Promise.reject(new Error('Invalid account copy version.'));
   return send(
     accountId,
     { method: 'POST', path: 'planning/delete', body: JSON.stringify({ expectedVersion }) },
     signal,
-    async (response) => {
-      cancelBody(response.body);
-      if (response.status !== 204) throw new BrowserPlanningError('uncertain');
+    async (response, s) => {
+      let copy: AccountPlanningCopy;
+      try {
+        copy = await copyFrom(response, s);
+      } catch (failure) {
+        if (failure instanceof DeadlineError) throw failure;
+        throw new BrowserPlanningError('uncertain');
+      }
+      if (copy.present || copy.version < expectedVersion)
+        throw new BrowserPlanningError('uncertain');
+      return copy;
     },
   );
 }

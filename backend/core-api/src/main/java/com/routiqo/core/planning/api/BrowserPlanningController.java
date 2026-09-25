@@ -50,9 +50,10 @@ public final class BrowserPlanningController {
         @Override public String toString() { return "PlanResponse[private]"; }
     }
 
-    public record PlanningResponse(long version, Instant updatedAt, List<PlanResponse> plans, List<String> saved) {
+    public record PlanningResponse(boolean present, long version, Instant updatedAt, List<PlanResponse> plans,
+            List<String> saved) {
         static PlanningResponse from(AccountPlanningCopy copy) {
-            return new PlanningResponse(copy.version(), copy.updatedAt(),
+            return new PlanningResponse(copy.present(), copy.version(), copy.updatedAt(),
                     copy.document().plans().stream().map(PlanResponse::from).toList(), copy.document().saved());
         }
         @Override public String toString() { return "PlanningResponse[private]"; }
@@ -67,10 +68,9 @@ public final class BrowserPlanningController {
         return PlanningResponse.from(planning.save(actor, BrowserPlanningJson.save(request.getInputStream())));
     }
 
-    @PostMapping("/delete") ResponseEntity<Void> delete(HttpServletRequest request) throws IOException {
+    @PostMapping("/delete") PlanningResponse delete(HttpServletRequest request) throws IOException {
         UUID actor = writer(request);
-        planning.delete(actor, BrowserPlanningJson.delete(request.getInputStream()));
-        return ResponseEntity.noContent().build();
+        return PlanningResponse.from(planning.delete(actor, BrowserPlanningJson.delete(request.getInputStream())));
     }
 
     private UUID writer(HttpServletRequest request) {

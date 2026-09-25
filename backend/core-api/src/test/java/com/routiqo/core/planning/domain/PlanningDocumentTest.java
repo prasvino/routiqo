@@ -39,6 +39,8 @@ class PlanningDocumentTest {
                         List.of(), "", "x"),
                 () -> new PlanningPlan("id", PlanningPlan.Kind.TRIP, "a", "b".repeat(101), "2026-01-01", "00:00",
                         List.of(), "", "x"),
+                () -> new PlanningPlan("id", PlanningPlan.Kind.TRIP, "Chennai", " chennai\u00a0", "2026-01-01", "00:00",
+                        List.of(), "", "x"),
                 () -> new PlanningPlan("id", PlanningPlan.Kind.TRIP, "a\tb", "c", "2026-01-01", "00:00", List.of(), "", "x"),
                 () -> new PlanningPlan("id", PlanningPlan.Kind.TRIP, "a\ud800", "c", "2026-01-01", "00:00", List.of(), "", "x"),
                 () -> new PlanningPlan("id", PlanningPlan.Kind.TRIP, "a", "\udc00c", "2026-01-01", "00:00", List.of(), "", "x"),
@@ -106,17 +108,21 @@ class PlanningDocumentTest {
         assertThat(plan("one").toString()).doesNotContain("Chennai", "Leave early");
     }
 
-    @Test void absentCopyIsVersionZeroWithoutTimestampOrContent() {
+    @Test void absentCopiesKeepTheirVersionButNoTimestampOrContent() {
         assertThat(AccountPlanningCopy.absent().version()).isZero();
         assertThat(AccountPlanningCopy.absent().updatedAt()).isNull();
+        assertThat(AccountPlanningCopy.absent().present()).isFalse();
+        assertThat(AccountPlanningCopy.absent(7).version()).isEqualTo(7);
         var content = new PlanningDocument(List.of(plan("one")), List.of());
-        assertThatThrownBy(() -> new AccountPlanningCopy(content, 0, null)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new AccountPlanningCopy(content, 1, null)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new AccountPlanningCopy(PlanningDocument.empty(), 0, Instant.EPOCH))
+        assertThatThrownBy(() -> new AccountPlanningCopy(content, 2, null, false)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new AccountPlanningCopy(content, 1, null, true)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new AccountPlanningCopy(PlanningDocument.empty(), 2, Instant.EPOCH, false))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new AccountPlanningCopy(content, AccountPlanningCopy.MAX_VERSION + 1, Instant.EPOCH))
+        assertThatThrownBy(() -> AccountPlanningCopy.present(content, 0, Instant.EPOCH))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThat(new AccountPlanningCopy(PlanningDocument.empty(), 3, Instant.EPOCH).version()).isEqualTo(3);
+        assertThatThrownBy(() -> AccountPlanningCopy.present(content, AccountPlanningCopy.MAX_VERSION + 1, Instant.EPOCH))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(AccountPlanningCopy.present(PlanningDocument.empty(), 3, Instant.EPOCH).present()).isTrue();
     }
 
     @Test void mutationsNeedAnIdentityAndABoundedExpectedVersion() {

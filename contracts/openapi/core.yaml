@@ -1236,10 +1236,10 @@ paths:
     get:
       operationId: getAccountPlanning
       security: [{ browserSession: [] }]
-      description: 'Owner-only account copy of planning state (ADR 0062). Version 0 means no copy exists. Enabled only by the default-off server planning backup flag. Explicit reads only; no background sync.'
+      description: 'Owner-only account copy of planning state (ADR 0062). present=false means no copy exists; the version still counts removals so it never repeats. Enabled only by the default-off server planning backup flag. Explicit reads only; no background sync.'
       responses:
         '200':
-          description: The account planning copy or the derived version 0 empty state
+          description: The account planning copy, or an absent state carrying the latest version
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AccountPlanning' }
@@ -1275,7 +1275,7 @@ paths:
     post:
       operationId: deleteAccountPlanning
       security: [{ browserSession: [] }]
-      description: 'Delete the account copy when its version matches. Succeeds when no copy exists. Local device data is unaffected. Shares the planning write budget.'
+      description: 'Remove the account copy when its version matches, keeping a content-free record of the next version so a stale device can never match a later copy. Succeeds without change when no copy is present. Local device data is unaffected. Shares the planning write budget.'
       parameters:
         - { $ref: '#/components/parameters/AuthOrigin' }
         - { $ref: '#/components/parameters/AuthCsrf' }
@@ -1285,7 +1285,11 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/AccountPlanningDelete' }
       responses:
-        '204': { description: Account copy deleted or already absent }
+        '200':
+          description: The resulting absent state with its version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountPlanning' }
         '400': { description: 'Invalid expected version. Empty response body.' }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
@@ -2134,9 +2138,10 @@ components:
         createdAt: { type: string, minLength: 1, maxLength: 64 }
     AccountPlanning:
       type: object
-      required: [version, updatedAt, plans, saved]
+      required: [present, version, updatedAt, plans, saved]
       properties:
-        version: { type: integer, minimum: 0, maximum: 9007199254740991, description: 0 means no account copy }
+        present: { type: boolean, description: False when the account has no copy; plans and saved are then empty and updatedAt is null }
+        version: { type: integer, minimum: 0, maximum: 9007199254740991, description: 'Compare-and-swap version. Counts saves and removals, so it never repeats; 0 means never saved.' }
         updatedAt: { type: string, format: date-time, nullable: true }
         plans:
           type: array

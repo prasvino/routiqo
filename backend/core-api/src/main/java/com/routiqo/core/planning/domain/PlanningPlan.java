@@ -30,6 +30,10 @@ public record PlanningPlan(String id, Kind kind, String origin, String destinati
         if (kind == null) throw new IllegalArgumentException("Plan kind is required");
         origin = place(origin, "Origin");
         destination = place(destination, "Destination");
+        // Same rule as the browser: trimmed, case-insensitive endpoints must differ.
+        if (PlanningText.trim(origin).toLowerCase(java.util.Locale.ROOT)
+                .equals(PlanningText.trim(destination).toLowerCase(java.util.Locale.ROOT)))
+            throw new IllegalArgumentException("Origin and destination must differ");
         date = date(date);
         if (time == null || !TIME.matcher(time).matches()) throw new IllegalArgumentException("Invalid plan time");
         days = days(days, kind);

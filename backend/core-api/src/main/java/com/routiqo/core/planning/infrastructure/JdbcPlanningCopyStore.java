@@ -22,8 +22,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * One row per account. Removing a copy keeps a content-free tombstone with the next version, so versions
+ * never repeat for an account and a stale device cannot match a copy saved after a removal.
+ */
 public final class JdbcPlanningCopyStore implements PlanningCopyStore {
-    private static final String COLUMNS = "plans::text AS plans, saved::text AS saved, version, updated_at, latest_mutation_id";
+    private static final String COLUMNS =
+            "present, plans::text AS plans, saved::text AS saved, version, updated_at, latest_mutation_id";
+    private static final PlanningDocumentJson.Encoded EMPTY = PlanningDocumentJson.encode(PlanningDocument.empty());
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
 
@@ -57,14 +63,28 @@ public final class JdbcPlanningCopyStore implements PlanningCopyStore {
     }
 
     @Override
-    public void delete(UUID accountId, long expectedVersion) {
-        Objects.requireNonNull(accountId);
-        transaction.executeWithoutResult(status -> {
+    public AccountPlanningCopy delete(UUID accountId, long expectedVersion, Instant now) {
+        Objects.requireNonNull(accountId); Objects.requireNonNull(now);
+        Instant storedAt = now.truncatedTo(ChronoUnit.MICROS);
+        return Objects.requireNonNull(transaction.execute(status -> {
             Optional<Stored> existing = rows(accountId, true).stream().findFirst();
-            if (existing.isEmpty()) return;
-            if (existing.get().copy().version() != expectedVersion) throw new PlanningConflict();
-            jdbc.update("DELETE FROM account_planning_copy WHERE account_id = ? AND version = ?", accountId, expectedVersion);
-        });
+            if (existing.isEmpty()) return AccountPlanningCopy.absent();
+            AccountPlanningCopy current = existing.get().copy();
+            if (!current.present()) return current;
+            if (current.version() != expectedVersion || current.version() >= AccountPlanningCopy.MAX_VERSION)
+                throw new PlanningConflict();
+            long next = current.version() + 1;
+            // A fresh mutation identity ensures no earlier save can be replayed against the tombstone.
+            int changed = jdbc.update("""
+                UPDATE account_planning_copy
+                SET present = FALSE, plans = CAST(? AS jsonb), saved = CAST(? AS jsonb), document_bytes = ?,
+                    version = ?, updated_at = ?, latest_mutation_id = ?
+                WHERE account_id = ? AND version = ?
+                """, EMPTY.plans(), EMPTY.saved(), EMPTY.bytes(), next, Timestamp.from(storedAt), UUID.randomUUID(),
+                    accountId, current.version());
+            if (changed != 1) throw new PlanningConflict();
+            return AccountPlanningCopy.absent(next);
+        }));
     }
 
     private AccountPlanningCopy saveLocked(UUID accountId, PlanningMutation mutation,
@@ -74,10 +94,10 @@ public final class JdbcPlanningCopyStore implements PlanningCopyStore {
         if (mutation.expectedVersion() != 0) throw new PlanningConflict();
         jdbc.update("""
             INSERT INTO account_planning_copy
-                (account_id, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
-            VALUES (?, CAST(? AS jsonb), CAST(? AS jsonb), ?, 1, ?, ?)
+                (account_id, present, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
+            VALUES (?, TRUE, CAST(? AS jsonb), CAST(? AS jsonb), ?, 1, ?, ?)
             """, accountId, encoded.plans(), encoded.saved(), encoded.bytes(), Timestamp.from(now), mutation.mutationId());
-        return new AccountPlanningCopy(mutation.document(), 1, now);
+        return AccountPlanningCopy.present(mutation.document(), 1, now);
     }
 
     private AccountPlanningCopy reconcileLocked(UUID accountId, PlanningMutation mutation) {
@@ -97,17 +117,18 @@ public final class JdbcPlanningCopyStore implements PlanningCopyStore {
         long next = current + 1;
         int changed = jdbc.update("""
             UPDATE account_planning_copy
-            SET plans = CAST(? AS jsonb), saved = CAST(? AS jsonb), document_bytes = ?, version = ?,
+            SET present = TRUE, plans = CAST(? AS jsonb), saved = CAST(? AS jsonb), document_bytes = ?, version = ?,
                 updated_at = ?, latest_mutation_id = ?
             WHERE account_id = ? AND version = ?
             """, encoded.plans(), encoded.saved(), encoded.bytes(), next, Timestamp.from(now), mutation.mutationId(),
                 accountId, current);
         if (changed != 1) throw new PlanningConflict();
-        return new AccountPlanningCopy(mutation.document(), next, now);
+        return AccountPlanningCopy.present(mutation.document(), next, now);
     }
 
     private static Optional<AccountPlanningCopy> replay(Stored existing, PlanningMutation mutation) {
-        return existing.latestMutationId().equals(mutation.mutationId())
+        return existing.copy().present()
+                && existing.latestMutationId().equals(mutation.mutationId())
                 && existing.copy().version() == mutation.expectedVersion() + 1
                 && existing.copy().document().equals(mutation.document())
                 ? Optional.of(existing.copy()) : Optional.empty();
@@ -121,8 +142,11 @@ public final class JdbcPlanningCopyStore implements PlanningCopyStore {
     private static Stored map(ResultSet row, int number) throws SQLException {
         final AccountPlanningCopy copy;
         try {
-            copy = new AccountPlanningCopy(PlanningDocumentJson.decode(row.getString("plans"), row.getString("saved")),
-                    row.getLong("version"), row.getTimestamp("updated_at").toInstant());
+            long version = row.getLong("version");
+            PlanningDocument document = PlanningDocumentJson.decode(row.getString("plans"), row.getString("saved"));
+            copy = row.getBoolean("present")
+                    ? AccountPlanningCopy.present(document, version, row.getTimestamp("updated_at").toInstant())
+                    : new AccountPlanningCopy(document, version, null, false);
         } catch (RuntimeException corrupt) {
             // Never report stored-data corruption as a client input error, and never echo its content.
             throw new IllegalStateException("Stored planning copy is invalid");

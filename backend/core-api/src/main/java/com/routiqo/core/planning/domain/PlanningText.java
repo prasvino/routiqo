@@ -32,11 +32,19 @@ final class PlanningText {
         return true;
     }
 
+    /** Mirrors JavaScript String.prototype.trim(). */
+    static String trim(String value) {
+        int start = 0, end = value.length();
+        while (start < end && ecmaWhitespace(value.charAt(start))) start++;
+        while (end > start && ecmaWhitespace(value.charAt(end - 1))) end--;
+        return value.substring(start, end);
+    }
+
     private static boolean ecmaWhitespace(char unit) {
         return switch (unit) {
-            case '\t', '\n', '\u000B', '\f', '\r', ' ', ' ', ' ', ' ', ' ', ' ',
-                    ' ', '　', '﻿' -> true;
-            default -> unit >= ' ' && unit <= ' ';
+            case '\t', '\n', '\u000B', '\f', '\r', ' ', '\u00A0', '\u1680', '\u2028', '\u2029', '\u202F',
+                    '\u205F', '\u3000', '\uFEFF' -> true;
+            default -> unit >= '\u2000' && unit <= '\u200A';
         };
     }
 }

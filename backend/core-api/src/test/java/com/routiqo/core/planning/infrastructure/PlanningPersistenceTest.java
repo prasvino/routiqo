@@ -129,24 +129,56 @@ class PlanningPersistenceTest {
         assertThat(service(NOW).get(owner).document().plans()).extracting(PlanningPlan::id).containsExactly("private");
     }
 
-    @Test void deleteMatchesVersionAndIsIdempotentWhenAbsent() {
+    @Test void removalLeavesAContentFreeTombstoneAndIsIdempotent() {
         UUID owner = account();
-        service(NOW).delete(owner, 1);
+        assertThat(service(NOW).delete(owner, 1)).isEqualTo(AccountPlanningCopy.absent());
+        assertThat(rows(owner)).isZero();
         service(NOW).save(owner, mutation(document("a"), 0));
         service(NOW).save(owner, mutation(document("b"), 1));
         assertThatThrownBy(() -> service(NOW).delete(owner, 1)).isInstanceOf(PlanningConflict.class);
-        assertThat(rows(owner)).isEqualTo(1);
-        service(NOW).delete(owner, 2);
-        assertThat(rows(owner)).isZero();
-        assertThat(service(NOW).get(owner)).isEqualTo(AccountPlanningCopy.absent());
-        service(NOW).delete(owner, 2);
-        assertThat(service(NOW).save(owner, mutation(document("again"), 0)).version()).isEqualTo(1);
+        AccountPlanningCopy removed = service(NOW).delete(owner, 2);
+        assertThat(removed).isEqualTo(AccountPlanningCopy.absent(3));
+        assertThat(service(NOW).get(owner)).isEqualTo(AccountPlanningCopy.absent(3));
+        assertThat(jdbc().queryForObject("""
+            SELECT jsonb_array_length(plans) + jsonb_array_length(saved) FROM account_planning_copy
+            WHERE account_id = ? AND NOT present""", Integer.class, owner)).isZero();
+        assertThat(service(NOW).delete(owner, 2)).isEqualTo(AccountPlanningCopy.absent(3));
+        assertThat(service(NOW).delete(owner, 99)).isEqualTo(AccountPlanningCopy.absent(3));
+        assertThatThrownBy(() -> service(NOW).save(owner, mutation(document("again"), 0)))
+                .isInstanceOf(PlanningConflict.class);
+        AccountPlanningCopy again = service(NOW).save(owner, mutation(document("again"), 3));
+        assertThat(again.version()).isEqualTo(4);
+        assertThat(again.present()).isTrue();
         assertThatThrownBy(() -> service(NOW).delete(owner, 0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void versionsNeverRepeatSoStaleDevicesCannotOverwriteOrRemoveNewerCopies() {
+        UUID owner = account();
+        AccountPlanningCopy seenByA = service(NOW).save(owner, mutation(document("x"), 0));
+        // Device B removes the copy and saves new content.
+        AccountPlanningCopy removed = service(NOW).delete(owner, seenByA.version());
+        AccountPlanningCopy fromB = service(NOW).save(owner, mutation(document("y"), removed.version()));
+        assertThat(fromB.version()).isGreaterThan(seenByA.version());
+        // Device A still holds version 1: both a replace and a retried removal must conflict.
+        assertThatThrownBy(() -> service(NOW).save(owner, mutation(document("stale"), seenByA.version())))
+                .isInstanceOf(PlanningConflict.class);
+        assertThatThrownBy(() -> service(NOW).delete(owner, seenByA.version())).isInstanceOf(PlanningConflict.class);
+        assertThat(service(NOW).get(owner)).isEqualTo(fromB);
+    }
+
+    @Test void anEarlierSaveCannotBeReplayedAfterRemoval() {
+        UUID owner = account();
+        var uncertain = mutation(document("first"), 0);
+        service(NOW).save(owner, uncertain);
+        service(NOW).delete(owner, 1);
+        assertThatThrownBy(() -> service(NOW).save(owner, uncertain)).isInstanceOf(PlanningConflict.class);
+        assertThat(service(NOW).get(owner).present()).isFalse();
     }
 
     @Test void accountDeletionCascadesAndMissingAccountsCannotWrite() {
         UUID owner = account();
         service(NOW).save(owner, mutation(document("a"), 0));
+        service(NOW).delete(owner, 1);
         jdbc().update("DELETE FROM routiqo_account WHERE id = ?", owner);
         assertThat(rows(owner)).isZero();
         assertThatThrownBy(() -> service(NOW).save(owner, mutation(document("a"), 0)))
@@ -167,7 +199,7 @@ class PlanningPersistenceTest {
         List<PlanningPlan> escaped = new ArrayList<>();
         for (int index = 0; index < 100; index++)
             escaped.add(new PlanningPlan("த".repeat(97) + String.format("%03d", index), PlanningPlan.Kind.TRIP,
-                    "த".repeat(100), "த".repeat(100), "2026-01-01", "00:00", List.of(), "த".repeat(500),
+                    "த".repeat(100), "ந".repeat(100), "2026-01-01", "00:00", List.of(), "த".repeat(500),
                     "த".repeat(64)));
         UUID other = account();
         assertThatThrownBy(() -> service(NOW).save(other, mutation(new PlanningDocument(escaped, List.of()), 0)))
@@ -221,16 +253,20 @@ class PlanningPersistenceTest {
     @Test void databaseConstraintsBoundRowsIndependentlyOfTheApplication() {
         UUID owner = account();
         assertThatThrownBy(() -> jdbc().update("""
-            INSERT INTO account_planning_copy (account_id, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
-            VALUES (?, '{}'::jsonb, '[]'::jsonb, 10, 1, now(), gen_random_uuid())""", owner))
+            INSERT INTO account_planning_copy (account_id, present, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
+            VALUES (?, TRUE, '{}'::jsonb, '[]'::jsonb, 10, 1, now(), gen_random_uuid())""", owner))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc().update("""
-            INSERT INTO account_planning_copy (account_id, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
-            VALUES (?, '[]'::jsonb, '[]'::jsonb, 262145, 1, now(), gen_random_uuid())""", owner))
+            INSERT INTO account_planning_copy (account_id, present, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
+            VALUES (?, TRUE, '[]'::jsonb, '[]'::jsonb, 262145, 1, now(), gen_random_uuid())""", owner))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc().update("""
-            INSERT INTO account_planning_copy (account_id, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
-            VALUES (?, '[]'::jsonb, '[]'::jsonb, 10, 0, now(), gen_random_uuid())""", owner))
+            INSERT INTO account_planning_copy (account_id, present, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
+            VALUES (?, TRUE, '[]'::jsonb, '[]'::jsonb, 10, 0, now(), gen_random_uuid())""", owner))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc().update("""
+            INSERT INTO account_planning_copy (account_id, present, plans, saved, document_bytes, version, updated_at, latest_mutation_id)
+            VALUES (?, FALSE, '[]'::jsonb, '["ooty"]'::jsonb, 10, 1, now(), gen_random_uuid())""", owner))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
 }

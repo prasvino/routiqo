@@ -35,6 +35,7 @@ const plan = (id: string, destination = 'DLF Chennai'): JourneyPlan => ({
   createdAt: '2026-09-25T06:00:00.000Z',
 });
 const absent: AccountPlanningCopy = {
+  present: false,
   version: 0,
   updatedAt: null,
   state: { version: 1, plans: [], saved: [] },
@@ -44,6 +45,7 @@ const stored = (
   plans: JourneyPlan[],
   saved: string[] = [],
 ): AccountPlanningCopy => ({
+  present: true,
   version,
   updatedAt: '2026-09-25T07:00:00.000000Z',
   state: { version: 1, plans, saved },
@@ -199,7 +201,7 @@ describe('AccountPlanningCopyPanel', () => {
     fireEvent.click(button('Remove account copy'));
     const dialog = screen.getByRole('dialog', { name: 'Remove your account copy?' });
     expect(dialog.textContent).toContain('are not changed');
-    transport.remove.mockResolvedValue(undefined);
+    transport.remove.mockResolvedValue({ ...absent, version: 4 });
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove account copy' }).at(-1)!);
     expect(
       await screen.findByText('Your account copy was removed. Plans on this device are unchanged.'),
@@ -219,6 +221,42 @@ describe('AccountPlanningCopyPanel', () => {
     await waitFor(() =>
       expect((button('Check account copy') as HTMLButtonElement).disabled).toBe(false),
     );
+  });
+
+  it('keeps the exact retry offered and blocks other changes until it resolves', async () => {
+    renderPanel({ plans: [plan('a')], saved: [] });
+    transport.read.mockResolvedValue(stored(2, [plan('b')]));
+    fireEvent.click(button('Check account copy'));
+    await screen.findByText(/1 plan · 0 saved places · saved/);
+    transport.save.mockRejectedValueOnce(new BrowserPlanningError('uncertain'));
+    fireEvent.click(button(/Save this device/));
+    fireEvent.click(button('Replace account copy'));
+    await screen.findByRole('button', { name: 'Retry save' });
+    expect((button('Add account plans to this device') as HTMLButtonElement).disabled).toBe(true);
+    expect((button('Remove account copy') as HTMLButtonElement).disabled).toBe(true);
+    expect((button(/Save this device/) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('explains which plan cannot be kept instead of sending it', async () => {
+    renderPanel({ plans: [plan('a', 'Office\u0007')], saved: [] });
+    transport.read.mockResolvedValue(absent);
+    fireEvent.click(button('Check account copy'));
+    await screen.findByText('No plans saved on your account yet');
+    fireEvent.click(button(/Save this device/));
+    expect((await screen.findByRole('alert')).textContent).toContain('The plan “Navalur → Office');
+    expect(transport.save).not.toHaveBeenCalled();
+  });
+
+  it('reports a merge over the limits without disabling the panel', async () => {
+    const places = Array.from({ length: 100 }, (_, index) => `place-${index}`);
+    renderPanel({ plans: [plan('a')], saved: places });
+    transport.read.mockResolvedValue(stored(2, [], ['kodaikanal']));
+    fireEvent.click(button('Check account copy'));
+    await screen.findByText(/0 plans · 1 saved place · saved/);
+    fireEvent.click(button('Add account plans to this device'));
+    expect((await screen.findByRole('alert')).textContent).toContain('100 saved places');
+    expect((button(/Save this device/) as HTMLButtonElement).disabled).toBe(false);
+    expect(JSON.parse(localStorage.getItem(KEY)!).saved).toHaveLength(100);
   });
 
   it('does not offer an empty first copy', async () => {

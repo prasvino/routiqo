@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CloudUpload, CloudDownload, RefreshCw } from 'lucide-react';
 import {
   createAccountPlanningWrite,
+  mergePlanningBackup,
   samePlanningContent,
   type AccountPlanningCopy,
   type AccountPlanningWrite,
@@ -125,11 +126,15 @@ export function AccountPlanningCopyPanel({ accountId }: { accountId: string }) {
     let write: AccountPlanningWrite;
     try {
       write = createAccountPlanningWrite(planning.state, copy.version, crypto.randomUUID());
-    } catch {
-      setError('Plans on this device need attention before they can be kept on your account.');
+    } catch (failure) {
+      setError(
+        failure instanceof Error && failure.message.startsWith('The plan')
+          ? failure.message
+          : 'Plans on this device need attention before they can be kept on your account.',
+      );
       return;
     }
-    if (copy.version > 0) {
+    if (copy.present) {
       setPending({ kind: 'save', write });
       setConfirm('replace');
     } else save(write);
@@ -141,8 +146,8 @@ export function AccountPlanningCopyPanel({ accountId }: { accountId: string }) {
     void run(
       'remove',
       (signal) => deleteBrowserAccountPlanning(accountId, version, signal),
-      () => {
-        setCopy({ version: 0, updatedAt: null, state: { version: 1, plans: [], saved: [] } });
+      (removed) => {
+        setCopy(removed);
         setPending(null);
         setNotice('Your account copy was removed. Plans on this device are unchanged.');
       },
@@ -150,8 +155,16 @@ export function AccountPlanningCopyPanel({ accountId }: { accountId: string }) {
   }
 
   function addToDevice() {
-    if (!copy || copy.version === 0) return;
+    if (!copy || !copy.present) return;
     setError('');
+    try {
+      // Check the merge first so a rejected merge does not mark local storage as failed.
+      mergePlanningBackup(planning.state, copy.state);
+    } catch (failure) {
+      setNotice('');
+      setError(failure instanceof Error ? failure.message : 'Plans could not be added.');
+      return;
+    }
     try {
       const summary = planning.restoreBackup(copy.state);
       const kept = summary.keptPlans
@@ -166,11 +179,14 @@ export function AccountPlanningCopyPanel({ accountId }: { accountId: string }) {
     }
   }
 
-  const retry = pending && !busy && error && !confirm;
-  const matches = copy && copy.version > 0 && samePlanningContent(copy.state, planning.state);
+  // A pending exact request stays offered until it succeeds, fails definitively, or a new check discards it.
+  const retry = pending && !busy && !confirm;
+  const matches = copy?.present && samePlanningContent(copy.state, planning.state);
   const disabled = Boolean(busy) || !online || !planning.ready;
   const nothingToSave =
-    planning.state.plans.length === 0 && planning.state.saved.length === 0 && copy?.version === 0;
+    planning.state.plans.length === 0 &&
+    planning.state.saved.length === 0 &&
+    copy?.present === false;
   return (
     <section className="settings-section planning-copy" aria-labelledby="planning-copy-heading">
       <h2 id="planning-copy-heading">Plans on your account</h2>
@@ -191,7 +207,7 @@ export function AccountPlanningCopyPanel({ accountId }: { accountId: string }) {
               ? 'Checking…'
               : !copy
                 ? 'Not checked yet'
-                : copy.version === 0
+                : !copy.present
                   ? 'No plans saved on your account yet'
                   : `${describe(copy.state)} · saved ${savedAt(copy.updatedAt!)}`}
           </dd>
@@ -243,10 +259,10 @@ export function AccountPlanningCopyPanel({ accountId }: { accountId: string }) {
             {busy === 'save' ? 'Saving…' : 'Save this device’s plans'}
           </button>
         )}
-        {copy && copy.version > 0 && (
+        {copy?.present && (
           <button
             className="button secondary"
-            disabled={Boolean(busy) || !planning.ready || Boolean(planning.error)}
+            disabled={Boolean(busy) || !planning.ready || Boolean(planning.error) || Boolean(retry)}
             onClick={addToDevice}
           >
             <CloudDownload size={16} aria-hidden="true" />
@@ -254,7 +270,7 @@ export function AccountPlanningCopyPanel({ accountId }: { accountId: string }) {
           </button>
         )}
       </div>
-      {copy && copy.version > 0 && (
+      {copy?.present && (
         <button
           className="account-delete-link"
           disabled={disabled || Boolean(retry)}
@@ -295,7 +311,7 @@ export function AccountPlanningCopyPanel({ accountId }: { accountId: string }) {
           </div>
         </Modal>
       )}
-      {confirm === 'remove' && copy && copy.version > 0 && (
+      {confirm === 'remove' && copy?.present && (
         <Modal title="Remove your account copy?" onClose={() => setConfirm(null)}>
           <p className="modal-intro">
             This removes {describe(copy.state)} from your account. Plans and saved places on this

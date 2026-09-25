@@ -6,12 +6,15 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface PlanningCopyStore {
-    /** Returns the owner's copy, or {@link AccountPlanningCopy#absent()} when none is stored. */
+    /** Returns the owner's copy; an absent copy still reports the account's latest version. */
     AccountPlanningCopy find(UUID accountId);
 
     /** Compare-and-swap replacement with exact replay of the latest mutation. */
     AccountPlanningCopy save(UUID accountId, PlanningMutation mutation, Instant now);
 
-    /** Deletes the copy when its version matches; succeeds when no copy exists. */
-    void delete(UUID accountId, long expectedVersion);
+    /**
+     * Removes the copy's content when its version matches, leaving a content-free tombstone with the next
+     * version. Succeeds without change when no copy is present.
+     */
+    AccountPlanningCopy delete(UUID accountId, long expectedVersion, Instant now);
 }

@@ -829,7 +829,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Owner-only account copy of planning state (ADR 0062). Version 0 means no copy exists. Enabled only by the default-off server planning backup flag. Explicit reads only; no background sync. */
+        /** @description Owner-only account copy of planning state (ADR 0062). present=false means no copy exists; the version still counts removals so it never repeats. Enabled only by the default-off server planning backup flag. Explicit reads only; no background sync. */
         get: operations["getAccountPlanning"];
         put?: never;
         /** @description Replace the account copy with compare-and-swap on expectedVersion and exact latest-mutation replay. Request bodies up to 264 KiB are accepted on this path only; the stored canonical document may not exceed 256 KiB. Twenty planning writes (saves and deletes) per account per minute. */
@@ -852,7 +852,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Delete the account copy when its version matches. Succeeds when no copy exists. Local device data is unaffected. Shares the planning write budget. */
+        /** @description Remove the account copy when its version matches, keeping a content-free record of the next version so a stale device can never match a later copy. Succeeds without change when no copy is present. Local device data is unaffected. Shares the planning write budget. */
         post: operations["deleteAccountPlanning"];
         delete?: never;
         options?: never;
@@ -1514,7 +1514,9 @@ export interface components {
             createdAt: string;
         };
         AccountPlanning: {
-            /** @description 0 means no account copy */
+            /** @description False when the account has no copy; plans and saved are then empty and updatedAt is null */
+            present: boolean;
+            /** @description Compare-and-swap version. Counts saves and removals, so it never repeats; 0 means never saved. */
             version: number;
             /** Format: date-time */
             updatedAt: string | null;
@@ -4104,7 +4106,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The account planning copy or the derived version 0 empty state */
+            /** @description The account planning copy, or an absent state carrying the latest version */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4192,12 +4194,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Account copy deleted or already absent */
-            204: {
+            /** @description The resulting absent state with its version */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AccountPlanning"];
+                };
             };
             /** @description Invalid expected version. Empty response body. */
             400: {

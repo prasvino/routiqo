@@ -17,11 +17,18 @@ Backend behavior:
 - a 20-per-minute account write budget.
 
 Checks (cloud container, JDK 25, Docker):
-- **Java:** 598 tests. The 30 new planning tests (domain, parser, PostgreSQL store, HTTP with the flag on and off) and the architecture rules pass. 16 tests in the community-traffic V3 classes fail identically on untouched `main`: their fixtures are fixed at 2026-09-23 while grant expiry uses the real clock, so the 24-hour grant constraint and expiry checks now fail. That is a date-dependent defect, not this change. `bootJar` passed.
-- **TypeScript:** 767 tests across 97 files pass under CI's Node 22.21.1. Under this container's Node 22.22.2 (ICU 78.2), 12 commute-summary tests fail on `main` too, because ICU 78 omits the `era` part for the `iso8601` calendar, which `commute-summaries.ts` depends on. That affects real runtimes with ICU 78 and needs a separate fix.
+- **Java:** 600 tests. The 32 new planning tests (domain, parser, PostgreSQL store, HTTP with the flag on and off) and the architecture rules pass. 16 tests in the community-traffic V3 classes fail identically on untouched `main`: their fixtures are fixed at 2026-09-23 while grant expiry uses the real clock, so the 24-hour grant constraint and expiry checks now fail. That is a date-dependent defect, not this change. `bootJar` passed.
+- **TypeScript:** 781 tests across 97 files pass under CI's Node 22.21.1. Under this container's Node 22.22.2 (ICU 78.2), 12 commute-summary tests fail on `main` too, because ICU 78 omits the `era` part for the `iso8601` calendar, which `commute-summaries.ts` depends on. That affects real runtimes with ICU 78 and needs a separate fix.
 - **Other checks:** all six typechecks, lint, formatting, the generated-contract check and the full `pnpm build` passed.
 - **Secrets:** the pinned gitleaks image could not be pulled (GHCR blobs are blocked here), so gitleaks v8.30.1 from Docker Hub was run with the repo's config: no leaks.
 - **Rendered QA:** Playwright against a synthetic API, recorded in the [evidence](evidence/account-planning-copy-2026-09-25/README.md): 1280 px and 360 px at 130% zoom, keyboard, offline, conflict, uncertain retry (exactly one new version), and flags-off absence.
+
+An independent review found one Medium defect, now fixed. Removing a copy let the next save reuse version 1, so a stale device could overwrite a newer copy or retry a removal onto it. Removal now leaves a content-free marker at the next version, so versions never repeat, and the response carries an explicit `present` flag. The Low findings are also fixed:
+- the client now applies the server's text rules and the 256 KiB limit before sending;
+- the server now also requires origin and destination to differ;
+- a pending exact retry blocks other changes;
+- a rejected merge no longer disables the panel;
+- the privacy heading is accurate when the feature is on.
 
 Still open: real OAuth on HTTPS staging with two devices, screen-reader verification, native Android controls, and backup-retention operations.
 

@@ -14,6 +14,7 @@ Rules:
 - A server flag and a UI flag (`ROUTIQO_PLANNING_BACKUP_API_ENABLED`, `NEXT_PUBLIC_ROUTIQO_PLANNING_BACKUP_UI_ENABLED`) are both off by default.
 - The document limit is 256 KiB. Only `POST /api/v1/planning` gets a larger body limit; all other browser POSTs stay at 20 KiB.
 - The server validates the structure strictly. The client re-validates semantics on read and rejects the whole document if anything is invalid.
+- Removing a copy keeps a content-free record with the next version, so versions never repeat for an account. A device holding an older version can't replace or remove a copy saved later.
 - Deleting the account deletes the copy (cascade). Signing out does not.
 
 Contract and behavior: `docs/features/journey/ACCOUNT_PLANNING_BACKUP_SPEC.md`.

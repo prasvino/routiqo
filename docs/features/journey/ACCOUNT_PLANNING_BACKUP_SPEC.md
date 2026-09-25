@@ -60,20 +60,22 @@ These endpoints require the `persistence` and `web-auth` profiles, plus the serv
 |---|---|---|---|
 | `GET /api/v1/planning` | none | 200 `AccountPlanning` | 401 |
 | `POST /api/v1/planning` | `AccountPlanningWrite` | 200 `AccountPlanning` | 400, 401, 403, 409, 413, 415, 429 |
-| `POST /api/v1/planning/delete` | `AccountPlanningDelete` | 204 | 400, 401, 403, 409, 413, 415, 429 |
+| `POST /api/v1/planning/delete` | `AccountPlanningDelete` | 200 `AccountPlanning` | 400, 401, 403, 409, 413, 415, 429 |
 
 Every call needs the session cookie and exactly one `X-Routiqo-Account` header matching the session. POST also needs `Origin`, CSRF and `application/json`. Responses are `no-store`.
 
-- `AccountPlanning` is `{version, updatedAt, plans, saved}`.
-  - Version 0 means there is no account copy: `updatedAt` is null and both lists are empty.
+- `AccountPlanning` is `{present, version, updatedAt, plans, saved}`.
+  - `present: false` means there is no account copy: `updatedAt` is null and both lists are empty.
+  - `version` counts every save and removal, so it never repeats for an account. Version 0 means nothing was ever saved.
 - `AccountPlanningWrite` is `{plans, saved, expectedVersion, mutationId}`.
-  - The write is a compare-and-swap: it succeeds only when `expectedVersion` equals the stored version (0 for none).
+  - The write is a compare-and-swap: it succeeds only when `expectedVersion` equals the current version, including after a removal.
   - A request repeating the same mutation ID, expected version and content returns the stored result without writing again.
   - Reusing a mutation ID with different content, or sending a stale version, returns 409.
 - `AccountPlanningDelete` is `{expectedVersion}`, with `expectedVersion` ≥ 1.
-  - A version match deletes the copy.
-  - If no copy exists, the call succeeds (idempotent).
+  - A version match removes the copy's content. It leaves a content-free record at the next version and returns that absent state.
+  - If no copy is present, the call succeeds and returns the current absent state (idempotent).
   - A mismatch returns 409.
+  - Because versions never repeat, a device holding an older version can neither replace nor remove a copy saved after a removal. An earlier save can't be replayed after a removal either.
 
 ## Validation (server)
 
@@ -88,7 +90,7 @@ Field rules:
 - `plans`: at most 100, with unique IDs.
 - Plan `id`: 1–100 characters.
 - `kind`: `trip` or `commute`.
-- `origin` and `destination`: 1–100 characters, not blank after trimming.
+- `origin` and `destination`: 1–100 characters, not blank after trimming, and different from each other after trimming and ignoring case (the same rule as the browser).
 - `date`: a real calendar date in `YYYY-MM-DD`.
 - `time`: `HH:MM` on a 24-hour clock.
 - `days`: unique integers 0–6. A commute needs at least one day.
@@ -100,15 +102,18 @@ The stored document may not exceed 256 KiB of UTF-8 JSON. The browser guard and 
 
 The client runs the full `readPlanningState` validation on everything it receives. It refuses the whole copy rather than partially merging.
 
+Local storage accepts some text the server rejects, such as control characters in text restored from a backup file. Before sending, the client applies the server's text rules and names the plan to fix. It also refuses a document over 256 KiB without sending it.
+
 ## Data, retention and deletion
 
 Migration V28 adds table `account_planning_copy`, with one row per account:
-- `plans` and `saved` (JSONB);
+- `present`;
+- `plans` and `saved` (JSONB), which must be empty when `present` is false;
 - `document_bytes` (≤ 256 KiB);
 - `version`, `updated_at` and `latest_mutation_id`;
 - a foreign key to `routiqo_account` with `ON DELETE CASCADE`.
 
-The copy is kept until the traveller removes it or deletes the account. Signing out keeps it. The content is used only to return it to its owner. It is never logged (`toString` is redacted), never exposed to other accounts, and never used by LIVE, discovery or AI. Operational database backups follow the backup-retention release gate in `docs/privacy/DATA_RETENTION_AND_DELETION.md`.
+The copy is kept until the traveller removes it or deletes the account. Removing it clears the content immediately; the remaining row holds only the version and timestamp. Signing out keeps it. The content is used only to return it to its owner. It is never logged (`toString` is redacted), never exposed to other accounts, and never used by LIVE, discovery or AI. Operational database backups follow the backup-retention release gate in `docs/privacy/DATA_RETENTION_AND_DELETION.md`.
 
 ## Security and abuse
 
@@ -124,7 +129,8 @@ The copy is kept until the traveller removes it or deletes the account. Signing 
 - **PostgreSQL:**
   - first save, compare-and-swap, stale version, replay, and mutation reuse with different content;
   - a concurrent first save;
-  - delete (matching, mismatched, absent);
+  - removal (matching, mismatched, absent, repeated), with no version reuse after removal;
+  - no replay of an earlier save after removal;
   - account-deletion cascade;
   - owner isolation.
 - **HTTP:**

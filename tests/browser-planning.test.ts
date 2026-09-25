@@ -27,6 +27,7 @@ const write = createAccountPlanningWrite(
   mutation,
 );
 const stored = {
+  present: true,
   version: 3,
   updatedAt: '2026-09-25T07:00:00.123456Z',
   plans: [plan],
@@ -72,6 +73,7 @@ describe('browser account planning transport', () => {
   it('treats malformed, oversized or wrong-type read responses as unavailable', async () => {
     for (const response of [
       () => json({ ...stored, plans: [{ id: 'bad' }] }),
+      () => json({ ...stored, present: false }),
       () => json({ ...stored, version: 0 }),
       () => new Response(JSON.stringify(stored), { headers: { 'Content-Type': 'text/html' } }),
       () => new Response('{', { headers: { 'Content-Type': 'application/json' } }),
@@ -123,6 +125,7 @@ describe('browser account planning transport', () => {
       { ...stored, plans: [{ ...plan, notes: 'changed' }] },
       { ...stored, saved: [] },
       { ...stored, plans: [{ id: 'bad' }] },
+      { ...stored, present: false, updatedAt: null, plans: [], saved: [] },
     ]) {
       server(() => json(mismatch));
       await expect(saveBrowserAccountPlanning(account, write)).rejects.toMatchObject({
@@ -151,10 +154,13 @@ describe('browser account planning transport', () => {
 
   it('refuses oversized writes before any request', async () => {
     const fetcher = server(() => json(stored));
-    const huge = { ...write, plans: [{ ...plan, notes: 'a'.repeat(270 * 1024) }] };
-    await expect(saveBrowserAccountPlanning(account, huge)).rejects.toMatchObject({
-      kind: 'too-large',
-    });
+    // Over the 256 KiB document limit but under the 264 KiB request limit, then over both.
+    for (const size of [257 * 1024, 270 * 1024]) {
+      const huge = { ...write, plans: [{ ...plan, notes: 'a'.repeat(size) }] };
+      await expect(saveBrowserAccountPlanning(account, huge)).rejects.toMatchObject({
+        kind: 'too-large',
+      });
+    }
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -180,19 +186,30 @@ describe('browser account planning transport', () => {
     await settled;
   });
 
-  it('deletes with the checked version and expects an empty 204', async () => {
-    const fetcher = server(() => new Response(null, { status: 204 }));
-    await deleteBrowserAccountPlanning(account, 3);
+  it('removes with the checked version and returns the resulting absent state', async () => {
+    const removed = { present: false, version: 4, updatedAt: null, plans: [], saved: [] };
+    const fetcher = server(() => json(removed));
+    expect(await deleteBrowserAccountPlanning(account, 3)).toMatchObject({
+      present: false,
+      version: 4,
+    });
     const call = fetcher.mock.calls.find(([url]) => url === '/api/v1/planning/delete')!;
     expect(JSON.parse(call[1]!.body as string)).toEqual({ expectedVersion: 3 });
     server(() => new Response(null, { status: 409 }));
     await expect(deleteBrowserAccountPlanning(account, 3)).rejects.toMatchObject({
       kind: 'conflict',
     });
-    server(() => json({}));
-    await expect(deleteBrowserAccountPlanning(account, 3)).rejects.toMatchObject({
-      kind: 'uncertain',
-    });
+    for (const response of [
+      () => json({}),
+      () => new Response(null, { status: 204 }),
+      () => json(stored),
+      () => json({ ...removed, version: 2 }),
+    ]) {
+      server(response);
+      await expect(deleteBrowserAccountPlanning(account, 3)).rejects.toMatchObject({
+        kind: 'uncertain',
+      });
+    }
     await expect(deleteBrowserAccountPlanning(account, 0)).rejects.toThrow();
   });
 

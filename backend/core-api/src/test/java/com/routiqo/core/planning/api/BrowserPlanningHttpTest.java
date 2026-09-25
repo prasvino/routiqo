@@ -120,6 +120,7 @@ class BrowserPlanningHttpTest {
         assertThat(absent.statusCode()).isEqualTo(200);
         assertThat(absent.headers().firstValue("Cache-Control")).contains("no-store");
         assertThat(JsonPath.<Integer>read(absent.body(), "$.version")).isZero();
+        assertThat(JsonPath.<Boolean>read(absent.body(), "$.present")).isFalse();
         assertThat(JsonPath.<Object>read(absent.body(), "$.updatedAt")).isNull();
         assertThat(JsonPath.<List<Object>>read(absent.body(), "$.plans")).isEmpty();
         assertThat(JsonPath.<List<Object>>read(absent.body(), "$.saved")).isEmpty();
@@ -166,11 +167,19 @@ class BrowserPlanningHttpTest {
         assertThat(send(owner, "planning/delete", "{\"expectedVersion\":1}").statusCode()).isEqualTo(409);
         assertThat(rows(owner.account())).isEqualTo(1);
         HttpResponse<String> deleted = send(owner, "planning/delete", "{\"expectedVersion\":2}");
-        assertThat(deleted.statusCode()).isEqualTo(204);
-        assertThat(deleted.body()).isEmpty();
-        assertThat(rows(owner.account())).isZero();
-        assertThat(send(owner, "planning/delete", "{\"expectedVersion\":2}").statusCode()).isEqualTo(204);
-        assertThat(JsonPath.<Integer>read(send(owner, "planning", null).body(), "$.version")).isZero();
+        assertThat(deleted.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<Boolean>read(deleted.body(), "$.present")).isFalse();
+        assertThat(JsonPath.<Integer>read(deleted.body(), "$.version")).isEqualTo(3);
+        assertThat(JsonPath.<Object>read(deleted.body(), "$.updatedAt")).isNull();
+        assertThat(JsonPath.<List<Object>>read(deleted.body(), "$.plans")).isEmpty();
+        assertThat(send(owner, "planning/delete", "{\"expectedVersion\":2}").statusCode()).isEqualTo(200);
+        HttpResponse<String> afterRemoval = send(owner, "planning", null);
+        assertThat(JsonPath.<Integer>read(afterRemoval.body(), "$.version")).isEqualTo(3);
+        assertThat(JsonPath.<Boolean>read(afterRemoval.body(), "$.present")).isFalse();
+        // A device that last saw version 1 cannot overwrite a copy saved after the removal.
+        assertThat(send(owner, "planning", write(plan("new", ""), "", 3, UUID.randomUUID())).statusCode()).isEqualTo(200);
+        assertThat(send(owner, "planning", write("", "", 1, UUID.randomUUID())).statusCode()).isEqualTo(409);
+        assertThat(send(owner, "planning/delete", "{\"expectedVersion\":1}").statusCode()).isEqualTo(409);
     }
 
     @Test void postsRequireSessionAccountOriginCsrfAndJson() throws Exception {
@@ -207,7 +216,8 @@ class BrowserPlanningHttpTest {
                 write(plan("p1", ""), "", -1, mutation),
                 write(plan("p1", "") + "," + plan("p1", ""), "", 0, mutation),
                 write(plan("p1", ""), "", 0, mutation).replace("\"days\":[1,2,3,4,5]", "\"days\":[]"),
-                write(plan("p1", ""), "", 0, mutation).replace("2026-09-28", "2026-02-30"))) {
+                write(plan("p1", ""), "", 0, mutation).replace("2026-09-28", "2026-02-30"),
+                write(plan("p1", ""), "", 0, mutation).replace("DLF Chennai", " navalur "))) {
             HttpResponse<String> response = send(owner, "planning", body);
             assertThat(response.statusCode()).as(body).isEqualTo(400);
             assertThat(response.body()).doesNotContain("Bad-Place", "bell", "Navalur");
@@ -238,13 +248,13 @@ class BrowserPlanningHttpTest {
             assertThat(send(owner, "planning", write("", "", version, UUID.randomUUID())).statusCode())
                     .as("write %s", version + 1).isEqualTo(200);
         }
-        assertThat(send(owner, "planning/delete", "{\"expectedVersion\":19}").statusCode()).isEqualTo(204);
+        assertThat(send(owner, "planning/delete", "{\"expectedVersion\":19}").statusCode()).isEqualTo(200);
         HttpResponse<String> limited = send(owner, "planning", write("", "", 0, UUID.randomUUID()));
         assertThat(limited.statusCode()).isEqualTo(429);
         assertThat(limited.headers().firstValue("Retry-After")).contains("60");
         assertThat(send(owner, "planning/delete", "{\"expectedVersion\":1}").statusCode()).isEqualTo(429);
         assertThat(send(owner, "planning", null).statusCode()).isEqualTo(200);
-        assertThat(rows(owner.account())).isZero();
+        assertThat(JsonPath.<Boolean>read(send(owner, "planning", null).body(), "$.present")).isFalse();
     }
 
     @Test void accountDeletionRemovesTheCopy() throws Exception {

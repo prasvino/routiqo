@@ -18,6 +18,11 @@ Captured on 2026-09-25 from a production `next build` / `next start` of `apps/we
   - The retry resent the identical mutation and was replayed. The server version moved 2 → 3, exactly one new version.
 - **`09-offline.png`:** in offline mode the account actions are disabled with an explanation. Local data stays available.
 - **`10-remove-confirmation.png`, `11-removed.png`:** removal needs a confirmation. It removes only the account copy, and the device counts are unchanged.
+- **`15-stale-after-removal-conflict.png`:** covers the version-reuse case found in independent review.
+  1. Device B checks after the removal (v4).
+  2. Device A saves a new copy (v5).
+  3. B's save then conflicts instead of overwriting.
+  Versions keep increasing after a removal, so an older version never matches again.
 - **`12-keyboard-focus.png`:** keyboard focus shows a visible ring. Pressing Enter on the focused check button performed the check.
 - **`13-narrow-large-text.png`, `14-narrow-large-text-saved.png`:** checked at 360 px width with 130% page zoom and `prefers-reduced-motion: reduce`. The status cards stack, buttons take full width, and there is no horizontal overflow (measured).
 
