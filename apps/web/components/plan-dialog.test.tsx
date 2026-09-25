@@ -195,4 +195,13 @@ describe('PlanDialog commute weekday validation and feedback', () => {
     expect(destInput.value).toBe('Mysuru');
     expect(notesInput.value).toBe('Early breakfast stop');
   });
+
+  it('exposes the journey type choice as a named group of toggle buttons', () => {
+    vi.mocked(usePlanning).mockReturnValue(createPlanningMock());
+    render(<PlanDialog onClose={vi.fn()} />);
+    const group = screen.getByRole('group', { name: 'Journey type' });
+    const [trip, commute] = within(group).getAllByRole('button');
+    expect(trip?.getAttribute('aria-pressed')).toBe('true');
+    expect(commute?.getAttribute('aria-pressed')).toBe('false');
+  });
 });
