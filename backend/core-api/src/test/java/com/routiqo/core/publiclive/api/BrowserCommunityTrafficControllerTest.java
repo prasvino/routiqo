@@ -22,7 +22,7 @@ class BrowserCommunityTrafficControllerTest {
     private static final UUID JOURNEY = UUID.fromString("10000000-0000-4000-8000-000000000002");
     private static final UUID COMMAND = UUID.fromString("10000000-0000-4000-8000-000000000003");
     private static final UUID REQUEST = UUID.fromString("10000000-0000-4000-8000-000000000004");
-    private static final Instant WINDOW = Instant.parse("2026-09-23T10:00:00Z");
+    private static final Instant WINDOW = com.routiqo.core.publiclive.RecentTrafficWindow.now();
     private final CommunityTrafficShareService service = mock(CommunityTrafficShareService.class);
     private final GoogleSessionService sessions = mock(GoogleSessionService.class);
     private final AuthRateGate rates = mock(AuthRateGate.class);
