@@ -26,7 +26,7 @@ The **Codex orchestration** section does not apply to Claude. That covers the GP
 | `packages/design-tokens` | Shared tokens (`index.ts`, `tokens.css`). |
 | `backend/core-api` | Java 25 / Spring Boot modular monolith: `identity`, `journey`, `journal`, `routing`, `routeupdate`, `publiclive`, `privacy`, `moderation`, `verification`. Each has `api/application/domain/infrastructure`. |
 | `backend/realtime`, `backend/workers` | Separately deployable startup code only. |
-| `backend/core-api/src/main/resources/db/migration` | Flyway migrations `V1…V27`. Add a new version; never edit an applied one. |
+| `backend/core-api/src/main/resources/db/migration` | Versioned Flyway migrations (`V<n>__<name>.sql`). Add the next unused version; never edit an applied one. |
 | `contracts/openapi/core.yaml` | The HTTP contract. Regenerate the client after any change. |
 | `tests/` | Cross-package Vitest suites (browser/native transport, storage, contracts). |
 
