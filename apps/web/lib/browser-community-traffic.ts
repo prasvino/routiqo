@@ -232,9 +232,13 @@ export function reportBrowserCommunityTraffic(
     expectedStatus: 202,
     signal,
     validate: (value) => {
-      const item = record(value, ['status']);
+      const item = record(value, ['status', 'receivedAt', 'receiptExpiresAt']);
       if (item.status !== 'received') throw new BrowserLiveError('unavailable');
-      return { status: 'received' as const };
+      return {
+        status: 'received' as const,
+        receivedAt: readInstant(item.receivedAt).raw,
+        receiptExpiresAt: readInstant(item.receiptExpiresAt).raw,
+      };
     },
   });
 }

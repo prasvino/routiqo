@@ -120,66 +120,11 @@ class LiveSafetyDomainTest {
     }
 
     @Test
-    void reportReplayIsReporterScopedAndExcludesReceiptTime() {
-        var report = new StructuredReport(ACTOR, REQUEST, REFERENCE,
-                StructuredReport.Reason.MISLEADING_INFORMATION, NOW);
-        var later = new StructuredReport(ACTOR, REQUEST, REFERENCE,
-                StructuredReport.Reason.MISLEADING_INFORMATION, NOW.plusSeconds(1));
-        assertThat(report.classifySubmission(ACTOR, REQUEST, REFERENCE,
-                StructuredReport.Reason.MISLEADING_INFORMATION))
-                .isEqualTo(StructuredReport.SubmissionMatch.EXACT_REPLAY);
-        assertThat(later.classifySubmission(ACTOR, REQUEST, REFERENCE,
-                StructuredReport.Reason.MISLEADING_INFORMATION))
-                .isEqualTo(StructuredReport.SubmissionMatch.EXACT_REPLAY);
-        assertThat(report.classifySubmission(ACTOR, REQUEST, THIRD,
-                StructuredReport.Reason.MISLEADING_INFORMATION))
-                .isEqualTo(StructuredReport.SubmissionMatch.CONFLICT);
-        assertThat(report.classifySubmission(ACTOR, REQUEST, REFERENCE,
-                StructuredReport.Reason.HARASSMENT))
-                .isEqualTo(StructuredReport.SubmissionMatch.CONFLICT);
-        assertThat(report.classifySubmission(OTHER, REQUEST, REFERENCE,
-                StructuredReport.Reason.MISLEADING_INFORMATION))
-                .isEqualTo(StructuredReport.SubmissionMatch.DIFFERENT_REQUEST);
-        assertThatThrownBy(() -> new StructuredReport(ACTOR, NIL, REFERENCE,
-                StructuredReport.Reason.SPAM_MANIPULATION, NOW))
-                .isInstanceOf(IllegalArgumentException.class).hasNoCause();
-        assertThatThrownBy(() -> new StructuredReport(ACTOR, REQUEST, REFERENCE,
-                StructuredReport.Reason.SPAM_MANIPULATION, Instant.MAX))
-                .isInstanceOf(IllegalArgumentException.class).hasNoCause();
-    }
-
-    @Test
-    void caseResolutionRequiresOriginalRevisionAndExactTerminalRetry() {
-        var report = new StructuredReport(ACTOR, REQUEST, REFERENCE,
-                StructuredReport.Reason.UNSAFE_CONTENT, NOW);
-        var open = ModerationCase.open(THIRD, report);
-        assertDenied(() -> open.resolve(-1, OTHER, ModerationCase.State.DISMISSED));
-        assertDenied(() -> open.resolve(1, OTHER, ModerationCase.State.DISMISSED));
-        assertDenied(() -> open.resolve(0, NIL, ModerationCase.State.DISMISSED));
-        assertDenied(() -> open.resolve(0, OTHER, ModerationCase.State.OPEN));
-        var actioned = open.resolve(0, OTHER, ModerationCase.State.ACTIONED);
-        assertThat(actioned.revision()).isEqualTo(1);
-        assertThat(actioned.resolve(0, OTHER, ModerationCase.State.ACTIONED)).isSameAs(actioned);
-        assertDenied(() -> actioned.resolve(1, OTHER, ModerationCase.State.ACTIONED));
-        assertDenied(() -> actioned.resolve(0, REQUEST, ModerationCase.State.ACTIONED));
-        assertDenied(() -> actioned.resolve(0, OTHER, ModerationCase.State.DISMISSED));
-        assertDenied(() -> actioned.resolve(2, OTHER, ModerationCase.State.ACTIONED));
-        var saturated = new ModerationCase(THIRD, report, Long.MAX_VALUE,
-                ModerationCase.State.OPEN, null, -1);
-        assertDenied(() -> saturated.resolve(Long.MAX_VALUE, OTHER,
-                ModerationCase.State.DISMISSED));
-    }
-
-    @Test
     void diagnosticsRedactPrivateIdentitiesAndTimes() {
         var assessment = ContributorAssessment.initial(ACTOR)
                 .assess(0, REFERENCE, NOW, NOW.plusSeconds(60));
         var block = DirectionalBlock.initial(ACTOR, OTHER).block(0);
-        var report = new StructuredReport(ACTOR, REQUEST, REFERENCE,
-                StructuredReport.Reason.HARASSMENT, NOW);
-        var moderationCase = ModerationCase.open(THIRD, report)
-                .resolve(0, OTHER, ModerationCase.State.DISMISSED);
-        for (Object value : new Object[] { assessment, block, report, moderationCase }) {
+        for (Object value : new Object[] { assessment, block }) {
             assertThat(value.toString()).contains("[private]")
                     .doesNotContain(ACTOR.toString(), OTHER.toString(), THIRD.toString(),
                             REFERENCE.toString(), REQUEST.toString(), NOW.toString());

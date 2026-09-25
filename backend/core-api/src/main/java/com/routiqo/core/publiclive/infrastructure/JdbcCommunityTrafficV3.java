@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** Authenticated reader/report store and grant-gated internal moderation command. */
@@ -62,34 +63,66 @@ public final class JdbcCommunityTrafficV3 {
                 .filter(moment -> moment.expiresAt().isAfter(serverTime)).toList());
     }
 
-    public void report(UUID actor, UUID journey, UUID ref, UUID requestId, String reason) {
+    /** Minimized owner receipt: proves only that this reporter's request was received. */
+    public record Receipt(Instant receivedAt, Instant receiptExpiresAt) {}
+
+    static final int REPORTS_PER_DAY = 10;
+    private static final long REPORTER_ROW_SECONDS = 168L * 3600;
+    private static final long GROUP_SECONDS = 720L * 3600;
+
+    /**
+     * Report protocol (ADR 0064). Lock order: reporter account, projection, report, group. An exact
+     * retry is answered from the reporter's own retained row before any current authorization, so a
+     * lost response stays recoverable after the moment expires; new reports need current visibility
+     * and the durable rolling quota.
+     */
+    public Receipt report(UUID actor, UUID journey, UUID ref, UUID requestId, String reason) {
         if (!List.of("INACCURATE", "UNSAFE", "SPAM").contains(reason))
             throw new IllegalArgumentException("Invalid report reason");
-        transaction.executeWithoutResult(status -> {
+        if (TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Report intake must own its transaction");
+        return transaction.execute(status -> {
+            // The reporter's own account row serializes that reporter's quota. It is taken first,
+            // matching the account-first order of every other account-bound write.
+            if (jdbc.query("""
+                    SELECT id FROM routiqo_account WHERE id = ? AND enabled FOR NO KEY UPDATE
+                    """, (row, n) -> row.getObject(1, UUID.class), actor).isEmpty())
+                throw new Missing();
             Instant now = clock.instant();
+            List<Prior> prior = jdbc.query("""
+                    SELECT ref, reason, created_at, expires_at FROM community_traffic_report_v3
+                    WHERE actor_id = ? AND request_id = ? AND expires_at > ?
+                    """, (row, n) -> new Prior(row.getObject(1, UUID.class), row.getString(2),
+                            row.getTimestamp(3).toInstant(), row.getTimestamp(4).toInstant()),
+                    actor, requestId, Timestamp.from(now));
+            if (!prior.isEmpty()) {
+                Prior earlier = prior.getFirst();
+                if (earlier.ref().equals(ref) && earlier.reason().equals(reason))
+                    return new Receipt(earlier.createdAt(), earlier.expiresAt());
+                throw new Conflict();
+            }
             if (!eligibleReader(actor, journey, now) || !visible(actor, journey, ref, now))
                 throw new Missing();
             // The projection share lock serializes report creation with moderator review.
             // Recheck time after a possible wait so an expired projection cannot be reported.
             now = clock.instant();
             if (!visible(actor, journey, ref, now)) throw new Missing();
-            List<Report> prior = jdbc.query("""
-                    SELECT ref, reason FROM community_traffic_report_v3
-                    WHERE actor_id = ? AND request_id = ?
-                    """, (row, n) -> new Report(row.getObject(1, UUID.class), row.getString(2)),
-                    actor, requestId);
-            if (!prior.isEmpty()) {
-                if (prior.getFirst().ref().equals(ref) && prior.getFirst().reason().equals(reason))
-                    return;
-                throw new Conflict();
-            }
+            if (Boolean.TRUE.equals(jdbc.query("""
+                    SELECT TRUE FROM community_traffic_report_v3 WHERE actor_id = ? AND ref = ?
+                    """, (org.springframework.jdbc.core.ResultSetExtractor<Boolean>) rows -> rows.next(),
+                    actor, ref))) throw new Conflict();
+            Integer recent = jdbc.queryForObject("""
+                    SELECT count(*) FROM community_traffic_report_v3
+                    WHERE actor_id = ? AND created_at > ?
+                    """, Integer.class, actor, Timestamp.from(now.minusSeconds(24L * 3600)));
+            if (recent != null && recent >= REPORTS_PER_DAY) throw new Limited();
+            Instant expires = now.plusSeconds(REPORTER_ROW_SECONDS);
             int created = jdbc.update("""
                     INSERT INTO community_traffic_report_v3
                       (actor_id, request_id, ref, reason, created_at, expires_at)
                     VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT DO NOTHING
-                    """, actor, requestId, ref, reason, Timestamp.from(now),
-                    Timestamp.from(now.plusSeconds(720L * 3600)));
+                    """, actor, requestId, ref, reason, Timestamp.from(now), Timestamp.from(expires));
             if (created == 0) throw new Conflict();
             Long sequence = jdbc.queryForObject("""
                     SELECT review_sequence FROM community_traffic_report_v3
@@ -108,10 +141,10 @@ public final class JdbcCommunityTrafficV3 {
                       expires_at = GREATEST(community_traffic_report_group_v3.expires_at, EXCLUDED.expires_at)
                     """, ref, Timestamp.from(now), sequence,
                     reason.equals("INACCURATE") ? 1 : 0, reason.equals("UNSAFE") ? 1 : 0,
-                    reason.equals("SPAM") ? 1 : 0, Timestamp.from(now.plusSeconds(720L * 3600)));
+                    reason.equals("SPAM") ? 1 : 0, Timestamp.from(now.plusSeconds(GROUP_SECONDS)));
+            return new Receipt(now, expires);
         });
     }
-
 
     private boolean eligibleReader(UUID actor, UUID journey, Instant now) {
         return Boolean.TRUE.equals(jdbc.query("""
@@ -140,7 +173,9 @@ public final class JdbcCommunityTrafficV3 {
                 ref, Timestamp.from(now)));
     }
 
-    private record Report(UUID ref, String reason) {}
+    private record Prior(UUID ref, String reason, Instant createdAt, Instant expiresAt) {}
     public static final class Missing extends RuntimeException {}
     public static final class Conflict extends RuntimeException {}
+    /** The reporter reached the durable rolling report quota. */
+    public static final class Limited extends RuntimeException {}
 }
