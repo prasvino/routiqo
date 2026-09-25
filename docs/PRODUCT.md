@@ -91,7 +91,7 @@ followers, or a tracker of where individual people are.
 - **Content types:** one-tap signals (e.g. Moving / Slow / Stopped;
   Good / Avoid; queue bands), short text posts, voice notes. Photos later.
 - **Post-passing prompt:** when the phone detects I passed a Spot, it offers one
-  tap, e.g. "How was Chengalpattu Toll? Under 5 min / 5–15 min / Over 15 min".
+  tap, e.g. "How was Chengalpattu Toll? Under 5 min / 5–15 min / 15–30 min / Over 30 min".
   Detection happens on the device; only the answer is sent. See *Driver safety*.
 - **Still true?** Others can confirm a post; confirmation extends its life,
   silence lets it expire. Each confirmation resets the remaining life to half the
