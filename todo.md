@@ -80,6 +80,7 @@ ADR 0055's community traffic summary is authorized for V3 implementation and sta
 - [ ] Verify journal conflicts, navigation protection, older history, summary completeness and backup/restore with real sign-in.
 - [ ] Verify authenticated planning flows, keyboard/focus behavior, small screens, large text, reduced motion and storage-failure recovery.
 - [ ] Confirm supported recovery flows preserve acknowledged work, account isolation and exact replay semantics.
+- [x] Confirm the web recovery flows end to end across two simulated devices sharing one server (`tests/journey-recovery-flows.test.ts`): history restore beside unsent work, exact finish replay after another device finished, discard of a start refused because another device started a journey, reconcile of an applied action (discard refused), re-authentication without cross-account release, and account isolation and deletion on a shared device. Native and real-sign-in runs remain.
 
 ## Android release
 
