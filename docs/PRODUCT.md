@@ -83,8 +83,8 @@ followers, or a tracker of where individual people are.
 
 ### Spots
 
-- Spots are seeded in advance for the pilot corridor (about 50–100) and can later
-  be suggested by users. The existing curated anchor catalog is the starting
+- Spots are seeded in advance for the pilot corridors (about 150–200 across the
+  trunk and branches; see *Pilot*) and can later be suggested by users. The existing curated anchor catalog is the starting
   point for Spot seeds.
 - A Spot becomes "live" when it gets fresh activity and fades back when activity
   stops.
@@ -94,18 +94,24 @@ followers, or a tracker of where individual people are.
   tap, e.g. "How was Chengalpattu Toll? Under 5 min / 5–15 min / Over 15 min".
   Detection happens on the device; only the answer is sent. See *Driver safety*.
 - **Still true?** Others can confirm a post; confirmation extends its life,
-  silence lets it expire.
-- **Lifespan by type:**
+  silence lets it expire. Each confirmation resets the remaining life to half the
+  base life, never beyond the maximum below. One confirmation per account per
+  post; authors cannot confirm their own posts.
+- **No longer true:** two confirmations from distinct accounts expire a post
+  early. This is the cheapest defence against false alarms.
+- **Lifespan by type** (decided 2026-09-25; tune after the dry run):
 
-  | Content | Default life |
-  | --- | --- |
-  | Traffic and queue signals | about 1–2 hours |
-  | Food, fuel and restroom posts | about 24 hours |
-  | Festival route room | the event window |
-  | After expiry | top tips per Spot become **highlights**; no full chat archive |
+  | Content | Base life | Maximum with "Still true?" |
+  | --- | --- | --- |
+  | Traffic signal (Moving / Slow / Stopped); toll or bus-stand queue signal | 60 min | 2 h |
+  | Traffic or incident text/voice post | 90 min | 3 h |
+  | Food, fuel, restroom posts; Good / Avoid | 24 h | 36 h |
+  | Ask Ahead question (answers inherit it) | 45 min, or until the asker passes the Spot | not extended |
+  | Festival route room | the event window | not extended |
+  | After expiry | top tips per Spot, ranked by confirmations, become **highlights**; no full chat archive | — |
 
 - **Identity:** a random alias per room (e.g. "Blue Auto"). No follower graph.
-  No private DMs in the pilot.
+  No private DMs in the pilot. See *Aliases* under the decisions below.
 
 ### Ask Ahead
 
@@ -253,23 +259,48 @@ their capture time, never as new. Ghost Mode, sign-out and account deletion clea
 queued social items. Read-only Spot content cached offline is labelled stale and
 dropped at expiry.
 
-## Pilot: Pongal exodus, Chennai southbound
+## Pilot: Diwali 2026 dry run, Pongal 2027 launch
 
-The first real test is the Pongal travel rush in mid-January 2027.
+Decided 2026-09-25:
 
-**Corridor:** Chennai to Trichy and Madurai along GST Road, via Chengalpattu,
-Tindivanam, Villupuram, Ulundurpet and Perambalur, plus the Kilambakkam bus
-terminus.
+- **Diwali 2026 (around 8 November; outbound rush roughly 5–7 November — confirm
+  dates) is the dry run (Phase 4)** with friends and early testers, Android
+  only, on a reduced scope (below). Six weeks is not enough to launch publicly
+  with working moderation.
+- **Pongal 2027 (mid-January) is the public launch (Phase 5)** with the full
+  pilot scope.
 
-**In scope**
+**Corridors.** Most southbound Chennai festival traffic shares one trunk, so
+density concentrates there:
+
+| Corridor | Route | Diwali dry run | Pongal launch |
+| --- | --- | --- | --- |
+| Trunk | Chennai (incl. Kilambakkam terminus) → Chengalpattu → Tindivanam → Villupuram → Ulundurpet → Perambalur → Trichy (GST Road) | Yes | Yes |
+| Branch | Trichy → Thanjavur | Yes | Yes |
+| Branch | Trichy → Madurai → Tirunelveli | Yes | Yes |
+| Branch | Madurai → Tuticorin | Yes | Yes |
+| Separate trunk | Chennai → Vellore → Krishnagiri → Salem → Coimbatore | No | Yes |
+
+About 150–200 seeded Spots across trunk and branches (more for Coimbatore at
+Pongal). Seeding is weighted to the trunk; branch Spots cover major tolls, bus
+stands and highway eateries only.
+
+**Diwali dry-run scope:** Spots ahead on the Android Journey map, one-tap
+signals, short text posts, "Still true?" / "No longer true", per-type expiry,
+Report/Block and moderator hide, official alerts on the corridor districts.
+**Not in the dry run:** voice notes, Ask Ahead, post-passing prompts, Spot
+chat and the festival room, route guides. A second, smaller dry run on a
+December long weekend exercises those before Pongal.
+
+**Pongal launch scope**
 
 - Android app on physical devices (primary); web for route guides and planning.
 - Journey with map and Spots ahead; offline-first.
-- About 50–100 seeded Spots: tolls, major eateries, fuel stations, restrooms, bus
-  stands.
+- About 150–200 seeded Spots (plus the Coimbatore trunk): tolls, major eateries,
+  fuel stations, restrooms, bus stands.
 - One-tap signals, short posts, voice notes, post-passing prompts, "Still true?".
 - Ask Ahead.
-- A festival route room for the corridor for the event window.
+- A festival route room per corridor for the event window.
 - Route guides from completed journeys.
 - Report, moderation and a small on-call moderator rota during the rush.
 
@@ -284,8 +315,12 @@ essentials.
 | 1. Foundations | Google sign-in, hosted maps and routing, Android tested on real devices | App installs and runs a full journey on 3+ Android phones |
 | 2. Spots and posts | Seeded Spots, signals, posts, voice notes, expiry, moderation | 10 testers complete a real highway trip and post |
 | 3. Ask Ahead and route guides | Questions on Spots, post-passing prompts, publish a guide | Questions get answered on a test trip |
-| 4. Dry run | A normal long weekend before Pongal with friends and early users | No blocking bugs; moderation works |
-| 5. Pongal pilot | Public launch on the corridor | Measure against success signals below |
+| 4. Dry run | Diwali 2026 with friends and early users on the reduced scope; a December long weekend for voice, Ask Ahead, prompts, chat and guides | No blocking bugs; moderation works |
+| 5. Pongal pilot | Public launch on the corridors | Measure against success signals below |
+
+Phases overlap in time: the Diwali dry run needs Phase 1 and the reduced
+Phase 2 scope by about 1 November 2026; Phase 3 and the rest of Phase 2 follow
+before the December dry run.
 
 New capabilities ship default-off behind flags until their phase gate passes.
 The release checklist is [`../todo.md`](../todo.md); the engineering sequence is
@@ -342,15 +377,50 @@ aggregates; do not optimise time spent, message volume or notification count.
 - [ ] How do we handle businesses posting about their own Spots?
 - [ ] When, if ever, do aggregate counts come back, and under what privacy
       review?
-- [ ] Spot chat and festival room transport: bounded HTTP refresh or WebSockets
-      (needs an ADR).
-- [ ] Spot-passage detection on Android: foreground service during an active
-      journey, battery budget, and how "stopped/slow" is detected for the prompt.
-- [ ] Alias model: generation, collision handling, and how blocks map to aliases
-      without exposing account identity.
-- [ ] Exact per-type lifetimes and how much "Still true?" extends them.
-- [ ] Official alert coverage for corridor districts (Villupuram, Perambalur,
-      Trichy, Madurai).
+- [ ] Who seeds and verifies ~150–200 Spots before 1 November?
+- [ ] Exact Diwali and Pongal travel dates and the festival room windows.
+
+## Decisions (2026-09-25)
+
+Recorded after the brief was adopted; each is a default to revisit with
+evidence from the dry runs.
+
+1. **Spot chat and festival room transport:** bounded foreground HTTP refresh,
+   not WebSockets, for the pilot — every 15–20 s while a Spot panel or room is
+   open, about once a minute otherwise, never in the background, one request in
+   flight, cursor-based. Highway connectivity is patchy and the pattern already
+   exists (ADR 0022, official alerts). Revisit WebSockets only if the festival
+   room behaves like a live group chat. See
+   [ADR 0062](adr/0062-bounded-http-refresh-for-spot-chat.md).
+2. **Spot-passage detection on Android:** only during an active journey, a
+   location foreground service with its visible notification, balanced
+   accuracy, about every 100 m or 30 s. Started while the app is in use, so no
+   "allow all the time" background-location permission is requested. The phone
+   matches the next ~20 Spots ahead on the route; a pass is entering about
+   150 m of a Spot and then continuing past it. "Stopped or slow" is speed under
+   about 10 km/h for 20 s or more; the prompt card waits for that or for the next
+   app open, and disappears after about 30 min. Battery target: about 3–4% extra
+   per hour, measured on the Phase 1 phones; reduce frequency if exceeded.
+3. **Aliases:** server-generated per room and account, random (never derived
+   from the account ID), from a curated English and Tamil-friendly word list
+   with no offensive pairs; stable for the room's life, deleted when it expires.
+   Collisions within a room get a number ("Blue Auto 2"). Blocking a post or
+   alias blocks the underlying account everywhere without revealing which
+   account it is. Moderators can see the account behind an alias; every lookup
+   is audited.
+4. **Lifetimes and "Still true?":** as in the Spots lifespan table above,
+   including "No longer true" (two distinct accounts expire a post early) and
+   highlights ranked by confirmations.
+5. **Timeline, corridors and official alerts:** Diwali 2026 dry run, Pongal 2027
+   launch, trunk plus branches (see *Pilot*). Official alerts stay optional but
+   are extended to the corridor districts before Diwali, because November is
+   north-east monsoon season in Tamil Nadu and rain and cyclone warnings matter
+   more then.
+6. **Tabs:** keep four tabs — Home, Guides, Trips, Profile — with Explore renamed
+   Guides when route guides ship (Phase 3). The active Journey is a full-screen
+   map mode opened from Home with a persistent "Back to journey" bar, not a
+   tab. No chat tab. Same structure on Android and web; on web the Journey is
+   secondary to planning and guides.
 
 ## Related documents
 

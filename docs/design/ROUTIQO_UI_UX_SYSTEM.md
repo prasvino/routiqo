@@ -663,17 +663,19 @@ Current direction (Android is the primary pilot client; web serves
 route guides and planning):
 
 ``` text
-Home | Explore | Trips | Profile
+Home | Guides | Trips | Profile
 ```
 
--   The active **Journey** is the hero: a full-screen map experience
-    reached from any tab, not a tab among equals.
--   **Explore** is demoted and is replaced over time by route guides.
+Decided 2026-09-25 (see `docs/PRODUCT.md` *Decisions*):
+
+-   Four tabs on Android and web. **Explore** stays until route guides
+    ship in Phase 3, then is renamed **Guides**.
+-   The active **Journey** is the hero: a full-screen map mode opened
+    from Home, with a persistent "Back to journey" bar on every tab while
+    a journey runs. It is not a tab.
 -   Do not create a permanent Chat tab. Chat belongs to a Spot or a
     festival route room within the active journey.
-
-The four tabs may stay structurally for now. The final tab structure is
-an open design decision; do not change it as part of polish.
+-   On web the Journey is secondary; web leads with planning and guides.
 
 Avoid deep navigation hierarchies.
 

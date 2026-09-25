@@ -10,8 +10,8 @@ idempotent commands, abuse budgets, expiry maintenance, anchor catalog and
 route-anchor matching in `routeupdate`, and journey ownership through application
 interfaces. Expiry uses server time. Spot passage is opt-in, received only with an
 answer or for Ask Ahead eligibility, stored with coarse time and purged within
-24 hours. No server-side location ingestion or presence. Chat/room transport is an
-open decision (see REALTIME_ARCHITECTURE.md).
+24 hours. No server-side location ingestion or presence. Chat/room transport is
+bounded HTTP refresh ([ADR 0062](../adr/0062-bounded-http-refresh-for-spot-chat.md)).
 
 Already-built private owner consent, route binding and Quick Signal command
 storage/transports (ADRs 0026–0035) and public LIVE publication (`publiclive`)

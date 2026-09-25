@@ -2,7 +2,7 @@
 
 Status: implemented locally behind a default-off backend flag; staging activation and real authenticated/provider QA remain pending. This is a provider-only active-journey list and does not activate traveller-derived Live Moments or publish private Quick Signals.
 
-> **Direction brief (2026-09-25):** Kept, optional: official alerts are shown on Spots and the Journey when available. Coverage names only Chennai-area districts; the GST Road pilot corridor districts Villupuram, Perambalur, Trichy and Madurai are not yet covered. See [PRODUCT.md](../../PRODUCT.md).
+> **Direction brief (2026-09-25):** Kept, optional: official alerts are shown on Spots and the Journey when available. Coverage names only Chennai-area districts; per the 2026-09-25 decision it is extended to the trunk and branch corridor districts before the Diwali 2026 dry run (north-east monsoon season), and to the Coimbatore trunk before Pongal. See [PRODUCT.md](../../PRODUCT.md).
 
 ## Scope and acceptance
 

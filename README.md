@@ -2,7 +2,7 @@
 
 Routiqo tells you what your journey is like right now, from people who were just there: how bad the toll queue is, which highway eatery is good today, whether the bus is crowded. It is a live, human layer on top of the journey, built around three ideas — **Journey**, **Spots** and **Ask Ahead** — and it runs on what people choose to post or tap, not on tracking their movements. See [docs/PRODUCT.md](docs/PRODUCT.md).
 
-The first pilot is the Pongal 2027 exodus on GST Road (Chennai to Trichy and Madurai). Android is the primary client; web serves route guides and planning. Spots, posts, voice notes and Ask Ahead are **not built yet**.
+A reduced-scope dry run with early testers is planned for Diwali 2026, and the public pilot for the Pongal 2027 exodus from Chennai along GST Road and its southern branches. Android is the primary client; web serves route guides and planning. Spots, posts, voice notes and Ask Ahead are **not built yet**.
 
 Today the repository contains a runnable web preview (curated discovery, local trip/commute planning, private journey and journal flows), an Android app with journeys, planning, explicit route planning, history and journals (emulator-verified; physical-device checks pending), and default-off backend foundations that the Spots model reuses. A separate default-off official-alert pilot shows Chennai district NDMA warnings during an authenticated active journey. It is not a production deployment.
 

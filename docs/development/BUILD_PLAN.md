@@ -29,18 +29,34 @@ execution queue and L0–L5 stages are archived verbatim in
 - Android on physical devices is the primary client. Emulator and synthetic
   evidence does not close a phase gate. Cloud agent sessions have no Android SDK;
   record device checks as pending.
-- Preserve the four tabs and existing offline journey writes. Explore is demoted:
-  keep it working, invest in route guides instead.
+- Keep four tabs (Home, Explore → Guides when route guides ship, Trips, Profile)
+  and existing offline journey writes. The active Journey is a full-screen map
+  mode opened from Home with a "Back to journey" bar, not a tab; no chat tab.
+  Explore is demoted: keep it working, invest in route guides instead.
+
+## Timeline (decided 2026-09-25)
+
+- **By about 1 November 2026:** Phase 1 gate plus the reduced Phase 2 scope for
+  the Diwali dry run: Spots ahead, one-tap signals, text posts, expiry with
+  "Still true?" / "No longer true", report/block/hide moderation, official alerts
+  on the corridor districts. Nothing else is started before Diwali.
+- **Diwali 2026 (around 8 November):** first dry run (Phase 4) on the trunk and
+  branches.
+- **November–December:** rest of Phase 2 (voice notes, Spot chat, festival room)
+  and Phase 3 (Spot passage, post-passing prompts, Ask Ahead, route guides),
+  then a December long-weekend dry run.
+- **Pongal 2027 (mid-January):** public launch (Phase 5), adding the Chennai →
+  Salem → Coimbatore trunk.
 
 ## Phases and gates
 
 | Phase | Goal | Gate to move on |
 | --- | --- | --- |
 | 1. Foundations | Google sign-in, hosted maps and routing, Android tested on real devices | App installs and runs a full journey on 3+ physical Android phones |
-| 2. Spots and posts | Seeded Spots, signals, posts, voice notes, expiry, moderation | 10 testers complete a real highway trip on the corridor and post |
+| 2. Spots and posts | Seeded Spots, signals, posts, voice notes, expiry, moderation | 10 testers complete a real highway trip on a corridor and post (the Diwali dry run can serve as this trip for the reduced scope) |
 | 3. Ask Ahead and route guides | Questions on Spots, post-passing prompts, publish a guide | Questions get answered on a test trip |
-| 4. Dry run | A normal long weekend before Pongal with friends and early users | No blocking bugs; moderation works |
-| 5. Pongal pilot | Public launch on GST Road (Chennai to Trichy/Madurai, plus Kilambakkam) | Measured against PRODUCT.md success signals |
+| 4. Dry runs | Diwali 2026 on the reduced scope; a December long weekend for the rest | No blocking bugs; moderation works |
+| 5. Pongal pilot | Public launch on the trunk (Chennai incl. Kilambakkam → Trichy), branches (Thanjavur, Madurai → Tirunelveli, Tuticorin) and the Coimbatore trunk | Measured against PRODUCT.md success signals |
 
 ## Engineering sequence
 
@@ -66,9 +82,11 @@ Sequence:
 
 1. Configure Google Web and Android OAuth clients and a staging HTTPS API; run a
    real sign-in on Android.
-2. Import and host corridor-scoped Valhalla, Photon and tiles/styles; set fixed
-   origins, bounds and redacted logs.
-3. New spec: **Android Journey map** (selected route on map, foreground-only "me"
+2. Import and host Valhalla, Photon and tiles/styles scoped to the trunk and
+   branch corridors (add Coimbatore before Pongal); set fixed origins, bounds and
+   redacted logs.
+3. New spec: **Android Journey map** (full-screen journey mode opened from Home
+   with a "Back to journey" bar; selected route on map, foreground-only "me"
    during an active journey, a panel slot for Spots ahead, offline and permission
    states). Implement behind a flag.
 4. Close the native Android, routing, history and journal ledgers on 3+ physical
@@ -96,20 +114,28 @@ Reuse:
   `V3_OPERATOR_GRANT_ADMIN_SPEC.md`, `DURABLE_REPORT_INTAKE_PROPOSAL.md`),
   re-scoped from traffic summaries to posts, voice notes and chat.
 - Journey outbox and idempotency for offline posts (PRODUCT.md *Offline rule*).
-- Official alert pilot, optional, shown on Spots (ADR 0050).
+- Official alert pilot, optional, shown on Spots and the Journey (ADR 0050).
+  Extend the fixed district list from the Chennai area to the corridor districts
+  before Diwali (north-east monsoon season).
 
-New specs, in order:
+New specs, in order (1, 2 and 5 are needed for Diwali):
 
-1. **Spots** — seeding 50–100 corridor Spots, catalog versioning, live/fade,
-   Spots-ahead ordering, honest empty states.
+1. **Spots** — seeding about 150–200 Spots on the trunk and branches, catalog
+   versioning, live/fade, Spots-ahead ordering, honest empty states, bounded
+   refresh per ADR 0062.
 2. **Posts and signals** — public one-tap signals (from private Quick Signals),
-   text posts, per-type lifetime on server time, "Still true?", highlights,
-   report counts, rate limits.
+   text posts, the decided per-type lifetimes on server time, "Still true?"
+   (resets to half base life, capped), "No longer true" (two distinct accounts
+   expire early), highlights ranked by confirmations, report counts, rate
+   limits.
 3. **Voice notes** — signed direct S3 upload, limits, retention, deletion and
    report/hide.
-4. **Aliases and rooms** — per-room aliases, block mapping, Spot chat and the
-   festival route room, plus an ADR choosing bounded HTTP refresh or WebSockets
-   (`backend/realtime` is scaffold only).
+4. **Aliases and rooms** — server-generated random per-room aliases from a
+   curated English/Tamil-friendly word list, numbered collisions, account-level
+   blocks without revealing identity, audited moderator lookup; Spot chat and
+   the festival route room over bounded HTTP refresh
+   ([ADR 0062](../adr/0062-bounded-http-refresh-for-spot-chat.md);
+   `backend/realtime` stays scaffold only).
 5. **Pilot moderation** — report intake for posts/voice/chat, content hide
    action (follow-up to ADR 0041), simplified time-boxed grants; see
    [PILOT_MODERATION_RUNBOOK.md](PILOT_MODERATION_RUNBOOK.md).
@@ -124,18 +150,25 @@ history as route-guide source material (`../features/journey/TRIP_JOURNAL_SPEC.m
 
 New specs:
 
-1. **Spot passage** — on-device detection during an active journey, one opt-in,
-   coarse time, 24-hour deletion, outcome-code logging, battery budget and the
-   stopped/slow or passenger condition for the post-passing prompt (driver safety).
+1. **Spot passage** — per the PRODUCT.md decision: location foreground service
+   with visible notification only during an active journey, balanced accuracy
+   about every 100 m / 30 s, no background-location permission, on-device match
+   against the next ~20 Spots ahead with a ~150 m pass radius; one opt-in,
+   coarse time, 24-hour deletion, outcome-code logging; prompt waits for
+   stopped/slow (under ~10 km/h for 20 s) or the next app open and expires after
+   ~30 min; battery target ~3–4% per hour measured on the Phase 1 phones.
 2. **Ask Ahead** — bounded, non-deterministic recipient selection that respects
    blocks and avoids repeat targeting; asker never learns recipients; honest
    no-answer state; answer summaries.
 3. **Route guides** — publishing a completed journey with journal notes and Spot
-   tips; strip exact home, office and start/end addresses; web display for planning.
+   tips; strip exact home, office and start/end addresses; web display for
+   planning. Rename Explore to Guides when this ships.
 
-### Phase 4 — Dry run
+### Phase 4 — Dry runs
 
-No new product features. Set exact success targets; production database, secrets,
+Diwali 2026 on the reduced scope, then a December long weekend for voice notes,
+chat, Ask Ahead, prompts and guides. No new product features beyond each
+run's scope. Set exact success targets; production database, secrets,
 networking, TLS and flags; migration/backup/rollback rehearsal (including the V13
 acceptance-writer quiet period); expiry throughput and alerts; redacted monitoring;
 on-call moderator rota; privacy disclosures and retention; authenticated release QA
@@ -144,7 +177,7 @@ and load checks.
 ### Phase 5 — Pongal pilot
 
 Signed Android release, remote CI on the release commit, Pongal capacity plan,
-festival room window, on-call rota, then launch on the corridor with only
+festival room windows, on-call rota, then launch on the corridors with only
 gate-passed flags enabled and measure against the success targets.
 
 ### Later, not pilot

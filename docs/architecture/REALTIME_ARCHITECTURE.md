@@ -1,10 +1,12 @@
 # Realtime architecture
 
 Short temporary Spot chat and the festival route room (see
-[`../PRODUCT.md`](../PRODUCT.md)) need a transport decision: bounded authenticated
-foreground HTTP refresh or WebSockets through `backend/realtime`. This is open and
-requires an ADR before implementation, weighing pilot density, Android battery and
-network conditions, and multi-replica fan-out. Whichever is chosen, the Spot panel,
+[`../PRODUCT.md`](../PRODUCT.md)) use bounded authenticated foreground HTTP refresh in the pilot, not WebSockets
+([ADR 0062](../adr/0062-bounded-http-refresh-for-spot-chat.md)): every 15–20 s
+while a Spot panel or room is open, about once a minute otherwise, never in the
+background, one request in flight, cursor-based. `backend/realtime` stays
+scaffold only; WebSockets are revisited after Pongal only if the festival room
+behaves like a live group chat. Either way, the Spot panel,
 map markers and chat share the same authorized, expiry-aware projection, and every
 read checks current membership, blocks, restrictions and moderation; a slower
 transport does not permit stale authorization or client-side privacy filtering.

@@ -3,7 +3,7 @@
 Date: 2026-09-23
 Status: accepted implementation direction; runtime activation requires pilot verification
 
-> **Status update (2026-09-25):** Accepted — role note by the direction brief. Official alerts are kept as an optional source shown on Spots when available. Coverage for corridor districts (Villupuram, Perambalur, Trichy, Madurai) is still open. See [PRODUCT.md](../PRODUCT.md).
+> **Status update (2026-09-25):** Accepted — role note by the direction brief. Official alerts are kept as an optional source shown on Spots when available. Coverage is to be extended from the Chennai-area districts to the corridor districts before the Diwali 2026 dry run (decision 2026-09-25). See [PRODUCT.md](../PRODUCT.md).
 
 Routiqo will introduce a narrow active-journey provider-alert list before traveller-derived public Live Moments. The initial source is NDMA SACHET CAP alerts for the Chennai district area. This route presents district-wide official warnings with issuer, validity and source link; it makes no assertion about a specific road, traveller presence or Quick Signal corroboration.
 

@@ -55,9 +55,10 @@ authorize an unsolicited whole-app critique or implementation pass.
   no engagement-bait prompts. Ghost Mode stops all sending, including Spot passage
   and queued posts, and stays visible and immediate.
 - Commutes and trips keep different workflows; rich journals are not commute
-  summaries. Chat belongs to a Spot or room, not a permanent social tab. Explore
-  is demoted toward route guides; final tab structure is a design decision, not
-  a polish change.
+  summaries. Chat belongs to a Spot or room, not a permanent social tab. Tabs
+  are Home, Explore (renamed Guides when route guides ship), Trips and Profile;
+  the active Journey is a full-screen map mode from Home with a "Back to journey"
+  bar, not a tab. Do not change the tab structure during polish.
 - Active journeys prioritize glanceable state, one-handed controls, readable
   hierarchy and minimal typing. Discovery may be more expressive. Neither needs
   decorative cards, redundant badges or motion that competes with the task.

@@ -2,7 +2,7 @@
 
 Journey, Spots and Ask Ahead (planned; see [`../PRODUCT.md`](../PRODUCT.md)):
 
-- **Spots:** a seeded catalog for the pilot corridor (about 50–100), reusing the
+- **Spots:** a seeded catalog for the pilot corridors (about 150–200 on the GST Road trunk and branches; Coimbatore added for Pongal), reusing the
   curated anchor catalog and route-anchor matching; later user suggestions go
   through moderation.
 - **Posts and signals:** tied to a Spot, not to the author's position; per-room

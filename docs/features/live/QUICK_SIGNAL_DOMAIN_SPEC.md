@@ -3,7 +3,7 @@
 Status: internal model implemented and tested; no application wiring or public
 Live behavior. Verification is recorded in BUILD_STATUS.md.
 
-> **Direction brief (2026-09-25):** Evolves: private Quick Signals become public one-tap signals on Spots under a per-room alias. The 15-minute maximum lifetime and no-renewal rule become per-type lifetimes (about 1–2 hours for traffic/queue, about 24 hours for food/fuel/restroom) with "Still true?" confirmation extending life; consent generation is retired. The built four queue bands differ from the brief's three (under 5 / 5–15 / over 15 min), and Good/Avoid must be added. See [PRODUCT.md](../../PRODUCT.md).
+> **Direction brief (2026-09-25):** Evolves: private Quick Signals become public one-tap signals on Spots under a per-room alias. The 15-minute maximum lifetime and no-renewal rule become per-type lifetimes (decided: 60 min base / 2 h max for traffic and queue signals, 24 h / 36 h for food, fuel and restroom) with "Still true?" extending and "No longer true" shortening life; consent generation is retired. The built four queue bands differ from the brief's three (under 5 / 5–15 / over 15 min), and Good/Avoid must be added. See [PRODUCT.md](../../PRODUCT.md).
 
 Scope: internal immutable structured Route Update evidence, not an exposed Live
 feature. Canonical product direction was `../../archive/features/live/ROUTIQO_LIVE_SPEC.md` (archived; now PRODUCT.md). No controllers,

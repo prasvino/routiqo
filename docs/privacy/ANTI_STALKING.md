@@ -11,7 +11,14 @@ Planned for the pilot; not implemented unless
 - **Per-room aliases.** A random alias per room (e.g. "Blue Auto"). Aliases are
   not stable public handles, never embed account identifiers and cannot be
   linked across rooms, Spots or events by other users. Alias generation and
-  collision handling must not leak account identity or join order.
+  collision handling must not leak account identity or join order. Decided
+  2026-09-25: the server assigns a random alias per room and account from a
+  curated English/Tamil-friendly word list with no offensive pairs, never derived
+  from the account ID; it lasts for the room's life and is deleted with it.
+  Collisions get a number ("Blue Auto 2"), assigned randomly rather than in join
+  order. Blocking a post or alias blocks the account everywhere without
+  revealing which account it is; moderator lookups of the account behind an
+  alias are audited.
 - **No private DMs** between strangers in the pilot. No follower graph.
 - **Spot passage is never visible to others.** No surface shows who passed a
   Spot, when, or how many opted-in passers exist. Report and reply counts are

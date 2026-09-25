@@ -33,6 +33,15 @@ server deletes Spot-passage records within 24 hours and logs them only as outcom
 codes. Other users never see who passed a Spot; see
 [`ANTI_STALKING.md`](ANTI_STALKING.md) for Ask Ahead recipient rules.
 
+Android mechanism (decided 2026-09-25): a location foreground service with its
+required visible notification, started while the app is in use and stopped when
+the journey ends, at balanced accuracy about every 100 m or 30 s. No
+"allow all the time" background-location permission is requested. The phone
+matches locally against the next ~20 Spots ahead on the planned route; a pass is
+entering about 150 m of a Spot and then continuing past it. Location readings
+stay on the device and are not persisted beyond what matching needs. Battery
+target about 3–4% extra per hour, measured on the Phase 1 phones.
+
 Ghost Mode stops all sending, including Spot passage and queued posts, and takes
 priority over reconnect and outbox replay.
 

@@ -41,6 +41,12 @@ parts of it (for example transport or coordinator patterns) or remove it is a
 
 ## Next steps: Phase 1 — Foundations
 
+**Deadline (decided 2026-09-25):** the Diwali 2026 dry run (around 8 November)
+needs Phase 1 plus the reduced Phase 2 scope by about 1 November: see the
+*Diwali dry-run critical path* in [`todo.md`](../../todo.md) and the timeline
+in [`BUILD_PLAN.md`](../development/BUILD_PLAN.md). Work outside that path waits
+until after Diwali.
+
 Gate: the app installs and runs a full journey on **3 or more physical Android
 phones** against hosted staging services.
 

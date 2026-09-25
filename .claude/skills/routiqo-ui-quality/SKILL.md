@@ -32,7 +32,7 @@ This skill adds Routiqo-specific checks to UI work. It is not a second design sy
   - One tap first. Voice notes come before long text.
   - Driver safety. The post-passing prompt is a quiet, dismissible card shown only when stopped, slow or a passenger. It is never a modal or sound while moving, and it never uses engagement-bait prompts.
   - Ghost Mode stops all sending, including Spot passage and queued posts. Keep it visible and immediate.
-  - Commutes and trips keep different workflows, and rich journals are not commute summaries. Chat belongs to a Spot or room, not to a permanent social tab. Treat Explore as demoted toward route guides. The final tab structure is a design decision, so do not change it during polish.
+  - Commutes and trips keep different workflows, and rich journals are not commute summaries. Chat belongs to a Spot or room, not to a permanent social tab. Tabs are Home, Explore (renamed Guides when route guides ship), Trips and Profile; the active Journey is a full-screen map mode from Home with a "Back to journey" bar, not a tab. Do not change the tab structure during polish.
 - Active journeys need glanceable state, one-handed controls, readable hierarchy and minimal typing. Discovery can be more expressive. Neither needs decorative cards, redundant badges or motion that competes with the task.
 - Reuse shared tokens and semantic colors. When the UI drifts from the design system, work out whether the cause is a missing token, a duplicated component, an inconsistent flow or a local defect.
 - Check:

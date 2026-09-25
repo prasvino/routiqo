@@ -23,21 +23,24 @@ remove. Keep public basemap content separate from account-specific route records
 ## Pilot content lifetimes
 
 Planned for the pilot (see [`docs/PRODUCT.md`](../PRODUCT.md)); not implemented
-unless [`BUILD_STATUS.md`](../quality/BUILD_STATUS.md) says so. Exact per-type
-lifetimes and the "Still true?" extension remain open questions.
+unless [`BUILD_STATUS.md`](../quality/BUILD_STATUS.md) says so. Lifetimes were
+decided on 2026-09-25 and are tuned after the dry runs.
 
-| Content | Lifetime |
-| --- | --- |
-| Traffic and queue signals | about 1–2 hours |
-| Food, fuel and restroom posts | about 24 hours |
-| Festival route room | the event window |
-| After expiry | top tips per Spot kept as highlights; no full chat archive |
-| Ask Ahead questions and answers | expire with the Spot content they are pinned to |
+| Content | Base life | Maximum with "Still true?" |
+| --- | --- | --- |
+| Traffic signal; toll or bus-stand queue signal | 60 min | 2 h |
+| Traffic or incident text/voice post | 90 min | 3 h |
+| Food, fuel, restroom posts; Good / Avoid | 24 h | 36 h |
+| Ask Ahead questions (answers inherit) | 45 min, or until the asker passes the Spot | not extended |
+| Festival route room and its aliases | the event window | not extended |
+| After expiry | top tips per Spot, ranked by confirmations, kept as highlights; no full chat archive | — |
 | Spot passage records | deleted within 24 hours; logged only as outcome codes |
 | Route guides | kept until the author deletes them |
 
-- Expiry uses server time. "Still true?" confirmations extend a post's life by a
-  bounded amount; silence lets it expire. Client clocks and retries cannot
+- Expiry uses server time. Each "Still true?" confirmation resets remaining life
+  to half the base life, up to the maximum; "No longer true" from two distinct
+  accounts expires a post early; silence lets it expire. Aliases are deleted
+  when their room expires. Client clocks and retries cannot
   refresh content, and nothing expired is shown as current.
 - Offline posts, signals and answers queue with capture time and an idempotency
   key; the server rejects them once the type's lifetime has elapsed since capture

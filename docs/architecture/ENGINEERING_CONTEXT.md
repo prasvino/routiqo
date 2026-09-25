@@ -65,7 +65,8 @@ and fan-out justify it), OpenSearch, ClickHouse, EKS/Kubernetes.
   scaling, reliability, deployment, security or organisational reasons.
 - **Realtime is separate** because long-lived connections scale differently
   from HTTP: Spot chat and festival route room subscriptions, message and signal
-  fan-out. Whether the pilot uses it at all is an open decision (see
+  fan-out. The pilot does not use it: Spot chat and rooms use
+  bounded HTTP refresh ([ADR 0062](../adr/0062-bounded-http-refresh-for-spot-chat.md),
   [`REALTIME_ARCHITECTURE.md`](REALTIME_ARCHITECTURE.md)). It holds no presence
   and publishes no traveller counts.
 - **Workers** host asynchronous work as it appears: moderation, push
