@@ -953,6 +953,79 @@ class JdbcCommunityTrafficV3IntegrationTest {
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
 
+    // --- ADR 0065 adversarial pilot suite (real PostgreSQL; not a staging red-team run) ---
+
+    @Test void colludingVerifiedAccountsNeedTheFullThresholdAndAreBlockedByHonestDissent() {
+        // Residual risk documented in ADR 0065: ten colluding verified people in a window with only
+        // two honest reports can publish a false condition. The guard is that the coalition can never
+        // be smaller than 10 agreeing accounts at >= 80%, so three honest dissenters stop it.
+        for (int i = 0; i < 10; i++) seed("TRAFFIC_MOVING");
+        for (int i = 0; i < 3; i++) seed("TRAFFIC_STOPPED");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+
+        clear();
+        for (int i = 0; i < 9; i++) seed("TRAFFIC_MOVING");
+        for (int i = 0; i < 3; i++) seed("TRAFFIC_MOVING");
+        jdbc.update("UPDATE live_verified_contributor SET state = 'revoked' WHERE account_id = ANY(?)",
+                (Object) owners.subList(9, 12).stream().map(Owner::actor).toArray(UUID[]::new));
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        // Nine verified colluders plus three unverified sock puppets are nine eligible accounts.
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void reVerificationChurnGivesOnePersonAtMostOneVoteInAWindow() {
+        // Eleven people agree; person P also re-verified a second account and shared from both.
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        var original = owners.getFirst();
+        var churned = owners.get(11);
+        UUID person = jdbc.queryForObject("SELECT person_ref FROM live_verified_contributor WHERE account_id = ?",
+                UUID.class, original.actor());
+        jdbc.update("UPDATE live_verified_contributor SET state = 'revoked' WHERE account_id = ?", original.actor());
+        jdbc.update("UPDATE live_verification_case SET person_ref = ? WHERE account_id = ?", person, churned.actor());
+        jdbc.update("UPDATE live_verified_contributor SET person_ref = ? WHERE account_id = ?", person, churned.actor());
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        // Twelve accounts shared, but only eleven distinct active verified people remain.
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void aLateDissentingCandidateCannotReopenOrFlipAPublishedWindow() {
+        for (int i = 0; i < 12; i++) seed("TRAFFIC_SLOW");
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        String ref = jdbc.queryForObject("SELECT ref::text FROM community_traffic_projection_v3", String.class);
+        for (int i = 0; i < 5; i++) seed("TRAFFIC_MOVING");
+        publisher(WINDOW.plusSeconds(302)).publish(20);
+        assertThat(outcome()).isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM community_traffic_decision_v3 WHERE window_start = ?",
+                Integer.class, Timestamp.from(WINDOW))).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT ref::text || traffic_value FROM community_traffic_projection_v3",
+                String.class)).isEqualTo(ref + "TRAFFIC_SLOW");
+    }
+
+    @Test void reportsFromTheNextWindowNeverCountTowardTheClosingWindow() {
+        for (int i = 0; i < 11; i++) seed("TRAFFIC_SLOW");
+        seedAt("TRAFFIC_SLOW", WINDOW.plusSeconds(300));
+        publisher(WINDOW.plusSeconds(301)).publish(20);
+        assertThat(outcome()).isEqualTo("NO_OUTPUT");
+    }
+
+    @Test void theDatabaseRejectsACandidateTimedOutsideItsWindow() {
+        seed("TRAFFIC_SLOW");
+        var owner = owners.getFirst();
+        for (long offset : new long[] { -1, 300 })
+            assertThatThrownBy(() -> jdbc.update("""
+                    INSERT INTO community_traffic_candidate_v3(candidate_id, actor_id, command_id,
+                        request_id, journey_id, anchor_id, traffic_value, window_start, catalog_version,
+                        consent_generation, state, received_at, created_at, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'TRAFFIC_SLOW', ?, ?, 7, 'ACTIVE', ?, ?, ?)
+                    """, UUID.randomUUID(), owner.actor(), UUID.randomUUID(), UUID.randomUUID(), owner.journey(),
+                    ANCHOR, Timestamp.from(WINDOW.plusSeconds(300)), CATALOG_VERSION,
+                    Timestamp.from(WINDOW.plusSeconds(300 + offset)), Timestamp.from(WINDOW.plusSeconds(310)),
+                    Timestamp.from(WINDOW.plusSeconds(300 + 24 * 3600 + 300))))
+                    .as("received %+d s from the window start", offset)
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
     // --- Reporting protocol (ADR 0064) ---
 
     private UUID publishOne() {
