@@ -34,6 +34,7 @@ import { useMobilePlanning } from '../../storage/planning';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import { NativePlanningBackup } from './planning-backup';
 import { NativeJourneyPanel } from '../journey/native-journey-panel';
+import { ActiveJourneyCardContainer, JourneyReturnBarContainer } from '../journey/journey-entry';
 import { NativeAccountControls } from '../../auth/native-account-controls';
 import pondicherry from '../../../assets/pondicherry.jpg';
 import heritage from '../../../assets/heritage.jpg';
@@ -149,6 +150,7 @@ export function DiscoveryScreen({
       : searchDestinations(query, category);
   return (
     <SafeAreaView edges={['bottom']} style={s.safe}>
+      <JourneyReturnBarContainer />
       <FlatList
         ref={listRef}
         keyboardShouldPersistTaps="handled"
@@ -179,6 +181,7 @@ export function DiscoveryScreen({
                 {error}
               </Text>
             ) : null}
+            {section === 'Home' ? <ActiveJourneyCardContainer /> : null}
             {section !== 'Profile' && (
               <Pressable style={s.primary} accessibilityRole="button" onPress={() => plan()}>
                 <Text style={s.primaryText}>Plan a journey →</Text>

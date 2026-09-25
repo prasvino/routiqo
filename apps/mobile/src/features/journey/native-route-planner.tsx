@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   AppState,
   Keyboard,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
 import type { PlaceMatch, RouteMode, RouteRequest } from '@routiqo/shared';
-import { useNativeAccount } from '../../auth/native-account-provider';
+import { useNativeAccount, type JourneyRouteInput } from '../../auth/native-account-provider';
 import {
   createNativeRoutingController,
   type NativeRoutingState,
@@ -56,6 +56,8 @@ export interface NativeRoutePlannerViewProps {
   onCalculate(): void;
   onAlternative(index: number): void;
   onStep(index: number): void;
+  /** Journey map flag on and no journey in progress. */
+  startWithRoute?: { disabled: boolean; onPress(): void } | null;
 }
 export function NativeRoutePlannerView({
   state,
@@ -69,6 +71,7 @@ export function NativeRoutePlannerView({
   onCalculate,
   onAlternative,
   onStep,
+  startWithRoute = null,
 }: NativeRoutePlannerViewProps) {
   const ready = online && available;
   const failure =
@@ -221,6 +224,19 @@ export function NativeRoutePlannerView({
               Showing the last loaded estimate for these places. Recalculate explicitly when ready.
             </Text>
           ) : null}
+          {startWithRoute ? (
+            <>
+              <Action
+                label="Start trip with this route"
+                disabled={startWithRoute.disabled}
+                onPress={startWithRoute.onPress}
+              />
+              <Text style={styles.notice}>
+                Opens the Journey map. The route stays on this phone and is removed when the journey
+                ends.
+              </Text>
+            </>
+          ) : null}
           <Text style={styles.label}>Directions</Text>
           {currentStep ? (
             <>
@@ -254,10 +270,29 @@ export function NativeRoutePlannerView({
   );
 }
 
+/** The route input for starting a journey from the planner's selected alternative. */
+export function plannerJourneyRoute(state: NativeRoutingState): JourneyRouteInput | null {
+  const option = state.route?.routes[state.alternative];
+  const origin = state.origin.selected;
+  const destination = state.destination.selected;
+  if (!state.route || !option || !origin || !destination) return null;
+  return {
+    mode: state.mode,
+    originLabel: origin.label,
+    destinationLabel: destination.label,
+    origin: origin.coordinate,
+    destination: destination.coordinate,
+    alternativeIndex: state.alternative,
+    calculatedAt: state.route.calculatedAt,
+    route: option,
+  };
+}
+
 export function NativeRoutePlanner({
   accountId,
   available,
   onSelectionChange,
+  canStartJourney = false,
 }: {
   accountId: string;
   available: boolean;
@@ -265,8 +300,10 @@ export function NativeRoutePlanner({
     selection: (RouteRequest & { alternativeIndex: number }) | null,
     sessionEpoch: number,
   ) => void;
+  canStartJourney?: boolean;
 }) {
   const session = useNativeAccount();
+  const router = useRouter();
   const live = useRef({ session, available });
   live.current = { session, available };
   const selectionCallback = useRef(onSelectionChange);
@@ -378,6 +415,20 @@ export function NativeRoutePlanner({
       onCalculate={() => void controller.current?.calculate()}
       onAlternative={(index) => controller.current?.alternative(index)}
       onStep={(index) => controller.current?.step(index)}
+      startWithRoute={
+        canStartJourney && plannerJourneyRoute(state)
+          ? {
+              disabled: session.busy || state.busy !== null,
+              onPress: () => {
+                const input = plannerJourneyRoute(state);
+                if (!input) return;
+                void session.startWithRoute('trip', input).then((started) => {
+                  if (started) router.push('/journey');
+                });
+              },
+            }
+          : null
+      }
     />
   );
 }

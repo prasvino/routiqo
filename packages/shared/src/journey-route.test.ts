@@ -55,15 +55,18 @@ describe('simplifyJourneyGeometry', () => {
 describe('projectOntoRoute', () => {
   const line = north(11); // about 1.11 km
   const measures = cumulativeRouteMetres(line);
+  const start: RouteCoordinate = [80, 12];
+  const end: RouteCoordinate = [80, 12.01];
+  const total = measures.at(-1) ?? Number.NaN;
 
   it('measures cumulative distance', () => {
     expect(measures[0]).toBe(0);
-    expect(measures[10]).toBeCloseTo(haversineMetres(line[0], line[10]), 3);
+    expect(total).toBeCloseTo(haversineMetres(start, end), 3);
   });
 
   it('projects onto a segment interior, not only vertices', () => {
     const projection = projectOntoRoute(line, [80.0005, 12.0055], measures);
-    expect(projection.alongMetres).toBeCloseTo(haversineMetres(line[0], [80, 12.0055]), -1);
+    expect(projection.alongMetres).toBeCloseTo(haversineMetres(start, [80, 12.0055]), -1);
     expect(projection.offsetMetres).toBeGreaterThan(50);
     expect(projection.offsetMetres).toBeLessThan(60);
     expect(projection.offRoute).toBe(false);
@@ -71,7 +74,7 @@ describe('projectOntoRoute', () => {
 
   it('clamps before the start and after the end', () => {
     expect(projectOntoRoute(line, [80, 11.999], measures).alongMetres).toBe(0);
-    expect(projectOntoRoute(line, [80, 12.02], measures).alongMetres).toBeCloseTo(measures[10], 3);
+    expect(projectOntoRoute(line, [80, 12.02], measures).alongMetres).toBeCloseTo(total, 3);
   });
 
   it('flags positions more than 1 km from the route', () => {

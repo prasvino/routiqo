@@ -127,7 +127,8 @@ interface NativeAccountContext {
   retryDeletionCleanup(): Promise<void>;
   restore(): Promise<void>;
   sync(): Promise<void>;
-  start(kind: JourneyKind): Promise<void>;
+  /** Resolves true once the start is saved on this device. */
+  start(kind: JourneyKind): Promise<boolean>;
   /** Start with the calculated route; the route stays on this device only (ADR 0067). */
   startWithRoute(kind: JourneyKind, route: JourneyRouteInput): Promise<boolean>;
   complete(id: string): Promise<void>;
@@ -783,9 +784,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         retryDeletionCleanup,
         restore,
         sync,
-        start: async (kind) => {
-          await action({ journeyId: randomUUID(), action: 'start', kind });
-        },
+        start: (kind) => action({ journeyId: randomUUID(), action: 'start', kind }),
         startWithRoute: (kind, route) =>
           action({ journeyId: randomUUID(), action: 'start', kind }, route),
         complete: async (journeyId) => {

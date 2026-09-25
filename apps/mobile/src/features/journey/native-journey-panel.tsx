@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
 import { useNativeAccount } from '../../auth/native-account-provider';
@@ -12,11 +13,13 @@ import {
 import { NativeMapPreview } from './native-map';
 import { NativeRoutePlanner } from './native-route-planner';
 import { NativeJourneyHistory } from './native-journey-history';
+import { journeyMapEnabled } from './journey-mode-model';
 
 const c = tokens.colors;
 const consentEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_LIVE_CONSENT_ENABLED === 'true';
 const routingEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_ROUTING_ENABLED === 'true';
 const bindingEnabled = process.env.EXPO_PUBLIC_ROUTIQO_NATIVE_LIVE_ROUTE_BINDING_ENABLED === 'true';
+const mapEnabled = journeyMapEnabled();
 export function NativeJourneyPanel({
   onLayout,
   onHistoryLayout,
@@ -27,6 +30,11 @@ export function NativeJourneyPanel({
   onHistoryNavigate?: () => void;
 }) {
   const session = useNativeAccount();
+  const router = useRouter();
+  const startJourney = (kind: 'trip' | 'commute') =>
+    void session.start(kind).then((started) => {
+      if (started && mapEnabled) router.push('/journey');
+    });
   const coordinatorRef = useRef({
     accountId: session.accountId,
     value: createNativeRoutePreparationCoordinator(),
@@ -94,6 +102,15 @@ export function NativeJourneyPanel({
               <Text style={styles.notice}>
                 Started {new Date(active.startedAt).toLocaleString()}
               </Text>
+              {mapEnabled ? (
+                <Pressable
+                  style={styles.primary}
+                  accessibilityRole="button"
+                  onPress={() => router.push('/journey')}
+                >
+                  <Text style={styles.primaryText}>Open journey map</Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 style={styles.secondary}
                 accessibilityRole="button"
@@ -109,7 +126,7 @@ export function NativeJourneyPanel({
                 style={styles.primary}
                 accessibilityRole="button"
                 disabled={session.busy}
-                onPress={() => void session.start('trip')}
+                onPress={() => startJourney('trip')}
               >
                 <Text style={styles.primaryText}>Start trip now</Text>
               </Pressable>
@@ -117,7 +134,7 @@ export function NativeJourneyPanel({
                 style={styles.secondary}
                 accessibilityRole="button"
                 disabled={session.busy}
-                onPress={() => void session.start('commute')}
+                onPress={() => startJourney('commute')}
               >
                 <Text style={styles.secondaryText}>Start commute now</Text>
               </Pressable>
@@ -156,6 +173,7 @@ export function NativeJourneyPanel({
           accountId={session.accountId}
           available={!session.restoring && !session.busy && !session.deletionCleanupPending}
           onSelectionChange={onSelectionChange}
+          canStartJourney={mapEnabled && !active && pending.length === 0}
         />
       ) : null}
       {consentEnabled && consentScope ? (
