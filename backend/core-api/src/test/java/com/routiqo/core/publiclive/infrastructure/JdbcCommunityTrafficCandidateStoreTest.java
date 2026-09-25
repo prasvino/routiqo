@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ActiveProfiles("persistence")
 class JdbcCommunityTrafficCandidateStoreTest {
     private static final PostgreSQLContainer DATABASE = new PostgreSQLContainer("postgres:16-alpine");
-    private static final Instant WINDOW = Instant.parse("2026-09-23T10:00:00Z");
+    private static final Instant WINDOW = com.routiqo.core.publiclive.RecentTrafficWindow.now();
     static { DATABASE.start(); }
 
     @DynamicPropertySource static void database(DynamicPropertyRegistry properties) {
@@ -49,8 +49,8 @@ class JdbcCommunityTrafficCandidateStoreTest {
                 .isInstanceOf(CommunityTrafficConflict.class);
         assertThat(jdbc.queryForObject("""
                 SELECT used FROM community_traffic_daily_debit_v3
-                WHERE actor_id = ? AND utc_day = DATE '2026-09-23'
-                """, Integer.class, actor)).isEqualTo(1);
+                WHERE actor_id = ? AND utc_day = ?
+                """, Integer.class, actor, java.sql.Date.valueOf(WINDOW.atOffset(java.time.ZoneOffset.UTC).toLocalDate()))).isEqualTo(1);
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM community_traffic_candidate_v3 WHERE actor_id = ?
                 """, Integer.class, actor)).isEqualTo(1);
@@ -86,8 +86,8 @@ class JdbcCommunityTrafficCandidateStoreTest {
         assertThat(owner).hasSize(12);
         assertThat(jdbc.queryForObject("""
                 SELECT used FROM community_traffic_daily_debit_v3
-                WHERE actor_id = ? AND utc_day = DATE '2026-09-23'
-                """, Integer.class, actor)).isEqualTo(12);
+                WHERE actor_id = ? AND utc_day = ?
+                """, Integer.class, actor, java.sql.Date.valueOf(WINDOW.atOffset(java.time.ZoneOffset.UTC).toLocalDate()))).isEqualTo(12);
     }
 
     private UUID account() {

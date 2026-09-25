@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ActiveProfiles("persistence")
 class JdbcCommunityTrafficV3IntegrationTest {
     private static final PostgreSQLContainer DATABASE = new PostgreSQLContainer("postgres:16-alpine");
-    private static final Instant WINDOW = Instant.parse("2026-09-23T10:00:00Z");
+    private static final Instant WINDOW = com.routiqo.core.publiclive.RecentTrafficWindow.now();
     private static final UUID ANCHOR = UUID.randomUUID();
     private static final UUID CATALOG_VERSION = UUID.randomUUID();
     static { DATABASE.start(); }
