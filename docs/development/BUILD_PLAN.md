@@ -136,7 +136,7 @@ New specs, in order (1, 2 and 5 are needed for Diwali):
    the festival route room over bounded HTTP refresh
    ([ADR 0066](../adr/0066-bounded-http-refresh-for-spot-chat.md);
    `backend/realtime` stays scaffold only).
-5. **Pilot moderation** — report intake for posts/voice/chat, content hide
+5. **Pilot moderation** ([drafted](../features/spots/PILOT_MODERATION_SPEC.md); ADR 0069) — report intake for posts/voice/chat, content hide
    action (follow-up to ADR 0041), simplified time-boxed grants; see
    [PILOT_MODERATION_RUNBOOK.md](PILOT_MODERATION_RUNBOOK.md).
 

@@ -174,8 +174,9 @@ the proven patterns, not the archived tables:
   account-level block edge (ADR 0040) without revealing the account. Activity
   reads then omit that author's posts and votes for the blocker everywhere.
   Blocked authors are not told.
-- **Moderator hide:** a new audited permission `content_hide` on the admin app
-  (ADR 0041 pattern; time-boxed grants per the
+- **Moderator hide:** audited permission `spots_hide` on the admin app
+  ([PILOT_MODERATION_SPEC.md](PILOT_MODERATION_SPEC.md), ADR 0069;
+  ADR 0041 pattern; shift grants per the
   [pilot moderation runbook](../../development/PILOT_MODERATION_RUNBOOK.md)).
   Hiding removes an item from all reads at once with a reason
   (`abuse`, `spam`, `false_alarm`, `personal_data`, `unsafe`); the author sees
@@ -231,7 +232,8 @@ the proven patterns, not the archived tables:
   signal per account, Spot and category.
 - `spot_alias` (room, account, alias; unique alias per room), `spot_vote`
   (item, account, kind, time; one per account per item), `spot_highlight`,
-  report tables following ADR 0064, a `content_hide` audit table and the budget
+  report tables following ADR 0064, moderation audit tables
+  ([PILOT_MODERATION_SPEC.md](PILOT_MODERATION_SPEC.md)) and the budget
   ledgers.
 - Every table cascades on account deletion; indexes support activity reads by
   Spot and expiry purges. Posts and signals never store coordinates.

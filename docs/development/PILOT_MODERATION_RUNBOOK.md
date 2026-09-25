@@ -34,16 +34,13 @@ operators. It was built for V3 traffic summaries and must be re-scoped to conten
 
 ## Still to build (Phase 2)
 
-- **Report intake** for posts, voice notes, chat and Ask Ahead: resolve evidence
-  identity, reference authorization, exact retries after revocation and lock order
-  (see `../features/live/DURABLE_REPORT_INTAKE_PROPOSAL.md`).
-- **Content hide action** as a follow-up to ADR 0041's restriction boundary:
-  audited, revision-checked, effective across reads, caches, realtime delivery and
-  replay.
-- **Post-expiry evidence:** what a moderator can still see after content expires,
-  with an explicit bounded retention.
-- Queue display for voice notes (playback through short-lived signed URLs, never
-  public links).
+Specified in [PILOT_MODERATION_SPEC.md](../features/spots/PILOT_MODERATION_SPEC.md)
+(ADR 0069) for Spot posts and signals: report intake and queue keyed by Spot item
+reference, hide, restore, clear signals, restrict, audited alias lookup,
+post-expiry evidence under ADR 0064 retention, renewable admin sessions, shift
+grants and the urgent-report alert. Still to specify with their features: voice
+notes (playback through short-lived signed URLs, never public links), Spot chat,
+the festival room and Ask Ahead.
 
 ## Report reasons
 
@@ -65,12 +62,18 @@ Lighter than the V3 staging process, still finite and audited:
 
 - A **small named rota** of moderators, each with an existing Routiqo account
   under the same Google subject used for admin sign-in.
-- **Time-boxed grants** covering the dry run and the Pongal event window; review
-  and hide for rota members, restrict only for the leads.
-- One grant administrator. The first grant-administrator row is still created
-  **out of band** by a named database operator, never by a migration, startup,
-  fixture or API; record who authorized it, the account UUID, reason and expiry.
-- Revoke grants at the end of each window or when a rota member leaves.
+- **Shift grants** of 1–12 hours, issued at the start of each shift and revoked
+  at its end: `spots_review` and `spots_hide` for every rota moderator,
+  `spots_restrict` and `spots_alias_lookup` for leads (ADR 0069).
+- **Two grant administrators** (`spots_grant_admin`), for example the owner and
+  one lead, so each can grant the other queue access; nobody can grant
+  themselves. Both rows are created **out of band** by a named database
+  operator, never by a migration, startup, fixture or API; record who authorized
+  each, the account UUID, reason and expiry.
+- Every rota member has Google 2-Step Verification on, checked at onboarding and
+  recorded in the rota list.
+- Revoke grants at the end of each shift, at the end of each window and when a
+  rota member leaves.
 
 ## Configuration (borrowed from the archived V3 runbooks)
 
@@ -99,7 +102,14 @@ and
 
 - Cover the whole dry-run weekend and the Pongal event window, with extra cover
   on the peak departure and return days.
-- Target response time for hide decisions, set before the dry run.
+- Targets: urgent reports decided within a median of 5 minutes and at most 15
+  minutes while staffed; other reports within 2 hours. Drill before 5 November:
+  a moderator hides a reported test post within 2 minutes, from a phone.
+- Suggested Diwali pattern (5–7 November): 6-hour shifts around the clock, two
+  moderators on evening and night departure peaks, one otherwise, and one lead
+  on call throughout. Adjust once the tester count is known.
+- Urgent-report alerts go to one private team chat through the count-only
+  webhook (ADR 0069); whoever is on shift acknowledges in the handoff log.
 - Moderators need Tamil and English; at least one per shift reads Tanglish well.
 - Keep a shared handoff log outside the app (who is on, open escalations), with no
   personal data copied into it.
