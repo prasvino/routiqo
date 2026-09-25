@@ -15,6 +15,44 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 _Archived 2026-09-25:_ the user had authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag; that work is now archived and is no longer authorized pilot work. The different production privacy contract is not accepted. Person-level research is archived with its code preserved. Traveller-derived public LIVE remains disabled in production.
 
+## September 25 Android Journey map (flagged, not device-verified)
+
+Android has a full-screen Journey mode behind `EXPO_PUBLIC_ROUTIQO_JOURNEY_MAP_ENABLED`
+(exact `true`, default off) per
+[ANDROID_JOURNEY_MAP_SPEC.md](../features/journey/ANDROID_JOURNEY_MAP_SPEC.md) and
+ADR 0067:
+
+- **Journey route.** "Start trip with this route" in the Trips planner stores a
+  device-only route record (`journey_route_v1`) with the start command in one
+  SQLite transaction. The geometry is simplified to at most 2,000 points. The
+  record is deleted with completion, on sign-out, account change, account deletion
+  and Clear local data, and whenever its journey is no longer current. It never
+  enters the outbox or any request.
+- **Own position.** `expo-location` uses while-in-use permission only; background
+  location and the location foreground-service permission are removed from the
+  manifest. Permission is requested only from "Show my position". Updates run only
+  while Journey mode is focused and the app is in the foreground, are kept in
+  memory, and are published at most once per second.
+- **Screen.** Journey mode sits on a stack above the tabs, which moved into an
+  `(tabs)` route group with unchanged URLs. It shows the route line, owner-only
+  endpoints, the position dot and Follow me; Close is separate from Complete,
+  which asks for confirmation. It covers every permission and location state and
+  shows notices for offline tiles and an unconfigured style. Every tab shows a
+  "Back to journey" bar and Home shows a journey card while a journey is current.
+  The Spots panel slot stays hidden until Spots exist.
+
+Checks: `pnpm check` passed (contracts, formatting, all typechecks, lint;
+**865 TypeScript tests / 105 files**). That includes new tests for route
+geometry, the SQLite route record on file-backed SQLite, the location store and
+Journey mode views. The Android JavaScript export succeeded. Expo config
+introspection shows `ACCESS_BACKGROUND_LOCATION` and
+`FOREGROUND_SERVICE_LOCATION` marked `tools:node="remove"`.
+
+Not verified: no emulator or device run in this cloud session. Map rendering,
+real location, permission dialogs, battery, large text on device and the
+configured map style are pending in
+[the native Android ledger](../validation/NATIVE_ANDROID_PENDING.md).
+
 ## September 25 account planning copy (ADR 0062)
 
 A signed-in web traveller can keep one explicit, owner-only copy of their plans and saved places on their account. They can check it, save (replacing the copy only after confirmation), add it to another device (merge only, so local plans are never removed) or remove it. The feature sits behind default-off server, proxy and UI flags (`ROUTIQO_PLANNING_BACKUP_API_ENABLED`, `NEXT_PUBLIC_ROUTIQO_PLANNING_BACKUP_UI_ENABLED`). Details are in the [spec](../features/journey/ACCOUNT_PLANNING_BACKUP_SPEC.md).

@@ -75,7 +75,7 @@ Hosted maps and routing (corridor-scoped):
 Android Journey map:
 
 - [x] Author the Android Journey map spec — drafted as [ANDROID_JOURNEY_MAP_SPEC.md](docs/features/journey/ANDROID_JOURNEY_MAP_SPEC.md) with [ADR 0067](docs/adr/0067-on-device-journey-route-and-spots-ahead.md), proposed and awaiting review (full-screen journey mode opened from Home with a persistent "Back to journey" bar; route on map, "me", Spots-ahead panel slot, offline and permission states).
-- [ ] Implement selected-route display and explicit, foreground-only location permission during an active journey; no background tracking and no real location requested in agent QA.
+- [x] Implement selected-route display and explicit, foreground-only location permission during an active journey (flagged; 2026-09-25). Device checks are in the native Android ledger.
 
 Journey reliability (Android first):
 

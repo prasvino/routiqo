@@ -1,7 +1,9 @@
 # ADR 0067: On-device journey route and Spots-ahead matching
 
 Date: 2026-09-25
-Status: proposed with the Journey map and Spots specs; not implemented
+Status: accepted. Decisions 1, 5 and 6 (device-only journey route, foreground
+position, `expo-location`) are implemented behind the Journey map flag; 2–4
+(catalog on device, Spots-ahead matching, activity reads) arrive with Spots.
 
 ## Context
 

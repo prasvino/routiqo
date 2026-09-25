@@ -11,3 +11,4 @@ export * from './place-search';
 export * from './trip-journal';
 export * from './commute-summaries';
 export * from './account-planning';
+export * from './journey-route';

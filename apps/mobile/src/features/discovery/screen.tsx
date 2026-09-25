@@ -31,8 +31,10 @@ import {
 } from '@routiqo/shared';
 import { tokens } from '@routiqo/design-tokens';
 import { useMobilePlanning } from '../../storage/planning';
+import { useNativeAccount } from '../../auth/native-account-provider';
 import { NativePlanningBackup } from './planning-backup';
 import { NativeJourneyPanel } from '../journey/native-journey-panel';
+import { ActiveJourneyCardContainer, JourneyReturnBarContainer } from '../journey/journey-entry';
 import { NativeAccountControls } from '../../auth/native-account-controls';
 import pondicherry from '../../../assets/pondicherry.jpg';
 import heritage from '../../../assets/heritage.jpg';
@@ -63,6 +65,7 @@ export function DiscoveryScreen({
     };
   }, []);
   const { state, ready, error, update, clear } = useMobilePlanning();
+  const account = useNativeAccount();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category>('All');
   const [detail, setDetail] = useState<Destination | null>(null);
@@ -147,6 +150,7 @@ export function DiscoveryScreen({
       : searchDestinations(query, category);
   return (
     <SafeAreaView edges={['bottom']} style={s.safe}>
+      <JourneyReturnBarContainer />
       <FlatList
         ref={listRef}
         keyboardShouldPersistTaps="handled"
@@ -177,6 +181,7 @@ export function DiscoveryScreen({
                 {error}
               </Text>
             ) : null}
+            {section === 'Home' ? <ActiveJourneyCardContainer /> : null}
             {section !== 'Profile' && (
               <Pressable style={s.primary} accessibilityRole="button" onPress={() => plan()}>
                 <Text style={s.primaryText}>Plan a journey →</Text>
@@ -293,7 +298,8 @@ export function DiscoveryScreen({
               <>
                 <NativeAccountControls />
                 <Text style={s.notice}>
-                  No GPS collected. No live position shared. Clear your plans and saved places at
+                  No GPS is collected or shared. If you show your position on the Journey map, it
+                  stays on this phone. Clear your plans, saved places and stored journey route at
                   any time.
                 </Text>
                 <Pressable
@@ -302,7 +308,7 @@ export function DiscoveryScreen({
                   onPress={() =>
                     Alert.alert(
                       'Clear local data?',
-                      'All plans and saved places on this device will be removed.',
+                      'All plans, saved places and the stored journey route on this device will be removed.',
                       [
                         { text: 'Keep', style: 'cancel' },
                         {
@@ -310,6 +316,7 @@ export function DiscoveryScreen({
                           style: 'destructive',
                           onPress: () => {
                             void clear();
+                            void account.clearJourneyRoutes().catch(() => undefined);
                           },
                         },
                       ],

@@ -11,7 +11,15 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { randomUUID } from 'expo-crypto';
 import { useSQLiteContext } from 'expo-sqlite';
-import type { JourneyKind, PlaceResults, RouteRequest, RouteResult } from '@routiqo/shared';
+import { buildJourneyRoute } from '@routiqo/shared';
+import type {
+  JourneyKind,
+  JourneyRoute,
+  JourneyRouteSource,
+  PlaceResults,
+  RouteRequest,
+  RouteResult,
+} from '@routiqo/shared';
 import type { TripJournal, TripJournalWrite } from '@routiqo/shared';
 import { NativeHttpStatus } from './safe-transport';
 import { nativeTransport } from './android-transport';
@@ -54,8 +62,10 @@ import {
 } from '../storage/journal-storage';
 import {
   clearJourneyPartition,
+  clearMobileJourneyRoutes,
   queueMobileJourney,
   readMobileJourneyPartition,
+  readMobileJourneyRoute,
 } from '../storage/journey-outbox';
 
 type Partition = Awaited<ReturnType<typeof readMobileJourneyPartition>>;
@@ -117,9 +127,16 @@ interface NativeAccountContext {
   retryDeletionCleanup(): Promise<void>;
   restore(): Promise<void>;
   sync(): Promise<void>;
-  start(kind: JourneyKind): Promise<void>;
+  /** Resolves true once the start is saved on this device. */
+  start(kind: JourneyKind): Promise<boolean>;
+  /** Start with the calculated route; the route stays on this device only (ADR 0067). */
+  startWithRoute(kind: JourneyKind, route: JourneyRouteInput): Promise<boolean>;
   complete(id: string): Promise<void>;
+  /** Device-only route of the current journey, or null. */
+  journeyRoute: JourneyRoute | null;
+  clearJourneyRoutes(): Promise<void>;
 }
+export type JourneyRouteInput = Omit<JourneyRouteSource, 'journeyId'>;
 const Context = createContext<NativeAccountContext | null>(null);
 
 export function NativeAccountProvider({ children }: { children: ReactNode }) {
@@ -131,6 +148,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
   const journeys = useMemo(() => createNativeJourneys(db, identity), [db, identity]);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [partition, setPartition] = useState<Partition | null>(null);
+  const [journeyRoute, setJourneyRoute] = useState<JourneyRoute | null>(null);
   const [online, setOnline] = useState(false);
   const onlineRef = useRef(false);
   // Android may report an unknown state during startup while the app is visible.
@@ -442,7 +460,16 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
 
   async function load(account: string) {
     const value = await readMobileJourneyPartition(db, account);
-    if (identity.activeAccount() === account) setPartition(value);
+    let route: JourneyRoute | null = null;
+    try {
+      route = await readMobileJourneyRoute(db, account);
+    } catch {
+      route = null; // The map degrades to "no route"; journey actions are unaffected.
+    }
+    if (identity.activeAccount() === account) {
+      setPartition(value);
+      setJourneyRoute(route);
+    }
   }
   async function sync() {
     const account = identity.activeAccount();
@@ -480,6 +507,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
       const account = await identity.restore();
       setAccountId(account);
       if (account) {
+        await clearMobileJourneyRoutes(db, { except: account });
         await load(account);
         await journeys.resume(account);
       }
@@ -504,6 +532,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
       const account = await identity.signIn();
       if (account) {
         setAccountId(account);
+        await clearMobileJourneyRoutes(db, { except: account });
         await load(account);
         await journeys.resume(account);
       }
@@ -521,10 +550,12 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
     working.current = true;
     setBusy(true);
     setError('');
+    const leaving = identity.activeAccount();
     setAccountId(null);
     setPartition(null);
     try {
       await identity.logout();
+      if (leaving) await clearMobileJourneyRoutes(db, { only: leaving }).catch(() => undefined);
     } catch {
       const current = identity.activeAccount();
       setAccountId(current);
@@ -651,24 +682,36 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
     command:
       | { journeyId: string; action: 'start'; kind: JourneyKind }
       | { journeyId: string; action: 'complete' },
-  ) {
+    routeInput: JourneyRouteInput | null = null,
+  ): Promise<boolean> {
     const account = identity.activeAccount();
-    if (!account || working.current) return;
+    if (!account || working.current) return false;
     working.current = true;
     setBusy(true);
     setError('');
     try {
-      await queueMobileJourney(db, account, command, Date.now());
+      const route = routeInput
+        ? buildJourneyRoute({ ...routeInput, journeyId: command.journeyId })
+        : null;
+      await queueMobileJourney(db, account, command, Date.now(), route);
       await load(account);
     } catch {
       setError('Could not save the journey action on this device. Try again.');
-      return;
+      return false;
     } finally {
       working.current = false;
       setBusy(false);
     }
     if (onlineRef.current && foregroundRef.current) void sync();
+    return true;
   }
+  async function clearJourneyRoutes() {
+    await clearMobileJourneyRoutes(db, 'all');
+    setJourneyRoute(null);
+  }
+  useEffect(() => {
+    if (!accountId) setJourneyRoute(null);
+  }, [accountId]);
   useEffect(() => {
     if (identity.configured) void restore();
     const network = NetInfo.addEventListener((state) => {
@@ -742,7 +785,13 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         restore,
         sync,
         start: (kind) => action({ journeyId: randomUUID(), action: 'start', kind }),
-        complete: (journeyId) => action({ journeyId, action: 'complete' }),
+        startWithRoute: (kind, route) =>
+          action({ journeyId: randomUUID(), action: 'start', kind }, route),
+        complete: async (journeyId) => {
+          await action({ journeyId, action: 'complete' });
+        },
+        journeyRoute,
+        clearJourneyRoutes,
       }}
     >
       {children}

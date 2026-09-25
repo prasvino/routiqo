@@ -1,6 +1,9 @@
 # Android Journey map
 
-Status: proposed, 2026-09-25. Not implemented. Phase 1 of the pilot path
+Status: implemented behind `EXPO_PUBLIC_ROUTIQO_JOURNEY_MAP_ENABLED`, 2026-09-25,
+with local automated checks (see BUILD_STATUS). Emulator and physical-device
+checks are pending in `../../validation/NATIVE_ANDROID_PENDING.md`. The Spots
+panel content arrives with the Spots spec. Phase 1 of the pilot path
 ([PRODUCT.md](../../PRODUCT.md)); needed for the Diwali 2026 dry run. Decision
 record: [ADR 0067](../../adr/0067-on-device-journey-route-and-spots-ahead.md).
 

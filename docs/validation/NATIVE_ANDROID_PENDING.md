@@ -53,6 +53,33 @@ staging services. Emulator and synthetic evidence does not close it.
 - [ ] Complete independent security review of the native bridge, token lifecycle,
       OAuth configuration and proxy/TLS behavior before production use.
 
+## Journey map (flag `EXPO_PUBLIC_ROUTIQO_JOURNEY_MAP_ENABLED`)
+
+Implemented and locally tested on 2026-09-25, with no emulator or device run.
+Still to check on a rebuilt development client (the new `expo-location` native
+module needs a rebuild) and then on 3+ physical phones:
+
+- [ ] Start a trip with a calculated route; Journey mode opens; the route line,
+      both endpoints and the camera fit are correct on the configured style.
+- [ ] "Show my position": the permission dialog appears only then; allow, deny,
+      "don't ask again" (settings link) and location services off all show
+      their states; no prompt at app start, sign-in or journey start.
+- [ ] Position updates stop when leaving Journey mode, backgrounding the app,
+      completing the journey and switching accounts. Confirm with the Android
+      location indicator that nothing runs in the background.
+- [ ] Follow me turns off on a manual pan; reduced motion jumps instead of
+      animating.
+- [ ] Offline: route and notice with tiles unavailable; unconfigured style shows
+      the text route summary.
+- [ ] "Back to journey" bar on all tabs and the Home card; Android back closes
+      Journey mode without completing; Complete asks for confirmation.
+- [ ] The stored route is gone after completion, sign-out, account change and
+      Clear local data (inspect with a debug build).
+- [ ] 360 dp width at 200% font scale and TalkBack order; one-hour battery and
+      memory reading on each phone.
+- [ ] The merged manifest has no `ACCESS_BACKGROUND_LOCATION` or location
+      foreground-service permission.
+
 ## Evidence
 
 Recovered Android build, 2026-09-24:
