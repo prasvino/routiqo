@@ -2,6 +2,8 @@
 
 Status: proposed for review, not implemented or production-approved.
 
+> **Direction brief (2026-09-25):** Still a proposal, now simpler: posts, voice notes, chat and signals are public and directly reportable, so most blockers about reporting aggregate or hidden evidence without a reference authority dissolve. Minimized reporter data, bounded intake and rate limits still apply. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope and authority
 
 Persist minimized structured-report/case metadata independently of public output.

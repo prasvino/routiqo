@@ -1,5 +1,8 @@
 # ADR 0003: Platform UI and selected libraries
 Status: accepted, 2026-09-06.
+
+> **Status update (2026-09-25):** Partly superseded by the direction brief. Library and UI choices still hold. Curated destination content (Explore) is demoted and will be replaced over time by route guides. See [PRODUCT.md](../PRODUCT.md).
+
 Share design tokens/domain helpers; implement web UI with semantic HTML/CSS and lucide-react, mobile UI with React Native and Expo SQLite. Do not introduce a universal UI framework.
 Next.js provides routing/builds. Vitest/ESLint/TypeScript cover TypeScript quality. Spring Security defaults fail closed. ArchUnit enforces Java domain independence. Gradle wrapper pins the Java build.
 Expo SDK 55 is a deliberately selected stable baseline; use its recommended React/native package versions. Upgrade via a compatibility review.

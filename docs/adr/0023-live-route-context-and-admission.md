@@ -3,6 +3,8 @@
 Status: accepted internal design; registration, storage and HTTP issuance pending.
 This resolves the admission portion of L0.2, not aggregate publication approval.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. Server-owned route context and short-lived admission still hold for Spot contributions. Consent-generation binding is retired, and the product references below now point to archived specs. See [PRODUCT.md](../PRODUCT.md).
+
 ## Context
 
 Current persisted journeys contain lifecycle/ownership, not validated route
@@ -61,4 +63,4 @@ context/revision and must not serve as the complete durable acceptance record.
 Cohort publication remains separately gated: fixed partitions/windows, sparse and
 block-safe suppression, independent evidence criteria, colluding/repeated-query
 analysis and bounded cached projections. No count or moment may be exposed merely
-because an admission check succeeds. See ROUTIQO_LIVE_SPEC.md and PRESENCE_SPEC.md.
+because an admission check succeeds. See `../archive/features/live/ROUTIQO_LIVE_SPEC.md` and `../archive/features/presence/PRESENCE_SPEC.md` (both archived).

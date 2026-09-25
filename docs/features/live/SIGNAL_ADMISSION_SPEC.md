@@ -4,6 +4,8 @@ Status: internal models and policy implemented and tested; no public Live admiss
 ingestion. ADR 0023 owns the route-context/admission decision. This feature spec
 owns concrete model acceptance and regression cases.
 
+> **Direction brief (2026-09-25):** Kept as short-lived server admission for Spot contributions. Consent revision/generation binding is retired (one Spot-passage opt-in plus Ghost Mode); route/Spot binding, the short grant and redaction rules still hold. See [PRODUCT.md](../../PRODUCT.md).
+
 LiveRouteContext has non-null, non-nil context/actor/journey UUIDs, a nonnegative
 revision and 1–128 distinct non-null, non-nil anchor UUIDs. Defensively copy the
 set. SignalAdmission binds non-nil actor/journey/context/anchor UUIDs, nonnegative

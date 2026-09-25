@@ -3,6 +3,8 @@
 Status: implemented and verified under ADR 0041. No administrative HTTP surface.
 Current integration evidence is recorded in BUILD_STATUS.md.
 
+> **Direction brief (2026-09-25):** Kept as the audited moderation boundary. It needs a content-hide action so moderators can quickly hide a post, voice note, chat message or signal, not only restrict an account; the moderator surface is simplified for the pilot rota. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Purpose and non-goals
 
 Provide a real transactional permission, effect and audit prerequisite for future

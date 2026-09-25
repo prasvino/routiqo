@@ -4,6 +4,8 @@ Date: 2026-09-19
 
 Status: accepted; implementation tested and independently reviewed.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. The owner choice and issuance transport is kept (web secondary to Android). Consent coupling is retired, and the "private" framing no longer applies to Spot signals. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Expose the ADR 0043 minimized owner choice snapshot and ADR 0044 exact-context

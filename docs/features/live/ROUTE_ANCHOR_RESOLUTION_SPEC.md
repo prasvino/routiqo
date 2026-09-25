@@ -3,6 +3,8 @@
 Status: implemented and verified as a default-off internal resolver. This does not mount
 HTTP registration, bind a journey context, issue a signal grant or publish data.
 
+> **Direction brief (2026-09-25):** Kept and renamed: anchors are Spots, and this resolver is the basis for "Spots ahead" on a Journey. The curated anchor catalog seeds the pilot's ~50–100 GST Road corridor Spots; its 512-anchor bound covers that. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Trusted input and configuration
 
 Route Update owns an immutable curated anchor catalog. Each anchor has a nonnil

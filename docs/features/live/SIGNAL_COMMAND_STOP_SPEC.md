@@ -2,6 +2,8 @@
 
 Status: implemented and independently reviewed, 2026-09-19. Guarded browser exposure is ADR 0047; no UI or public projection.
 
+> **Direction brief (2026-09-25):** Kept. Stop/withdraw becomes the user-facing "delete my post" for signals, posts and voice notes; the uncertain-write fence still applies. Do not claim remote erasure of copies already delivered to disconnected devices. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Recovery gap
 
 Existing withdrawal requires a retained receipt. During an uncertain acceptance,

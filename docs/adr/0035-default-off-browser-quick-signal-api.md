@@ -3,6 +3,8 @@
 Status: accepted and implemented as a private, separately disabled transport. No
 public Live projection, UI, moderation workflow or automatic retry is enabled.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. Idempotent issue/accept/withdraw transport is kept for Spot signals (withdraw becomes "delete my post"). The private-only, consent-gated framing is retired; signals are public under per-room aliases. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Expose only owner-scoped POST command issue, acceptance and withdrawal leaves

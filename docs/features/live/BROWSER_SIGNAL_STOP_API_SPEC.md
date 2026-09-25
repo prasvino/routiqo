@@ -2,6 +2,8 @@
 
 Status: implemented and independently reviewed, 2026-09-19; remains default off.
 
+> **Direction brief (2026-09-25):** Kept; stop/withdraw becomes "delete my post". Web is secondary to Android, and the same behaviour is needed on the native transport. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope
 
 Add POST `/api/v1/journeys/{id}/signal-commands/{commandId}/stop`, exact body `{}`,

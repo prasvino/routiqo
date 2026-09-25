@@ -2,6 +2,8 @@
 
 Status: implemented for isolated staging behind a separate disabled flag. Real staging is pending. This does not approve V3 production activation, its privacy terms, or person-level public LIVE research.
 
+> **Direction brief (2026-09-25):** The V3 target and its `traffic_review`/`traffic_suppress` grants are retired. The grant-administration boundary (separate admin login, short-lived audited grants) is kept and simplified for the pilot moderator rota; see [PILOT_MODERATION_RUNBOOK.md](../../development/PILOT_MODERATION_RUNBOOK.md). See [PRODUCT.md](../../PRODUCT.md).
+
 ## Purpose and scope
 
 A designated grant administrator can issue and revoke short-lived `traffic_review` and `traffic_suppress` permissions for an already enabled Routiqo account. This closes the manual day-to-day grant operation gap in the V3 moderator trial. It does not create accounts, discover operators, administer the private verified-contributor program, or make a report decision. The initial `traffic_grant_admin` trust root is provisioned out of band by a named database/security operator and is never issuable by this API.

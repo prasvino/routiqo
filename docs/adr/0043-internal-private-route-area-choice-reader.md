@@ -4,6 +4,8 @@ Date: 2026-09-19
 
 Status: accepted; internal implementation tested and independently reviewed.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. The choice reader remains useful for the Spot signal picker. The consent read and on-consent requirement are retired; restriction and context checks still hold. See [PRODUCT.md](../PRODUCT.md).
+
 ## Context
 
 ADR 0042 permits readable catalog metadata without exposing it. Populating a

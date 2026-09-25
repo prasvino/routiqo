@@ -2,6 +2,8 @@
 
 Status: implemented locally behind a default-off backend flag; staging activation and real authenticated/provider QA remain pending. This is a provider-only active-journey list and does not activate traveller-derived Live Moments or publish private Quick Signals.
 
+> **Direction brief (2026-09-25):** Kept, optional: official alerts are shown on Spots and the Journey when available. Coverage names only Chennai-area districts; the GST Road pilot corridor districts Villupuram, Perambalur, Trichy and Madurai are not yet covered. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope and acceptance
 
 - For an authenticated active journey, show at most 10 current official CAP weather/disaster alerts that explicitly name Chennai, Chengalpattu, Kanchipuram or Tiruvallur district, or the entire state of Tamil Nadu. The pilot is district/state-wide, not a claim that an alert applies to the user's particular road or exact route. Do not inspect device GPS or private signal receipts to populate it.

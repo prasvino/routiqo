@@ -3,6 +3,8 @@
 Status: accepted and implemented behind an inactive server flag. No consent UI,
 signal ingestion, presence lease or public projection is enabled.
 
+> **Status update (2026-09-25):** Superseded by the direction brief. The browser consent API is retired with per-journey consent and stays default-off. The Spot-passage opt-in replaces it; web is secondary to Android. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Expose the authenticated owner's private journey consent state at GET and POST

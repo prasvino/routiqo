@@ -4,6 +4,8 @@ Status: internal configured facade implemented and tested. ADR 0035 adds a
 separately default-off private owner command transport through this facade; no UI,
 flag activation or public publication exists.
 
+> **Direction brief (2026-09-25):** Kept and renamed: the catalog is the seeded Spot catalog, and this facade authorizes signals against Spots. Consent checks inside it are retired; restriction, block and budget checks still apply. See [PRODUCT.md](../../PRODUCT.md).
+
 ADR 0044 adds a distinct internal expected-context issuance path; its implementation
 and evidence are tracked in `EXACT_CONTEXT_SIGNAL_ISSUANCE_PLAN.md`. The existing
 anchor-only owner HTTP contract remains unchanged. Future displayed-choice callers

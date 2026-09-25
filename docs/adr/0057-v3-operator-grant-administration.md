@@ -2,6 +2,8 @@
 
 Status: implemented behind disabled flags for isolated staging evaluation on 2026-09-23. Real staging and production activation remain unapproved.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. V3 `traffic_review`/`traffic_suppress` grants are retired with the V3 target. Controlled, audited, short-lived grant administration is kept and simplified for the pilot moderator rota (see `../development/PILOT_MODERATION_RUNBOOK.md`). See [PRODUCT.md](../PRODUCT.md).
+
 ## Context
 
 ADR 0056 authenticates a V3 moderator separately and checks finite database permissions, but grant issuance and revocation still require manual operator database work. Real staging needs a repeatable, audited operation without exposing role management to a consumer account or letting a moderator elevate itself.

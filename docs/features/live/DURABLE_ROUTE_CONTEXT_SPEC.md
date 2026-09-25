@@ -5,6 +5,8 @@ default-off provider-backed resolver and private two-transaction binding; no
 public registration, admission issuer or projection exists. ADR 0027 records the
 storage behavior and limits.
 
+> **Direction brief (2026-09-25):** Kept as the store for a Journey's Spots ahead. The 15-minute bound context used by route binding is too short for long highway trips (Chennai to Madurai) and needs a longer or renewable lifetime. Consent-participant ordering is retired with per-journey consent. See [PRODUCT.md](../../PRODUCT.md).
+
 ADR 0033 adds nullable catalog provenance to the stored envelope. Provider-bound
 replacement requires and stores the resolver's non-nil immutable catalog version.
 Historical and ordinary trusted replacements remain unvalidated and explicitly

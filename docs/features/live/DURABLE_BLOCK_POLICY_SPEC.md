@@ -3,6 +3,8 @@
 Status: implemented and independently reviewed; final core check/bootJar passed 363 tests across 50 suites. No public block API, contributor lookup,
 aggregate suppression or delivery implementation is authorized by this spec.
 
+> **Direction brief (2026-09-25):** Kept. Still to design: how account-level blocks map to per-room aliases without exposing account identity, and enforcement across REST, realtime, room subscription, Ask Ahead recipient selection and replay. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope
 
 Persist the reviewed DirectionalBlock policy as moderation-owned directed edges.

@@ -4,6 +4,8 @@ Status: implemented, tested and independently reviewed, 2026-09-19. Internal rea
 prerequisite only. ADR0045 adds gated composition, owner HTTP and browser clients;
 the reader itself performs no grant mutation and no contribution UI is mounted.
 
+> **Direction brief (2026-09-25):** Kept as infrastructure for the Spot signal picker, but the "private" framing and the on-consent requirement are retired: consent coupling is replaced by one Spot-passage opt-in plus Ghost Mode, and posting is an explicit act. Restriction and context checks still apply. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Authority
 
 Route Update owns a small choice reader using the existing JourneyWriteAuthority,

@@ -3,6 +3,8 @@
 Status: accepted and implemented as an internal, default-off composition. No
 public binding endpoint, signal issuer or Live publication is enabled.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. Two-transaction binding stays as the mechanism behind Spots ahead. The consent lock and "current sharing consent" requirement are retired, and binding should happen automatically on journey start. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Route binding uses two short account-and-owned-journey transactions with provider

@@ -3,6 +3,8 @@
 Date: 2026-09-23
 Status: rejected for public release after independent adversarial review; private prerequisites may continue
 
+> **Status update (2026-09-25):** Already rejected; the direction brief also removes the underlying need, since threshold-gated traveller LIVE release is archived and posts are openly public under per-room aliases. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision under review
 
 Build a separate, explicit public-share path from an accepted private Quick Signal. A private consent toggle or receipt alone never authorizes public use. A human-reviewed, revocable one-person authority is mandatory. The canonical output is one immutable coarse condition per curated anchor, category and nonoverlapping five-minute window; every authorized reader sees the same output. No per-viewer evidence subtraction, arbitrary area query, count, individual timestamp, person identifier or raw report is public.

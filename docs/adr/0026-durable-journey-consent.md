@@ -3,6 +3,8 @@
 Status: accepted and implemented for internal persistence. No public presence or
 Live signal endpoint is enabled.
 
+> **Status update (2026-09-25):** Superseded by the direction brief. Per-journey consent generations are retired and replaced by one Spot-passage opt-in plus Ghost Mode; posting is an explicit act that needs no consent step. The table and code stay default-off, and no stored consent becomes public through a migration. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Store one latest `presence_consent` row per account in PostgreSQL. The row binds

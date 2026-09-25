@@ -1,7 +1,9 @@
 # Maps, directions and connection loss
 
+> **Direction brief (2026-09-25):** The LIVE list paragraph below is superseded: the Journey map is now the hero, showing the route and the Spots ahead ordered by distance (earlier "anchors"; the archived LIVE spec is at [`../../archive/features/live/ROUTIQO_LIVE_SPEC.md`](../../archive/features/live/ROUTIQO_LIVE_SPEC.md)). Routiqo is not turn-by-turn navigation, so on-device navigation and offline rerouting are demoted; the Android map is primary and web is secondary. The maps direction is ADR 0021 (MapLibre, Valhalla, Photon); the remaining Mapbox references below are historical. See [PRODUCT.md](../../PRODUCT.md).
+
 Routiqo Live planning update: the first active-journey experience adds a LIVE list
-before collective map overlays. See `docs/features/live/ROUTIQO_LIVE_SPEC.md` and
+before collective map overlays. See `docs/archive/features/live/ROUTIQO_LIVE_SPEC.md` and
 ADR 0022. Later moment markers use the same authorized projection and coarse
 anchors; no stranger dots, finer zoom-derived member queries or public counts.
 Keep route geometry/provider work separate from social evidence and maintain
@@ -127,10 +129,12 @@ configuration; fixtures are not evidence of provider success.
 
 Threats: T01/T02 authentication/account isolation, T04/T12 private endpoints and
 map viewport disclosure, T13 stale callbacks, T14 request/geometry/step bounds,
-T19 no unreviewed persistence. Map display sends viewport/tile requests to Mapbox
+T19 no unreviewed persistence. Map display sends viewport/tile requests to the
+configured same-origin MapLibre style/tile service (ADR 0021; formerly Mapbox)
 only after explicit action; no Routiqo social presence or journey starts.
 
-References checked 2026-09-12:
+Historical Mapbox references, checked 2026-09-12 (superseded by ADR 0021
+MapLibre/Valhalla/Photon; kept for the legacy browser-cache disclosure):
 - [Directions v5](https://docs.mapbox.com/api/navigation/directions/)
 - [Mapbox GL JS](https://docs.mapbox.com/mapbox-gl-js/guides/)
 - [Native offline maps](https://docs.mapbox.com/help/dive-deeper/mobile-offline/)

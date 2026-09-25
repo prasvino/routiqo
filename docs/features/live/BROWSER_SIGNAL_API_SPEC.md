@@ -3,6 +3,8 @@
 Status: implemented and tested as an owner-only, separately default-off private
 transport under ADR 0035. No UI or public Live projection is enabled.
 
+> **Direction brief (2026-09-25):** Kept as a default-off transport, but web is secondary to Android. Private-only signals become public signals on Spots under per-room aliases; the 15-minute evidence lifetime becomes per-type lifetimes with "Still true?" renewal; consent coupling and the disabled-consent errors are retired. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Scope and wire contract
 
 Add ROUTIQO_LIVE_SIGNAL_API_ENABLED=false, explicit web-auth/routing/persistence
@@ -33,7 +35,7 @@ implicit renewal or retry client is added.
 
 Accept builds the exact existing fingerprint from path journey + strict body and
 calls CatalogSignalService.accept once. Server constants are 15-minute evidence
-and 24-hour receipt retention, matching ROUTIQO_LIVE_SPEC; caller cannot override.
+and 24-hour receipt retention, matching the archived `../../archive/features/live/ROUTIQO_LIVE_SPEC.md`; caller cannot override.
 Existing 90-second grant and 15-minute bound-context limits remain. Response:
 {commandId, status, receivedAt, expiresAt, retainUntil}, where status is accepted,
 withdrawn or superseded (maps private receipt lifecycle, never publication status).

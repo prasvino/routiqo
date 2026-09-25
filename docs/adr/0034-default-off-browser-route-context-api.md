@@ -3,6 +3,8 @@
 Status: accepted and implemented as a private, separately disabled transport. No
 signal ingestion, public Live projection or UI is enabled.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. The owner-only route-context transport is kept, but the explicit private route-preparation flow it served is archived; Spots ahead should load automatically, and web is secondary to Android. See [PRODUCT.md](../PRODUCT.md).
+
 ## Decision
 
 Expose owner-only `GET` and `POST /api/v1/journeys/{id}/route-context` only when

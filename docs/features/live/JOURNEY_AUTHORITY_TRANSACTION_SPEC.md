@@ -6,6 +6,8 @@ Scope: real PostgreSQL account/journey serialization, not signal receipt storage
 route registration or public Live ingestion. Durable consent now uses this
 boundary under ADR 0026.
 
+> **Direction brief (2026-09-25):** Kept: account then journey serialization remains the write boundary. The consent step in the account -> journey -> consent -> route context lock order is retired; the Spot-passage opt-in and Ghost Mode will need their own place in that order. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Contract and ownership
 
 Identity owns an AccountWriteAuthority application interface with a synchronous

@@ -7,6 +7,8 @@ implement durable grants, receipts, quotas and catalog-aware authority; ADR 0035
 adds only a separately default-off private browser transport. This pure policy
 does not itself provide persistence or public publication.
 
+> **Direction brief (2026-09-25):** Kept: idempotent command grants and retry decisions are infrastructure for Spot signals, posts, voice notes and answers, including offline-queued items under the PRODUCT.md offline rule. Consent-generation binding is retired. See [PRODUCT.md](../../PRODUCT.md).
+
 SignalCommandGrant binds a non-nil server command ID to one SignalAdmission and
 UNUSED or CONSUMED state. Reuse the admission's immutable issue/expiry interval;
 there is no independent renewal. Consumption is terminal and idempotent. Eligibility

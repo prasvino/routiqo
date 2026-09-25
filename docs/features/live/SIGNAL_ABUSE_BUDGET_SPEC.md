@@ -2,6 +2,8 @@
 
 Status: implemented and reviewed; no public publication approval.
 
+> **Direction brief (2026-09-25):** Kept. Budgets must extend to text posts, voice uploads, Ask Ahead questions and answers, "Still true?" confirmations and reports, with stricter limits for new accounts. Recheck the per-hour and cooldown values against festival-exodus density on the Pongal corridor. See [PRODUCT.md](../../PRODUCT.md).
+
 New successful acceptance must satisfy the existing five-per-fixed-minute budget,
 plus at most 20 accepted signals in the rolling preceding hour per actor and a
 60-second cooldown per actor/anchor/category. At exactly 60 seconds/one hour the

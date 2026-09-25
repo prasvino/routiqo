@@ -2,6 +2,8 @@
 
 Status: accepted for implementation; public activation is not authorized.
 
+> **Status update (2026-09-25):** Partly superseded by the direction brief. Work is paused. Consent epochs and the explicit "check / prepare private route" ceremony are retired; the native route-context transport may be reused so Android shows Spots ahead automatically on journey start. See [PRODUCT.md](../PRODUCT.md).
+
 Expose existing owned route-context read/bind through a separately gated native
 leaf and strict Android transport. Reuse the two-transaction binder, shared durable
 quotas, fresh resolver output, exact context expectation and consent rechecks. Widen

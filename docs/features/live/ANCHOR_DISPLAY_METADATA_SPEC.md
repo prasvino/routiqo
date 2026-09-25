@@ -3,6 +3,8 @@
 Status: implemented, tested and independently reviewed, 2026-09-19. This is a catalog prerequisite
 for readable private Quick Signal choices, not a choice API or public publication.
 
+> **Direction brief (2026-09-25):** Kept and renamed: `displayLabel` becomes the Spot name shown on the Journey map and Spot panel (e.g. "Chengalpattu Toll"). The "private choices only" framing is retired; Spot names are public. See [PRODUCT.md](../../PRODUCT.md).
+
 ## Narrow implementation
 
 Extend the existing immutable operator-selected route-anchor catalog with optional
