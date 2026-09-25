@@ -1,8 +1,10 @@
 # Routiqo --- UI/UX & Performance System for Codex
 
 > **Purpose:** This document is the permanent UI/UX constitution for
-> Routiqo. It complements `ROUTIQO_MASTER_CONTEXT.md` and
-> `ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`.
+> Routiqo. It complements [`../PRODUCT.md`](../PRODUCT.md) (product
+> source of truth) and
+> [`ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md`](../development/ROUTIQO_CODEX_ENGINEERING_GUARDRAILS.md).
+> Where they disagree on product scope, PRODUCT.md wins.
 >
 > Codex must use these principles when implementing or reviewing any
 > user-facing experience. The objective is a **world-class consumer
@@ -27,25 +29,24 @@ The interface should be:
 -   Accessible.
 -   Reliable on mid-range devices and unreliable networks.
 -   Information-efficient during active journeys.
--   Emotionally richer when browsing trips, places, and memories.
+-   Emotionally richer when browsing trips, route guides, and memories.
 
-The product hierarchy remains:
+The product hierarchy is:
 
 ``` text
 Journey
   ↓
 Map
   ↓
-What's happening
+Spots ahead
   ↓
-People
+Ask Ahead / Spot chat
   ↓
-Conversation
-  ↓
-Memories
+Route guides
 ```
 
-Do not turn Routiqo into a generic social feed.
+Users learn three ideas: Journey, Spots, Ask Ahead. The map shows places
+and posts, not people. Do not turn Routiqo into a generic social feed.
 
 ------------------------------------------------------------------------
 
@@ -119,9 +120,16 @@ Define and reuse:
 -   Empty states.
 -   Error states.
 -   Map markers.
--   Traveller clusters.
+-   Spot markers.
+-   Spot panel.
+-   Signal chips.
+-   Spot post cards.
+-   Voice note recorder/player.
+-   Post-passing prompt card.
+-   Ask Ahead card.
+-   "Still true?" control.
+-   Alias chip.
 -   Route incidents.
--   Route-update cards.
 -   Journey cards.
 
 Avoid arbitrary values scattered throughout components.
@@ -158,10 +166,18 @@ Prefer reusable semantic components such as:
 ``` text
 <RoutiqoJourneyCard />
 <RouteStatusChip />
-<TravellerCluster />
+<SpotMarker />
+<SpotPanel />
+<SignalChip />
+<SpotPostCard />
+<VoiceNoteRecorder />
+<VoiceNotePlayer />
+<PostPassingPromptCard />
+<AskAheadCard />
+<StillTrueControl />
+<AliasChip />
 <RouteIncidentCard />
 <RouteBottomSheet />
-<RouteUpdateCard />
 <PrimaryCTA />
 <PrivacyIndicator />
 <JourneyBrief />
@@ -219,13 +235,16 @@ Every decorative element must justify its visual cost.
 
 Each screen must have an obvious primary purpose.
 
-For the Living Route, the user should immediately understand:
+For the Journey map, the user should immediately understand:
 
 1.  Where am I?
 2.  Where am I going?
-3.  What is happening ahead?
-4.  What matters to me now?
-5.  How active is this route?
+3.  Which Spots are ahead, and how far?
+4.  What is it like there now, and how fresh is that?
+5.  What matters to me now?
+
+Express freshness with capture time and report counts ("3 reports in
+20 min"), never with traveller counts or "how many people are here".
 
 Do not display ten elements with equal visual importance.
 
@@ -238,9 +257,9 @@ Immediate route intelligence
         ↓
 Navigation/context
         ↓
-Useful places
+Spots ahead and their latest signals
         ↓
-Community activity
+Posts, Ask Ahead, Spot chat
         ↓
 Secondary actions
 ```
@@ -263,8 +282,8 @@ Preferred pattern:
 |                          |
 +--------------------------+
 |      Bottom Sheet        |
-|  What's Ahead | Places   |
-|  Updates      | Chat     |
+|  Spots ahead | Ask Ahead |
+|  Chat (in a Spot/room)   |
 |                    [+]   |
 +--------------------------+
 ```
@@ -277,21 +296,31 @@ Primary journey actions should use large, forgiving touch targets.
 
 ## 9. Fast Contributions
 
-Route contributions should require very little effort.
+Spot contributions should require very little effort. One tap beats
+typing; voice notes beat long text while travelling.
 
 Example:
 
 ``` text
-+
+Spot panel
 ↓
-Traffic
+Signal: Moving / Slow / Stopped
 ↓
-Heavy
-↓
-Submit
+Sent (with capture time)
 ```
 
-Common updates should ideally require only a few taps and no keyboard.
+Common updates should ideally require one or two taps and no keyboard.
+
+Voice notes are recorded only by explicit action (press to record,
+clear stop, review or discard) and show duration and upload state.
+
+The **post-passing prompt** asks one question after the device detects
+the user passed a Spot (opt-in), e.g. "How was Chengalpattu Toll?
+Under 5 min / 5--15 min / Over 15 min". It is a quiet, dismissible card,
+never a blocking modal or sound while moving. It appears only when the
+phone reports the vehicle stopped or slow, or to a user who said they
+are a passenger, and it expires if not answered. Contributions are
+never required.
 
 Use structured input before free-form text where it improves speed,
 moderation, and data quality.
@@ -313,18 +342,20 @@ Show:
 -   Route geometry.
 -   Destination.
 -   Relevant geographic context.
--   Privacy-safe traveller clusters.
--   Important incidents.
--   Useful places.
+-   Spots ahead, marked by type and freshness (live, fading, quiet).
+-   Important incidents and official alerts where available.
 -   Route status.
 
-Do not expose exact stranger locations.
+Show places and posts, not people. Do not show traveller clusters,
+stranger locations, avatars on the map or traveller counts.
 
 Use progressive disclosure as zoom changes.
 
-Avoid marker overload. Aggregate/clustering is preferred.
+Avoid marker overload. Prioritize the nearest Spots ahead and collapse
+distant or passed Spots.
 
-High-frequency presence changes must not cause full-map rerenders.
+High-frequency location and Spot updates must not cause full-map
+rerenders.
 
 The map should remain interactive while realtime updates arrive.
 
@@ -343,7 +374,7 @@ Codex must avoid:
 -   Original-size images used as thumbnails.
 -   Expensive synchronous work on interaction paths.
 -   Excessive animation/layout work.
--   Re-rendering all map markers for every presence update.
+-   Re-rendering all map markers for every Spot update.
 
 Preferred location flow:
 
@@ -352,7 +383,7 @@ GPS
  ↓
 Location Service
  ↓
-Derived Route/Presence State
+Derived route progress / Spots ahead (on device)
  ↓
 Only UI That Needs It
 ```
@@ -407,8 +438,8 @@ measurements on representative devices.
 
 -   Target smooth 60 FPS during normal scrolling, transitions, and map
     interaction on supported devices.
--   Presence updates must not visibly stall map gestures.
--   Avoid large frame drops during route updates.
+-   Spot and chat updates must not visibly stall map gestures.
+-   Avoid large frame drops during Spot updates.
 
 ### Loading
 
@@ -485,10 +516,15 @@ Every applicable feature must consider:
 Routiqo-specific states include:
 
 ``` text
-0 travellers
-3 travellers
-300 travellers
-3,000+ travellers
+Spot with no recent posts
+Spot live (fresh activity)
+Spot fading (activity stopping)
+Spot expired (highlights only)
+Ask Ahead unanswered
+Ask Ahead answered ("5 replies: mostly 10-20 min")
+Post captured offline (shown with capture time)
+Post rejected (lifetime elapsed while offline)
+Voice note uploading / failed
 
 No incidents
 One incident
@@ -503,15 +539,21 @@ Journey completed
 
 Ghost Mode enabled
 
-Realtime disconnected
-Realtime reconnecting
+Spot passage opt-in off
 
-No route updates
-No route conversation
+Chat disconnected
+Chat reconnecting
+
+No Spots ahead
+No Spot chat
 ```
 
 Empty states should remain useful and should not make Routiqo feel
-broken during cold-start conditions.
+broken during cold-start conditions. When a Spot has no recent posts or
+an Ask Ahead question gets no answer, say so honestly and show the
+latest signals, official alerts or route-guide tips instead. Never fill
+the gap with invented posts, synthetic crowds or AI-generated
+conditions.
 
 ------------------------------------------------------------------------
 
@@ -551,9 +593,8 @@ Good examples:
 
 -   Natural bottom-sheet motion.
 -   Subtle journey-start transition.
--   Gentle traveller-count update.
 -   Brief incident-arrival attention cue.
--   Spatial cluster expansion.
+-   Calm Spot freshness change (live to fading).
 -   Clear Ghost Mode privacy transition.
 
 Avoid:
@@ -618,14 +659,21 @@ moving.
 
 Navigation must remain predictable.
 
-Consumer mobile primary navigation should approximately follow:
+Current direction (Android is the primary pilot client; web serves
+route guides and planning):
 
 ``` text
 Home | Explore | Trips | Profile
 ```
 
-Do not create a permanent Chat tab. Route conversation is contextual to
-an active journey.
+-   The active **Journey** is the hero: a full-screen map experience
+    reached from any tab, not a tab among equals.
+-   **Explore** is demoted and is replaced over time by route guides.
+-   Do not create a permanent Chat tab. Chat belongs to a Spot or a
+    festival route room within the active journey.
+
+The four tabs may stay structurally for now. The final tab structure is
+an open design decision; do not change it as part of polish.
 
 Avoid deep navigation hierarchies.
 
@@ -755,8 +803,8 @@ location, for example:
 docs/design/reference/
 ├── home-approved.png
 ├── journey-approved.png
-├── route-update-sheet-approved.png
-├── route-chat-approved.png
+├── spot-panel-approved.png
+├── spot-chat-approved.png
 ├── journal-approved.png
 └── ...
 ```
@@ -780,7 +828,7 @@ production screenshots.
 Before accepting a major screen, review at minimum:
 
   Dimension          Check
-  ------------------ -----------------------------------------------
+  ------------------ ---------------------------------------------------------
   Visual hierarchy   Primary action/content is immediately obvious
   Consistency        Uses established tokens/components
   Performance        Smooth on target devices
@@ -792,7 +840,8 @@ Before accepting a major screen, review at minimum:
   Offline            Appropriate degraded experience
   Long text          No clipping/layout breakage
   Realtime           Updates without visual instability
-  Privacy            No accidental location/user exposure
+  Privacy            No accidental location/user exposure; no traveller counts
+  Freshness          Capture time shown; nothing expired shown as current
   One-hand use       Key mobile actions reachable
   Motion             Purposeful and restrained
 
@@ -839,14 +888,15 @@ Useful metrics include:
 -   App startup time.
 -   Time to interactive.
 -   Journey-start completion time.
--   Time to first useful route signal.
+-   Time to first useful Spot signal.
 -   Route-map frame performance.
 -   Crash-free sessions.
 -   UI/API error rate.
--   Route contribution completion time.
+-   Spot contribution completion time.
+-   Post-passing prompt tap and dismiss rates.
 -   Contribution abandonment.
 -   Permission-denial impact.
--   Realtime reconnect success.
+-   Chat reconnect success.
 -   User dismissal of journey alerts.
 -   Repeat journey usage.
 -   Accessibility-related defects.
@@ -956,15 +1006,30 @@ constraints, make it run the real product, inspect what it built,
 measure performance, and iterate until both the visual and interaction
 quality meet Routiqo standards.
 
-## Routiqo Live first-release composition (planned)
+## Journey and Spots composition (planned)
 
-Canonical scope: `docs/features/live/ROUTIQO_LIVE_SPEC.md`. Place a glanceable LIVE
-list inside the active journey; preserve the four primary tabs. Prioritize situation,
-reported condition, coarse freshness and uncertainty, followed by optional structured
-contribution. Use text/icon labels as well as color. No avatar-heavy feed, count
-badges, endless scroll, fake activity or new map query surface. Show loading,
-insufficient evidence, stale/offline, expiry and submission uncertainty distinctly.
-Do not announce freshness every second or send prompts merely to drive engagement.
-No proactive driving prompts; one-tap input is not automatically safe for drivers.
-List/map later share the same projection and selection semantics. Apply existing
-keyboard, touch target, large-text, reduced-motion and screen-reader standards.
+Canonical scope: [`../PRODUCT.md`](../PRODUCT.md). The active Journey is a
+full-screen map with the route, "me" and the Spots ahead ordered by distance, plus a
+bottom sheet listing what matters next (e.g. "Chengalpattu Toll, 12 km ahead, slow,
+3 reports in 20 min"). Opening a Spot shows its panel: latest signals, posts and
+voice notes with capture time and alias, Ask Ahead, and the short temporary chat.
+Prioritize the Spot, reported condition, coarse freshness and uncertainty, followed
+by one-tap contribution. Use text/icon labels as well as color. Show "Still true?"
+on posts and let silence expire them; after expiry show highlights only.
+
+No avatar-heavy feed, traveller counts, presence, endless scroll or fake activity.
+Report counts are allowed. Show loading, no recent posts, stale/offline, expiry,
+Ask Ahead unanswered and submission uncertainty distinctly. Do not announce
+freshness every second or send prompts merely to drive engagement.
+
+Driver safety: one-tap input is not automatically safe for drivers. The
+post-passing prompt is a quiet, dismissible card shown only when the phone reports
+stopped or slow, or to a passenger; never a blocking modal or sound while moving;
+it expires if unanswered. Voice notes are recorded only by explicit action.
+Contributions are never required.
+
+Every post, voice note and chat message has Report and Block. Aliases are per room
+and must not look like stable handles. Ghost Mode is always reachable and stops all
+sending. List and map share the same projection and selection semantics. Apply
+existing keyboard, touch target, large-text, reduced-motion and screen-reader
+standards.

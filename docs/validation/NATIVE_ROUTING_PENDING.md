@@ -36,11 +36,16 @@ All temporary fixtures and display overrides were removed. See
 
 ## Subsequent features
 
-- Native private route preparation/recovery, then Quick Signal controls and the
-  separately authorized LIVE list/reporting projection.
-- Selected-route map rendering, explicit location permission, on-device navigation
-  and downloaded maps need their own complete implementation/validation phases.
-  Loaded manual instructions are not turn-by-turn guidance or offline route graphs.
+- **Android Journey map with Spots ahead** (Phase 1, then Phase 2 Spots): selected
+  route rendered on the map, explicit foreground-only location permission during an
+  active journey, and the Spots ahead ordered along the route. This replaces the
+  earlier plan of native private route preparation, Quick Signal controls and the
+  LIVE list, which were archived on 2026-09-25 (see [`PRODUCT.md`](../PRODUCT.md)).
+  The paused route preparation checkpoint is described in
+  [`IMPLEMENTATION_RESUME.md`](IMPLEMENTATION_RESUME.md).
+- On-device navigation and downloaded maps are later, not pilot, and need their
+  own implementation/validation phases. Loaded manual instructions are not
+  turn-by-turn guidance or offline route graphs.
 
 No credentials, administrator step or production activation is needed for local
 implementation and bounded fixture testing.

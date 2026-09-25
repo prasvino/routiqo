@@ -1,7 +1,11 @@
 # Routiqo --- Codex Engineering Guardrails
 
-> **Purpose:** This document complements `ROUTIQO_MASTER_CONTEXT.md`.
-> The master context explains **what Routiqo is and what to build**.
+> **Purpose:** This document complements [`../PRODUCT.md`](../PRODUCT.md)
+> and [`../architecture/ENGINEERING_CONTEXT.md`](../architecture/ENGINEERING_CONTEXT.md).
+> PRODUCT.md explains **what Routiqo is and what to build**; the
+> engineering context records stack, modules and working method. (Both
+> replace the archived `ROUTIQO_MASTER_CONTEXT.md`, see
+> [`../archive/README.md`](../archive/README.md).)
 > This document defines **how Codex must build it** so architecture,
 > security, privacy, reliability, performance, and maintainability do
 > not gradually degrade during implementation.
@@ -61,9 +65,11 @@ Examples:
 ``` text
 docs/features/
 ├── journey/JOURNEY_SPEC.md
-├── presence/PRESENCE_SPEC.md
-├── route-chat/ROUTE_CHAT_SPEC.md
-├── route-updates/ROUTE_UPDATES_SPEC.md
+├── spots/SPOTS_SPEC.md
+├── spots/SPOT_PASSAGE_SPEC.md
+├── ask-ahead/ASK_AHEAD_SPEC.md
+├── rooms/SPOT_CHAT_SPEC.md
+├── route-guides/ROUTE_GUIDE_SPEC.md
 ├── moderation/MODERATION_SPEC.md
 ├── trip-journal/TRIP_JOURNAL_SPEC.md
 └── intelligence/JOURNEY_INTELLIGENCE_SPEC.md
@@ -126,7 +132,8 @@ plans should be written close to implementation time.
 For every non-trivial task, Codex must:
 
 1.  Read root `AGENTS.md`.
-2.  Read `ROUTIQO_MASTER_CONTEXT.md`.
+2.  Read `docs/PRODUCT.md` (product) and
+    `docs/architecture/ENGINEERING_CONTEXT.md` (engineering).
 3.  Read the relevant architecture/security/privacy documents.
 4.  Inspect existing implementation before proposing structural changes.
 5.  Identify the relevant feature specification.
@@ -148,7 +155,7 @@ A task is **not complete merely because the happy path works locally**.
 
 # 3. Security Invariants
 
-Routiqo handles live movement and communication between strangers. Treat
+Routiqo handles journeys and communication between strangers. Treat
 security requirements as product correctness.
 
 ## Authentication
@@ -175,6 +182,7 @@ Never trust client-provided:
 -   Journey IDs.
 -   Route IDs.
 -   Room IDs.
+-   Spot IDs and aliases.
 -   Role claims not cryptographically/server verified.
 -   Location values as proof of authorization.
 
@@ -219,25 +227,28 @@ The core privacy rule is:
 > **No Routiqo feature may require exposing one user's precise real-time
 > location to an unrelated stranger.**
 
-## Required processing boundary
+## Active input and on-device Spot passage
 
-Conceptually:
+The pilot runs on **active input** only. There is no server-side GPS
+ingestion pipeline:
 
 ``` text
-Precise GPS
+Precise GPS (device)
     ↓
-Secure location ingestion
-    ↓
-Route/map matching
-    ↓
-Privacy transformation
-    ↓
-Approximate route segment / coarse cell / aggregate
-    ↓
-Presence and social APIs
+On-device route progress / Spots ahead / Spot passage detection
+    ↓  (nothing leaves the device unless the user acts or has opted in)
+Explicit post, signal or answer tied to a Spot  ──→  server
+Opt-in Spot passage: Spot ID + coarse time      ──→  server (deleted ≤ 24 h)
 ```
 
-Raw GPS must not leak across this boundary.
+-   Continuous location is not collected on the server.
+-   Posts and signals are tied to a Spot, not the author's position.
+-   Spot passage is detected on the device after one clear opt-in, sent
+    only with an answer or to be eligible for Ask Ahead, with a coarse
+    time, and deleted within 24 hours by a tested purge job.
+-   Spot passage is logged only as outcome codes.
+
+Raw GPS must not leave the device for social features.
 
 ## Stranger-facing APIs must not expose
 
@@ -249,26 +260,14 @@ Raw GPS must not leak across this boundary.
 -   Stable identifiers that enable location tracking.
 -   APIs allowing nearby-user enumeration.
 
-## Presence
+## Aggregate counts
 
-Prefer aggregate information:
-
-``` text
-"128 travellers on this route"
-"23 travellers around this route segment"
-```
-
-rather than individually trackable moving dots.
-
-Apply:
-
--   Minimum anonymity thresholds.
--   Coarse/fuzzy spatial representation.
--   Time-limited presence.
--   Automatic expiry.
--   Anti-enumeration.
--   Rate limits.
--   Temporal/spatial smoothing where necessary.
+Aggregate traveller counts (travellers ahead/behind, waves, cohorts),
+traveller clusters and presence are **out of pilot scope**. They require
+a separate privacy review approved in `docs/PRODUCT.md` before any build.
+Report counts ("3 reports in 20 min", "5 replies") are allowed. Earlier
+presence, threshold, cohort and differential-privacy material is archived
+in [`../archive/`](../archive/README.md); its code stays default-off.
 
 ## Ghost Mode
 
@@ -276,15 +275,18 @@ Ghost Mode is a hard privacy control.
 
 When enabled:
 
--   Stop publishing social presence.
--   Remove/expire existing discoverable presence promptly.
--   Do not continue exposing cached presence through another channel.
+-   Stop **all** sending, including Spot passage and posts.
+-   Clear queued social items (posts, signals, answers, voice notes)
+    from the outbox.
+-   Take priority over reconnect and outbox replay.
+-   Remove the user from Ask Ahead recipient eligibility promptly.
 -   Realtime subscriptions must respect the new privacy state.
 -   Automated tests must verify this behavior.
 
 ## Logging
 
-Precise GPS is sensitive operational data.
+Precise GPS is sensitive data and should not reach the server in the
+pilot; these rules apply wherever location appears.
 
 -   Do not place precise coordinates in ordinary application logs.
 -   Do not include coordinates in exception messages unless absolutely
@@ -307,15 +309,18 @@ Design against:
 -   User enumeration by map coordinates.
 -   Correlating recurring exact home/work endpoints.
 -   Scraping room membership.
+-   Linking one alias across rooms or to a real account.
+-   Using Ask Ahead or Spot passage to learn that a specific person
+    passed a place.
 -   Searching for a person across routes.
 -   Repeated unwanted contact.
 -   Block circumvention.
 
 Where applicable use:
 
--   Aggregation.
--   Fuzzing/coarsening.
--   Minimum crowd thresholds.
+-   Per-room aliases.
+-   Coarse time for Spot passage.
+-   Bounded, non-deterministic Ask Ahead recipient selection.
 -   Rate limits.
 -   Query budgets.
 -   Visibility expiry.
@@ -329,23 +334,33 @@ explicit review and an ADR/security review.
 
 ------------------------------------------------------------------------
 
-# 6. Route Room and User-Generated Content Safety
+# 6. Spot Chat, Rooms and User-Generated Content Safety
 
-Route Rooms are temporary contextual spaces, not permanent open chat
-groups.
+Spot chats and festival route rooms are temporary contextual spaces, not
+permanent open chat groups.
 
-## V1 restrictions
+## Pilot restrictions
 
 Do not implement without explicit later approval:
 
--   Unrestricted direct messages.
+-   Private DMs between users (none in the pilot).
 -   Live group audio/video calling.
 -   Public exact participant locations.
--   Permanent route groups.
+-   Permanent route groups or follower graphs.
 
 ## Room behavior
 
--   Rooms are scoped to route/journey/time context.
+-   Rooms are scoped to a Spot, a journey, or a festival event window.
+-   People post under a random **per-room alias**; aliases are not stable
+    public handles, never embed account identifiers and cannot be linked
+    across rooms by other users.
+-   Content expires **by type** using server time (e.g. traffic/queue
+    signals about 1--2 h; food/fuel/restroom posts about 24 h; festival
+    room for the event window).
+-   "Still true?" confirmations extend a post's life; silence lets it
+    expire.
+-   After expiry, only per-Spot **highlights** remain; no full chat
+    archive.
 -   Membership/subscription authorization is server controlled.
 -   Rooms expire or become inactive.
 -   Clients cannot enumerate all members/rooms arbitrarily.
@@ -358,12 +373,11 @@ Do not implement without explicit later approval:
 Every user-generated communication path requires rate limiting,
 including:
 
--   Text messages.
--   Reactions.
--   Route updates.
+-   Text posts and chat messages.
+-   One-tap signals and "Still true?".
+-   Voice-note uploads.
+-   Ask Ahead questions and answers.
 -   Reports.
--   Media.
--   Future voice snippets.
 -   Connection/meeting requests if introduced.
 
 New/untrusted accounts should have stricter limits.
@@ -396,6 +410,20 @@ Provide easy:
 -   Block.
 -   Enforcement.
 -   Human escalation for serious cases.
+
+Voice notes use the same report/hide path as text.
+
+## Pilot content risks
+
+Design and test against:
+
+-   Spam, fake reviews and promotional posts by businesses at Spots.
+-   Abuse and harassment in anonymous chat, including Tamil and Tanglish
+    content (keyword lists and classifiers must cover both; do not rely
+    on English-only moderation).
+-   False alarms (e.g. fake "accident" posts): "Still true?" and expiry
+    are the first defence, moderation the second.
+-   Personal data in posts and voice notes (homes, number plates).
 
 ------------------------------------------------------------------------
 
@@ -478,10 +506,10 @@ for state that must be visible across replicas.
 
 This applies especially to:
 
--   WebSocket presence.
--   Route-room membership.
+-   WebSocket sessions.
+-   Room membership and alias assignment.
 -   Notifications.
--   Live traveller counts.
+-   Ask Ahead recipient selection and repeat-targeting limits.
 -   Rate limiting.
 -   Background jobs.
 -   Distributed locks.
@@ -512,22 +540,24 @@ ADR justifies extraction.
 Organize by domain:
 
 ``` text
-identity
-user
-journey
-route
-location
-privacy
-presence
-place
-update
-chat
-moderation
-journal
-notification
-media
-intelligence
+identity        (existing)
+journey         (existing)
+journal         (existing)
+routing         (existing)
+routeupdate     (existing; signal/anchor infrastructure for Spots)
+moderation      (existing)
+privacy         (existing; Spot-passage opt-in candidate)
+spot            (planned)
+askahead        (planned)
+room            (planned)
+routeguide      (planned)
+notification    (later)
+media           (later)
+intelligence    (later)
 ```
+
+Current and planned modules are described in
+[`../architecture/ENGINEERING_CONTEXT.md`](../architecture/ENGINEERING_CONTEXT.md).
 
 Within modules prefer:
 
@@ -597,7 +627,7 @@ Requirements:
 
 Use for:
 
--   Ephemeral presence.
+-   Ephemeral room/chat state.
 -   Hot realtime state.
 -   Rate limiting.
 -   Short-lived counters/cache.
@@ -625,9 +655,12 @@ It must explicitly address:
 -   Saved places.
 -   Journeys.
 -   Trip Journals.
--   Photos/media.
--   Route updates.
--   Chat messages.
+-   Photos/media and voice notes.
+-   Spot posts, signals and "Still true?" confirmations.
+-   Ask Ahead questions and answers.
+-   Spot-passage records (24-hour deletion).
+-   Route guides.
+-   Chat messages and aliases.
 -   Reports/moderation evidence.
 -   Precise/raw location remnants.
 -   AI-derived user data.
@@ -720,16 +753,24 @@ Requirements:
 -   Define conflict/reconciliation behavior.
 -   Network reconnect should restore relevant realtime subscriptions
     safely.
+-   Offline posts, signals and answers queue with capture time; the
+    server rejects them if the type's lifetime has elapsed and shows
+    accepted ones with capture time, never as new.
+-   Ghost Mode, sign-out and account deletion clear queued social items.
 -   Do not repeatedly request location/network resources in a
     battery-hostile way.
 
-Background location collection must be:
+Location during an active journey is read in the foreground for the
+map and Spots ahead and stays on the device. Background location is
+used only for opt-in, on-device Spot-passage detection during an active
+journey (e.g. an Android foreground service), and must be:
 
 -   Purpose limited.
 -   Battery aware.
 -   Permission aware.
 -   Platform compliant.
--   Disabled when no longer required.
+-   Disabled when the journey ends, Ghost Mode is on or the opt-in is
+    withdrawn.
 
 ------------------------------------------------------------------------
 
@@ -751,7 +792,7 @@ Areas requiring special attention:
 ### Mobile/map
 
 -   Do not rerender all markers on every GPS sample.
--   Cluster/aggregate traveller presence.
+-   Prioritize nearby Spot markers; collapse distant ones.
 -   Virtualize long lists.
 -   Load thumbnail-sized media where appropriate.
 -   Avoid unnecessary global-state updates.
@@ -801,8 +842,8 @@ Monitor at minimum:
 -   HTTP latency/error rate.
 -   WebSocket connections/disconnections.
 -   Subscription failures.
--   Presence update rate.
--   Route-room throughput.
+-   Room/chat throughput.
+-   Expiry and Spot-passage purge job lag.
 -   Redis latency/memory.
 -   Database latency/pool usage.
 -   Background job failures.
@@ -828,11 +869,14 @@ Examples of mandatory invariant tests:
 
 ``` text
 shouldNeverExposePreciseLocationToRouteParticipant()
-ghostModeShouldRemoveDiscoverablePresence()
+ghostModeShouldStopSpotPassageAndClearQueuedPosts()
 blockedUserCannotReachTargetThroughRealtimeChannel()
 unauthorizedUserCannotSubscribeToAnotherJourney()
 expiredJourneyCannotJoinRouteRoom()
-routePresenceCannotBeEnumeratedByCoordinates()
+askAheadNeverRevealsRecipientsToAsker()
+aliasCannotBeLinkedAcrossRooms()
+spotPassageIsDeletedWithin24Hours()
+expiredPostCannotBeRefreshedByClientClock()
 exactHomeLocationIsNeverReturnedToStrangers()
 ```
 
@@ -861,22 +905,25 @@ Critical E2E paths:
 -   Login.
 -   Start commute/trip.
 -   Deny/allow location.
--   Enter Living Route.
--   Receive aggregate presence.
+-   Enter Journey with Spots ahead.
 -   Ghost Mode.
--   Add route update.
--   Join route room.
+-   Post a signal, text post and voice note on a Spot.
+-   Confirm "Still true?".
+-   Ask Ahead: ask, receive and answer.
+-   Post-passing prompt.
+-   Join Spot chat / festival route room.
 -   Block/report.
 -   Lose/recover connectivity.
 -   End journey.
 -   View journal.
+-   Publish a route guide.
 -   Account deletion.
 
 ## Load/chaos scenarios
 
 As the product matures, test:
 
--   Large numbers of travellers on one corridor.
+-   Festival-rush post, voice-upload and chat volume on one corridor.
 -   WebSocket reconnect storms.
 -   Redis degradation.
 -   AI provider outage.
@@ -978,7 +1025,8 @@ decisions such as:
 -   AI provider strategy.
 -   Authentication/session model.
 -   Location retention policy.
--   Public individual-presence model.
+-   Spot-passage detection or retention changes.
+-   Aggregate traveller counts or any presence model.
 -   New cross-user communication capability.
 -   Major framework/library.
 -   Kubernetes/EKS adoption.
@@ -1004,7 +1052,7 @@ Unless explicitly approved:
     because they appear in the long-term architecture.
 -   Do not expose raw stranger GPS.
 -   Do not implement public individual tracking.
--   Do not add unrestricted DMs.
+-   Do not add private DMs.
 -   Do not add live group calls.
 -   Do not weaken authorization to simplify development.
 -   Do not store tokens in insecure client storage.
@@ -1125,7 +1173,7 @@ exposes real decisions.
 
 # 25. Final Engineering Principle
 
-The master product context tells Codex **what Routiqo should become**.
+`docs/PRODUCT.md` tells Codex **what Routiqo should become**.
 
 These guardrails ensure that as implementation grows, Routiqo remains:
 

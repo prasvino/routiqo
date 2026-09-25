@@ -1,12 +1,18 @@
 # Offline architecture
 
-Planned Live data is separate from durable journey commands. Per ROUTIQO_LIVE_SPEC.md,
-keep Live rows in memory, mark them stale offline and remove them at expiry. Disable
-offline Quick Signal submission; do not queue stale reports in the journey outbox.
-Reconnect refreshes under current authorization and does not replay contributions.
-An uncertain write may be retried explicitly with the exact idempotency identity
-within its validity window. Account/journey changes clear Live state. Maps, saved
+Spot content follows the offline rule in [`../PRODUCT.md`](../PRODUCT.md).
+Posts, signals, answers and voice notes (audio held locally until upload) made offline are queued in the
+journey outbox with capture time and an idempotency key. On sync the server
+accepts them only if the content type's lifetime has not elapsed since capture
+(server time), and shows them with their capture time, never as new. Ghost Mode,
+sign-out and account deletion clear queued social items; Ghost Mode also stops
+Spot-passage sending. Read-only Spot content cached offline is labelled stale and
+removed at expiry. Reconnect refreshes Spot content under current authorization.
+An uncertain write is retried with the exact idempotency identity only within its
+type's lifetime. Account/journey changes clear cached Spot state. Maps, saved
 plans and start/finish durability continue to follow their existing policies.
+The archived LIVE design disabled offline Quick Signal submission; that
+default-off code is unchanged.
 Current: validated versioned local planning persistence, browser localStorage and native SQLite. Storage errors are visible; corrupted payloads do not silently become trusted state.
 
 Authenticated journey commands use account-partitioned durable queues and snapshots
@@ -45,4 +51,4 @@ memory, battery, location permissions, boundary coverage and airplane-mode cold
 starts before promising guidance. When unavailable, retain verified downloaded
 instructions with their age/coverage and clearly state that recalculation needs
 connectivity; never synthesize a replacement route.
-Do not sync stale route incidents into expired rooms. Presence is ephemeral and must not be replayed from an offline queue. Ghost Mode must take priority over reconnect.
+Do not sync stale posts into expired Spots or rooms. Spot passage is never replayed after its prompt expires or Ghost Mode is on. Ghost Mode must take priority over reconnect and outbox replay.

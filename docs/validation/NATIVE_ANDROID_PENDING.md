@@ -1,8 +1,15 @@
 # Native Android implementation and pending release evidence
 
-Updated: 2026-09-24. Implementation is for a development build and staging
-evaluation. Production activation, V3 community traffic output, GPS navigation and
-downloaded/offline maps are outside this approval.
+Updated: 2026-09-24; gate reframed 2026-09-25. Implementation is for a
+development build and staging evaluation. Production activation, GPS navigation
+and downloaded/offline maps are outside this approval. V3 community traffic output
+is out of scope: it was archived with the 2026-09-25 direction reset (see
+[`PRODUCT.md`](../PRODUCT.md)).
+
+**Phase 1 gate:** Android is the primary pilot client. This ledger closes when the
+app installs and runs a full journey (sign in, plan, start, travel, complete, see
+history and journal) on **3 or more physical Android phones** against hosted
+staging services. Emulator and synthetic evidence does not close it.
 
 ## Implemented code path
 
@@ -34,13 +41,15 @@ downloaded/offline maps are outside this approval.
 - [ ] Supply reviewed self-hosted `/maps/` style, sprites, glyphs and regional tiles
       on the configured host. Inspect all nested resource URLs, attribution, logs,
       egress and failures. Do not use a public demo as production fallback.
-- [ ] Complete configured-service checks on an emulator and a representative physical device: cold start,
+- [ ] Complete configured-service checks on an emulator and on 3+ physical Android phones (low-end and mid-range): cold start,
       SecureStore/SQLite persistence, screen sizes/large text, slow/offline/reconnect,
       map load/failure, Google cancellation, background/resume, blocked replay and
       account isolation. Capture visual/device evidence and performance.
-- [ ] Produce a signed release candidate with the owner's signing key and store
-      access, then verify its signing fingerprint and real OAuth registration. A debug
-      APK does not satisfy this gate.
+- [ ] Produce a signed build with the owner's signing key (an internal test build
+      for Phase 1; the store release for the pilot), then verify its signing
+      fingerprint and real OAuth registration. A debug APK does not satisfy this gate.
+- [ ] Run the full-journey gate above on 3+ physical phones and record device
+      model, Android version, memory and latency.
 - [ ] Complete independent security review of the native bridge, token lifecycle,
       OAuth configuration and proxy/TLS behavior before production use.
 

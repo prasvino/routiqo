@@ -17,7 +17,7 @@ the Android account/journey integration. It remains behind the existing
 
 This read-only feature needs no new external provider, migration or operator
 permission. It does not expand the durable recovery cache, upload local plans,
-enable journals or activate public LIVE.
+enable journals or enable any archived LIVE capability.
 
 ## Verification evidence
 
