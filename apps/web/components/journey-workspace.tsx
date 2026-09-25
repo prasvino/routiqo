@@ -528,7 +528,7 @@ export function JourneyWorkspace() {
       )}
       {account && (
         <PrivateSignalsPanel
-          key={account}
+          key={`private-signals:${account}`}
           coordinator={signalRecovery}
           accountId={account}
           journeyId={active?.id ?? null}
@@ -559,7 +559,7 @@ export function JourneyWorkspace() {
       )}
       {account && process.env.NEXT_PUBLIC_ROUTIQO_PUBLIC_SIGNAL_INTENT_UI_ENABLED === 'true' && (
         <PublicIntentRecoveryPanel
-          key={account}
+          key={`public-intent-recovery:${account}`}
           accountId={account}
           online={!offline}
           identityConfirmed={identityConfirmed}
@@ -567,10 +567,18 @@ export function JourneyWorkspace() {
         />
       )}
       {availability === 'ready' && account && partition && (
-        <CommuteSummaries key={account} snapshots={partition.snapshots} account={account} />
+        <CommuteSummaries
+          key={`commute-summaries:${account}`}
+          snapshots={partition.snapshots}
+          account={account}
+        />
       )}
       {availability === 'ready' && account && (
-        <JourneyHistory key={account} account={account} onOpenJournal={setJournal} />
+        <JourneyHistory
+          key={`journey-history:${account}`}
+          account={account}
+          onOpenJournal={setJournal}
+        />
       )}
       {availability === 'ready' &&
         account &&
