@@ -5,26 +5,29 @@ Manual rendered UI checks complement automated checks. Native bundling does not 
 Foundation tests must exercise validation, persistence corruption/version handling, duplicate saved IDs, plan changes, lifecycle invariants and privacy suppression.
 
 
-## Routiqo Live acceptance plan
+## Journey, Spots and Ask Ahead acceptance plan
 
-Planned specification: `docs/features/live/ROUTIQO_LIVE_SPEC.md`. Tests are required
-before exposure; this matrix is not a report of implemented or passing behavior.
+Product scope: [`../PRODUCT.md`](../PRODUCT.md). Tests are required before
+exposure; this matrix is not a report of implemented or passing behavior.
 
 | Layer | Required cases |
 |---|---|
-| Pure policies (L0) | Allowed categories/values, server-time boundaries, contribution replacement, duplicate identity, expiry, conflicting evidence, consent generation and no fabricated moments |
-| Persistence/HTTP (L1) | Owner isolation, stale/fake admission, origin/CSRF/session guards, schema/body caps, concurrent idempotency, distributed quotas, bounded cleanup and unavailable-authority suppression |
-| Privacy projection | Sparse cohorts, collusion, overlap/repeated probing, temporal differences, blocked/withdrawn evidence, opaque reference expiry and no membership/coordinate fields |
-| Moderation/deletion | Report authorization, duplicate reports, restricted operator access, hide/reinstate rules, minimal evidence holds, account deletion and cache invalidation |
-| Multi-replica | Ghost/submit/read races, reordered generation changes, block changes, cleanup races, stale cache and Redis outages |
-| UI/offline (L2) | Cold start, insufficient evidence, coarse freshness, expiry while open, stale offline rows, no report replay, uncertain exact retries, account/end/Ghost clearing, keyboard/screen-reader/large-text checks |
-| Safety/provenance | No crowd or report counts, no implied location verification, no lane advice, no safety inference from absent reports, no fabricated confidence and no driving prompts |
+| Pure policies (L0) | Allowed signal categories/values, per-type lifetimes at server-time boundaries, "Still true?" extension and silence-expiry, highlight derivation, duplicate identity, conflicting reports and no fabricated posts |
+| Persistence/HTTP (L1) | Owner isolation, origin/CSRF/session guards, schema/body and voice-note size/duration caps, concurrent idempotency, distributed rate limits (stricter for new accounts), bounded cleanup and 24-hour Spot-passage purge |
+| Privacy | Per-room aliases unlinkable across rooms and never embedding account IDs; Ask Ahead anti-targeting (bounded, non-deterministic, no repeat targeting, blocks respected) and recipient anonymity towards the asker; Spot passage only after opt-in, coarse time, outcome-code logging; no membership, coordinate or traveller-count fields |
+| Moderation/deletion | Report authorization, duplicate reports, hide/reinstate for text, voice and chat, business spam and false-alarm handling, Tamil/Tanglish abuse fixtures, author delete, account deletion and cache invalidation |
+| Multi-replica | Ghost/submit/read races, block changes, room membership expiry, cleanup races, stale cache and Redis outages |
+| UI/offline (L2) | Cold start, no recent posts, Ask Ahead unanswered, coarse freshness, expiry while open, stale offline rows; offline queue keeps capture time, server rejects items whose lifetime elapsed and shows accepted ones with capture time; uncertain exact retries; Ghost Mode stops Spot passage and clears queued posts; account/end clearing; keyboard/screen-reader/large-text checks |
+| Safety/provenance | Report counts allowed, traveller counts forbidden; no implied location verification, no safety inference from absent reports, no fabricated confidence; post-passing prompt is a dismissible card only when stopped/slow or passenger, never a modal while moving |
+| Device (phase gates) | Physical Android devices (3+ phones, including mid-range and small screen) for journey, Spot-passage detection, battery and weak-network behaviour; cloud sessions record these as pending |
 
 Use synthetic locations and users; no actual GPS or personal evidence in agent QA.
 Review serialized API/cache/log projections for leaks. Real sign-in and reviewed
-regional context are pilot gates. Later sockets need revocation/reconnect/replay
-and multi-replica fanout tests; Ask Ahead needs anti-targeting and recipient-consent
-tests. Those future tests are not prerequisites for implementing L0 pure policies.
+corridor Spots are pilot gates. Sockets, if adopted, need revocation/reconnect/
+replay and multi-replica fanout tests. Sparse-cohort, collusion and probing tests
+for published aggregates are archived with the cohort design
+([`../archive/README.md`](../archive/README.md)) and return only with aggregate
+traveller counts.
 
 ## API contract checks
 

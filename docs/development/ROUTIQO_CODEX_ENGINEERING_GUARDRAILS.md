@@ -365,8 +365,8 @@ Do not implement without explicit later approval:
 -   Rooms expire or become inactive.
 -   Clients cannot enumerate all members/rooms arbitrarily.
 -   Reconnection must not duplicate messages.
--   Block state must apply to realtime delivery as well as REST
-    retrieval.
+-   Block state must apply to realtime delivery, REST retrieval, room
+    subscription, Ask Ahead recipient selection and replay.
 
 ## Rate limiting
 
