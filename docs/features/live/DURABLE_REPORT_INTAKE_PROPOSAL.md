@@ -2,6 +2,8 @@
 
 Status: proposed for review, not implemented or production-approved.
 
+Update 2026-09-25: [REPORTING_PROTOCOL_PROPOSAL.md](REPORTING_PROTOCOL_PROPOSAL.md) proposes answers to the four review questions below, based on the implemented V3 canonical-report path, and recommends retiring this separate store for V1.
+
 ## Scope and authority
 
 Persist minimized structured-report/case metadata independently of public output.
