@@ -263,8 +263,7 @@ dropped at expiry.
 
 Decided 2026-09-25:
 
-- **Diwali 2026 (around 8 November; outbound rush roughly 5–7 November — confirm
-  dates) is the dry run (Phase 4)** with friends and early testers, Android
+- **Diwali 2026 (outbound rush 5–7 November) is the dry run (Phase 4)** with friends and early testers, Android
   only, on a reduced scope (below). Six weeks is not enough to launch publicly
   with working moderation.
 - **Pongal 2027 (mid-January) is the public launch (Phase 5)** with the full
@@ -378,7 +377,7 @@ aggregates; do not optimise time spent, message volume or notification count.
 - [ ] When, if ever, do aggregate counts come back, and under what privacy
       review?
 - [ ] Who seeds and verifies ~150–200 Spots before 1 November?
-- [ ] Exact Diwali and Pongal travel dates and the festival room windows.
+- [ ] Exact Pongal travel dates and the festival room windows.
 
 ## Decisions (2026-09-25)
 

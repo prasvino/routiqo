@@ -40,7 +40,7 @@ execution queue and L0–L5 stages are archived verbatim in
   the Diwali dry run: Spots ahead, one-tap signals, text posts, expiry with
   "Still true?" / "No longer true", report/block/hide moderation, official alerts
   on the corridor districts. Nothing else is started before Diwali.
-- **Diwali 2026 (around 8 November):** first dry run (Phase 4) on the trunk and
+- **Diwali 2026 (outbound rush 5–7 November):** first dry run (Phase 4) on the trunk and
   branches.
 - **November–December:** rest of Phase 2 (voice notes, Spot chat, festival room)
   and Phase 3 (Spot passage, post-passing prompts, Ask Ahead, route guides),

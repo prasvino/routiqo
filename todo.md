@@ -7,8 +7,8 @@ from [`docs/PRODUCT.md`](docs/PRODUCT.md); the engineering sequence per phase is
 behaviour: tick an item here only when its evidence is recorded there or in the
 matching `docs/validation/*_PENDING.md` ledger.
 
-**Timeline (decided 2026-09-25):** Diwali 2026 (around 8 November; confirm travel
-dates) is the **dry run** on a reduced scope with friends and early testers;
+**Timeline (decided 2026-09-25):** Diwali 2026 (outbound rush 5–7 November) is the
+**dry run** on a reduced scope with friends and early testers;
 Pongal 2027 is the **public launch**. A second, smaller dry run on a December long
 weekend covers what Diwali leaves out. See PRODUCT.md *Pilot* and *Decisions*.
 
