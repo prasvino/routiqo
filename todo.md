@@ -76,6 +76,7 @@ ADR 0055's community traffic summary is authorized for V3 implementation and sta
 - [x] Implement the explicit, default-off account planning copy (ADR 0062): owner-only save/check/add/remove of plans and saved places with CAS, exact retry and merge-only restore on web. See `docs/features/journey/ACCOUNT_PLANNING_BACKUP_SPEC.md`.
 - [ ] Validate the account planning copy with real Google sign-in across two devices on HTTPS staging, then add native Android controls on the same contract.
 - [ ] Test delayed responses, duplicate commands, network flaps, interrupted writes and unavailable storage across accounts/devices.
+- [x] Cover web journey sync with deterministic scenario tests against the server's idempotency rules: lost and deadline-delayed responses, duplicate taps and competing tabs, a network flap with backoff and FIFO order, a delayed response across an account switch, and storage failing during acknowledgement (`tests/journey-network-resilience.test.ts`). Real-network, two-device and native runs remain.
 - [ ] Verify journal conflicts, navigation protection, older history, summary completeness and backup/restore with real sign-in.
 - [ ] Verify authenticated planning flows, keyboard/focus behavior, small screens, large text, reduced motion and storage-failure recovery.
 - [ ] Confirm supported recovery flows preserve acknowledged work, account isolation and exact replay semantics.
