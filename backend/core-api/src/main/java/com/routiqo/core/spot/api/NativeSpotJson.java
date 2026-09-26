@@ -74,24 +74,45 @@ final class NativeSpotJson {
     static byte[] activityResponse(SpotActivity activity) {
         List<SpotActivity.Entry> entries = new ArrayList<>(activity.spots());
         byte[] body = write(activity, entries);
-        while (body.length > MAX_RESPONSE_BYTES) {
-            int dropFrom = -1;
-            java.time.Instant oldest = null;
-            for (int index = 0; index < entries.size(); index++) {
-                List<SpotActivity.PostView> posts = entries.get(index).posts();
-                if (posts.isEmpty()) continue;
-                var last = posts.getLast().capturedAt();
-                if (oldest == null || last.isBefore(oldest)) {
-                    oldest = last;
-                    dropFrom = index;
-                }
-            }
-            if (dropFrom < 0) throw new ResponseTooLarge();
-            var entry = entries.get(dropFrom);
-            entries.set(dropFrom, entry.withPosts(entry.posts().subList(0, entry.posts().size() - 1), true));
-            body = write(activity, entries);
+        if (body.length <= MAX_RESPONSE_BYTES) return body;
+        // Measure each post once, then drop the globally oldest until the estimate fits.
+        record Candidate(int entry, java.time.Instant capturedAt, int bytes) {}
+        var candidates = new ArrayList<Candidate>();
+        for (int index = 0; index < entries.size(); index++)
+            for (var post : entries.get(index).posts())
+                candidates.add(new Candidate(index, post.capturedAt(), postBytes(post) + 1));
+        candidates.sort(java.util.Comparator.comparing(Candidate::capturedAt));
+        int[] drop = new int[entries.size()];
+        long excess = body.length - (long) MAX_RESPONSE_BYTES;
+        for (var candidate : candidates) {
+            if (excess <= 0) break;
+            drop[candidate.entry()]++;
+            excess -= candidate.bytes();
         }
-        return body;
+        for (int attempt = 0; ; attempt++) {
+            var trimmed = new ArrayList<SpotActivity.Entry>(entries.size());
+            for (int index = 0; index < entries.size(); index++) {
+                var entry = entries.get(index);
+                int keep = Math.max(0, entry.posts().size() - drop[index]);
+                trimmed.add(drop[index] == 0 ? entry : entry.withPosts(entry.posts().subList(0, keep), true));
+            }
+            body = write(activity, trimmed);
+            if (body.length <= MAX_RESPONSE_BYTES) return body;
+            // The estimate was short (rare): drop the next oldest post and try again.
+            var next = candidates.stream().filter(candidate -> drop[candidate.entry()]
+                    < entries.get(candidate.entry()).posts().size()).findFirst();
+            if (next.isEmpty() || attempt > 20) throw new ResponseTooLarge();
+            drop[next.get().entry()]++;
+        }
+    }
+
+    private static int postBytes(SpotActivity.PostView post) {
+        ObjectNode node = MAPPER.createObjectNode();
+        node.put("ref", post.ref().toString()).put("alias", post.alias()).put("text", post.text())
+                .put("type", post.type()).put("capturedAt", post.capturedAt().toString())
+                .put("expiresAt", post.expiresAt().toString()).put("stillTrue", post.stillTrue())
+                .put("viewerVote", post.viewerVote()).put("mine", post.mine());
+        return MAPPER.writeValueAsBytes(node).length;
     }
 
     private static byte[] write(SpotActivity activity, List<SpotActivity.Entry> entries) {

@@ -88,3 +88,11 @@ The owner split the step into three PRs:
   capture"**, in exchange for not dropping honest offline contributions.
 - **Summary votes are shared.** Every current signal with the same value is
   extended or expired together, which matches how the summary is shown.
+- **An account's own earlier vote counts only inside the current window.** A vote
+  cast before the group's current signals is treated as absent, so voting again
+  takes effect.
+- **Serialization.** Summary votes lock the group row `FOR NO KEY UPDATE`, which
+  lets new signals reference it. First posts in a room are serialized with a
+  transaction advisory lock on the room. Highlight promotion is serialized across
+  replicas and considers each expired post once.
+- **Deleting a post also deletes any highlight made from it.**

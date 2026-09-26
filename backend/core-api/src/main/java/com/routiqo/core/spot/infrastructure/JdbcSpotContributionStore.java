@@ -166,7 +166,8 @@ final class JdbcSpotContributionStore implements SpotContributionStore {
 
     @Override public boolean lockGroup(UUID groupRef) {
         requireTransaction();
-        return !jdbc.queryForList("SELECT ref FROM spot_signal_group WHERE ref = ? FOR UPDATE",
+        // NO KEY UPDATE serializes voters without blocking FK key-share from concurrent signal inserts.
+        return !jdbc.queryForList("SELECT ref FROM spot_signal_group WHERE ref = ? FOR NO KEY UPDATE",
                 UUID.class, groupRef).isEmpty();
     }
 
@@ -182,10 +183,22 @@ final class JdbcSpotContributionStore implements SpotContributionStore {
                         instant(row, "max_expires_at")), groupRef, at(now));
     }
 
-    @Override public Optional<VoteKind> vote(UUID itemRef, UUID actorId) {
+    @Override public Optional<VoteKind> vote(UUID itemRef, UUID actorId, Instant since) {
         requireTransaction();
-        return jdbc.queryForList("SELECT kind FROM spot_vote WHERE item_ref = ? AND actor_id = ?",
-                String.class, itemRef, actorId).stream().findFirst().map(VoteKind::valueOf);
+        return jdbc.queryForList(
+                "SELECT kind FROM spot_vote WHERE item_ref = ? AND actor_id = ? AND voted_at >= ?",
+                String.class, itemRef, actorId, at(since)).stream().findFirst().map(VoteKind::valueOf);
+    }
+
+    @Override public void deleteHighlightOf(UUID postRef) {
+        requireTransaction();
+        jdbc.update("DELETE FROM spot_highlight WHERE source_post_ref = ?", postRef);
+    }
+
+    @Override public void lockRoom(UUID spotId, LocalDate roomDay) {
+        requireTransaction();
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", Object.class,
+                "spot-room:" + spotId + ":" + roomDay);
     }
 
     @Override public void putVote(UUID itemRef, UUID actorId, VoteKind kind, Instant now) {

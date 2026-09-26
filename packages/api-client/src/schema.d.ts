@@ -1391,7 +1391,7 @@ export interface components {
             expiresAt: string;
             stillTrue: number;
             viewerVote: components["schemas"]["NativeSpotVote"];
-            /** @description True only for the viewer's own posts */
+            /** @description True only for the viewer's own posts, so they can delete them. */
             mine: boolean;
         };
         NativeSpotReceipt: {

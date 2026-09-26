@@ -2400,11 +2400,8 @@ components:
         stillTrue: { type: integer, minimum: 0 }
         viewerVote: { $ref: '#/components/schemas/NativeSpotVote' }
         mine:
-          {
-            type: boolean,
-            description: True only for the viewer's own posts,
-            so they can delete them.,
-          }
+          type: boolean
+          description: "True only for the viewer's own posts, so they can delete them."
     NativeSpotReceipt:
       type: object
       additionalProperties: false

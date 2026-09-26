@@ -386,6 +386,109 @@ class SpotContributionPersistenceTest {
         assertThat(count("spot_highlight")).isZero();
     }
 
+    @Test void aSameKindVoteFromBeforeTheCurrentSignalsCountsAgain() {
+        Traveller author = traveller(false);
+        Traveller voter = traveller(false);
+        Traveller third = traveller(false);
+        service.submitSignal(author.account(), signal(author, TOLL, "traffic", "slow", START));
+        UUID group = jdbc.queryForObject("SELECT group_ref FROM spot_signal", UUID.class);
+        service.vote(voter.account(), group, VoteKind.NO_LONGER_TRUE);
+        // The next day, fresh signals with the same value: yesterday's vote is outside the window.
+        clock.advance(Duration.ofHours(15));
+        Traveller later = traveller(false);
+        service.submitSignal(later.account(), signal(later, TOLL, "traffic", "slow", clock.instant()));
+        service.vote(voter.account(), group, VoteKind.NO_LONGER_TRUE);
+        var result = service.vote(third.account(), group, VoteKind.NO_LONGER_TRUE);
+        assertThat(result.status()).isEqualTo("expired");
+    }
+
+    @Test void deletingAPostAlsoRemovesItsHighlight() {
+        Traveller author = traveller(false);
+        Traveller a = traveller(false);
+        Traveller b = traveller(false);
+        var tip = service.submitPost(author.account(), post(author, EATERY, "place", "Ask for the family room"));
+        service.vote(a.account(), tip.ref(), VoteKind.STILL_TRUE);
+        service.vote(b.account(), tip.ref(), VoteKind.STILL_TRUE);
+        var maintenance = new JdbcSpotContributionMaintenance(jdbc, manager, clock);
+        clock.advance(Duration.ofHours(37));
+        assertThat(maintenance.promoteHighlights(100)).isEqualTo(1);
+        assertThat(service.deletePost(author.account(), tip.ref()).status()).isEqualTo("deleted");
+        assertThat(count("spot_highlight")).isZero();
+        assertThat(activity.read(a.account(), List.of(EATERY)).spots().getFirst().highlights()).isEmpty();
+    }
+
+    @Test void highlightsKeepTheBestThreeAndNeverChurnOnLaterPasses() {
+        Traveller author = traveller(false);
+        List<Traveller> voters = List.of(traveller(false), traveller(false), traveller(false), traveller(false));
+        for (int index = 0; index < 5; index++) {
+            clock.advance(Duration.ofMinutes(11));
+            var tip = service.submitPost(author.account(), post(author, EATERY, "place", "Tip " + index));
+            for (int vote = 0; vote < 2 + (index % 3); vote++)
+                service.vote(voters.get(vote).account(), tip.ref(), VoteKind.STILL_TRUE);
+        }
+        var maintenance = new JdbcSpotContributionMaintenance(jdbc, manager, clock);
+        clock.advance(Duration.ofHours(37));
+        maintenance.promoteHighlights(100);
+        List<String> first = jdbc.queryForList("SELECT ref::text FROM spot_highlight ORDER BY ref", String.class);
+        assertThat(first).hasSize(3);
+        assertThat(maintenance.promoteHighlights(100)).isZero();
+        assertThat(jdbc.queryForList("SELECT ref::text FROM spot_highlight ORDER BY ref", String.class))
+                .isEqualTo(first);
+        assertThat(jdbc.queryForObject("SELECT min(still_true) FROM spot_highlight", Integer.class)).isEqualTo(3);
+    }
+
+    @Test void concurrentReReportsAndSummaryVotesDoNotDeadlock() throws Exception {
+        Traveller seed = traveller(false);
+        service.submitSignal(seed.account(), signal(seed, TOLL, "traffic", "slow", START));
+        UUID group = jdbc.queryForObject("SELECT group_ref FROM spot_signal", UUID.class);
+        List<Traveller> reporters = new ArrayList<>();
+        List<Traveller> voters = new ArrayList<>();
+        for (int index = 0; index < 6; index++) {
+            Traveller reporter = traveller(false);
+            service.submitSignal(reporter.account(), signal(reporter, TOLL, "traffic", "slow", START));
+            reporters.add(reporter);
+            voters.add(traveller(false));
+        }
+        clock.advance(Duration.ofSeconds(61));
+        List<Callable<Object>> work = new ArrayList<>();
+        for (int index = 0; index < 6; index++) {
+            Traveller reporter = reporters.get(index);
+            Traveller voter = voters.get(index);
+            work.add(() -> service.submitSignal(reporter.account(),
+                    signal(reporter, TOLL, "traffic", "slow", clock.instant())));
+            work.add(() -> service.vote(voter.account(), group, VoteKind.STILL_TRUE));
+        }
+        try (var pool = Executors.newFixedThreadPool(12)) {
+            for (var result : pool.invokeAll(work)) result.get(); // any deadlock surfaces as a failure here
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_signal WHERE state = 'ACTIVE'", Integer.class))
+                .isEqualTo(7);
+    }
+
+    @Test void concurrentFirstPostsInOneRoomGetDistinctAliases() throws Exception {
+        var single = new AliasWords("t", names("Aa", 20), names("Bb", 20));
+        var pinned = new SpotContributionService(journeys, accounts, activeJourneys, restrictions, ages,
+                new JdbcSpotContributionStore(jdbc), catalog, single, clock,
+                // Everyone wants the same pair; only the numbered fallback varies.
+                bound -> bound == 98 ? java.util.concurrent.ThreadLocalRandom.current().nextInt(98) : 0);
+        List<Traveller> travellers = new ArrayList<>();
+        for (int index = 0; index < 4; index++) travellers.add(traveller(false));
+        List<Callable<SpotContributionService.Receipt>> posts = new ArrayList<>();
+        for (Traveller t : travellers)
+            posts.add(() -> pinned.submitPost(t.account(), post(t, TOLL, "traffic", "Hello")));
+        List<String> aliases = new ArrayList<>();
+        try (var pool = Executors.newFixedThreadPool(4)) {
+            for (var result : pool.invokeAll(posts)) aliases.add(result.get().alias());
+        }
+        assertThat(aliases).doesNotHaveDuplicates().contains("Aaa Bba");
+    }
+
+    private static List<String> names(String prefix, int count) {
+        var out = new ArrayList<String>();
+        for (int index = 0; index < count; index++) out.add(prefix + (char) ('a' + index));
+        return out;
+    }
+
     @Test void deletingTheAccountRemovesEverythingItContributed() {
         Traveller t = traveller(false);
         Traveller other = traveller(false);

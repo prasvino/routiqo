@@ -50,31 +50,36 @@ final class JdbcSpotContributionMaintenance {
     int promoteHighlights(int limit) {
         limit(limit);
         return transactions.execute(status -> {
+            // One promoter at a time across replicas, so the top-3 trim sees every new highlight.
+            jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended('spot-highlight-promotion', 0))",
+                    Object.class);
             Timestamp now = Timestamp.from(clock.instant());
+            // Each expired place post is considered exactly once, whatever its vote count.
+            List<UUID> considered = jdbc.queryForList("""
+                    UPDATE spot_post SET highlight_checked = TRUE WHERE ref IN (
+                        SELECT ref FROM spot_post
+                        WHERE type = 'place' AND state = 'ACTIVE' AND NOT highlight_checked AND expires_at <= ?
+                        ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
+                    RETURNING ref
+                    """, UUID.class, now, limit);
+            if (considered.isEmpty()) return 0;
             List<UUID> spots = jdbc.queryForList("""
-                    WITH candidates AS (
-                        SELECT p.ref, p.spot_id, p.actor_id, p.text, p.expires_at,
-                               (SELECT count(*) FROM spot_vote v
-                                WHERE v.item_ref = p.ref AND v.kind = 'STILL_TRUE') AS still_true
-                        FROM spot_post p
-                        WHERE p.type = 'place' AND p.state = 'ACTIVE' AND p.expires_at <= ?
-                          AND NOT EXISTS (SELECT 1 FROM spot_highlight h WHERE h.source_post_ref = p.ref)
-                          AND (SELECT count(*) FROM spot_vote v
-                               WHERE v.item_ref = p.ref AND v.kind = 'STILL_TRUE') >= 2
-                        ORDER BY p.expires_at LIMIT ? FOR UPDATE OF p SKIP LOCKED)
                     INSERT INTO spot_highlight (ref, spot_id, source_post_ref, actor_id, text, still_true,
                         created_at, expires_at)
-                    SELECT gen_random_uuid(), spot_id, ref, actor_id, text, still_true, expires_at,
-                           expires_at + INTERVAL '30 days'
-                    FROM candidates
+                    SELECT gen_random_uuid(), p.spot_id, p.ref, p.actor_id, p.text, votes.still_true, p.expires_at,
+                           p.expires_at + INTERVAL '30 days'
+                    FROM spot_post p
+                    CROSS JOIN LATERAL (SELECT count(*)::INTEGER AS still_true FROM spot_vote v
+                        WHERE v.item_ref = p.ref AND v.kind = 'STILL_TRUE') votes
+                    WHERE p.ref = ANY (?) AND votes.still_true >= 2
                     ON CONFLICT (source_post_ref) DO NOTHING
                     RETURNING spot_id
-                    """, UUID.class, now, limit);
+                    """, UUID.class, (Object) considered.toArray(UUID[]::new));
             for (UUID spot : spots.stream().distinct().toList()) {
                 jdbc.update("""
                         DELETE FROM spot_highlight WHERE spot_id = ? AND ref NOT IN (
                             SELECT ref FROM spot_highlight WHERE spot_id = ?
-                            ORDER BY still_true DESC, created_at DESC LIMIT 3)
+                            ORDER BY still_true DESC, created_at DESC, ref LIMIT 3)
                         """, spot, spot);
             }
             return spots.size();

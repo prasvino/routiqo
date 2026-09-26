@@ -52,11 +52,16 @@ public interface SpotContributionStore {
     Optional<LockedPost> lockPost(UUID ref);
     boolean lockGroup(UUID groupRef);
     List<LockedSignal> lockActiveSignals(UUID groupRef, Instant now);
-    Optional<VoteKind> vote(UUID itemRef, UUID actorId);
+    /** The account's current vote, ignoring votes cast before {@code since} (the item's vote window). */
+    Optional<VoteKind> vote(UUID itemRef, UUID actorId, Instant since);
     void putVote(UUID itemRef, UUID actorId, VoteKind kind, Instant now);
     int countVotes(UUID itemRef, VoteKind kind, Instant since, List<UUID> excludedActors);
     void extendPost(UUID ref, Instant expiresAt);
     void extendSignal(UUID ref, Instant expiresAt);
     void endPost(UUID ref, String state, Instant now);
     void endSignal(UUID ref, Instant now);
+    /** Removes any highlight made from this post (delete my post, and later moderation). */
+    void deleteHighlightOf(UUID postRef);
+    /** Serializes first posts in a room across accounts, so alias choice cannot race. */
+    void lockRoom(UUID spotId, LocalDate roomDay);
 }

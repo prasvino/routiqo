@@ -64,7 +64,7 @@ Public contributions on Spots exist on the server behind
 
 Checks (cloud session, JDK 25, Docker):
 
-- **Java:** `./gradlew check bootJar` gave **694 tests / 118 suites**, zero
+- **Java:** `./gradlew check bootJar` gave **699 tests / 118 suites**, zero
   failures, errors or skips; the baseline was 669.
   - New domain tests cover lifetimes, capture rules, the Still-true formula, text
     rules and aliases.
@@ -86,7 +86,24 @@ Checks (cloud session, JDK 25, Docker):
     - response truncation.
   - The architecture rule now also forbids `spot` from depending on moderation
     infrastructure or API.
-  - The late-replay test was added after that full run and passes in its suite.
+- **Independent review:** a fresh-subagent review found two High and two Medium
+  issues. All are fixed and regression-tested in the follow-up commit:
+  - A same-kind vote cast before the current signals now counts again; it was
+    silently ignored before.
+  - Deleting a post now also removes a highlight made from it.
+  - Summary votes and concurrent re-reports no longer deadlock: the group row is
+    locked with `FOR NO KEY UPDATE`.
+  - Highlight promotion considers each expired post once, is serialized across
+    replicas, and uses a deterministic top-3 tie-break.
+  - Low fixes:
+    - First posts in a room are serialized by an advisory lock, so aliases can't
+      collide;
+    - the summary ref is deterministic;
+    - response truncation measures each post once;
+    - a contract description is quoted properly;
+    - an exhausted alias list returns 503.
+  - Open for a product decision: the phone-number rule ("7 or more digits") also
+    rejects dates such as 2026-11-05.
 - **TypeScript:** `pnpm check` passed with **914 tests / 109 files**, and the
   contract is in sync.
 

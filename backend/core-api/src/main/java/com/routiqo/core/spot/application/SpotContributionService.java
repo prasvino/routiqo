@@ -140,8 +140,14 @@ public final class SpotContributionService {
                     || store.countCharges(actor, Action.POST, now.minus(Duration.ofHours(24))) >= (fresh ? 5 : 20))
                 throw new SpotsRateLimited();
             LocalDate room = LocalDate.ofInstant(timing.effectiveCreated(), ROOM_ZONE);
+            store.lockRoom(spot.id(), room);
             String alias = store.alias(spot.id(), room, actor).orElseGet(() -> {
-                String picked = aliases.pick(random, candidate -> store.aliasTaken(spot.id(), room, candidate));
+                final String picked;
+                try {
+                    picked = aliases.pick(random, candidate -> store.aliasTaken(spot.id(), room, candidate));
+                } catch (IllegalStateException exhausted) {
+                    throw new SpotsUnavailable();
+                }
                 store.insertAlias(spot.id(), room, actor, picked, now);
                 return picked;
             });
@@ -178,6 +184,8 @@ public final class SpotContributionService {
                     .orElseThrow(SpotContributionNotFound::new);
             Instant now = clock.instant();
             if ("ACTIVE".equals(post.state())) store.endPost(ref, "DELETED", now);
+            // A deleted post disappears everywhere, including a highlight already made from it.
+            store.deleteHighlightOf(ref);
             return receipt(ref, now);
         });
     }
@@ -188,7 +196,7 @@ public final class SpotContributionService {
         if (post.actorId().equals(actor)) throw new SpotContributionForbidden();
         Instant expires = post.expiresAt();
         String status = "active";
-        if (store.vote(post.ref(), actor).orElse(null) != kind) {
+        if (store.vote(post.ref(), actor, post.effectiveCreated()).orElse(null) != kind) {
             chargeVote(actor, now);
             store.putVote(post.ref(), actor, kind, now);
             if (kind == VoteKind.STILL_TRUE) {
@@ -215,7 +223,7 @@ public final class SpotContributionService {
         Instant window = signals.stream().map(SpotContributionStore.LockedSignal::effectiveCreated)
                 .min(Instant::compareTo).orElseThrow();
         String status = "active";
-        if (store.vote(group, actor).orElse(null) != kind) {
+        if (store.vote(group, actor, window).orElse(null) != kind) {
             chargeVote(actor, now);
             store.putVote(group, actor, kind, now);
             if (kind == VoteKind.STILL_TRUE) {

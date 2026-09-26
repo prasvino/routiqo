@@ -47,7 +47,8 @@ final class SpotActivityAssembler {
             // Most reported value; ties go to the most recent report.
             var top = byValue.entrySet().stream().max(Comparator
                     .<Map.Entry<String, List<SignalRow>>>comparingInt(entry -> entry.getValue().size())
-                    .thenComparing(entry -> latest(entry.getValue()))).orElseThrow();
+                    .thenComparing(entry -> latest(entry.getValue()))
+                    .thenComparing(Map.Entry::getKey)).orElseThrow(); // deterministic, so the vote ref is stable
             UUID ref = top.getValue().getFirst().groupRef();
             Instant window = top.getValue().stream().map(SignalRow::effectiveCreated)
                     .min(Instant::compareTo).orElseThrow();

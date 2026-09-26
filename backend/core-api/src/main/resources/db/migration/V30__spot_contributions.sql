@@ -58,6 +58,8 @@ CREATE TABLE spot_post (
     max_expires_at TIMESTAMPTZ NOT NULL,
     state TEXT NOT NULL CHECK (state IN ('ACTIVE', 'DELETED', 'EXPIRED_EARLY')),
     ended_at TIMESTAMPTZ,
+    -- Set once maintenance has considered the expired post for a highlight, so it is never retried.
+    highlight_checked BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT spot_post_owned_journey FOREIGN KEY (journey_id, actor_id)
         REFERENCES journey(id, owner_id) ON DELETE CASCADE,
     CONSTRAINT spot_post_times CHECK (
@@ -66,6 +68,8 @@ CREATE TABLE spot_post (
 );
 CREATE INDEX spot_post_by_spot ON spot_post (spot_id, effective_created_at DESC) WHERE state = 'ACTIVE';
 CREATE INDEX spot_post_expiry ON spot_post (expires_at);
+CREATE INDEX spot_post_highlight_pending ON spot_post (expires_at)
+    WHERE type = 'place' AND state = 'ACTIVE' AND NOT highlight_checked;
 CREATE INDEX spot_post_room ON spot_post (spot_id, room_day);
 
 -- Exact-fingerprint idempotency for app-generated client keys; kept 48 hours.
