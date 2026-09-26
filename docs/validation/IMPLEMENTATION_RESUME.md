@@ -1,6 +1,6 @@
 # Implementation resume: handoff for the next session
 
-Updated 2026-09-26 (Spots backend, Android Spots, and step 3: posts and signals 3a, Report and Block 3b, Android contributions 3c). Read this first, then `CLAUDE.md` / `AGENTS.md`,
+Updated 2026-09-26, end of day (steps 1–3 merged as PRs #21–#25; next is the staging rate-gate fix, then moderation). Read this first, then `CLAUDE.md` / `AGENTS.md`,
 [`PRODUCT.md`](../PRODUCT.md) and the spec for whatever you pick up. The
 previous private LIVE handoff is archived at
 [`../archive/validation/IMPLEMENTATION_RESUME.md`](../archive/validation/IMPLEMENTATION_RESUME.md).
@@ -141,6 +141,20 @@ honest.
    - four queue bands, per-type lifetimes, "Still true?" and "No longer true";
    - aliases from the word list, delete my post, Report, Block;
    - Ghost Mode and the separate `spot_outbox_v1` offline queue on Android.
+**Next, in this order (agreed 2026-09-26 to save credits):**
+
+- **A. Staging blocker: per-address rate gate behind the load balancer. Small; no
+  plan mode.**
+  - The problem: `NativeAuthGuard` limits every native path to 120 requests per
+    minute per peer address (`native-other`), and `forward-headers-strategy` is
+    `none`.
+  - Behind a load balancer and mobile carrier NAT, many phones share one peer.
+    They would all get 429, including on session renew.
+  - Recommendation: trust client IPs only from the balancer's address range (for
+    example RemoteIpValve with configured trusted proxies), default-off. Record it
+    in an ADR.
+  - Details are in NATIVE_ANDROID_PENDING.md, "Spots native transport".
+
 4. **Moderation** ([PILOT_MODERATION_SPEC.md](../features/spots/PILOT_MODERATION_SPEC.md),
    ADR 0069):
    - `spots_*` permissions and 1–12 h shift grants;
@@ -148,9 +162,38 @@ honest.
    - a queue for Spot items with hide, restore, clear signals, restrict and
      audited lookup;
    - the count-only urgent-report webhook and the phone-friendly admin UI.
+   - **Plan mode.** Split it into **4a, server** (permissions, grants, sessions,
+     the queue over `spot_report_group` and hide/restore) and **4b, admin UI and
+     webhook**. 4a alone lets the on-call rota hide items.
+   - Step 4 must also:
+     - add an "upheld" state: highlights currently skip *any* reported post
+       (ADR 0072);
+     - make hidden items vanish from activity reads;
+     - show the author "Hidden by a moderator".
+   - The queue reads `spot_report_group`: one row per incident, severity-first
+     index, reporter-free.
+   - Reporter rows (`spot_report`, 7 days) hold the reporter only for rate
+     limits and de-duplication. They are never shown to moderators.
 5. **Official alerts:** extend the NDMA district pattern (currently hard-coded
    in `NdmaCapAlerts.java`) to the catalog's districts, and add a native read
-   inside the activity response.
+   inside the activity response. Small; no plan mode.
+   - `alertIds` / `alerts` in the activity contract are `maxItems: 0` today, and
+     the Android parser already tolerates non-empty values.
+
+## Decisions the owner still has to make
+
+- **Block scope:** Block currently hides the alias only in that room (the Spot
+  on that day), because hiding everywhere would link aliases across rooms.
+  Keep it, or send wider hiding to a privacy review (ADR 0072 §6).
+- **Ghost Mode:**
+  - Delete my post is allowed while it is on. Confirm or forbid (ADR 0073).
+  - It is device-wide, not per account. Confirm.
+- **Phone-number rule:** "7 or more digits" also rejects dates such as
+  2026-11-05. Keep it, or require 10 or more digits.
+- **Alias word list:** `alias-words-v1.txt` is a draft that needs owner
+  approval and a Tamil review.
+- **District list:** confirm the catalog districts, which step 5 needs.
+- **Load-balancer rate gate:** approve the approach in step A.
 
 ## Waiting on the owner (outside the code)
 
@@ -168,12 +211,33 @@ honest.
 
 ## Working notes for agents
 
-- **Branch:** `claude/direction-brief-docs-j88j6f`. The owner merges each PR and
-  deletes the branch, so recreate it from the latest `main` at the start of each
-  task (`git fetch origin main && git checkout -B <branch> origin/main`). Open a
-  PR only when asked.
-- **ADR numbers:** check `docs/adr/` on the latest `main` before numbering a new
-  ADR; other work lands on `main` in parallel. The next free number is **0071**.
+- **Branch:** use the branch the session names (recently
+  `claude/spots-backend-impl-jmqihk`). The owner merges each PR and deletes the
+  branch, so recreate it from the latest `main` at the start of each task
+  (`git fetch origin main && git checkout -B <branch> origin/main`). Open a PR
+  only when asked ("yes, open the PR").
+- **Numbering:** check the latest `main` before numbering anything; other work
+  lands there in parallel.
+  - The next free ADR number is **0074**.
+  - The next Flyway migration is **V32**. Never edit an applied migration.
+- **Baselines on `main` (`cb78e6b`, after PR #25):**
+  - `pnpm check`: **956 tests / 114 files**;
+  - `./gradlew check bootJar`: **707 tests / 119 suites**, counted across all
+    backend modules;
+  - `pnpm build`: passes.
+- **Workflow the owner uses:**
+  1. Plan mode for large steps only.
+  2. Build in phased commits, pushing each one.
+  3. One independent fresh-subagent review per PR, then fix what it finds.
+  4. Update BUILD_STATUS, `todo.md`, the spec status and this file.
+  5. Report, then open the PR on request.
+  - Commit trailers are `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
+    plus the session URL. Never put model names in PR text.
+- **Credits:** the owner has limited cloud credits (about $60 left on
+  2026-09-26), so keep sessions lean:
+  - skip plan mode for small steps;
+  - one review per PR;
+  - avoid re-running the full backend suite when only TypeScript changed.
 - **Checks:** `pnpm install --frozen-lockfile`, then `pnpm check` (contracts,
   formatting, typecheck, lint, Vitest) and `pnpm --filter @routiqo/mobile build`.
   Backend: `(cd backend && ./gradlew check)`; PostgreSQL tests need Docker, so
@@ -197,6 +261,10 @@ honest.
     and `--max-workers=1` resolved it.
   - The pinned GHCR gitleaks image cannot be pulled, so run gitleaks v8.30.1 from
     Docker Hub with `.gitleaks.toml`.
+    - Copy the tracked files (`git ls-files`) into a temporary folder.
+    - Run `docker run --rm --network none --mount type=bind,source=<tmp>,target=/scan,readonly zricethezav/gitleaks:v8.30.1 dir /scan --config /scan/.gitleaks.toml --redact`.
+  - Count backend tests across all modules
+    (`backend/*/build/test-results/test/*.xml`), not `core-api` alone.
 - **Docs:** `prettier` does not cover `docs/`, so check relative links by hand.
   The only known broken ones are the two external Wayfind references.
 
