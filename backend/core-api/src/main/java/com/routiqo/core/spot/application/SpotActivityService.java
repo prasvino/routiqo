@@ -2,6 +2,7 @@ package com.routiqo.core.spot.application;
 
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.journey.application.ActiveJourneyReader;
+import com.routiqo.core.moderation.application.BlockedAccountsReader;
 import com.routiqo.core.spot.domain.Spot;
 import com.routiqo.core.spot.domain.SpotActivity;
 import com.routiqo.core.spot.domain.SpotCatalog;
@@ -9,13 +10,15 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Activity read for the Spots ahead (SPOTS_SPEC, ADR 0067). The requested Spot IDs are private journey
  * data: they are used only to shape this response and are never logged, stored or used as a rate key.
  * Content (signal summaries, posts, highlights) comes from {@link SpotActivityReader}; without any,
- * every known Spot is quiet.
+ * every known Spot is quiet. Posts and votes by accounts the viewer has blocked are left out for that
+ * viewer only (ADR 0072); signal summaries are unattributed and stay.
  */
 public final class SpotActivityService {
     static final String RATE_CATEGORY = "spot-activity-read-account";
@@ -27,16 +30,23 @@ public final class SpotActivityService {
     private final Map<UUID, Spot> spots;
     private final Clock clock;
     private final SpotActivityReader content;
+    private final BlockedAccountsReader blocks;
 
     public SpotActivityService(AuthRateGate rates, ActiveJourneyReader journeys, SpotCatalog catalog,
             Clock clock) {
         this(rates, journeys, catalog, clock,
-                (ids, now) -> new SpotActivityReader.Contents(List.of(), List.of(), List.of(), List.of()));
+                (ids, now, hidden) -> new SpotActivityReader.Contents(List.of(), List.of(), List.of(), List.of()));
     }
 
     public SpotActivityService(AuthRateGate rates, ActiveJourneyReader journeys, SpotCatalog catalog,
             Clock clock, SpotActivityReader content) {
+        this(rates, journeys, catalog, clock, content, viewer -> Set.of());
+    }
+
+    public SpotActivityService(AuthRateGate rates, ActiveJourneyReader journeys, SpotCatalog catalog,
+            Clock clock, SpotActivityReader content, BlockedAccountsReader blocks) {
         this.content = java.util.Objects.requireNonNull(content);
+        this.blocks = java.util.Objects.requireNonNull(blocks);
         this.rates = rates;
         this.journeys = journeys;
         this.catalog = catalog;
@@ -67,7 +77,7 @@ public final class SpotActivityService {
         try {
             rows = known.isEmpty()
                     ? new SpotActivityReader.Contents(List.of(), List.of(), List.of(), List.of())
-                    : content.read(known, now);
+                    : content.read(known, now, blocks.blockedBy(actor));
         } catch (RuntimeException unavailable) {
             throw new SpotsUnavailable();
         }

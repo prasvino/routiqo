@@ -2,6 +2,7 @@ package com.routiqo.core.spot.application;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -26,6 +27,9 @@ public interface SpotActivityReader {
     record Contents(List<SignalRow> signals, List<PostRow> posts, List<VoteRow> votes,
             List<HighlightRow> highlights) {}
 
-    /** Unexpired, active content for these Spots: at most 10 newest posts and 3 highlights per Spot. */
-    Contents read(List<UUID> spotIds, Instant now);
+    /**
+     * Unexpired, active content for these Spots: at most 10 newest posts and 3 highlights per Spot.
+     * Posts and votes by {@code hiddenAuthors} (the viewer's blocks) are left out before the limit.
+     */
+    Contents read(List<UUID> spotIds, Instant now, Set<UUID> hiddenAuthors);
 }

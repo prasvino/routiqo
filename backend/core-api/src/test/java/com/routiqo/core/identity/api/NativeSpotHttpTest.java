@@ -299,7 +299,8 @@ class NativeSpotHttpTest {
         Login owner = login(false);
         String journey = start(owner);
         for (String path : List.of("spots/signals", "spots/posts", "spots/items/" + UUID.randomUUID() + "/vote",
-                "spots/items/" + UUID.randomUUID() + "/delete"))
+                "spots/items/" + UUID.randomUUID() + "/delete", "spots/items/" + UUID.randomUUID() + "/reports",
+                "spots/items/" + UUID.randomUUID() + "/block-author"))
             empty(post(path, "{\"journeyId\":\"" + journey + "\"}", owner), 403);
     }
 

@@ -30,7 +30,7 @@ phase.
 - [ ] Public one-tap signals and short text posts; per-type expiry; "Still true?" and "No longer true".
 - [ ] Bounded HTTP refresh for Spot content (ADR 0066); offline rule for queued signals and posts.
 - [ ] Ghost Mode stops all sending; delete my post; account deletion covers posts and signals.
-- [ ] Report/Block on every item; moderator hide; admin login and a named, time-boxed moderator rota for the dry run.
+- [ ] Report/Block on every item; moderator hide; admin login and a named, time-boxed moderator rota for the dry run. _Report and Block server done 2026-09-26 (step 3b, ADR 0072, default-off); Android buttons in 3c; hide in step 4._
 - [ ] Rate limits, stricter for new accounts.
 - [ ] Official alerts shown on Spots and the Journey for the corridor districts (north-east monsoon season).
 - [ ] Minimal staging deployment, monitoring and rollback for the dry-run testers.
@@ -142,15 +142,15 @@ Moderation (re-scoped to posts, voice notes and chat; see the
 [pilot moderation runbook](docs/development/PILOT_MODERATION_RUNBOOK.md)):
 
 - [x] Default-off moderator queue, audited review/suppression and controlled grant console exist (ADRs 0056/0057); reuse them rather than rebuild.
-- [ ] Report and Block on every post, voice note and chat message; report reasons include business promotion, false alarm, abuse (Tamil/Tanglish) and personal data.
+- [ ] Report and Block on every post, voice note and chat message; report reasons include business promotion, false alarm, abuse (Tamil/Tanglish) and personal data. _Posts and signal summaries: server done 2026-09-26 (step 3b, ADR 0072, default-off; reasons `false_alarm`, `abuse`, `spam`, `personal_data`, `unsafe`); voice notes and chat later._
 - [x] Reporting protocol implemented for V3 under ADR 0064 (receipt-first retry, 7/30-day retention split, 10-per-24h quota, UNSAFE-first queue, groups close as `CLOSED_EVIDENCE_UNAVAILABLE` after expiry). Reuse it rather than rebuild.
-- [ ] Re-target the ADR 0064 reporting path from V3 summaries to posts, voice notes, chat and signals: evidence identity, reference authorization, exact retries after revocation, lock order and durable intake.
+- [ ] Re-target the ADR 0064 reporting path from V3 summaries to posts, voice notes, chat and signals: evidence identity, reference authorization, exact retries after revocation, lock order and durable intake. _Posts and signal summaries done 2026-09-26 in new `spot_report*` tables (ADR 0072); voice notes and chat later._
 - [ ] Confirm what moderators can see after content expires for posts, voice and chat, building on ADR 0064's retention split.
 - [x] Pilot moderation spec drafted: [PILOT_MODERATION_SPEC.md](docs/features/spots/PILOT_MODERATION_SPEC.md) with [ADR 0069](docs/adr/0069-pilot-moderation-access-and-alerting.md), proposed and awaiting review (queue, hide, restore, clear signals, restrict, alias lookup, shift grants, renewable sessions, urgent-report alert).
 - [ ] Moderator hide, restore and clear-signals actions (`spots_hide`).
 - [ ] Reuse the admin app login with real admin OAuth; Spots permissions, 1–12 h shift grants, two out-of-band grant admins, renewable sessions up to 8 h (ADR 0069); rota members' Google 2-Step Verification checked at onboarding.
 - [ ] Urgent-report alert webhook to the rota's private team chat (choose the channel).
-- [ ] Blocks apply to REST and realtime delivery, room subscription, Ask Ahead recipient selection and replay.
+- [ ] Blocks apply to REST and realtime delivery, room subscription, Ask Ahead recipient selection and replay. _Spot activity reads done 2026-09-26 (ADR 0072); chat and Ask Ahead when built._
 - [ ] Propagate hide/block/delete across reads, caches and delivery channels; deny when authority is unavailable.
 - [ ] Verify multi-user, concurrent, replay, abuse and revocation scenarios with two or more real accounts.
 

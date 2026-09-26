@@ -45,7 +45,8 @@ final class JdbcSpotContributionMaintenance {
 
     /**
      * Expired place posts with at least two "Still true" votes become highlights (at most 3 kept per
-     * Spot, by votes then recency, for 30 days). Traffic posts and signals never become highlights.
+     * Spot, by votes then recency, for 30 days). Traffic posts and signals never become highlights, and
+     * neither does a reported post: until moderation (step 4) can judge a report, any report blocks it.
      */
     int promoteHighlights(int limit) {
         limit(limit);
@@ -72,6 +73,7 @@ final class JdbcSpotContributionMaintenance {
                     CROSS JOIN LATERAL (SELECT count(*)::INTEGER AS still_true FROM spot_vote v
                         WHERE v.item_ref = p.ref AND v.kind = 'STILL_TRUE') votes
                     WHERE p.ref = ANY (?) AND votes.still_true >= 2
+                      AND NOT EXISTS (SELECT 1 FROM spot_report_group g WHERE g.item_ref = p.ref)
                     ON CONFLICT (source_post_ref) DO NOTHING
                     RETURNING spot_id
                     """, UUID.class, (Object) considered.toArray(UUID[]::new));
@@ -86,25 +88,36 @@ final class JdbcSpotContributionMaintenance {
         });
     }
 
-    /** Removes posts and signals a day after they expired or ended, with their votes. */
+    /**
+     * Removes posts and signals a day after they expired or ended, with their votes. A reported item
+     * (a signal present when its summary was last reported) is kept while its report group lives, so
+     * moderators still have the evidence (ADR 0072).
+     */
     int purgeItems(int limit) {
         limit(limit);
         return transactions.execute(status -> {
-            Timestamp cutoff = Timestamp.from(clock.instant().minus(ITEM_GRACE));
+            Instant at = clock.instant();
+            Timestamp now = Timestamp.from(at);
+            Timestamp cutoff = Timestamp.from(at.minus(ITEM_GRACE));
             List<UUID> posts = jdbc.queryForList("""
                     DELETE FROM spot_post WHERE ref IN (
-                        SELECT ref FROM spot_post
-                        WHERE expires_at <= ? OR (ended_at IS NOT NULL AND ended_at <= ?)
+                        SELECT ref FROM spot_post p
+                        WHERE (expires_at <= ? OR (ended_at IS NOT NULL AND ended_at <= ?))
+                          AND NOT EXISTS (SELECT 1 FROM spot_report_group g
+                              WHERE g.item_ref = p.ref AND g.expires_at > ?)
                         ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
                     RETURNING ref
-                    """, UUID.class, cutoff, cutoff, limit);
+                    """, UUID.class, cutoff, cutoff, now, limit);
             List<UUID> signals = jdbc.queryForList("""
                     DELETE FROM spot_signal WHERE ref IN (
-                        SELECT ref FROM spot_signal
-                        WHERE expires_at <= ? OR (ended_at IS NOT NULL AND ended_at <= ?)
+                        SELECT ref FROM spot_signal s
+                        WHERE (expires_at <= ? OR (ended_at IS NOT NULL AND ended_at <= ?))
+                          AND NOT EXISTS (SELECT 1 FROM spot_report_group g
+                              WHERE g.item_ref = s.group_ref AND g.expires_at > ?
+                                AND s.effective_created_at <= g.latest)
                         ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
                     RETURNING ref
-                    """, UUID.class, cutoff, cutoff, limit);
+                    """, UUID.class, cutoff, cutoff, now, limit);
             if (!posts.isEmpty())
                 jdbc.update("DELETE FROM spot_vote WHERE item_ref = ANY (?)", (Object) posts.toArray(UUID[]::new));
             // A key must never outlive its item: a late replay is then judged afresh and refused as
@@ -117,7 +130,10 @@ final class JdbcSpotContributionMaintenance {
         });
     }
 
-    /** Old ledger, idempotency keys, summary votes, expired highlights and aliases of empty rooms. */
+    /**
+     * Old ledger, idempotency keys, summary votes, expired highlights, expired report rows (7 days)
+     * and report groups (30 days), and aliases of empty rooms.
+     */
     int purgeBookkeeping(int limit) {
         limit(limit);
         return transactions.execute(status -> {
@@ -143,6 +159,16 @@ final class JdbcSpotContributionMaintenance {
             removed += jdbc.update("""
                     DELETE FROM spot_highlight WHERE ref IN (
                         SELECT ref FROM spot_highlight WHERE expires_at <= ?
+                        ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
+                    """, Timestamp.from(now), limit);
+            removed += jdbc.update("""
+                    DELETE FROM spot_report WHERE (reporter_id, request_id) IN (
+                        SELECT reporter_id, request_id FROM spot_report WHERE expires_at <= ?
+                        ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
+                    """, Timestamp.from(now), limit);
+            removed += jdbc.update("""
+                    DELETE FROM spot_report_group WHERE item_ref IN (
+                        SELECT item_ref FROM spot_report_group WHERE expires_at <= ?
                         ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
                     """, Timestamp.from(now), limit);
             LocalDate yesterday = LocalDate.ofInstant(now, ROOM_ZONE).minusDays(1);

@@ -2,6 +2,7 @@ package com.routiqo.core.spot.infrastructure;
 
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.journey.application.ActiveJourneyReader;
+import com.routiqo.core.moderation.application.BlockedAccountsReader;
 import com.routiqo.core.routing.domain.RoutingRegion;
 import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.spot.application.SpotActivityReader;
@@ -47,8 +48,8 @@ public class SpotsConfiguration {
     }
 
     @Bean SpotActivityService spotActivityService(AuthRateGate rates, ActiveJourneyReader journeys,
-            SpotCatalog catalog, SpotActivityReader content) {
-        return new SpotActivityService(rates, journeys, catalog, Clock.systemUTC(), content);
+            SpotCatalog catalog, SpotActivityReader content, BlockedAccountsReader blocks) {
+        return new SpotActivityService(rates, journeys, catalog, Clock.systemUTC(), content, blocks);
     }
 
     private static IllegalStateException invalid() {

@@ -92,6 +92,7 @@ class NativeSpotContributionHttpTest {
         jdbc.update("DELETE FROM routiqo_account");
         jdbc.update("DELETE FROM spot_signal_group");
         jdbc.update("DELETE FROM spot_vote");
+        jdbc.update("DELETE FROM spot_report_group");
         client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
     }
 
@@ -214,6 +215,46 @@ class NativeSpotContributionHttpTest {
         var limited = post("spots/posts", postBody(TOLL, "traffic", "Three", now(), journey), author);
         empty(limited, 429);
         assertThat(limited.headers().firstValue("Retry-After")).contains("60");
+    }
+
+    @Test void reportAndBlockAnswerMinimallyAndLeaveNoAccountOrReasonInLogs(CapturedOutput output) throws Exception {
+        Login author = login(false);
+        Login other = login(true);
+        String journey = start(author);
+        start(other);
+        var posted = post("spots/posts", postBody(TOLL, "place", "Buy cashews at lane 4", now(), journey), author);
+        String ref = JsonPath.read(posted.body(), "$.ref");
+        int before = output.getAll().length();
+
+        String requestId = UUID.randomUUID().toString();
+        String body = "{\"requestId\":\"" + requestId + "\",\"reason\":\"personal_data\"}";
+        var reported = post("spots/items/" + ref + "/reports", body, other);
+        assertThat(reported.statusCode()).isEqualTo(202);
+        assertThat(JsonPath.<Map<String, Object>>read(reported.body(), "$").keySet())
+                .containsExactlyInAnyOrder("receivedAt", "receiptExpiresAt");
+        assertThat(post("spots/items/" + ref + "/reports", body, other).body()).isEqualTo(reported.body());
+        empty(post("spots/items/" + ref + "/reports", body.replace("personal_data", "spam"), other), 409);
+        empty(post("spots/items/" + ref + "/reports",
+                "{\"requestId\":\"" + UUID.randomUUID() + "\",\"reason\":\"spam\"}", author), 403);
+        empty(post("spots/items/" + ref + "/reports",
+                "{\"requestId\":\"" + UUID.randomUUID() + "\",\"reason\":\"rude\"}", other), 400);
+        empty(post("spots/items/" + UUID.randomUUID() + "/reports",
+                "{\"requestId\":\"" + UUID.randomUUID() + "\",\"reason\":\"spam\"}", other), 404);
+        empty(post("spots/items/" + ref + "/reports", body, null), 401);
+
+        empty(post("spots/items/" + ref + "/block-author", "{}", other), 204);
+        empty(post("spots/items/" + ref + "/block-author", "{}", other), 204);
+        empty(post("spots/items/" + ref + "/block-author", "{}", author), 403);
+        empty(post("spots/items/" + ref + "/block-author", "{\"x\":1}", other), 400);
+        empty(post("spots/items/" + UUID.randomUUID() + "/block-author", "{}", other), 404);
+        var hidden = post("spots/activity", "{\"spotIds\":[\"" + TOLL + "\"]}", other);
+        assertThat(JsonPath.<List<Object>>read(hidden.body(), "$.spots[0].posts")).isEmpty();
+        var visible = post("spots/activity", "{\"spotIds\":[\"" + TOLL + "\"]}", author);
+        assertThat(JsonPath.<List<Object>>read(visible.body(), "$.spots[0].posts")).hasSize(1);
+
+        String logged = output.getAll().substring(before);
+        assertThat(logged).contains("/reports", "/block-author");
+        assertThat(logged).doesNotContain(author.account(), other.account(), "personal_data", requestId, "cashews");
     }
 
     @Test void postTextAliasesAndSpotIdsNeverReachLogs(CapturedOutput output) throws Exception {

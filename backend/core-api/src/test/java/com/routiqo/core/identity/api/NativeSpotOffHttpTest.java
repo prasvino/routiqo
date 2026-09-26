@@ -89,6 +89,8 @@ class NativeSpotOffHttpTest {
                 .withBean(RoutingRegion.class, () -> region)
                 .withBean(AuthRateGate.class, () -> (key, category, limit) -> true)
                 .withBean(ActiveJourneyReader.class, () -> owner -> true)
+                .withBean(com.routiqo.core.moderation.application.BlockedAccountsReader.class,
+                        () -> viewer -> java.util.Set.of())
                 .withBean(org.springframework.jdbc.core.JdbcTemplate.class,
                         () -> new org.springframework.jdbc.core.JdbcTemplate(
                                 new org.springframework.jdbc.datasource.SimpleDriverDataSource()))

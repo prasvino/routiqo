@@ -1,6 +1,6 @@
 # Implementation resume: handoff for the next session
 
-Updated 2026-09-26 (Spots backend and Android Spots). Read this first, then `CLAUDE.md` / `AGENTS.md`,
+Updated 2026-09-26 (Spots backend, Android Spots, posts and signals 3a and Report and Block 3b). Read this first, then `CLAUDE.md` / `AGENTS.md`,
 [`PRODUCT.md`](../PRODUCT.md) and the spec for whatever you pick up. The
 previous private LIVE handoff is archived at
 [`../archive/validation/IMPLEMENTATION_RESUME.md`](../archive/validation/IMPLEMENTATION_RESUME.md).
@@ -111,10 +111,21 @@ honest.
      Writes need `ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED`. The alias word list
      `alias-words-v1.txt` is a **draft** that needs owner approval and a Tamil
      review first.
-   - **3b — Report and Block (server), next.** Maintenance must keep rows that open
-     reports need, and highlights must exclude items with an upheld report.
-   - **3c — Android:** the transport allowlist for the new paths (TypeScript and
-     Kotlin), `spot_outbox_v1`, contribution controls and Ghost Mode.
+   - **3b — Report and Block (server), done 2026-09-26, default-off**
+     ([ADR 0072](../adr/0072-spot-report-and-block.md)):
+     - `POST /spots/items/{ref}/reports` (posts and signal summaries; ADR 0064
+       receipt-first, 10 per 24 h, 7/30-day retention, severity-first index);
+     - `POST /spots/items/{ref}/block-author` (posts only; idempotent
+       `ensureBlocked`, 100-edge cap, 10 per minute; no unblock in the pilot);
+     - activity leaves out blocked authors' posts and votes for the blocker;
+     - maintenance keeps reported items up to 30 days; reported posts never
+       become highlights.
+     Step 4 must add hide/restore and an "upheld" state that lifts the highlight
+     exclusion for restored posts.
+   - **3c — Android, next:** the transport allowlist for the new paths
+     (signals, posts, vote, delete, reports, block-author; TypeScript and Kotlin),
+     `spot_outbox_v1`, contribution controls with Report and Block, and Ghost
+     Mode.
 
    Original scope list:
    - new tables (do not alter the archived V10 private-signal tables);

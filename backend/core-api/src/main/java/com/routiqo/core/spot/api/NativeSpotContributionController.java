@@ -5,11 +5,13 @@ import com.routiqo.core.journey.application.JourneyNotFound;
 import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.security.NativeAuthGuard;
 import com.routiqo.core.spot.application.SpotActivityNeedsActiveJourney;
+import com.routiqo.core.spot.application.SpotBlockService;
 import com.routiqo.core.spot.application.SpotContributionConflict;
 import com.routiqo.core.spot.application.SpotContributionForbidden;
 import com.routiqo.core.spot.application.SpotContributionNotFound;
 import com.routiqo.core.spot.application.SpotContributionService;
 import com.routiqo.core.spot.application.SpotJourneyNotActive;
+import com.routiqo.core.spot.application.SpotReportService;
 import com.routiqo.core.spot.application.SpotsRateLimited;
 import com.routiqo.core.spot.application.SpotsUnavailable;
 import com.routiqo.core.spot.domain.ContributionLife;
@@ -28,16 +30,24 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Public one-tap signals, short posts, votes and "delete my post" (POSTS_AND_SIGNALS_SPEC, ADR 0071). */
+/**
+ * Public one-tap signals, short posts, votes and "delete my post" (POSTS_AND_SIGNALS_SPEC, ADR 0071),
+ * with Report and Block on those items (ADR 0072).
+ */
 @RestController
 @RequestMapping("/api/v1/native/spots")
 @Profile("native-auth & routing & persistence")
 @ConditionalOnExactlyTrue({"ROUTIQO_SPOTS_API_ENABLED", "ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED"})
 public final class NativeSpotContributionController {
     private final SpotContributionService contributions;
+    private final SpotReportService reports;
+    private final SpotBlockService blocks;
 
-    public NativeSpotContributionController(SpotContributionService contributions) {
+    public NativeSpotContributionController(SpotContributionService contributions, SpotReportService reports,
+            SpotBlockService blocks) {
         this.contributions = contributions;
+        this.reports = reports;
+        this.blocks = blocks;
     }
 
     @PostMapping("/signals") ResponseEntity<byte[]> signal(HttpServletRequest request) {
@@ -66,6 +76,26 @@ public final class NativeSpotContributionController {
         UUID item = NativeSpotContributionJson.ref(ref);
         NativeSpotContributionJson.empty(request);
         return json(NativeSpotContributionJson.receipt(contributions.deletePost(actor, item)));
+    }
+
+    /** Report a post or a signal summary (ADR 0072): 202 with a minimized receipt, nothing public. */
+    @PostMapping("/items/{ref}/reports") ResponseEntity<byte[]> report(@PathVariable String ref,
+            HttpServletRequest request) {
+        UUID actor = actor(request);
+        UUID item = NativeSpotContributionJson.ref(ref);
+        byte[] body = NativeSpotContributionJson.reportReceipt(
+                reports.report(actor, item, NativeSpotContributionJson.report(request)));
+        return ResponseEntity.status(202).contentType(MediaType.APPLICATION_JSON).body(body);
+    }
+
+    /** Block a post's author (ADR 0072): 204 whether or not already blocked; the author is never named. */
+    @PostMapping("/items/{ref}/block-author") ResponseEntity<Void> blockAuthor(@PathVariable String ref,
+            HttpServletRequest request) {
+        UUID actor = actor(request);
+        UUID item = NativeSpotContributionJson.ref(ref);
+        NativeSpotContributionJson.empty(request);
+        blocks.blockAuthor(actor, item);
+        return ResponseEntity.noContent().build();
     }
 
     private static ResponseEntity<byte[]> json(byte[] body) {
