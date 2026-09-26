@@ -1,6 +1,7 @@
 package com.routiqo.core.spot.infrastructure;
 
 import com.routiqo.core.identity.application.AccountWriteAuthority;
+import com.routiqo.core.moderation.application.ModerationAccountFacts;
 import com.routiqo.core.moderation.application.OperatorGrantAuthority;
 import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.spot.application.SpotModerationService;
@@ -26,7 +27,7 @@ public class SpotModerationConfiguration {
     }
 
     @Bean SpotModerationService spotModerationService(AccountWriteAuthority accounts, SpotModerationStore store,
-            OperatorGrantAuthority grants, SpotCatalog catalog) {
-        return new SpotModerationService(accounts, store, grants, catalog, Clock.systemUTC());
+            OperatorGrantAuthority grants, ModerationAccountFacts facts, SpotCatalog catalog) {
+        return new SpotModerationService(accounts, store, grants, facts, catalog, Clock.systemUTC());
     }
 }

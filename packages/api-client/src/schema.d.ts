@@ -1332,6 +1332,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/spots/reports/{ref}/author": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Requires spots_alias_lookup and a reason (abuse, spam, false_alarm, personal_data, unsafe). Returns up to 20 authors of the reported post or summary incident with opaque 30-minute references usable only by this operator; never an account ID, e-mail, name or Google subject. Audited 30 days; an exact retry issues fresh references without a second audit row. */
+        post: operations["lookupAdminSpotAuthor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spots/accounts/restrict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Requires spots_restrict. Pauses the account's contributions through the audited restriction owner (20 actions per hour per operator, audited 30 days). The account reference travels in the body, never in the URL. Reasons spam_manipulation, harassment, unsafe_content. */
+        post: operations["restrictAdminSpotAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spots/accounts/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Requires spots_restrict. Resumes the account's contributions. Reasons appeal_upheld, error_correction. */
+        post: operations["restoreAdminSpotAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/spot-grants/me": {
         parameters: {
             query?: never;
@@ -2120,6 +2171,31 @@ export interface components {
             /** @enum {string} */
             status: "dismissed" | "hidden" | "restored" | "cleared";
             replayed: boolean;
+        };
+        AdminSpotAuthorLookup: {
+            authors: {
+                accountRef: string;
+                accountAgeDays: number;
+                completedJourneys: number;
+                restricted: boolean;
+                restrictionRevision: number;
+                notUpheldReports: number;
+                /** @description Three or more of this account's reports ruled not upheld in 30 days. */
+                repeatedNotUpheld: boolean;
+            }[];
+            replayed: boolean;
+        };
+        AdminSpotRestriction: {
+            accountRef: string;
+            /** Format: uuid */
+            requestId: string;
+            expectedRevision: number;
+            /** @enum {string} */
+            reason: "spam_manipulation" | "harassment" | "unsafe_content" | "appeal_upheld" | "error_correction";
+        };
+        AdminSpotRestrictionResult: {
+            restricted: boolean;
+            revision: number;
         };
         /** @enum {string} */
         AdminSpotGrantPermission: "spots_review" | "spots_hide" | "spots_restrict" | "spots_alias_lookup";
@@ -6011,6 +6087,170 @@ export interface operations {
                 content?: never;
             };
             /** @description Changed retry, or the group or item is not in a state for this action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    lookupAdminSpotAuthor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Authors */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotAuthorLookup"];
+                };
+            };
+            /** @description Invalid body or reason */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current spots_alias_lookup grant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown report group, or its evidence is gone */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Changed retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    restrictAdminSpotAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotRestriction"];
+            };
+        };
+        responses: {
+            /** @description Restriction applied or replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotRestrictionResult"];
+                };
+            };
+            /** @description Invalid body or reason */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current spots_restrict grant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, expired or another operator's account reference */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stale revision, hourly quota or a lost grant; nothing changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    restoreAdminSpotAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotRestriction"];
+            };
+        };
+        responses: {
+            /** @description Restore applied or replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotRestrictionResult"];
+                };
+            };
+            /** @description Invalid body or reason */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current spots_restrict grant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, expired or another operator's account reference */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stale revision, hourly quota or a lost grant; nothing changed */
             409: {
                 headers: {
                     [name: string]: unknown;

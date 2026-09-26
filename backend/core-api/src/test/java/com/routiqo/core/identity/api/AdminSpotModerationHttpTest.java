@@ -320,6 +320,76 @@ class AdminSpotModerationHttpTest {
                 .isZero();
     }
 
+    @Test void auditedLookupGivesOperatorBoundReferencesThatRestrictAndRestore() throws Exception {
+        Login author = login(false);
+        Login reporter = login(true);
+        String journey = start(author);
+        start(reporter);
+        String post = postPlace(author, journey, "Call my cousin for rooms");
+        report(reporter, post, "spam");
+        for (int i = 0; i < 3; i++) jdbc.update("""
+                INSERT INTO spot_reporter_not_upheld (reporter_id, decided_at, expires_at)
+                VALUES (?::uuid, now(), now() + INTERVAL '30 days')
+                """, author.account());
+        var lead = new Moderator("spots_review", "spots_alias_lookup", "spots_restrict");
+        String reportRef = JsonPath.read(lead.queue().body(), "$.items[0].reportRef");
+
+        UUID request = UUID.randomUUID();
+        var lookup = lead.decide(reportRef, "author", request, "spam");
+        assertThat(lookup.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<List<Object>>read(lookup.body(), "$.authors")).hasSize(1);
+        assertThat(JsonPath.<Map<String, Object>>read(lookup.body(), "$.authors[0]").keySet())
+                .containsExactlyInAnyOrder("accountRef", "accountAgeDays", "completedJourneys", "restricted",
+                        "restrictionRevision", "notUpheldReports", "repeatedNotUpheld");
+        assertThat(JsonPath.<Boolean>read(lookup.body(), "$.authors[0].repeatedNotUpheld")).isTrue();
+        assertThat(JsonPath.<Integer>read(lookup.body(), "$.authors[0].restrictionRevision")).isZero();
+        assertThat(lookup.body()).doesNotContain(author.account(), reporter.account(), "native-http",
+                "google", "@");
+        String accountRef = JsonPath.read(lookup.body(), "$.authors[0].accountRef");
+        assertThat(accountRef).matches("[A-Za-z0-9_-]{43}");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_account_lookup_ref WHERE token_hash = ?",
+                Integer.class, accountRef)).isZero(); // Stored hashed only.
+        var replay = lead.decide(reportRef, "author", request, "spam");
+        assertThat(JsonPath.<Boolean>read(replay.body(), "$.replayed")).isTrue();
+        assertThat(lead.decide(reportRef, "author", request, "abuse").statusCode()).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_moderation_action WHERE action = 'LOOKUP'",
+                Integer.class)).isEqualTo(1);
+        assertThat(new Moderator("spots_review").decide(reportRef, "author", UUID.randomUUID(), "spam")
+                .statusCode()).isEqualTo(403);
+
+        String restrict = "{\"accountRef\":\"" + accountRef + "\",\"requestId\":\"" + UUID.randomUUID()
+                + "\",\"expectedRevision\":0,\"reason\":\"spam_manipulation\"}";
+        var restricted = lead.send("POST", "spots/accounts/restrict", restrict);
+        assertThat(restricted.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<Boolean>read(restricted.body(), "$.restricted")).isTrue();
+        assertThat(JsonPath.<Integer>read(restricted.body(), "$.revision")).isEqualTo(1);
+        assertThat(nativePost("spots/posts", "{\"clientKey\":\"" + UUID.randomUUID() + "\",\"spotId\":\"" + TOLL
+                + "\",\"type\":\"place\",\"text\":\"Again\",\"capturedAt\":\"" + now()
+                + "\",\"journeyId\":\"" + journey + "\"}", author).statusCode()).isEqualTo(403);
+        String stale = restrict.replace("spam_manipulation", "harassment").replaceAll(
+                "requestId\":\"[^\"]+", "requestId\":\"" + UUID.randomUUID());
+        assertThat(lead.send("POST", "spots/accounts/restrict", stale).statusCode()).isEqualTo(409);
+        String restore = "{\"accountRef\":\"" + accountRef + "\",\"requestId\":\"" + UUID.randomUUID()
+                + "\",\"expectedRevision\":1,\"reason\":\"appeal_upheld\"}";
+        var restored = lead.send("POST", "spots/accounts/restore", restore);
+        assertThat(JsonPath.<Boolean>read(restored.body(), "$.restricted")).isFalse();
+        assertThat(lead.send("POST", "spots/accounts/restore", restore.replace("appeal_upheld", "spam"))
+                .statusCode()).isEqualTo(400);
+
+        // References belong to the operator who looked up, and expire after 30 minutes.
+        var other = new Moderator("spots_restrict");
+        assertThat(other.send("POST", "spots/accounts/restrict", restrict.replace("\"expectedRevision\":0",
+                "\"expectedRevision\":2")).statusCode()).isEqualTo(404);
+        assertThat(new Moderator("spots_review").send("POST", "spots/accounts/restrict", restrict).statusCode())
+                .isEqualTo(403);
+        jdbc.update("""
+                UPDATE spot_account_lookup_ref SET created_at = now() - INTERVAL '31 minutes',
+                    expires_at = now() - INTERVAL '1 minute'
+                """);
+        assertThat(lead.send("POST", "spots/accounts/restrict", restrict.replace("\"expectedRevision\":0",
+                "\"expectedRevision\":2")).statusCode()).isEqualTo(404);
+    }
+
     @Test void groupsWhoseEvidenceIsGoneCloseAsUnavailable() throws Exception {
         Login author = login(false);
         Login reporter = login(true);

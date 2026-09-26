@@ -52,9 +52,10 @@ public final class JdbcAuditedContributionRestrictionParticipant
             AuditedContributionRestrictionService.Command command, Clock clock) {
         String permission = command.action() == AuditedContributionRestrictionService.Action.RESTRICT
                 ? "restrict" : "restore";
+        // The action's own grant, or spots_restrict, which covers both for the Spots rota (ADR 0075).
         List<Grant> grants = jdbc.query("""
             SELECT issued_at, expires_at FROM moderation_operator_grant
-            WHERE operator_id = ? AND permission = ? FOR UPDATE
+            WHERE operator_id = ? AND permission IN (?, 'spots_restrict') ORDER BY permission FOR UPDATE
             """, (row, number) -> new Grant(
                     row.getTimestamp("issued_at").toInstant(),
                     row.getTimestamp("expires_at").toInstant()),
@@ -79,7 +80,7 @@ public final class JdbcAuditedContributionRestrictionParticipant
                     row.getTimestamp("used_at").toInstant()), operatorId);
 
         Instant now = now(clock);
-        if (grants.size() != 1 || !current(grants.getFirst(), now)) throw denied();
+        if (grants.stream().noneMatch(grant -> current(grant, now))) throw denied();
         if (!audits.isEmpty()) return replay(command, audits.getFirst(), now);
         if (slots.stream().anyMatch(slot -> slot.usedAt().isAfter(now))) throw denied();
         if (auditCount(operatorId) >= AUDIT_CAPACITY) {

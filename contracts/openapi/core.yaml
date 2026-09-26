@@ -2183,6 +2183,92 @@ paths:
         '409':
           { description: 'Changed retry, or the group or item is not in a state for this action' }
         '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spots/reports/{ref}/author:
+    post:
+      operationId: lookupAdminSpotAuthor
+      security: [{ adminSession: [] }]
+      description: Requires spots_alias_lookup and a reason (abuse, spam, false_alarm, personal_data, unsafe). Returns up to 20 authors of the reported post or summary incident with opaque 30-minute references usable only by this operator; never an account ID, e-mail, name or Google subject. Audited 30 days; an exact retry issues fresh references without a second audit row.
+      parameters:
+        - { name: ref, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/AdminSpotDecisionRequest' } },
+            },
+        }
+      responses:
+        '200':
+          {
+            description: Authors,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminSpotAuthorLookup' } },
+              },
+          }
+        '400': { description: Invalid body or reason }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current spots_alias_lookup grant }
+        '404': { description: 'Unknown report group, or its evidence is gone' }
+        '409': { description: Changed retry }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spots/accounts/restrict:
+    post:
+      operationId: restrictAdminSpotAccount
+      security: [{ adminSession: [] }]
+      description: Requires spots_restrict. Pauses the account's contributions through the audited restriction owner (20 actions per hour per operator, audited 30 days). The account reference travels in the body, never in the URL. Reasons spam_manipulation, harassment, unsafe_content.
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/AdminSpotRestriction' } } },
+        }
+      responses:
+        '200':
+          {
+            description: Restriction applied or replayed,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminSpotRestrictionResult' } },
+              },
+          }
+        '400': { description: Invalid body or reason }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current spots_restrict grant }
+        '404': { description: "Unknown, expired or another operator's account reference" }
+        '409': { description: 'Stale revision, hourly quota or a lost grant; nothing changed' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spots/accounts/restore:
+    post:
+      operationId: restoreAdminSpotAccount
+      security: [{ adminSession: [] }]
+      description: Requires spots_restrict. Resumes the account's contributions. Reasons appeal_upheld, error_correction.
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/AdminSpotRestriction' } } },
+        }
+      responses:
+        '200':
+          {
+            description: Restore applied or replayed,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminSpotRestrictionResult' } },
+              },
+          }
+        '400': { description: Invalid body or reason }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current spots_restrict grant }
+        '404': { description: "Unknown, expired or another operator's account reference" }
+        '409': { description: 'Stale revision, hourly quota or a lost grant; nothing changed' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/admin/spot-grants/me:
     get:
       operationId: readAdminSpotGrantCapability
@@ -3504,6 +3590,56 @@ components:
       properties:
         status: { type: string, enum: [dismissed, hidden, restored, cleared] }
         replayed: { type: boolean }
+    AdminSpotAuthorLookup:
+      type: object
+      additionalProperties: false
+      required: [authors, replayed]
+      properties:
+        authors:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              [
+                accountRef,
+                accountAgeDays,
+                completedJourneys,
+                restricted,
+                restrictionRevision,
+                notUpheldReports,
+                repeatedNotUpheld,
+              ]
+            properties:
+              accountRef: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+              accountAgeDays: { type: integer, minimum: 0 }
+              completedJourneys: { type: integer, minimum: 0, maximum: 1000 }
+              restricted: { type: boolean }
+              restrictionRevision: { type: integer, minimum: 0 }
+              notUpheldReports: { type: integer, minimum: 0, maximum: 100 }
+              repeatedNotUpheld:
+                type: boolean
+                description: Three or more of this account's reports ruled not upheld in 30 days.
+        replayed: { type: boolean }
+    AdminSpotRestriction:
+      type: object
+      additionalProperties: false
+      required: [accountRef, requestId, expectedRevision, reason]
+      properties:
+        accountRef: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        requestId: { type: string, format: uuid }
+        expectedRevision: { type: integer, minimum: 0 }
+        reason:
+          type: string
+          enum: [spam_manipulation, harassment, unsafe_content, appeal_upheld, error_correction]
+    AdminSpotRestrictionResult:
+      type: object
+      additionalProperties: false
+      required: [restricted, revision]
+      properties:
+        restricted: { type: boolean }
+        revision: { type: integer, minimum: 1 }
     AdminSpotGrantPermission:
       type: string
       enum: [spots_review, spots_hide, spots_restrict, spots_alias_lookup]

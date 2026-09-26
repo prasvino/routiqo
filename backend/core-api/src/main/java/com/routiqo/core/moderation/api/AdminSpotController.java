@@ -2,6 +2,7 @@ package com.routiqo.core.moderation.api;
 
 import com.routiqo.core.identity.application.AccountWriteUnavailable;
 import com.routiqo.core.identity.application.AuthRateGate;
+import com.routiqo.core.moderation.application.ModeratorRestrictionService;
 import com.routiqo.core.moderation.application.OperatorNotPermitted;
 import com.routiqo.core.moderation.infrastructure.AdminSessionService;
 import com.routiqo.core.security.BrowserAuthPolicy;
@@ -45,15 +46,20 @@ public final class AdminSpotController {
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
     private final AdminSessionService sessions;
     private final SpotModerationService moderation;
+    private final ModeratorRestrictionService restrictions;
     private final BrowserAuthPolicy policy;
     private final AuthRateGate rates;
 
     public AdminSpotController(AdminSessionService sessions, SpotModerationService moderation,
-            AdminAccessConfiguration.AdminSettings settings, AuthRateGate rates) {
-        this.sessions = sessions; this.moderation = moderation; this.policy = settings.policy(); this.rates = rates;
+            ModeratorRestrictionService restrictions, AdminAccessConfiguration.AdminSettings settings,
+            AuthRateGate rates) {
+        this.sessions = sessions; this.moderation = moderation; this.restrictions = restrictions;
+        this.policy = settings.policy(); this.rates = rates;
     }
 
     record Input(UUID requestId, String reason) {}
+    record RestrictionInput(String accountRef, UUID requestId, long expectedRevision, String reason) {}
+    public record RestrictionResponse(boolean restricted, long revision) {}
 
     @GetMapping("/reports") SpotModerationService.Queue queue(HttpServletRequest request) {
         if (request.getParameterMap().keySet().stream().anyMatch(key -> !key.equals("cursor"))
@@ -73,6 +79,52 @@ public final class AdminSpotController {
     @PostMapping("/reports/{ref}/clear-signals") SpotModerationService.Decision clearSignals(@PathVariable String ref,
             HttpServletRequest request) { return decide(ref, SpotModerationService.Action.CLEAR_SIGNALS, request); }
 
+    @PostMapping("/reports/{ref}/author") SpotModerationService.AuthorLookup author(@PathVariable String ref,
+            HttpServletRequest request) {
+        AdminHttp.noQuery(request);
+        UUID operator = operator(request);
+        Input input = input(request);
+        AdminHttp.allow(rates, operator, "admin-spot-write", WRITES_PER_MINUTE);
+        return moderation.lookup(operator, input.requestId(), AdminTrafficJson.id(ref), input.reason(),
+                recheck(operator, request));
+    }
+
+    /** The account reference travels in the body, so it never lands in a URL, log line or history. */
+    @PostMapping("/accounts/restrict") RestrictionResponse restrict(HttpServletRequest request) {
+        return restriction(request, true);
+    }
+    @PostMapping("/accounts/restore") RestrictionResponse restoreAccount(HttpServletRequest request) {
+        return restriction(request, false);
+    }
+
+    private RestrictionResponse restriction(HttpServletRequest request, boolean restrict) {
+        AdminHttp.noQuery(request);
+        UUID operator = operator(request);
+        RestrictionInput input = restrictionInput(request);
+        AdminHttp.allow(rates, operator, "admin-spot-write", WRITES_PER_MINUTE);
+        UUID account = moderation.accountForRestriction(operator, input.accountRef(), recheck(operator, request));
+        var result = restrictions.apply(operator, input.requestId(), account, input.expectedRevision(), restrict,
+                input.reason());
+        return new RestrictionResponse(result.restricted(), result.revision());
+    }
+
+    static RestrictionInput restrictionInput(HttpServletRequest request) {
+        try {
+            JsonNode node = JSON.readTree(utf8(request));
+            if (node == null || !node.isObject()
+                    || !node.propertyNames().equals(Set.of("accountRef", "requestId", "expectedRevision", "reason"))
+                    || !node.get("accountRef").isTextual() || !node.get("requestId").isTextual()
+                    || !node.get("expectedRevision").isIntegralNumber() || !node.get("expectedRevision").canConvertToLong()
+                    || !node.get("reason").isTextual())
+                throw new IllegalArgumentException();
+            return new RestrictionInput(node.get("accountRef").textValue(),
+                    AdminTrafficJson.id(node.get("requestId").textValue()), node.get("expectedRevision").longValue(),
+                    node.get("reason").textValue());
+        } catch (IOException | RuntimeException malformed) {
+            throw new IllegalArgumentException("Invalid restriction request");
+        }
+    }
+
     private SpotModerationService.Decision decide(String ref, SpotModerationService.Action action,
             HttpServletRequest request) {
         AdminHttp.noQuery(request);
@@ -86,11 +138,7 @@ public final class AdminSpotController {
     /** Exactly {"requestId": "<uuid>", "reason": "<code>"}, at most 512 bytes of UTF-8. */
     static Input input(HttpServletRequest request) {
         try {
-            byte[] body = request.getInputStream().readNBytes(513);
-            if (body.length > 512) throw new IllegalArgumentException();
-            String content = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(body)).toString();
-            JsonNode node = JSON.readTree(content);
+            JsonNode node = JSON.readTree(utf8(request));
             if (node == null || !node.isObject() || !node.propertyNames().equals(Set.of("requestId", "reason"))
                     || !node.get("requestId").isTextual() || !node.get("reason").isTextual())
                 throw new IllegalArgumentException();
@@ -98,6 +146,13 @@ public final class AdminSpotController {
         } catch (IOException | RuntimeException malformed) {
             throw new IllegalArgumentException("Invalid decision request");
         }
+    }
+
+    private static String utf8(HttpServletRequest request) throws IOException {
+        byte[] body = request.getInputStream().readNBytes(513);
+        if (body.length > 512) throw new IllegalArgumentException();
+        return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(body)).toString();
     }
 
     private UUID operator(HttpServletRequest request) { return sessions.authenticate(credential(request)).accountId(); }
@@ -112,7 +167,8 @@ public final class AdminSpotController {
     @ExceptionHandler(SecurityException.class) ResponseEntity<Void> unauthenticated() { return ResponseEntity.status(401).build(); }
     @ExceptionHandler(OperatorNotPermitted.class) ResponseEntity<Void> denied() { return ResponseEntity.status(403).build(); }
     @ExceptionHandler(SpotContributionNotFound.class) ResponseEntity<Void> missing() { return ResponseEntity.notFound().build(); }
-    @ExceptionHandler(SpotContributionConflict.class) ResponseEntity<Void> conflict() { return ResponseEntity.status(409).build(); }
+    @ExceptionHandler({SpotContributionConflict.class, ModeratorRestrictionService.Refused.class})
+    ResponseEntity<Void> conflict() { return ResponseEntity.status(409).build(); }
     @ExceptionHandler(AdminHttp.Limited.class) ResponseEntity<Void> limited() {
         return ResponseEntity.status(429).header("Retry-After", "60").build();
     }

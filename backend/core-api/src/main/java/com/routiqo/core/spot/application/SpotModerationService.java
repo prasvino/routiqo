@@ -1,11 +1,14 @@
 package com.routiqo.core.spot.application;
 
 import com.routiqo.core.identity.application.AccountWriteAuthority;
+import com.routiqo.core.moderation.application.ModerationAccountFacts;
 import com.routiqo.core.moderation.application.OperatorGrantAuthority;
 import com.routiqo.core.spot.domain.Spot;
 import com.routiqo.core.spot.domain.SpotCatalog;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,19 +51,100 @@ public final class SpotModerationService {
 
     public record Decision(String status, boolean replayed) {}
 
+    /**
+     * One author behind a reported item. {@code accountRef} is an opaque 30-minute reference for this
+     * operator only; there is never an account ID, e-mail, name or Google subject.
+     */
+    public record Author(String accountRef, long accountAgeDays, int completedJourneys, boolean restricted,
+            long restrictionRevision, int notUpheldReports, boolean repeatedNotUpheld) {
+        @Override public String toString() { return "SpotAuthor[private]"; }
+    }
+
+    public record AuthorLookup(List<Author> authors, boolean replayed) {
+        public AuthorLookup { authors = List.copyOf(authors); }
+    }
+
+    static final int REPEATED_NOT_UPHELD = 3;
+    static final Duration NOT_UPHELD_WINDOW = Duration.ofDays(30);
+
     private final AccountWriteAuthority accounts;
     private final SpotModerationStore store;
     private final OperatorGrantAuthority grants;
+    private final ModerationAccountFacts facts;
     private final Map<UUID, Spot> spots;
     private final Clock clock;
+    private final SecureRandom random = new SecureRandom();
 
     public SpotModerationService(AccountWriteAuthority accounts, SpotModerationStore store,
-            OperatorGrantAuthority grants, SpotCatalog catalog, Clock clock) {
+            OperatorGrantAuthority grants, ModerationAccountFacts facts, SpotCatalog catalog, Clock clock) {
         this.accounts = accounts;
         this.store = store;
         this.grants = grants;
+        this.facts = facts;
         this.spots = catalog.byId();
         this.clock = clock;
+    }
+
+    /**
+     * Audited author lookup (spots_alias_lookup, a reason required). An exact retry issues fresh
+     * references without a second audit row; a changed retry conflicts.
+     */
+    public AuthorLookup lookup(UUID operator, UUID requestId, UUID reportRef, String reason, Runnable sessionRecheck) {
+        if (operator == null || invalid(requestId) || invalid(reportRef) || !HIDE_REASONS.contains(reason))
+            throw new IllegalArgumentException("Invalid lookup");
+        var intended = new SpotModerationStore.StoredAction("LOOKUP", reportRef, reason,
+                fingerprint("LOOKUP", reportRef, reason));
+        return accounts.withEnabledAccount(operator, () -> {
+            Optional<SpotModerationStore.StoredAction> stored = store.action(operator, requestId);
+            if (stored.isPresent() && !stored.get().fingerprint().equals(intended.fingerprint()))
+                throw new SpotContributionConflict();
+            SpotModerationStore.Group group = store.group(reportRef).orElseThrow(SpotContributionNotFound::new);
+            grants.requireCurrent(operator, "spots_alias_lookup");
+            sessionRecheck.run();
+            Instant now = clock.instant();
+            List<UUID> authors = store.authors(group, now);
+            if (authors.isEmpty()) throw new SpotContributionNotFound(); // Evidence gone.
+            var result = new ArrayList<Author>();
+            for (UUID account : authors) {
+                var context = facts.read(account);
+                int notUpheld = store.notUpheldReports(account, now.minus(NOT_UPHELD_WINDOW));
+                String token = token();
+                store.issueAccountRef(operator, account, sha256(token), now);
+                result.add(new Author(token, context.accountAgeDays(), context.completedJourneys(),
+                        context.restricted(), context.restrictionRevision(), notUpheld,
+                        notUpheld >= REPEATED_NOT_UPHELD));
+            }
+            if (stored.isEmpty()) store.recordAction(operator, requestId, intended, now);
+            return new AuthorLookup(result, stored.isPresent());
+        });
+    }
+
+    /**
+     * Resolves this operator's unexpired account reference for a restriction (spots_restrict). The
+     * account never leaves the server.
+     */
+    public UUID accountForRestriction(UUID operator, String accountRef, Runnable sessionRecheck) {
+        if (operator == null || accountRef == null || !accountRef.matches("[A-Za-z0-9_-]{43}"))
+            throw new SpotContributionNotFound();
+        return accounts.withEnabledAccount(operator, () -> {
+            grants.requireCurrent(operator, "spots_restrict");
+            sessionRecheck.run();
+            return store.accountRef(operator, sha256(accountRef), clock.instant())
+                    .orElseThrow(SpotContributionNotFound::new);
+        });
+    }
+
+    private String token() {
+        byte[] value = new byte[32];
+        random.nextBytes(value);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.US_ASCII)));
+        } catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
 
     /** A page of open report groups, urgent first. Items whose evidence is gone close on the way. */

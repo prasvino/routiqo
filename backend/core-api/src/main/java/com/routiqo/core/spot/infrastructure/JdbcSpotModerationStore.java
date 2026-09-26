@@ -214,6 +214,40 @@ final class JdbcSpotModerationStore implements SpotModerationStore {
                 (Object) evidence.toArray(UUID[]::new));
     }
 
+    @Override public List<UUID> authors(Group group, Instant now) {
+        requireTransaction();
+        if (group.kind() == Kind.POST)
+            return jdbc.queryForList("SELECT actor_id FROM spot_post WHERE ref = ?", UUID.class, group.itemRef());
+        return jdbc.queryForList("""
+                SELECT DISTINCT s.actor_id FROM spot_signal s
+                WHERE s.group_ref = ? AND s.effective_created_at >= ? AND s.effective_created_at <= ?
+                  AND EXISTS (SELECT 1 FROM spot_report_evidence e WHERE e.ref = s.ref)
+                ORDER BY s.actor_id LIMIT 20
+                """, UUID.class, group.itemRef(), Timestamp.from(group.windowStart()), Timestamp.from(group.latest()));
+    }
+
+    @Override public int notUpheldReports(UUID reporter, Instant since) {
+        return jdbc.queryForObject("""
+                SELECT count(*)::INTEGER FROM (SELECT 1 FROM spot_reporter_not_upheld
+                    WHERE reporter_id = ? AND decided_at > ? LIMIT 100) recent
+                """, Integer.class, reporter, Timestamp.from(since));
+    }
+
+    @Override public void issueAccountRef(UUID operator, UUID account, String tokenHash, Instant now) {
+        requireTransaction();
+        jdbc.update("""
+                INSERT INTO spot_account_lookup_ref (token_hash, operator_id, account_id, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?::timestamptz + INTERVAL '30 minutes')
+                """, tokenHash, operator, account, Timestamp.from(now), Timestamp.from(now));
+    }
+
+    @Override public Optional<UUID> accountRef(UUID operator, String tokenHash, Instant now) {
+        return jdbc.queryForList("""
+                SELECT account_id FROM spot_account_lookup_ref
+                WHERE token_hash = ? AND operator_id = ? AND created_at <= ? AND expires_at > ?
+                """, UUID.class, tokenHash, operator, Timestamp.from(now), Timestamp.from(now)).stream().findFirst();
+    }
+
     private static Group group(ResultSet row, int index) throws SQLException {
         long closed = row.getLong("closed_through");
         Long closedThrough = row.wasNull() ? null : closed;

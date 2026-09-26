@@ -17,6 +17,19 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Profile("persistence")
 public class ModerationPersistenceConfiguration {
     @Bean
+    com.routiqo.core.moderation.application.ModerationAccountFacts moderationAccountFacts(JdbcTemplate jdbc,
+            com.routiqo.core.identity.application.AccountAgeReader ages,
+            com.routiqo.core.moderation.application.ContributionRestrictionReader restrictions) {
+        return new JdbcModerationAccountFacts(jdbc, ages, restrictions, Clock.systemUTC());
+    }
+
+    @Bean
+    com.routiqo.core.moderation.application.ModeratorRestrictionService moderatorRestrictionService(
+            AuditedContributionRestrictionService restrictions) {
+        return new com.routiqo.core.moderation.application.ModeratorRestrictionService(restrictions);
+    }
+
+    @Bean
     com.routiqo.core.moderation.application.OperatorGrantAuthority operatorGrantAuthority(JdbcTemplate jdbc) {
         return new JdbcOperatorGrantAuthority(jdbc);
     }

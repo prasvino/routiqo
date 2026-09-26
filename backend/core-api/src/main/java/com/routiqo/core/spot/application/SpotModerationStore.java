@@ -70,4 +70,12 @@ public interface SpotModerationStore {
     void ruleNotUpheld(Group group, List<UUID> evidence, long fromExclusive, Instant now);
     /** Evidence blocks highlights again (the hide upheld the reports). */
     void ruleUpheld(List<UUID> evidence);
+
+    /** Distinct authors of the reported post or summary incident, at most 20. */
+    List<UUID> authors(Group group, Instant now);
+    /** Reports by this account ruled not upheld since then. */
+    int notUpheldReports(UUID reporter, Instant since);
+    /** Stores a hashed 30-minute account reference usable only by this operator. */
+    void issueAccountRef(UUID operator, UUID account, String tokenHash, Instant now);
+    Optional<UUID> accountRef(UUID operator, String tokenHash, Instant now);
 }
