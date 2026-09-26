@@ -31,7 +31,7 @@ phase.
 - [ ] Bounded HTTP refresh for Spot content (ADR 0066); offline rule for queued signals and posts.
 - [ ] Ghost Mode stops all sending; delete my post; account deletion covers posts and signals. _Done in code 2026-09-26 (steps 3a–3c, default-off); device checks pending in NATIVE_ANDROID_PENDING.md._
 - [ ] Report/Block on every item; moderator hide; admin login and a named, time-boxed moderator rota for the dry run. _Report and Block done 2026-09-26 on the server (step 3b, ADR 0072) and Android (step 3c, ADR 0073), default-off; hide in step 4._
-- [ ] Rate limits, stricter for new accounts.
+- [ ] Rate limits, stricter for new accounts. _Per-address gate behind the load balancer done in code 2026-09-26 (step A, ADR 0074, default-off `ROUTIQO_TRUSTED_PROXY_CIDRS`); staging ALB check and peak measurement pending in NATIVE_ANDROID_PENDING.md. Stricter new-account limits still open._
 - [ ] Official alerts shown on Spots and the Journey for the corridor districts (north-east monsoon season).
 - [ ] Minimal staging deployment, monitoring and rollback for the dry-run testers.
 
