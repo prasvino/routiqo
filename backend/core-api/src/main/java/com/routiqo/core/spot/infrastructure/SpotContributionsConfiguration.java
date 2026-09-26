@@ -42,13 +42,14 @@ public class SpotContributionsConfiguration {
         return new JdbcSpotReportStore(jdbc);
     }
 
-    @Bean SpotReportService spotReportService(AccountWriteAuthority accounts, SpotReportStore store) {
-        return new SpotReportService(accounts, store, Clock.systemUTC());
+    @Bean SpotReportService spotReportService(AuthRateGate rates, AccountWriteAuthority accounts,
+            SpotReportStore store) {
+        return new SpotReportService(rates, accounts, store, Clock.systemUTC());
     }
 
     @Bean SpotBlockService spotBlockService(AuthRateGate rates, SpotReportStore store,
             DurableBlockPolicyService blocks) {
-        return new SpotBlockService(rates, store, blocks);
+        return new SpotBlockService(rates, store, blocks, Clock.systemUTC());
     }
 
     @Bean AliasWords spotAliasWords() {

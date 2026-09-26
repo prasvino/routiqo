@@ -4,7 +4,6 @@ import com.routiqo.core.identity.application.AccountAgeReader;
 import com.routiqo.core.identity.application.AccountWriteAuthority;
 import com.routiqo.core.journey.application.ActiveJourneyReader;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
-import com.routiqo.core.moderation.application.BlockedAccountsReader;
 import com.routiqo.core.moderation.application.ContributionRestrictionReader;
 import com.routiqo.core.moderation.application.DurableBlockPolicyService;
 import com.routiqo.core.routing.domain.RouteRequest;
@@ -91,7 +90,6 @@ class SpotReportPersistenceTest {
     @Autowired ContributionRestrictionReader restrictions;
     @Autowired AccountAgeReader ages;
     @Autowired DurableBlockPolicyService blockPolicy;
-    @Autowired BlockedAccountsReader blocked;
 
     MovableClock clock;
     SpotContributionService service;
@@ -100,6 +98,7 @@ class SpotReportPersistenceTest {
     SpotActivityService activity;
     JdbcSpotContributionMaintenance maintenance;
     final AtomicBoolean blockRateOpen = new AtomicBoolean(true);
+    final AtomicBoolean reportRateOpen = new AtomicBoolean(true);
 
     private static Spot spot(UUID id, SpotKind kind, Set<SpotCategory> categories) {
         return new Spot(id, "Test " + kind.key(), "சோதனை", kind, new RouteRequest.Coordinate(79.9, 12.7),
@@ -113,8 +112,10 @@ class SpotReportPersistenceTest {
         jdbc.update("DELETE FROM spot_vote");
         jdbc.update("DELETE FROM spot_highlight");
         jdbc.update("DELETE FROM spot_report_group");
+        jdbc.update("DELETE FROM spot_report_evidence");
         clock = new MovableClock(START);
         blockRateOpen.set(true);
+        reportRateOpen.set(true);
         var catalog = new SpotCatalog(VERSION, List.of(new SpotCorridor("gst-trunk", "GST Road")), List.of(
                 spot(TOLL, SpotKind.TOLL, Set.of(SpotCategory.TRAFFIC, SpotCategory.QUEUE)),
                 spot(EATERY, SpotKind.EATERY, Set.of(SpotCategory.FOOD, SpotCategory.RESTROOM))));
@@ -126,10 +127,10 @@ class SpotReportPersistenceTest {
         service = new SpotContributionService(journeys, accounts, activeJourneys, restrictions, ages,
                 new JdbcSpotContributionStore(jdbc), catalog, words, clock, random::nextInt);
         var store = new JdbcSpotReportStore(jdbc);
-        reports = new SpotReportService(accounts, store, clock);
-        blocks = new SpotBlockService((key, category, limit) -> blockRateOpen.get(), store, blockPolicy);
+        reports = new SpotReportService((key, category, limit) -> reportRateOpen.get(), accounts, store, clock);
+        blocks = new SpotBlockService((key, category, limit) -> blockRateOpen.get(), store, blockPolicy, clock);
         activity = new SpotActivityService((key, category, limit) -> true, activeJourneys, catalog, clock,
-                new JdbcSpotActivityReader(jdbc), blocked);
+                new JdbcSpotActivityReader(jdbc));
         maintenance = new JdbcSpotContributionMaintenance(jdbc, manager, clock);
     }
 
@@ -164,7 +165,8 @@ class SpotReportPersistenceTest {
     }
 
     int reasonCount(UUID item, String reason) {
-        return jdbc.queryForObject("SELECT " + reason + " FROM spot_report_group WHERE item_ref = ?", Integer.class, item);
+        return jdbc.queryForObject("SELECT sum(" + reason + ")::int FROM spot_report_group WHERE item_ref = ?",
+                Integer.class, item);
     }
 
     @Test void reportsAreReceiptFirstOncePerItemAndNeverOnYourOwnContent() {
@@ -201,10 +203,16 @@ class SpotReportPersistenceTest {
         UUID group = signal(author, "slow");
         assertThatThrownBy(() -> reports.report(author.account(), group, report("false_alarm")))
                 .isInstanceOf(SpotContributionForbidden.class);
+        // A summary that also holds someone else's signal is reportable by either author.
+        signal(other, "slow");
+        reports.report(author.account(), group, report("false_alarm"));
         reports.report(reporter.account(), group, report("false_alarm"));
         assertThat(jdbc.queryForObject("SELECT item_kind FROM spot_report_group WHERE item_ref = ?", String.class,
                 group)).isEqualTo("SUMMARY");
-        assertThat(reasonCount(group, "false_alarm")).isEqualTo(1);
+        assertThat(reasonCount(group, "false_alarm")).isEqualTo(2);
+        reportRateOpen.set(false);
+        assertThatThrownBy(() -> reports.report(reporter.account(), ref, abuse)).isInstanceOf(SpotsRateLimited.class);
+        reportRateOpen.set(true);
 
         // Expired items cannot be reported; an exact replay still returns its receipt.
         clock.advance(Duration.ofHours(3));
@@ -228,7 +236,8 @@ class SpotReportPersistenceTest {
             reports.report(reporter.account(), refs.get(index), report("spam"));
         }
         assertThatThrownBy(() -> reports.report(reporter.account(), refs.get(10), report("spam")))
-                .isInstanceOf(SpotsRateLimited.class);
+                .isInstanceOfSatisfying(SpotsRateLimited.class, limited -> assertThat(limited.retryAfterSeconds())
+                        .isEqualTo(Duration.ofHours(24).minusMinutes(9).toSeconds()));
         assertThat(reports.report(reporter.account(), refs.getFirst(), first).receivedAt()).isEqualTo(START);
         clock.now = START.plus(Duration.ofHours(24)).plusSeconds(1);
         // Place posts are still current 24 hours on only if confirmed; post a fresh one to report.
@@ -262,7 +271,7 @@ class SpotReportPersistenceTest {
                 """, Integer.class)).isZero();
     }
 
-    @Test void reportedItemsOutliveTheirPurgeUntilTheGroupExpiresAndAreNeverHighlighted() {
+    @Test void reportedItemsAreKeptAFixedThirtyDaysAndAreNeverHighlighted() {
         Traveller author = traveller();
         Traveller a = traveller();
         Traveller b = traveller();
@@ -287,7 +296,7 @@ class SpotReportPersistenceTest {
         assertThat(plain).isNotEqualTo(tip);
         assertThat(jdbc.queryForList("SELECT actor_id FROM spot_signal", UUID.class)).containsExactly(author.account());
 
-        // Reporter rows go at 7 days; the reporter-free group at 30 days, then the evidence purges.
+        // Reporter rows go at 7 days; the reporter-free counts and the evidence at 30 days.
         clock.now = START.plus(Duration.ofDays(7)).plusSeconds(1);
         maintenance.purgeBookkeeping(100);
         assertThat(count("spot_report")).isZero();
@@ -297,38 +306,69 @@ class SpotReportPersistenceTest {
         clock.now = START.plus(Duration.ofDays(30)).plusSeconds(1);
         maintenance.purgeBookkeeping(100);
         assertThat(count("spot_report_group")).isZero();
+        assertThat(count("spot_report_evidence")).isZero();
         maintenance.purgeItems(100);
         assertThat(count("spot_post")).isZero();
         assertThat(count("spot_signal")).isZero();
     }
 
-    @Test void blockingAnAuthorHidesTheirPostsAndVotesForTheBlockerOnly() {
+    @Test void eachIncidentOnASummaryIsSeparateAndLaterReportsNeverExtendOldEvidence() {
+        Traveller author = traveller();
+        Traveller reporter = traveller();
+        UUID group = signal(author, "slow");
+        UUID first = jdbc.queryForObject("SELECT ref FROM spot_signal", UUID.class);
+        reports.report(reporter.account(), group, report("false_alarm"));
+        // Twenty days later the same summary (same stable ref) is a new incident.
+        clock.advance(Duration.ofDays(20));
+        Traveller next = traveller();
+        jdbc.update("UPDATE journey SET started_at = ? WHERE id = ?", Timestamp.from(clock.instant().minusSeconds(60)),
+                next.journey());
+        signal(next, "slow");
+        reports.report(reporter.account(), group, report("unsafe"));
+        assertThatThrownBy(() -> reports.report(reporter.account(), group, report("unsafe")))
+                .isInstanceOf(SpotContributionConflict.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_report_group WHERE item_ref = ?", Integer.class, group))
+                .isEqualTo(2);
+        assertThat(jdbc.queryForList("""
+                SELECT unsafe FROM spot_report_group WHERE item_ref = ? ORDER BY window_start
+                """, Integer.class, group)).containsExactly(0, 1);
+        // The first incident's signal goes 30 days after its own report, not after the later one.
+        clock.now = START.plus(Duration.ofDays(30)).plusSeconds(1);
+        maintenance.purgeBookkeeping(100);
+        maintenance.purgeItems(100);
+        assertThat(jdbc.queryForList("SELECT ref FROM spot_signal", UUID.class)).doesNotContain(first).hasSize(1);
+    }
+
+    @Test void blockingHidesTheAliasInThatRoomOnlyAndNeverLinksRoomsOrVotes() {
         Traveller author = traveller();
         Traveller blocker = traveller();
         Traveller bystander = traveller();
         Traveller friend = traveller();
         UUID mine = post(friend, TOLL, "traffic", "Toll lane 2 is fastest");
         UUID theirs = post(author, TOLL, "traffic", "Buy my cashew packets at lane 4");
+        UUID sameRoom = post(author, TOLL, "traffic", "Cashews again at lane 4");
+        UUID elsewhere = post(author, EATERY, "place", "Good filter coffee here");
         service.vote(author.account(), mine, VoteKind.STILL_TRUE);
         UUID group = signal(author, "slow");
 
         blocks.blockAuthor(blocker.account(), theirs);
         long revision = jdbc.queryForObject("SELECT revision FROM live_block_edge WHERE blocker_id = ? AND target_id = ?",
                 Long.class, blocker.account(), author.account());
-        blocks.blockAuthor(blocker.account(), theirs);
+        blocks.blockAuthor(blocker.account(), sameRoom);
         assertThat(jdbc.queryForObject("SELECT revision FROM live_block_edge WHERE blocker_id = ?", Long.class,
                 blocker.account())).isEqualTo(revision);
+        assertThat(count("spot_hidden_alias")).isEqualTo(1);
 
         SpotActivity.Entry seen = activity.read(blocker.account(), List.of(TOLL)).spots().getFirst();
         assertThat(seen.posts()).extracting(SpotActivity.PostView::ref).containsExactly(mine);
-        assertThat(seen.posts().getFirst().stillTrue()).isZero();
+        // Votes and summaries are unaffected, so the block reveals nothing beyond the room's alias.
+        assertThat(seen.posts().getFirst().stillTrue()).isEqualTo(1);
         assertThat(seen.signals()).extracting(SpotActivity.SignalSummary::ref).containsExactly(group);
-        SpotActivity.Entry unaffected = activity.read(bystander.account(), List.of(TOLL)).spots().getFirst();
-        assertThat(unaffected.posts()).hasSize(2);
-        assertThat(unaffected.posts()).filteredOn(view -> view.ref().equals(mine))
-                .extracting(SpotActivity.PostView::stillTrue).containsExactly(1);
+        assertThat(activity.read(blocker.account(), List.of(EATERY)).spots().getFirst().posts())
+                .extracting(SpotActivity.PostView::ref).containsExactly(elsewhere);
+        assertThat(activity.read(bystander.account(), List.of(TOLL)).spots().getFirst().posts()).hasSize(3);
         // The blocked author is not told and still reads normally.
-        assertThat(activity.read(author.account(), List.of(TOLL)).spots().getFirst().posts()).hasSize(2);
+        assertThat(activity.read(author.account(), List.of(TOLL)).spots().getFirst().posts()).hasSize(3);
 
         assertThatThrownBy(() -> blocks.blockAuthor(author.account(), theirs))
                 .isInstanceOf(SpotContributionForbidden.class);
@@ -336,12 +376,29 @@ class SpotReportPersistenceTest {
                 .isInstanceOf(SpotContributionNotFound.class);
         assertThatThrownBy(() -> blocks.blockAuthor(blocker.account(), group))
                 .isInstanceOf(SpotContributionNotFound.class);
+        service.deletePost(author.account(), elsewhere);
+        assertThatThrownBy(() -> blocks.blockAuthor(bystander.account(), elsewhere))
+                .isInstanceOf(SpotContributionNotFound.class);
         blockRateOpen.set(false);
         assertThatThrownBy(() -> blocks.blockAuthor(bystander.account(), theirs))
                 .isInstanceOf(SpotsRateLimited.class);
+        blockRateOpen.set(true);
+
+        // A disabled author answers the same; only the room hide is recorded.
+        jdbc.update("UPDATE routiqo_account SET enabled = FALSE WHERE id = ?", author.account());
+        blocks.blockAuthor(bystander.account(), theirs);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM live_block_edge WHERE blocker_id = ?", Integer.class,
+                bystander.account())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_hidden_alias WHERE blocker_id = ?", Integer.class,
+                bystander.account())).isEqualTo(1);
+
+        // Hidden aliases go once their room can hold no readable post.
+        clock.advance(Duration.ofDays(5));
+        maintenance.purgeBookkeeping(100);
+        assertThat(count("spot_hidden_alias")).isZero();
     }
 
-    @Test void blockCapacityIsAConflictAndTheBlockedSetIsBoundedByIt() {
+    @Test void blockCapacityIsAConflictAndHidesNothing() {
         Traveller blocker = traveller();
         for (int index = 0; index < 100; index++) {
             UUID target = traveller().account();
@@ -352,6 +409,6 @@ class SpotReportPersistenceTest {
         UUID ref = post(author, TOLL, "traffic", "Slow near the flyover");
         assertThatThrownBy(() -> blocks.blockAuthor(blocker.account(), ref))
                 .isInstanceOf(SpotContributionConflict.class);
-        assertThat(blocked.blockedBy(blocker.account())).hasSize(100).doesNotContain(author.account());
+        assertThat(count("spot_hidden_alias")).isZero();
     }
 }

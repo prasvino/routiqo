@@ -15,6 +15,89 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 _Archived 2026-09-25:_ the user had authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag; that work is now archived and is no longer authorized pilot work. The different production privacy contract is not accepted. Person-level research is archived with its code preserved. Traveller-derived public LIVE remains disabled in production.
 
+## September 26 Report and Block on Spot items, server (step 3b, flagged)
+
+Report and Block exist on the server behind the same write flags as 3a
+(`ROUTIQO_SPOTS_API_ENABLED` and `ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED`, exact
+`true`, default off), per
+[ADR 0072](../adr/0072-spot-report-and-block.md):
+
+- **Report** (`POST /spots/items/{ref}/reports`, 202):
+  - works on current posts and on signal summaries; a summary is reported per
+    incident, meaning the signals current at that moment;
+  - five reasons;
+  - receipt first: an exact replay returns the stored receipt; a changed replay,
+    or a second report on the same incident, returns 409;
+  - 10 reports per rolling 24 h, with Retry-After set to when the oldest report
+    leaves the window, and 20 attempts a minute;
+  - your own item returns 403; an unknown, expired or deleted item returns 404;
+  - the receipt is `{receivedAt, receiptExpiresAt}` only.
+- **Migration V31:**
+  - reporter rows, which cascade and are kept 7 days;
+  - reporter-free per-incident counts, kept 30 days and indexed with `unsafe` and
+    `abuse` first;
+  - evidence rows, kept a fixed 30 days from the first report;
+  - room-scoped hidden aliases.
+- **Block** (`POST /spots/items/{ref}/block-author`, 204):
+  - current posts only;
+  - hides that alias's posts in its room for the blocker, and records the
+    account-level edge through the new idempotent `ensureBlocked`;
+  - the list holds 100 edges; a full list returns 409;
+  - 10 blocks per minute;
+  - the author is never named or told;
+  - a disabled author gets the same 204 with no edge.
+  - Votes, summaries, highlights and other rooms are unaffected.
+  - This narrows the spec's "hide everywhere", which would link aliases across
+    rooms. That is an owner decision (ADR 0072 §6).
+- **Maintenance:**
+  - reported posts, and the signals current at a summary report, are kept 30
+    days as evidence;
+  - reported posts never become highlights;
+  - expired report rows, groups, evidence and old hidden aliases are purged.
+
+Checks (cloud session, JDK 25, Docker):
+
+- **Java:** `./gradlew check bootJar` gave **707 tests / 119 suites**, zero
+  failures, errors or skips; the baseline was 699 / 118.
+  - New PostgreSQL tests (`SpotReportPersistenceTest`) cover:
+    - replay, conflict and your-own-item rules, including a summary with mixed
+      authors;
+    - the quota with Retry-After and rollover;
+    - a separate count per incident, and old evidence not being extended by a
+      later report;
+    - reporter-free counts surviving account deletion, and the queue order;
+    - evidence retention and the highlight exclusion;
+    - room-only hiding, with votes, summaries and other rooms unchanged;
+    - idempotent blocks, 404 for deleted posts, the disabled-author case, rate
+      limits and the capacity 409.
+  - New HTTP tests cover the 202/204 shapes, the error matrix, the blocker's
+    read, and DEBUG log capture showing no account IDs, reasons, request IDs or
+    post text.
+  - The flag-off test now also covers both new paths.
+- **Independent review:** a fresh-subagent review found two High, three Medium
+  and five Low issues. All are fixed in this change:
+  - Summary evidence could be kept indefinitely through the permanent summary
+    ref. It is now evidence per item for a fixed 30 days, with separate
+    incidents.
+  - The account-wide hide let a blocker link aliases and votes. It is now
+    room-only.
+  - Block now works only on current posts.
+  - Report Retry-After is now accurate, and there is a per-attempt limit.
+  - An unavailable-authority error is now 503.
+  - The disabled-author 404 revealed that the author's account was disabled; it
+    is now the same 204.
+  - Old incidents no longer merge with new ones.
+  - Left as designed: highlights stay visible to a blocker (they are
+    unattributed), and a replay after 7 days counts as a new report (noted in
+    the ADR).
+- **TypeScript:** `pnpm check` passed with **914 tests / 109 files**; the
+  contract is regenerated and in sync.
+- **Secret scan:** no leaks.
+
+Not done in 3b: moderator hide and restore (step 4), and the Android Report and
+Block buttons and transport allowlist (3c). The write flag must stay off until
+those are done.
+
 ## September 26 Spot posts and signals, server (step 3a, flagged)
 
 Public contributions on Spots exist on the server behind

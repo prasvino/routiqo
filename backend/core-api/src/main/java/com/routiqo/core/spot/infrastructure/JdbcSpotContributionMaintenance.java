@@ -25,6 +25,8 @@ final class JdbcSpotContributionMaintenance {
     static final Duration LEDGER_RETENTION = Duration.ofHours(25);
     static final Duration VOTE_RETENTION = Duration.ofHours(37);
     static final Duration HIGHLIGHT_LIFE = Duration.ofDays(30);
+    /** Rooms older than this (beyond yesterday) hold no readable post: the longest post life is under 3 days. */
+    static final int HIDDEN_ALIAS_DAYS = 3;
     private static final ZoneId ROOM_ZONE = ZoneId.of("Asia/Kolkata");
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
@@ -73,7 +75,7 @@ final class JdbcSpotContributionMaintenance {
                     CROSS JOIN LATERAL (SELECT count(*)::INTEGER AS still_true FROM spot_vote v
                         WHERE v.item_ref = p.ref AND v.kind = 'STILL_TRUE') votes
                     WHERE p.ref = ANY (?) AND votes.still_true >= 2
-                      AND NOT EXISTS (SELECT 1 FROM spot_report_group g WHERE g.item_ref = p.ref)
+                      AND NOT EXISTS (SELECT 1 FROM spot_report_evidence e WHERE e.ref = p.ref)
                     ON CONFLICT (source_post_ref) DO NOTHING
                     RETURNING spot_id
                     """, UUID.class, (Object) considered.toArray(UUID[]::new));
@@ -89,9 +91,9 @@ final class JdbcSpotContributionMaintenance {
     }
 
     /**
-     * Removes posts and signals a day after they expired or ended, with their votes. A reported item
-     * (a signal present when its summary was last reported) is kept while its report group lives, so
-     * moderators still have the evidence (ADR 0072).
+     * Removes posts and signals a day after they expired or ended, with their votes. A reported post,
+     * or a signal current when its summary was reported, is kept as evidence for a fixed 30 days from
+     * the first report naming it (ADR 0072).
      */
     int purgeItems(int limit) {
         limit(limit);
@@ -103,8 +105,8 @@ final class JdbcSpotContributionMaintenance {
                     DELETE FROM spot_post WHERE ref IN (
                         SELECT ref FROM spot_post p
                         WHERE (expires_at <= ? OR (ended_at IS NOT NULL AND ended_at <= ?))
-                          AND NOT EXISTS (SELECT 1 FROM spot_report_group g
-                              WHERE g.item_ref = p.ref AND g.expires_at > ?)
+                          AND NOT EXISTS (SELECT 1 FROM spot_report_evidence e
+                              WHERE e.ref = p.ref AND e.expires_at > ?)
                         ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
                     RETURNING ref
                     """, UUID.class, cutoff, cutoff, now, limit);
@@ -112,9 +114,8 @@ final class JdbcSpotContributionMaintenance {
                     DELETE FROM spot_signal WHERE ref IN (
                         SELECT ref FROM spot_signal s
                         WHERE (expires_at <= ? OR (ended_at IS NOT NULL AND ended_at <= ?))
-                          AND NOT EXISTS (SELECT 1 FROM spot_report_group g
-                              WHERE g.item_ref = s.group_ref AND g.expires_at > ?
-                                AND s.effective_created_at <= g.latest)
+                          AND NOT EXISTS (SELECT 1 FROM spot_report_evidence e
+                              WHERE e.ref = s.ref AND e.expires_at > ?)
                         ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
                     RETURNING ref
                     """, UUID.class, cutoff, cutoff, now, limit);
@@ -131,8 +132,8 @@ final class JdbcSpotContributionMaintenance {
     }
 
     /**
-     * Old ledger, idempotency keys, summary votes, expired highlights, expired report rows (7 days)
-     * and report groups (30 days), and aliases of empty rooms.
+     * Old ledger, idempotency keys, summary votes, expired highlights, expired report rows (7 days),
+     * report groups and evidence (30 days), hidden aliases of old rooms, and aliases of empty rooms.
      */
     int purgeBookkeeping(int limit) {
         limit(limit);
@@ -167,11 +168,22 @@ final class JdbcSpotContributionMaintenance {
                         ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
                     """, Timestamp.from(now), limit);
             removed += jdbc.update("""
-                    DELETE FROM spot_report_group WHERE item_ref IN (
-                        SELECT item_ref FROM spot_report_group WHERE expires_at <= ?
+                    DELETE FROM spot_report_group WHERE (item_ref, window_start) IN (
+                        SELECT item_ref, window_start FROM spot_report_group WHERE expires_at <= ?
+                        ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
+                    """, Timestamp.from(now), limit);
+            removed += jdbc.update("""
+                    DELETE FROM spot_report_evidence WHERE ref IN (
+                        SELECT ref FROM spot_report_evidence WHERE expires_at <= ?
                         ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
                     """, Timestamp.from(now), limit);
             LocalDate yesterday = LocalDate.ofInstant(now, ROOM_ZONE).minusDays(1);
+            // A hidden alias only matters while its room's posts can still be read.
+            removed += jdbc.update("""
+                    DELETE FROM spot_hidden_alias WHERE (blocker_id, spot_id, room_day, alias) IN (
+                        SELECT blocker_id, spot_id, room_day, alias FROM spot_hidden_alias WHERE room_day < ?
+                        ORDER BY room_day LIMIT ? FOR UPDATE SKIP LOCKED)
+                    """, Date.valueOf(yesterday.minusDays(HIDDEN_ALIAS_DAYS)), limit);
             removed += jdbc.update("""
                     DELETE FROM spot_alias WHERE (spot_id, room_day, actor_id) IN (
                         SELECT a.spot_id, a.room_day, a.actor_id FROM spot_alias a

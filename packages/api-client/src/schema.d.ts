@@ -911,7 +911,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Default-off (ADR 0072). Report a current post (its ref) or signal summary (its summary ref). Receipt first: an exact requestId replay returns the original receipt. Ten reports per account per rolling 24 hours. Nothing about the report is public. */
+        /** @description Default-off (ADR 0072). Report a current post (its ref) or signal summary (its summary ref). Receipt first: an exact requestId replay returns the original receipt. A summary is reported per incident (its current signals). Ten reports per account per rolling 24 hours, and at most twenty attempts a minute; Retry-After says when the quota frees. Nothing about the report is public. */
         post: operations["reportNativeSpotItem"];
         delete?: never;
         options?: never;
@@ -933,7 +933,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Default-off (ADR 0072). Block the author of a post; idempotent. The author is never named or told. The blocker no longer sees that author's posts or votes; signal summaries are unattributed and stay. Ten blocks per account per minute. */
+        /** @description Default-off (ADR 0072). Block the author of a current post; idempotent. The author is never named or told. The blocker no longer sees that alias's posts in that room (the Spot on that day); posts elsewhere, votes and signal summaries are unaffected so a block never links rooms. Also records an account-level block for later features. Ten blocks per account per minute. */
         post: operations["blockNativeSpotPostAuthor"];
         delete?: never;
         options?: never;
@@ -4687,7 +4687,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The requestId was used with a different item or reason, or this item was already reported by the viewer. Empty response body. */
+            /** @description The requestId was used with a different item or reason, or the viewer already reported this post or this summary incident. Empty response body. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4746,7 +4746,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Unknown post (summary refs cannot be blocked). Empty response body. */
+            /** @description Unknown, expired or deleted post (summary refs cannot be blocked). Empty response body. */
             404: {
                 headers: {
                     [name: string]: unknown;

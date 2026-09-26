@@ -113,12 +113,16 @@ honest.
      review first.
    - **3b — Report and Block (server), done 2026-09-26, default-off**
      ([ADR 0072](../adr/0072-spot-report-and-block.md)):
-     - `POST /spots/items/{ref}/reports` (posts and signal summaries; ADR 0064
-       receipt-first, 10 per 24 h, 7/30-day retention, severity-first index);
-     - `POST /spots/items/{ref}/block-author` (posts only; idempotent
-       `ensureBlocked`, 100-edge cap, 10 per minute; no unblock in the pilot);
-     - activity leaves out blocked authors' posts and votes for the blocker;
-     - maintenance keeps reported items up to 30 days; reported posts never
+     - `POST /spots/items/{ref}/reports` (posts and signal-summary incidents;
+       ADR 0064 receipt-first, 10 per 24 h, 7/30-day retention, severity-first
+       index);
+     - `POST /spots/items/{ref}/block-author` (posts only; hides that alias in
+       its room for the blocker and records the account-level edge; 100-edge
+       cap, 10 per minute; no unblock in the pilot);
+     - the spec's "hide everywhere" was narrowed to the room, because it would
+       link aliases across rooms (ADR 0072 §6). **Owner decision:** keep this, or
+       commission a privacy review for wider hiding;
+     - reported posts and signals are kept a fixed 30 days as evidence and never
        become highlights.
      Step 4 must add hide/restore and an "upheld" state that lifts the highlight
      exclusion for restored posts.

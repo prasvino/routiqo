@@ -4,7 +4,6 @@ import com.routiqo.core.identity.application.EnabledAccountPairAuthority;
 import com.routiqo.core.moderation.application.AuditedContributionRestrictionParticipant;
 import com.routiqo.core.moderation.application.AuditedContributionRestrictionService;
 import com.routiqo.core.moderation.application.ContributionRestrictionAuditCleanup;
-import com.routiqo.core.moderation.application.BlockedAccountsReader;
 import com.routiqo.core.moderation.application.DirectionalBlockParticipant;
 import com.routiqo.core.moderation.application.DurableBlockPolicyService;
 import java.time.Clock;
@@ -44,11 +43,6 @@ public class ModerationPersistenceConfiguration {
     @Bean
     JdbcDirectionalBlockParticipant directionalBlockParticipant(JdbcTemplate jdbc) {
         return new JdbcDirectionalBlockParticipant(jdbc);
-    }
-
-    @Bean
-    BlockedAccountsReader blockedAccountsReader(JdbcTemplate jdbc) {
-        return new JdbcBlockedAccountsReader(jdbc);
     }
 
     @Bean

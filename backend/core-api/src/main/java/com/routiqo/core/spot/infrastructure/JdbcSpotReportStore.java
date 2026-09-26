@@ -1,16 +1,20 @@
 package com.routiqo.core.spot.infrastructure;
 
 import com.routiqo.core.spot.application.SpotReportStore;
+import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** PostgreSQL participant for Spot reports; report methods join the reporter's account transaction. */
+/** PostgreSQL participant for Spot reports and room-scoped blocks. */
 final class JdbcSpotReportStore implements SpotReportStore {
+    /** Evidence is kept a fixed 30 days from the first report naming it. */
+    private static final String EVIDENCE_LIFE = "30 days";
     private final JdbcTemplate jdbc;
 
     JdbcSpotReportStore(JdbcTemplate jdbc) { this.jdbc = jdbc; }
@@ -31,10 +35,11 @@ final class JdbcSpotReportStore implements SpotReportStore {
                 reporterId, requestId).stream().findFirst();
     }
 
-    @Override public boolean reported(UUID reporterId, UUID itemRef) {
+    @Override public boolean reported(UUID reporterId, UUID itemRef, Instant windowStart) {
         requireTransaction();
-        return !jdbc.queryForList("SELECT 1 FROM spot_report WHERE reporter_id = ? AND item_ref = ?",
-                Integer.class, reporterId, itemRef).isEmpty();
+        return !jdbc.queryForList("""
+                SELECT 1 FROM spot_report WHERE reporter_id = ? AND item_ref = ? AND window_start = ?
+                """, Integer.class, reporterId, itemRef, Timestamp.from(windowStart)).isEmpty();
     }
 
     @Override public int countReports(UUID reporterId, Instant since) {
@@ -43,22 +48,36 @@ final class JdbcSpotReportStore implements SpotReportStore {
                 Integer.class, reporterId, Timestamp.from(since));
     }
 
+    @Override public Optional<Instant> oldestReport(UUID reporterId, Instant since) {
+        requireTransaction();
+        Timestamp oldest = jdbc.queryForObject(
+                "SELECT min(created_at) FROM spot_report WHERE reporter_id = ? AND created_at > ?",
+                Timestamp.class, reporterId, Timestamp.from(since));
+        return Optional.ofNullable(oldest).map(Timestamp::toInstant);
+    }
+
     @Override public Optional<Reportable> reportable(UUID ref, Instant now) {
         requireTransaction();
         Timestamp at = Timestamp.from(now);
         Optional<Reportable> post = jdbc.query("""
-                SELECT spot_id, actor_id FROM spot_post WHERE ref = ? AND state = 'ACTIVE' AND expires_at > ?
+                SELECT spot_id, actor_id, effective_created_at FROM spot_post
+                WHERE ref = ? AND state = 'ACTIVE' AND expires_at > ?
                 """, (row, index) -> new Reportable(ref, ItemKind.POST, row.getObject("spot_id", UUID.class),
-                        List.of(row.getObject("actor_id", UUID.class))), ref, at).stream().findFirst();
+                        row.getTimestamp("effective_created_at").toInstant(),
+                        List.of(row.getObject("actor_id", UUID.class)), List.of(ref)), ref, at).stream().findFirst();
         if (post.isPresent()) return post;
-        List<UUID[]> signals = jdbc.query("""
-                SELECT spot_id, actor_id FROM spot_signal
-                WHERE group_ref = ? AND state = 'ACTIVE' AND expires_at > ? LIMIT 500
-                """, (row, index) -> new UUID[] {row.getObject("spot_id", UUID.class),
-                        row.getObject("actor_id", UUID.class)}, ref, at);
+        record Signal(UUID ref, UUID spotId, UUID actorId, Instant created) {}
+        List<Signal> signals = jdbc.query("""
+                SELECT ref, spot_id, actor_id, effective_created_at FROM spot_signal
+                WHERE group_ref = ? AND state = 'ACTIVE' AND expires_at > ? ORDER BY ref LIMIT 500
+                """, (row, index) -> new Signal(row.getObject("ref", UUID.class), row.getObject("spot_id", UUID.class),
+                        row.getObject("actor_id", UUID.class), row.getTimestamp("effective_created_at").toInstant()),
+                ref, at);
         if (signals.isEmpty()) return Optional.empty();
-        return Optional.of(new Reportable(ref, ItemKind.SUMMARY, signals.getFirst()[0],
-                signals.stream().map(pair -> pair[1]).distinct().toList()));
+        return Optional.of(new Reportable(ref, ItemKind.SUMMARY, signals.getFirst().spotId(),
+                signals.stream().map(Signal::created).min(Instant::compareTo).orElseThrow(),
+                signals.stream().map(Signal::actorId).distinct().toList(),
+                signals.stream().map(Signal::ref).toList()));
     }
 
     @Override public StoredReport insertReport(UUID reporterId, UUID requestId, Reportable item, String reason,
@@ -68,29 +87,48 @@ final class JdbcSpotReportStore implements SpotReportStore {
             case "false_alarm", "abuse", "spam", "personal_data", "unsafe" -> reason;
             default -> throw new IllegalArgumentException("Invalid report reason");
         };
+        Timestamp window = Timestamp.from(item.windowStart());
         var stored = jdbc.queryForObject("""
-                INSERT INTO spot_report (reporter_id, request_id, item_ref, item_kind, reason, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?::timestamptz + INTERVAL '7 days')
+                INSERT INTO spot_report (reporter_id, request_id, item_ref, item_kind, window_start, reason,
+                    created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?::timestamptz + INTERVAL '7 days')
                 RETURNING created_at, expires_at, review_sequence
                 """, (row, index) -> new Object[] {row.getTimestamp("created_at").toInstant(),
                         row.getTimestamp("expires_at").toInstant(), row.getLong("review_sequence")},
-                reporterId, requestId, item.ref(), item.kind().name(), reason, Timestamp.from(now),
+                reporterId, requestId, item.ref(), item.kind().name(), window, reason, Timestamp.from(now),
                 Timestamp.from(now));
-        Instant created = (Instant) stored[0];
+        Timestamp created = Timestamp.from((Instant) stored[0]);
         jdbc.update("""
-                INSERT INTO spot_report_group (item_ref, spot_id, item_kind, %1$s, latest, latest_sequence, expires_at)
-                VALUES (?, ?, ?, 1, ?, ?, ?::timestamptz + INTERVAL '30 days')
-                ON CONFLICT (item_ref) DO UPDATE SET %1$s = spot_report_group.%1$s + 1,
+                INSERT INTO spot_report_group (item_ref, window_start, spot_id, item_kind, %1$s, latest,
+                    latest_sequence, expires_at)
+                VALUES (?, ?, ?, ?, 1, ?, ?, ?::timestamptz + INTERVAL '30 days')
+                ON CONFLICT (item_ref, window_start) DO UPDATE SET %1$s = spot_report_group.%1$s + 1,
                     latest = GREATEST(spot_report_group.latest, excluded.latest),
                     latest_sequence = GREATEST(spot_report_group.latest_sequence, excluded.latest_sequence),
                     expires_at = GREATEST(spot_report_group.latest, excluded.latest) + INTERVAL '30 days'
-                """.formatted(column), item.ref(), item.spotId(), item.kind().name(), Timestamp.from(created),
-                stored[2], Timestamp.from(created));
-        return new StoredReport(item.ref(), reason, created, (Instant) stored[1]);
+                """.formatted(column), item.ref(), window, item.spotId(), item.kind().name(), created,
+                stored[2], created);
+        jdbc.update("""
+                INSERT INTO spot_report_evidence (ref, expires_at)
+                SELECT evidence, ?::timestamptz + INTERVAL '%s' FROM unnest(?::uuid[]) AS evidence
+                ON CONFLICT (ref) DO NOTHING
+                """.formatted(EVIDENCE_LIFE), created, (Object) item.evidence().toArray(UUID[]::new));
+        return new StoredReport(item.ref(), reason, (Instant) stored[0], (Instant) stored[1]);
     }
 
-    @Override public Optional<UUID> postAuthor(UUID ref) {
-        return jdbc.queryForList("SELECT actor_id FROM spot_post WHERE ref = ?", UUID.class, ref)
-                .stream().findFirst();
+    @Override public Optional<BlockablePost> blockablePost(UUID ref, Instant now) {
+        return jdbc.query("""
+                SELECT actor_id, spot_id, room_day, alias FROM spot_post
+                WHERE ref = ? AND state = 'ACTIVE' AND expires_at > ?
+                """, (row, index) -> new BlockablePost(row.getObject("actor_id", UUID.class),
+                        row.getObject("spot_id", UUID.class), row.getDate("room_day").toLocalDate(),
+                        row.getString("alias")), ref, Timestamp.from(now)).stream().findFirst();
+    }
+
+    @Override public void hideAlias(UUID blockerId, UUID spotId, LocalDate roomDay, String alias, Instant now) {
+        jdbc.update("""
+                INSERT INTO spot_hidden_alias (blocker_id, spot_id, room_day, alias, created_at)
+                VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
+                """, blockerId, spotId, Date.valueOf(roomDay), alias, Timestamp.from(now));
     }
 }

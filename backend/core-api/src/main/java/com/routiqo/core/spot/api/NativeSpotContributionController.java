@@ -88,7 +88,10 @@ public final class NativeSpotContributionController {
         return ResponseEntity.status(202).contentType(MediaType.APPLICATION_JSON).body(body);
     }
 
-    /** Block a post's author (ADR 0072): 204 whether or not already blocked; the author is never named. */
+    /**
+     * Block a post's author (ADR 0072): hides that alias in its room for the blocker and records the
+     * account-level edge. 204 whether or not already blocked; the author is never named.
+     */
     @PostMapping("/items/{ref}/block-author") ResponseEntity<Void> blockAuthor(@PathVariable String ref,
             HttpServletRequest request) {
         UUID actor = actor(request);
@@ -131,11 +134,12 @@ public final class NativeSpotContributionController {
     @ExceptionHandler(PostText.ContactDetails.class) ResponseEntity<Void> contactDetails() {
         return ResponseEntity.status(422).build();
     }
-    @ExceptionHandler(SpotsRateLimited.class) ResponseEntity<Void> limited() {
-        return ResponseEntity.status(429).header(HttpHeaders.RETRY_AFTER, "60").build();
+    @ExceptionHandler(SpotsRateLimited.class) ResponseEntity<Void> limited(SpotsRateLimited limited) {
+        return ResponseEntity.status(429)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(limited.retryAfterSeconds())).build();
     }
     @ExceptionHandler({SpotsUnavailable.class, AccountWriteUnavailable.class, DataAccessException.class,
-            TransactionException.class})
+            TransactionException.class, IllegalStateException.class})
     ResponseEntity<Void> unavailable() { return ResponseEntity.status(503).build(); }
     @ExceptionHandler(IllegalArgumentException.class) ResponseEntity<Void> invalid() {
         return ResponseEntity.badRequest().build();

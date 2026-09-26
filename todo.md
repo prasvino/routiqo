@@ -150,7 +150,7 @@ Moderation (re-scoped to posts, voice notes and chat; see the
 - [ ] Moderator hide, restore and clear-signals actions (`spots_hide`).
 - [ ] Reuse the admin app login with real admin OAuth; Spots permissions, 1–12 h shift grants, two out-of-band grant admins, renewable sessions up to 8 h (ADR 0069); rota members' Google 2-Step Verification checked at onboarding.
 - [ ] Urgent-report alert webhook to the rota's private team chat (choose the channel).
-- [ ] Blocks apply to REST and realtime delivery, room subscription, Ask Ahead recipient selection and replay. _Spot activity reads done 2026-09-26 (ADR 0072); chat and Ask Ahead when built._
+- [ ] Blocks apply to REST and realtime delivery, room subscription, Ask Ahead recipient selection and replay. _Spot activity reads done 2026-09-26 as a room-scoped alias hide plus the account-level edge (ADR 0072); chat and Ask Ahead when built._
 - [ ] Propagate hide/block/delete across reads, caches and delivery channels; deny when authority is unavailable.
 - [ ] Verify multi-user, concurrent, replay, abuse and revocation scenarios with two or more real accounts.
 

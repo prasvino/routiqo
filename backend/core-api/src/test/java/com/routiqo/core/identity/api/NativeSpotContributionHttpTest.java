@@ -93,6 +93,7 @@ class NativeSpotContributionHttpTest {
         jdbc.update("DELETE FROM spot_signal_group");
         jdbc.update("DELETE FROM spot_vote");
         jdbc.update("DELETE FROM spot_report_group");
+        jdbc.update("DELETE FROM spot_report_evidence");
         client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
     }
 
