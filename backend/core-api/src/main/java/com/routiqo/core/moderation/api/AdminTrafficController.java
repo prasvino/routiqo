@@ -27,48 +27,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin")
 @Profile("web-auth & persistence & google-auth")
-@ConditionalOnExactlyTrue({"ROUTIQO_V3_ADMIN_ENABLED"})
+@ConditionalOnExactlyTrue({"ROUTIQO_ADMIN_ENABLED", "ROUTIQO_V3_ADMIN_ENABLED"})
 public final class AdminTrafficController {
     private final AdminSessionService sessions;
     private final JdbcTrafficReview review;
     private final BrowserAuthPolicy policy;
     private final AuthRateGate rates;
     public AdminTrafficController(AdminSessionService sessions, JdbcTrafficReview review,
-            AdminTrafficConfiguration.AdminTrafficSettings settings, AuthRateGate rates) {
+            AdminAccessConfiguration.AdminSettings settings, AuthRateGate rates) {
         this.sessions = sessions; this.review = review; this.policy = settings.policy(); this.rates = rates;
     }
-    public record CsrfResponse(String token) {}
-    public record ChallengeResponse(UUID id, String nonce, Instant expiresAt) {}
-    public record SessionResponse(UUID accountId, Instant expiresAt) {}
     public record DecisionResponse(String status) {}
 
-    @GetMapping("/auth/csrf") CsrfResponse csrf(CsrfToken token) { return new CsrfResponse(token.getToken()); }
-    @PostMapping("/auth/google/challenge") ChallengeResponse challenge(HttpServletRequest request, HttpServletResponse response) {
-        emptyBody(request);
-        var value = sessions.begin();
-        response.addHeader(HttpHeaders.SET_COOKIE, policy.cookie("routiqo_admin_binding", value.binding(), 300));
-        return new ChallengeResponse(value.id(), value.nonce(), value.expiresAt());
-    }
-    @PostMapping("/auth/google/exchange") SessionResponse exchange(HttpServletRequest request, HttpServletResponse response) {
-        var input = AdminTrafficJson.exchange(request);
-        var value = sessions.exchange(input.challengeId(), cookie(request, "routiqo_admin_binding"), input.idToken());
-        response.addHeader(HttpHeaders.SET_COOKIE, policy.cookie("routiqo_admin_session", value.credential(), 900));
-        response.addHeader(HttpHeaders.SET_COOKIE, policy.cookie("routiqo_admin_binding", "", 0));
-        return new SessionResponse(value.accountId(), value.expiresAt());
-    }
-    @GetMapping("/auth/session") SessionResponse session(HttpServletRequest request) {
-        noQuery(request);
-        var value = sessions.authenticate(cookie(request, "routiqo_admin_session"));
-        return new SessionResponse(value.accountId(), value.expiresAt());
-    }
-    @PostMapping("/auth/logout") ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
-        emptyBody(request);
-        String credential = cookie(request, "routiqo_admin_session");
-        if (credential != null) try { sessions.revoke(credential); } catch (SecurityException malformed) { /* Clear malformed cookie. */ }
-        response.addHeader(HttpHeaders.SET_COOKIE, policy.cookie("routiqo_admin_session", "", 0));
-        response.addHeader(HttpHeaders.SET_COOKIE, policy.cookie("routiqo_admin_binding", "", 0));
-        return ResponseEntity.noContent().build();
-    }
     @GetMapping("/community-traffic/reports") JdbcTrafficReview.Queue queue(HttpServletRequest request,
             @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "20") int limit) {
         UUID operator = operator(request);

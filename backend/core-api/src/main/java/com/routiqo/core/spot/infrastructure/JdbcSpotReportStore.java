@@ -100,18 +100,26 @@ final class JdbcSpotReportStore implements SpotReportStore {
         Timestamp created = Timestamp.from((Instant) stored[0]);
         jdbc.update("""
                 INSERT INTO spot_report_group (item_ref, window_start, spot_id, item_kind, %1$s, latest,
-                    latest_sequence, expires_at)
-                VALUES (?, ?, ?, ?, 1, ?, ?, ?::timestamptz + INTERVAL '30 days')
+                    latest_sequence, expires_at, open_since)
+                VALUES (?, ?, ?, ?, 1, ?, ?, ?::timestamptz + INTERVAL '30 days', ?)
                 ON CONFLICT (item_ref, window_start) DO UPDATE SET %1$s = spot_report_group.%1$s + 1,
+                    -- A report on a decided group reopens it (ADR 0075).
+                    open_since = CASE WHEN spot_report_group.closed_through IS NOT NULL
+                            AND spot_report_group.latest_sequence <= spot_report_group.closed_through
+                        THEN excluded.open_since ELSE spot_report_group.open_since END,
                     latest = GREATEST(spot_report_group.latest, excluded.latest),
                     latest_sequence = GREATEST(spot_report_group.latest_sequence, excluded.latest_sequence),
                     expires_at = GREATEST(spot_report_group.latest, excluded.latest) + INTERVAL '30 days'
                 """.formatted(column), item.ref(), window, item.spotId(), item.kind().name(), created,
-                stored[2], created);
+                stored[2], created, created);
         jdbc.update("""
                 INSERT INTO spot_report_evidence (ref, expires_at)
                 SELECT evidence, ?::timestamptz + INTERVAL '%s' FROM unnest(?::uuid[]) AS evidence
-                ON CONFLICT (ref) DO NOTHING
+                ORDER BY evidence
+                -- A new report on evidence ruled not upheld blocks highlights again (ADR 0075). Sorted
+                -- inserts keep row-lock order stable across concurrent reports.
+                ON CONFLICT (ref) DO UPDATE SET not_upheld_at = NULL
+                    WHERE spot_report_evidence.not_upheld_at IS NOT NULL
                 """.formatted(EVIDENCE_LIFE), created, (Object) item.evidence().toArray(UUID[]::new));
         return new StoredReport(item.ref(), reason, (Instant) stored[0], (Instant) stored[1]);
     }

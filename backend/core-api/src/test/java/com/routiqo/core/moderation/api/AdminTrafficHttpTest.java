@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
     "ROUTIQO_WEB_ORIGIN=http://localhost:3000",
     "ROUTIQO_ADMIN_ORIGIN=http://localhost:3001",
     "ROUTIQO_AUTH_SECURE_COOKIES=false",
-    "ROUTIQO_V3_ADMIN_ENABLED=true"
+    "ROUTIQO_ADMIN_ENABLED=true", "ROUTIQO_V3_ADMIN_ENABLED=true"
 })
 @ActiveProfiles({"persistence", "google-auth", "web-auth"})
 @Import(AdminTrafficHttpTest.FakeIdentity.class)
@@ -128,14 +128,14 @@ class AdminTrafficHttpTest {
         assertThat(call("GET", "auth/session", "", null, null).statusCode()).isEqualTo(401);
     }
     @Test void adminOriginCannotEqualConsumerOrigin() {
-        assertThatThrownBy(() -> new AdminTrafficConfiguration()
-                .adminTrafficSettings("http://localhost:3000", "http://localhost:3000", false))
+        assertThatThrownBy(() -> new AdminAccessConfiguration()
+                .adminSettings("http://localhost:3000", "http://localhost:3000", false))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new AdminTrafficConfiguration()
-                .adminTrafficSettings("https://Admin.Example.test:443", "https://admin.example.test", true))
+        assertThatThrownBy(() -> new AdminAccessConfiguration()
+                .adminSettings("https://Admin.Example.test:443", "https://admin.example.test", true))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new AdminTrafficConfiguration()
-                .adminTrafficSettings("http://localhost:80", "http://localhost", false))
+        assertThatThrownBy(() -> new AdminAccessConfiguration()
+                .adminSettings("http://localhost:80", "http://localhost", false))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

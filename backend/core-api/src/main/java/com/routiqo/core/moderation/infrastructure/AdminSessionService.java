@@ -13,8 +13,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Independent admin challenge and session namespace. Exchange never provisions accounts. */
+/**
+ * Independent admin challenge and session namespace. Exchange never provisions accounts. Sessions last
+ * 15 minutes, renew while the operator is active, and never outlive 8 hours from sign-in (ADR 0069/0075).
+ */
 public final class AdminSessionService {
+    /** Any current grant of these lets an enabled account sign in; each action still checks its own. */
+    static final String ADMIN_PERMISSIONS = "('traffic_review', 'traffic_suppress', 'traffic_grant_admin', "
+            + "'spots_review', 'spots_hide', 'spots_restrict', 'spots_alias_lookup', 'spots_grant_admin')";
+    static final long IDLE_SECONDS = 900;
+    static final long ABSOLUTE_SECONDS = 8 * 3600;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final GoogleIdentityVerifier verifier;
@@ -31,7 +39,7 @@ public final class AdminSessionService {
     public record Challenge(UUID id, String nonce, String binding, Instant expiresAt) {
         @Override public String toString() { return "Challenge[redacted]"; }
     }
-    public record Session(UUID accountId, String credential, Instant expiresAt) {
+    public record Session(UUID accountId, String credential, Instant expiresAt, Instant absoluteExpiresAt) {
         @Override public String toString() { return "Session[redacted]"; }
     }
 
@@ -62,39 +70,75 @@ public final class AdminSessionService {
                     """, (row, n) -> new Object[]{row.getString(1), row.getTimestamp(2).toInstant(),
                             row.getTimestamp(3).toInstant()}, id, bindingHash);
             Instant at = databaseNow();
-            Instant expires = at.plusSeconds(900);
+            Instant expires = at.plusSeconds(IDLE_SECONDS);
+            Instant absolute = at.plusSeconds(ABSOLUTE_SECONDS);
             if (locked.isEmpty() || !locked.getFirst()[0].equals(nonce.getFirst())
                     || ((Instant) locked.getFirst()[1]).isAfter(at)
                     || !((Instant) locked.getFirst()[2]).isAfter(at)) throw denied();
             var ids = jdbc.query("""
                     SELECT a.id FROM routiqo_account a JOIN moderation_operator_grant g ON g.operator_id = a.id
                     WHERE a.google_subject = ? AND a.enabled = TRUE
-                      AND g.permission IN ('traffic_review', 'traffic_suppress', 'traffic_grant_admin')
+                      AND g.permission IN %s
                       AND g.issued_at <= ? AND g.expires_at > ?
                     LIMIT 1
-                    """, (row, n) -> row.getObject(1, UUID.class), identity.subject(), Timestamp.from(at), Timestamp.from(at));
+                    """.formatted(ADMIN_PERMISSIONS), (row, n) -> row.getObject(1, UUID.class), identity.subject(),
+                    Timestamp.from(at), Timestamp.from(at));
             if (ids.isEmpty()) throw denied();
             jdbc.update("UPDATE admin_login_challenge SET consumed_at = ? WHERE id = ?", Timestamp.from(at), id);
-            jdbc.update("INSERT INTO admin_auth_session (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-                    hash(credential), ids.getFirst(), Timestamp.from(at), Timestamp.from(expires));
-            return new Session(ids.getFirst(), credential, expires);
+            jdbc.update("""
+                    INSERT INTO admin_auth_session (token_hash, account_id, created_at, expires_at, absolute_expires_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, hash(credential), ids.getFirst(), Timestamp.from(at), Timestamp.from(expires),
+                    Timestamp.from(absolute));
+            return new Session(ids.getFirst(), credential, expires, absolute);
         });
     }
 
     public Session authenticate(String credential) {
         Instant now = databaseNow();
         var rows = jdbc.query("""
-                SELECT s.account_id, s.expires_at FROM admin_auth_session s
+                SELECT s.account_id, s.expires_at, s.absolute_expires_at FROM admin_auth_session s
                 JOIN routiqo_account a ON a.id = s.account_id AND a.enabled = TRUE
                 JOIN moderation_operator_grant g ON g.operator_id = a.id
                 WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.created_at <= ? AND s.expires_at > ?
-                  AND g.permission IN ('traffic_review', 'traffic_suppress', 'traffic_grant_admin')
+                  AND g.permission IN %s
                   AND g.issued_at <= ? AND g.expires_at > ?
                 LIMIT 1
-                """, (row, n) -> new Session(row.getObject(1, UUID.class), null, row.getTimestamp(2).toInstant()),
+                """.formatted(ADMIN_PERMISSIONS), (row, n) -> new Session(row.getObject(1, UUID.class), null,
+                        row.getTimestamp(2).toInstant(), row.getTimestamp(3).toInstant()),
                 hash(credential), Timestamp.from(now), Timestamp.from(now), Timestamp.from(now), Timestamp.from(now));
         if (rows.isEmpty()) throw denied();
         return rows.getFirst();
+    }
+
+    /**
+     * Extends an active session to 15 minutes from now, capped at its 8-hour absolute limit. The session
+     * must be unrevoked and unexpired, and the account enabled with a current admin grant.
+     */
+    public Session renew(String credential) {
+        String tokenHash = hash(credential);
+        return transaction.execute(status -> {
+            Instant now = databaseNow();
+            var rows = jdbc.query("""
+                    SELECT s.account_id, s.absolute_expires_at FROM admin_auth_session s
+                    JOIN routiqo_account a ON a.id = s.account_id AND a.enabled = TRUE
+                    WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.created_at <= ? AND s.expires_at > ?
+                      AND EXISTS (SELECT 1 FROM moderation_operator_grant g WHERE g.operator_id = a.id
+                          AND g.permission IN %s AND g.issued_at <= ? AND g.expires_at > ?)
+                    FOR UPDATE OF s
+                    """.formatted(ADMIN_PERMISSIONS), (row, n) -> new Object[] {row.getObject(1, UUID.class),
+                            row.getTimestamp(2).toInstant()}, tokenHash, Timestamp.from(now), Timestamp.from(now),
+                    Timestamp.from(now), Timestamp.from(now));
+            if (rows.isEmpty()) throw denied();
+            Instant absolute = (Instant) rows.getFirst()[1];
+            Instant idle = now.plusSeconds(IDLE_SECONDS);
+            Instant expires = idle.isBefore(absolute) ? idle : absolute;
+            Instant stored = jdbc.queryForObject("""
+                    UPDATE admin_auth_session SET expires_at = GREATEST(expires_at, ?) WHERE token_hash = ?
+                    RETURNING expires_at
+                    """, Timestamp.class, Timestamp.from(expires), tokenHash).toInstant();
+            return new Session((UUID) rows.getFirst()[0], null, stored, absolute);
+        });
     }
 
     public void revoke(String credential) {

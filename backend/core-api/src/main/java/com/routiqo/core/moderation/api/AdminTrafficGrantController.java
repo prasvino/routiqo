@@ -31,7 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RestController
 @RequestMapping("/api/v1/admin/traffic-grants")
 @Profile("web-auth & persistence & google-auth")
-@ConditionalOnExactlyTrue({"ROUTIQO_V3_ADMIN_ENABLED", "ROUTIQO_V3_GRANT_ADMIN_ENABLED"})
+@ConditionalOnExactlyTrue({"ROUTIQO_ADMIN_ENABLED", "ROUTIQO_V3_ADMIN_ENABLED", "ROUTIQO_V3_GRANT_ADMIN_ENABLED"})
 public final class AdminTrafficGrantController {
     private static final JsonMapper JSON = JsonMapper.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
@@ -41,7 +41,7 @@ public final class AdminTrafficGrantController {
     private final BrowserAuthPolicy policy;
     private final AuthRateGate rates;
     public AdminTrafficGrantController(AdminSessionService sessions, JdbcTrafficGrantAdmin grants,
-            AdminTrafficConfiguration.AdminTrafficSettings settings, AuthRateGate rates) {
+            AdminAccessConfiguration.AdminSettings settings, AuthRateGate rates) {
         this.sessions = sessions; this.grants = grants; this.policy = settings.policy(); this.rates = rates;
     }
     public record Capability(boolean canManageGrants) {}

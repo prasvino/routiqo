@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
     "ROUTIQO_GOOGLE_CLIENT_ID=consumer-client.apps.googleusercontent.com",
     "ROUTIQO_ADMIN_GOOGLE_CLIENT_ID=admin-client.apps.googleusercontent.com",
     "ROUTIQO_WEB_ORIGIN=http://localhost:3000", "ROUTIQO_ADMIN_ORIGIN=http://localhost:3001",
-    "ROUTIQO_AUTH_SECURE_COOKIES=false", "ROUTIQO_V3_ADMIN_ENABLED=true",
+    "ROUTIQO_AUTH_SECURE_COOKIES=false", "ROUTIQO_ADMIN_ENABLED=true", "ROUTIQO_V3_ADMIN_ENABLED=true",
     "ROUTIQO_V3_GRANT_ADMIN_ENABLED=true"
 })
 @ActiveProfiles({"persistence", "google-auth", "web-auth"})
