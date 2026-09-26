@@ -43,7 +43,8 @@ public interface SpotModerationStore {
 
     record Votes(int stillTrue, int noLongerTrue) {}
 
-    record StoredAction(String action, UUID reportRef, String reason, String fingerprint) {}
+    /** {@code occurredAt} is null for an action not yet stored. */
+    record StoredAction(String action, UUID reportRef, String reason, String fingerprint, Instant occurredAt) {}
 
     List<Group> openGroups(Optional<Cursor> after, int limit);
     Optional<Group> group(UUID reportRef);
@@ -59,11 +60,15 @@ public interface SpotModerationStore {
     Optional<SummaryItem> lockSummary(Group group, Instant now);
     Optional<Group> lockGroup(UUID reportRef);
 
+    /** Serializes signal clears on one Spot for the rest of the transaction. */
+    void lockSpotSignals(UUID spotId);
+    /** Deletes expired moderation records (decisions, reads, reporter outcomes, account references). */
+    int purgeExpired(int limit, Instant now);
     void hidePost(UUID ref, Instant now);
     void unhidePost(UUID ref);
     void hideSignals(List<UUID> refs, Instant now);
     void unhideSignals(List<UUID> refs);
-    /** Ends every active, unhidden signal for this Spot and category now; returns how many. */
+    /** Ends every active signal, hidden or not, for this Spot and category now; returns how many. */
     int clearSignals(UUID spotId, String category, Instant now);
     void close(UUID reportRef, long through, String decision, Instant now);
     /** Evidence stops blocking highlights, place posts are reconsidered, and new reporters are counted. */

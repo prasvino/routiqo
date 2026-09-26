@@ -86,11 +86,13 @@ final class JdbcSpotModerationStore implements SpotModerationStore {
                     s.moderation_hidden_at IS NOT NULL AS hidden
                 FROM spot_signal s JOIN spot_signal_group g ON g.ref = s.group_ref
                 WHERE s.group_ref = ? AND s.effective_created_at >= ? AND s.effective_created_at <= ?
+                  AND s.received_at <= ?
                   AND EXISTS (SELECT 1 FROM spot_report_evidence e WHERE e.ref = s.ref)
                 ORDER BY s.ref LIMIT 500""" + lock, (row, index) -> new Row(row.getObject("ref", UUID.class),
                         row.getString("category"), row.getString("value"), row.getString("state"),
                         instant(row, "effective_created_at"), instant(row, "expires_at"), row.getBoolean("hidden")),
-                group.itemRef(), Timestamp.from(group.windowStart()), Timestamp.from(group.latest()));
+                group.itemRef(), Timestamp.from(group.windowStart()), Timestamp.from(group.latest()),
+                Timestamp.from(group.latest()));
         if (rows.isEmpty()) return Optional.empty();
         int active = 0, hidden = 0;
         for (Row row : rows) {
@@ -123,10 +125,11 @@ final class JdbcSpotModerationStore implements SpotModerationStore {
     @Override public Optional<StoredAction> action(UUID operator, UUID requestId) {
         requireTransaction();
         return jdbc.query("""
-                SELECT action, report_ref, reason, fingerprint FROM spot_moderation_action
+                SELECT action, report_ref, reason, fingerprint, occurred_at FROM spot_moderation_action
                 WHERE operator_id = ? AND request_id = ? FOR UPDATE
                 """, (row, index) -> new StoredAction(row.getString("action"), row.getObject("report_ref", UUID.class),
-                        row.getString("reason"), row.getString("fingerprint")), operator, requestId)
+                        row.getString("reason"), row.getString("fingerprint"), instant(row, "occurred_at")),
+                operator, requestId)
                 .stream().findFirst();
     }
 
@@ -137,6 +140,26 @@ final class JdbcSpotModerationStore implements SpotModerationStore {
                     occurred_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?::timestamptz + INTERVAL '30 days')
                 """, operator, requestId, action.action(), action.reportRef(), action.reason(), action.fingerprint(),
                 Timestamp.from(now), Timestamp.from(now));
+    }
+
+    @Override public void lockSpotSignals(UUID spotId) {
+        requireTransaction();
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", Object.class,
+                "spot-signal-clear:" + spotId);
+    }
+
+    @Override public int purgeExpired(int limit, Instant now) {
+        if (limit < 1 || limit > 500) throw new IllegalArgumentException("Invalid purge limit");
+        int removed = 0;
+        for (String table : new String[] {"spot_moderation_action", "spot_moderation_read_audit",
+                "spot_reporter_not_upheld", "spot_account_lookup_ref"}) {
+            removed += jdbc.update("""
+                    DELETE FROM %1$s WHERE ctid IN (
+                        SELECT ctid FROM %1$s WHERE expires_at <= ?
+                        ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
+                    """.formatted(table), Timestamp.from(now), limit);
+        }
+        return removed;
     }
 
     @Override public void hidePost(UUID ref, Instant now) {
@@ -221,9 +244,11 @@ final class JdbcSpotModerationStore implements SpotModerationStore {
         return jdbc.queryForList("""
                 SELECT DISTINCT s.actor_id FROM spot_signal s
                 WHERE s.group_ref = ? AND s.effective_created_at >= ? AND s.effective_created_at <= ?
+                  AND s.received_at <= ?
                   AND EXISTS (SELECT 1 FROM spot_report_evidence e WHERE e.ref = s.ref)
                 ORDER BY s.actor_id LIMIT 20
-                """, UUID.class, group.itemRef(), Timestamp.from(group.windowStart()), Timestamp.from(group.latest()));
+                """, UUID.class, group.itemRef(), Timestamp.from(group.windowStart()), Timestamp.from(group.latest()),
+                Timestamp.from(group.latest()));
     }
 
     @Override public int notUpheldReports(UUID reporter, Instant since) {

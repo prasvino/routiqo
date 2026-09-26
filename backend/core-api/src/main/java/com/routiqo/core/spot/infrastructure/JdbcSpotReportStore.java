@@ -62,6 +62,7 @@ final class JdbcSpotReportStore implements SpotReportStore {
         Optional<Reportable> post = jdbc.query("""
                 SELECT spot_id, actor_id, effective_created_at FROM spot_post
                 WHERE ref = ? AND state = 'ACTIVE' AND expires_at > ? AND moderation_hidden_at IS NULL
+                FOR SHARE
                 """, (row, index) -> new Reportable(ref, ItemKind.POST, row.getObject("spot_id", UUID.class),
                         row.getTimestamp("effective_created_at").toInstant(),
                         List.of(row.getObject("actor_id", UUID.class)), List.of(ref)), ref, at).stream().findFirst();
@@ -70,7 +71,7 @@ final class JdbcSpotReportStore implements SpotReportStore {
         List<Signal> signals = jdbc.query("""
                 SELECT ref, spot_id, actor_id, effective_created_at FROM spot_signal
                 WHERE group_ref = ? AND state = 'ACTIVE' AND expires_at > ? AND moderation_hidden_at IS NULL
-                ORDER BY ref LIMIT 500
+                ORDER BY ref LIMIT 500 FOR SHARE
                 """, (row, index) -> new Signal(row.getObject("ref", UUID.class), row.getObject("spot_id", UUID.class),
                         row.getObject("actor_id", UUID.class), row.getTimestamp("effective_created_at").toInstant()),
                 ref, at);

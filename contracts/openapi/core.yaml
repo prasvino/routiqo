@@ -2187,7 +2187,7 @@ paths:
     post:
       operationId: lookupAdminSpotAuthor
       security: [{ adminSession: [] }]
-      description: Requires spots_alias_lookup and a reason (abuse, spam, false_alarm, personal_data, unsafe). Returns up to 20 authors of the reported post or summary incident with opaque 30-minute references usable only by this operator; never an account ID, e-mail, name or Google subject. Audited 30 days; an exact retry issues fresh references without a second audit row.
+      description: Requires spots_alias_lookup and a reason (abuse, spam, false_alarm, personal_data, unsafe). Returns up to 20 authors of the reported post or summary incident with opaque 30-minute references usable only by this operator; never an account ID, e-mail, name or Google subject. Audited 30 days; an exact retry within 5 minutes issues fresh references without a second audit row, later it is 409.
       parameters:
         - { name: ref, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -2195,8 +2195,7 @@ paths:
           required: true,
           content:
             {
-              application/json:
-                { schema: { $ref: '#/components/schemas/AdminSpotDecisionRequest' } },
+              application/json: { schema: { $ref: '#/components/schemas/AdminSpotLookupRequest' } },
             },
         }
       responses:
@@ -3530,6 +3529,7 @@ components:
       required:
         [
           reportRef,
+          reportVersion,
           kind,
           urgent,
           spotName,
@@ -3549,6 +3549,10 @@ components:
         ]
       properties:
         reportRef: { type: string, format: uuid }
+        reportVersion:
+          type: integer
+          minimum: 1
+          description: Send back with a decision; changes when a new report arrives.
         kind: { type: string, enum: [post, summary] }
         urgent: { type: boolean }
         spotName: { type: string, nullable: true, maxLength: 80 }
@@ -3574,12 +3578,23 @@ components:
         stillTrue: { type: integer, minimum: 0 }
         noLongerTrue: { type: integer, minimum: 0 }
         openSince: { type: string, format: date-time }
-    AdminSpotDecisionRequest:
+    AdminSpotLookupRequest:
       type: object
       additionalProperties: false
       required: [requestId, reason]
       properties:
         requestId: { type: string, format: uuid }
+        reason: { type: string, enum: [abuse, spam, false_alarm, personal_data, unsafe] }
+    AdminSpotDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, reason, reportVersion]
+      properties:
+        requestId: { type: string, format: uuid }
+        reportVersion:
+          type: integer
+          minimum: 1
+          description: The queue item's reportVersion; a newer report makes the decision a 409.
         reason:
           type: string
           enum: [abuse, spam, false_alarm, personal_data, unsafe, not_upheld, error_correction]

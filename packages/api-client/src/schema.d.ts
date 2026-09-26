@@ -1341,7 +1341,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Requires spots_alias_lookup and a reason (abuse, spam, false_alarm, personal_data, unsafe). Returns up to 20 authors of the reported post or summary incident with opaque 30-minute references usable only by this operator; never an account ID, e-mail, name or Google subject. Audited 30 days; an exact retry issues fresh references without a second audit row. */
+        /** @description Requires spots_alias_lookup and a reason (abuse, spam, false_alarm, personal_data, unsafe). Returns up to 20 authors of the reported post or summary incident with opaque 30-minute references usable only by this operator; never an account ID, e-mail, name or Google subject. Audited 30 days; an exact retry within 5 minutes issues fresh references without a second audit row, later it is 409. */
         post: operations["lookupAdminSpotAuthor"];
         delete?: never;
         options?: never;
@@ -2131,6 +2131,8 @@ export interface components {
         AdminSpotQueueItem: {
             /** Format: uuid */
             reportRef: string;
+            /** @description Send back with a decision; changes when a new report arrives. */
+            reportVersion: number;
             /** @enum {string} */
             kind: "post" | "summary";
             urgent: boolean;
@@ -2161,9 +2163,17 @@ export interface components {
             /** Format: date-time */
             openSince: string;
         };
+        AdminSpotLookupRequest: {
+            /** Format: uuid */
+            requestId: string;
+            /** @enum {string} */
+            reason: "abuse" | "spam" | "false_alarm" | "personal_data" | "unsafe";
+        };
         AdminSpotDecisionRequest: {
             /** Format: uuid */
             requestId: string;
+            /** @description The queue item's reportVersion; a newer report makes the decision a 409. */
+            reportVersion: number;
             /** @enum {string} */
             reason: "abuse" | "spam" | "false_alarm" | "personal_data" | "unsafe" | "not_upheld" | "error_correction";
         };
@@ -6107,7 +6117,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AdminSpotDecisionRequest"];
+                "application/json": components["schemas"]["AdminSpotLookupRequest"];
             };
         };
         responses: {

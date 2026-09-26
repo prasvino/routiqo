@@ -29,8 +29,9 @@ public final class ModeratorRestrictionService {
         this.restrictions = restrictions;
     }
 
+    /** {@code recheck} runs inside the restriction transaction and throws SecurityException to refuse. */
     public Result apply(UUID operator, UUID requestId, UUID account, long expectedRevision, boolean restrict,
-            String reason) {
+            String reason, Runnable recheck) {
         var mapped = reason == null ? null : REASONS.get(reason);
         if (mapped == null) throw new IllegalArgumentException("Invalid restriction reason");
         final AuditedContributionRestrictionService.Command command;
@@ -42,7 +43,7 @@ public final class ModeratorRestrictionService {
             throw new IllegalArgumentException("Invalid restriction request");
         }
         try {
-            var receipt = restrictions.execute(operator, command);
+            var receipt = restrictions.execute(operator, command, recheck);
             return new Result(receipt.restricted(), receipt.afterRevision(), false);
         } catch (SecurityException refused) {
             throw new Refused();

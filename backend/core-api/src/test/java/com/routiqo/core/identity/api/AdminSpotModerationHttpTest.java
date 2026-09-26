@@ -176,9 +176,18 @@ class AdminSpotModerationHttpTest {
             return browser.send(builder.build(), HttpResponse.BodyHandlers.ofString());
         }
         HttpResponse<String> queue() throws Exception { return send("GET", "spots/reports", ""); }
+        /** Decides at the group's current version, as a moderator who just refreshed the queue would. */
         HttpResponse<String> decide(String reportRef, String action, UUID requestId, String reason) throws Exception {
-            return send("POST", "spots/reports/" + reportRef + "/" + action,
+            if (action.equals("author")) return send("POST", "spots/reports/" + reportRef + "/author",
                     "{\"requestId\":\"" + requestId + "\",\"reason\":\"" + reason + "\"}");
+            List<Long> version = jdbc.queryForList("SELECT latest_sequence FROM spot_report_group WHERE ref = ?::uuid",
+                    Long.class, reportRef);
+            return decideAt(reportRef, action, requestId, reason, version.isEmpty() ? 1 : version.getFirst());
+        }
+        HttpResponse<String> decideAt(String reportRef, String action, UUID requestId, String reason, long version)
+                throws Exception {
+            return send("POST", "spots/reports/" + reportRef + "/" + action, "{\"requestId\":\"" + requestId
+                    + "\",\"reason\":\"" + reason + "\",\"reportVersion\":" + version + "}");
         }
     }
 
@@ -205,7 +214,7 @@ class AdminSpotModerationHttpTest {
         assertThat(JsonPath.<String>read(queue.body(), "$.items[1].category")).isEqualTo("traffic");
         assertThat(JsonPath.<String>read(queue.body(), "$.items[1].value")).isEqualTo("slow");
         assertThat(JsonPath.<Map<String, Object>>read(queue.body(), "$.items[0]").keySet()).containsExactlyInAnyOrder(
-                "reportRef", "kind", "urgent", "spotName", "spotNameTa", "text", "postType", "alias", "category",
+                "reportRef", "reportVersion", "kind", "urgent", "spotName", "spotNameTa", "text", "postType", "alias", "category",
                 "value", "capturedAt", "expiresAt", "state", "reports", "stillTrue", "noLongerTrue", "openSince");
         assertThat(JsonPath.<Map<String, Object>>read(queue.body(), "$.items[0].reports").keySet())
                 .containsExactlyInAnyOrder("unsafe", "abuse", "personal_data", "false_alarm", "spam");
@@ -297,15 +306,22 @@ class AdminSpotModerationHttpTest {
         start(reporter);
         String group = signal(author, journey);
         report(reporter, group, "false_alarm");
+        assertThat(nativePost("spots/signals", "{\"clientKey\":\"" + UUID.randomUUID() + "\",\"spotId\":\"" + TOLL
+                + "\",\"category\":\"queue\",\"value\":\"under_5\",\"capturedAt\":\"" + now()
+                + "\",\"journeyId\":\"" + journey + "\"}", author).statusCode()).isEqualTo(200);
         var moderator = new Moderator("spots_review", "spots_hide");
         String reportRef = JsonPath.read(moderator.queue().body(), "$.items[0].reportRef");
-        assertThat(JsonPath.<List<Object>>read(activity(reporter), "$.spots[0].signals")).hasSize(1);
+        assertThat(JsonPath.<List<Object>>read(activity(reporter), "$.spots[0].signals")).hasSize(2);
         assertThat(moderator.decide(reportRef, "hide", UUID.randomUUID(), "false_alarm").statusCode()).isEqualTo(200);
-        assertThat(JsonPath.<List<Object>>read(activity(reporter), "$.spots[0].signals")).isEmpty();
-        assertThat(JsonPath.<List<Object>>read(activity(author), "$.spots[0].signals")).isEmpty();
+        assertThat(JsonPath.<List<String>>read(activity(reporter), "$.spots[0].signals[*].category"))
+                .containsExactly("queue");
+        assertThat(JsonPath.<List<String>>read(activity(author), "$.spots[0].signals[*].category"))
+                .containsExactly("queue");
+        assertThat(nativePost("spots/items/" + group + "/vote", "{\"vote\":\"still_true\"}", reporter).statusCode())
+                .isEqualTo(404); // No votes on a hidden summary.
         assertThat(moderator.decide(reportRef, "restore", UUID.randomUUID(), "error_correction").statusCode())
                 .isEqualTo(200);
-        assertThat(JsonPath.<List<Object>>read(activity(reporter), "$.spots[0].signals")).hasSize(1);
+        assertThat(JsonPath.<List<Object>>read(activity(reporter), "$.spots[0].signals")).hasSize(2);
 
         // Coordinated false signals: clear every current signal for that Spot and category.
         jdbc.update("""
@@ -315,9 +331,10 @@ class AdminSpotModerationHttpTest {
         assertThat(moderator.decide(reportRef, "clear-signals", UUID.randomUUID(), "abuse").statusCode()).isEqualTo(400);
         var cleared = moderator.decide(reportRef, "clear-signals", UUID.randomUUID(), "false_alarm");
         assertThat(JsonPath.<String>read(cleared.body(), "$.status")).isEqualTo("cleared");
-        assertThat(JsonPath.<List<Object>>read(activity(reporter), "$.spots[0].signals")).isEmpty();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_signal WHERE state = 'ACTIVE'", Integer.class))
-                .isZero();
+        assertThat(JsonPath.<List<String>>read(activity(reporter), "$.spots[0].signals[*].category"))
+                .containsExactly("queue"); // Other categories are untouched.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_signal WHERE state = 'ACTIVE' AND category = 'traffic'",
+                Integer.class)).isZero();
     }
 
     @Test void auditedLookupGivesOperatorBoundReferencesThatRestrictAndRestore() throws Exception {
@@ -388,6 +405,84 @@ class AdminSpotModerationHttpTest {
                 """);
         assertThat(lead.send("POST", "spots/accounts/restrict", restrict.replace("\"expectedRevision\":0",
                 "\"expectedRevision\":2")).statusCode()).isEqualTo(404);
+    }
+
+    @Test void aReportThatArrivesAfterTheModeratorLookedIsNeverClosedUnseen() throws Exception {
+        Login author = login(false);
+        Login reporter = login(true);
+        String journey = start(author);
+        start(reporter);
+        String post = postPlace(author, journey, "Night bus from bay 9");
+        report(reporter, post, "spam");
+        var moderator = new Moderator("spots_review", "spots_hide");
+        var queue = moderator.queue();
+        String reportRef = JsonPath.read(queue.body(), "$.items[0].reportRef");
+        long seen = JsonPath.<Number>read(queue.body(), "$.items[0].reportVersion").longValue();
+        // An urgent report lands (simulated) before the moderator taps Dismiss.
+        jdbc.update("""
+                UPDATE spot_report_group SET unsafe = unsafe + 1, latest_sequence = latest_sequence + 1000,
+                    latest = now(), expires_at = now() + INTERVAL '30 days' WHERE ref = ?::uuid
+                """, reportRef);
+        assertThat(moderator.decideAt(reportRef, "dismiss", UUID.randomUUID(), "not_upheld", seen).statusCode())
+                .isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT decision FROM spot_report_group WHERE ref = ?::uuid", String.class,
+                reportRef)).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_reporter_not_upheld", Integer.class)).isZero();
+        var refreshed = moderator.queue();
+        assertThat(JsonPath.<Boolean>read(refreshed.body(), "$.items[0].urgent")).isTrue();
+        long current = JsonPath.<Number>read(refreshed.body(), "$.items[0].reportVersion").longValue();
+        assertThat(moderator.decideAt(reportRef, "hide", UUID.randomUUID(), "unsafe", current).statusCode())
+                .isEqualTo(200);
+        assertThat(moderator.send("POST", "spots/reports/" + reportRef + "/hide",
+                "{\"requestId\":\"" + UUID.randomUUID() + "\",\"reason\":\"unsafe\"}").statusCode()).isEqualTo(400);
+    }
+
+    @Test void revokedGrantOrSessionStopsTheNextActionAndReplaysNeedThemToo() throws Exception {
+        Login author = login(false);
+        Login reporter = login(true);
+        String journey = start(author);
+        start(reporter);
+        String post = postPlace(author, journey, "Toll lane 2 closed");
+        report(reporter, post, "spam");
+        var moderator = new Moderator("spots_review", "spots_hide");
+        String reportRef = JsonPath.read(moderator.queue().body(), "$.items[0].reportRef");
+        UUID request = UUID.randomUUID();
+        assertThat(moderator.decide(reportRef, "hide", request, "spam").statusCode()).isEqualTo(200);
+        jdbc.update("DELETE FROM moderation_operator_grant WHERE operator_id = ? AND permission = 'spots_hide'",
+                moderator.account);
+        assertThat(moderator.decide(reportRef, "hide", request, "spam").statusCode()).isEqualTo(403); // No replay.
+        assertThat(moderator.decide(reportRef, "restore", UUID.randomUUID(), "not_upheld").statusCode())
+                .isEqualTo(403);
+        assertThat(moderator.decide(UUID.randomUUID().toString(), "restore", UUID.randomUUID(), "not_upheld")
+                .statusCode()).isEqualTo(403); // No existence answer without the grant.
+        jdbc.update("UPDATE routiqo_account SET enabled = FALSE WHERE id = ?", moderator.account);
+        assertThat(moderator.queue().statusCode()).isEqualTo(401);
+        // The hidden post stays hidden and, once expired, a later restore never revives it.
+        var lead = new Moderator("spots_review", "spots_hide");
+        jdbc.update("UPDATE spot_post SET expires_at = now() - INTERVAL '1 minute' WHERE ref = ?::uuid", post);
+        assertThat(lead.decide(reportRef, "restore", UUID.randomUUID(), "error_correction").statusCode())
+                .isEqualTo(200);
+        assertThat(JsonPath.<List<Object>>read(activity(author), "$.spots[0].posts")).isEmpty();
+    }
+
+    @Test void identicalDoubleTapsReplay() throws Exception {
+        Login author = login(false);
+        Login reporter = login(true);
+        String journey = start(author);
+        start(reporter);
+        String post = postPlace(author, journey, "Queue at the ticket counter");
+        report(reporter, post, "spam");
+        var moderator = new Moderator("spots_review", "spots_hide");
+        String reportRef = JsonPath.read(moderator.queue().body(), "$.items[0].reportRef");
+        UUID request = UUID.randomUUID();
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = pool.submit(() -> moderator.decide(reportRef, "hide", request, "spam"));
+            var second = pool.submit(() -> moderator.decide(reportRef, "hide", request, "spam"));
+            var statuses = List.of(first.get().statusCode(), second.get().statusCode());
+            assertThat(statuses).containsOnly(200);
+            assertThat(List.of(JsonPath.<Boolean>read(first.get().body(), "$.replayed"),
+                    JsonPath.<Boolean>read(second.get().body(), "$.replayed"))).containsExactlyInAnyOrder(true, false);
+        }
     }
 
     @Test void groupsWhoseEvidenceIsGoneCloseAsUnavailable() throws Exception {

@@ -344,6 +344,79 @@ class SpotReportPersistenceTest {
                 .containsExactly(dismissed);
     }
 
+    @Test void aNewReportReopensADecidedGroupAndBlocksHighlightsAgainButHideDeletesOne() {
+        Traveller author = traveller();
+        Traveller a = traveller();
+        Traveller b = traveller();
+        Traveller first = traveller();
+        Traveller second = traveller();
+        UUID tip = post(author, EATERY, "place", "Clean restrooms at the back");
+        service.vote(a.account(), tip, VoteKind.STILL_TRUE);
+        service.vote(b.account(), tip, VoteKind.STILL_TRUE);
+        reports.report(first.account(), tip, report("spam"));
+        var store = new JdbcSpotModerationStore(jdbc);
+        var transactions = new org.springframework.transaction.support.TransactionTemplate(manager);
+        UUID ref = jdbc.queryForObject("SELECT ref FROM spot_report_group WHERE item_ref = ?", UUID.class, tip);
+        transactions.executeWithoutResult(status -> {
+            var group = store.lockGroup(ref).orElseThrow();
+            store.ruleNotUpheld(group, List.of(tip), 0, clock.instant());
+            store.close(ref, group.latestSequence(), "DISMISSED", clock.instant());
+        });
+        clock.advance(Duration.ofMinutes(5));
+        reports.report(second.account(), tip, report("abuse"));
+        var reopened = store.group(ref).orElseThrow();
+        assertThat(reopened.open()).isTrue();
+        assertThat(reopened.openSince()).isEqualTo(clock.instant());
+        assertThat(jdbc.queryForObject("SELECT not_upheld_at IS NULL FROM spot_report_evidence WHERE ref = ?",
+                Boolean.class, tip)).isTrue();
+
+        // A highlight made before a hide is deleted by it.
+        jdbc.update("""
+                INSERT INTO spot_highlight (ref, spot_id, source_post_ref, actor_id, text, still_true, created_at, expires_at)
+                VALUES (gen_random_uuid(), ?, ?, ?, 'Clean restrooms at the back', 2, ?, ?::timestamptz + INTERVAL '30 days')
+                """, EATERY, tip, author.account(), Timestamp.from(clock.instant()), Timestamp.from(clock.instant()));
+        transactions.executeWithoutResult(status -> store.hidePost(tip, clock.instant()));
+        assertThat(count("spot_highlight")).isZero();
+        // Only the second reporter's report is new since the dismissal; the first was already counted.
+        transactions.executeWithoutResult(status -> {
+            var group = store.lockGroup(ref).orElseThrow();
+            store.unhidePost(tip);
+            store.ruleNotUpheld(group, List.of(tip), group.notUpheldThrough(), clock.instant());
+        });
+        assertThat(jdbc.queryForList("SELECT reporter_id FROM spot_reporter_not_upheld ORDER BY id", UUID.class))
+                .containsExactly(first.account(), second.account());
+    }
+
+    @Test void queuePagesAreStableAcrossTheUrgentTierBoundary() {
+        // 25 synthetic open groups: every fifth is urgent; one closed group never appears.
+        for (int i = 1; i <= 26; i++) {
+            jdbc.update("""
+                    INSERT INTO spot_report_group (item_ref, window_start, spot_id, item_kind, spam, unsafe, latest,
+                        latest_sequence, expires_at, open_since, closed_through, decision, decided_at)
+                    VALUES (gen_random_uuid(), now(), ?, 'POST', 1, ?, now(), ?, now() + INTERVAL '30 days', now(),
+                        ?, ?, ?)
+                    """, TOLL, i % 5 == 0 ? 1 : 0, 100_000L + i, i == 26 ? 100_026L : null,
+                    i == 26 ? "DISMISSED" : null, i == 26 ? Timestamp.from(clock.instant()) : null);
+        }
+        var store = new JdbcSpotModerationStore(jdbc);
+        var seen = new java.util.ArrayList<com.routiqo.core.spot.application.SpotModerationStore.Group>();
+        java.util.Optional<com.routiqo.core.spot.application.SpotModerationStore.Cursor> cursor = java.util.Optional.empty();
+        while (true) {
+            var page = store.openGroups(cursor, 7);
+            seen.addAll(page);
+            if (page.size() < 7) break;
+            var last = page.getLast();
+            cursor = java.util.Optional.of(new com.routiqo.core.spot.application.SpotModerationStore.Cursor(
+                    last.counts().urgent(), last.latestSequence(), last.ref()));
+        }
+        assertThat(seen).hasSize(25);
+        assertThat(seen.stream().map(g -> g.ref()).distinct()).hasSize(25);
+        assertThat(seen.subList(0, 5)).allMatch(g -> g.counts().urgent());
+        assertThat(seen.subList(5, 25)).noneMatch(g -> g.counts().urgent());
+        assertThat(seen.subList(5, 25).stream().map(g -> g.latestSequence()).toList())
+                .isSortedAccordingTo(java.util.Comparator.reverseOrder());
+    }
+
     @Test void eachIncidentOnASummaryIsSeparateAndLaterReportsNeverExtendOldEvidence() {
         Traveller author = traveller();
         Traveller reporter = traveller();

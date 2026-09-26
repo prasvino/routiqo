@@ -64,9 +64,20 @@ public final class AuditedContributionRestrictionService {
     }
 
     public Receipt execute(UUID authenticatedOperatorId, Command command) {
+        return execute(authenticatedOperatorId, command, () -> { });
+    }
+
+    /**
+     * As above, running {@code withinTransaction} (for example an admin session recheck) after both
+     * accounts are locked and before the change, in the same transaction; it throws to refuse.
+     */
+    public Receipt execute(UUID authenticatedOperatorId, Command command, Runnable withinTransaction) {
         Objects.requireNonNull(command);
-        return accounts.withEnabledPair(authenticatedOperatorId, command.targetId(),
-                () -> participant.apply(authenticatedOperatorId, command, clock));
+        Objects.requireNonNull(withinTransaction);
+        return accounts.withEnabledPair(authenticatedOperatorId, command.targetId(), () -> {
+            withinTransaction.run();
+            return participant.apply(authenticatedOperatorId, command, clock);
+        });
     }
 
     private static boolean invalid(UUID value) { return value == null || NIL.equals(value); }

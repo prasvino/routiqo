@@ -41,7 +41,12 @@ public final class SpotModerationService {
     }
 
     /** One report group. Post fields or summary fields are null for the other kind. */
-    public record QueueItem(UUID reportRef, String kind, boolean urgent, String spotName, String spotNameTa,
+    /**
+     * {@code reportVersion} is the group's latest report sequence; a decision must send it back, so a
+     * report that arrives after the moderator looked makes the decision a 409 instead of closing unseen.
+     */
+    public record QueueItem(UUID reportRef, long reportVersion, String kind, boolean urgent, String spotName,
+            String spotNameTa,
             String text, String postType, String alias, String category, String value, Instant capturedAt,
             Instant expiresAt, String state, Map<String, Integer> reports, int stillTrue, int noLongerTrue,
             Instant openSince) {
@@ -65,6 +70,8 @@ public final class SpotModerationService {
     }
 
     static final int REPEATED_NOT_UPHELD = 3;
+    /** A lookup retry re-issues references only briefly, so one audit row never covers a later reveal. */
+    static final Duration LOOKUP_REPLAY = Duration.ofMinutes(5);
     static final Duration NOT_UPHELD_WINDOW = Duration.ofDays(30);
 
     private final AccountWriteAuthority accounts;
@@ -93,15 +100,16 @@ public final class SpotModerationService {
         if (operator == null || invalid(requestId) || invalid(reportRef) || !HIDE_REASONS.contains(reason))
             throw new IllegalArgumentException("Invalid lookup");
         var intended = new SpotModerationStore.StoredAction("LOOKUP", reportRef, reason,
-                fingerprint("LOOKUP", reportRef, reason));
+                fingerprint("LOOKUP", reportRef, reason), null);
         return accounts.withEnabledAccount(operator, () -> {
-            Optional<SpotModerationStore.StoredAction> stored = store.action(operator, requestId);
-            if (stored.isPresent() && !stored.get().fingerprint().equals(intended.fingerprint()))
-                throw new SpotContributionConflict();
-            SpotModerationStore.Group group = store.group(reportRef).orElseThrow(SpotContributionNotFound::new);
             grants.requireCurrent(operator, "spots_alias_lookup");
             sessionRecheck.run();
             Instant now = clock.instant();
+            Optional<SpotModerationStore.StoredAction> stored = store.action(operator, requestId);
+            if (stored.isPresent() && (!stored.get().fingerprint().equals(intended.fingerprint())
+                    || !now.isBefore(stored.get().occurredAt().plus(LOOKUP_REPLAY))))
+                throw new SpotContributionConflict();
+            SpotModerationStore.Group group = store.group(reportRef).orElseThrow(SpotContributionNotFound::new);
             List<UUID> authors = store.authors(group, now);
             if (authors.isEmpty()) throw new SpotContributionNotFound(); // Evidence gone.
             var result = new ArrayList<Author>();
@@ -132,6 +140,16 @@ public final class SpotModerationService {
             return store.accountRef(operator, sha256(accountRef), clock.instant())
                     .orElseThrow(SpotContributionNotFound::new);
         });
+    }
+
+    /**
+     * Inside the caller's restriction transaction: the reference must still be this operator's, unexpired
+     * and for this account.
+     * @throws SecurityException to refuse the change.
+     */
+    public void requireAccountRef(UUID operator, String accountRef, UUID account) {
+        if (!store.accountRef(operator, sha256(accountRef), clock.instant()).equals(Optional.of(account)))
+            throw new SecurityException("Account reference no longer valid");
     }
 
     private String token() {
@@ -167,13 +185,17 @@ public final class SpotModerationService {
         });
     }
 
-    public Decision decide(UUID operator, UUID requestId, UUID reportRef, Action action, String reason,
-            Runnable sessionRecheck) {
-        if (operator == null || invalid(requestId) || invalid(reportRef) || action == null
+    public Decision decide(UUID operator, UUID requestId, UUID reportRef, long reportVersion, Action action,
+            String reason, Runnable sessionRecheck) {
+        if (operator == null || invalid(requestId) || invalid(reportRef) || reportVersion < 1 || action == null
                 || !reasons(action).contains(reason)) throw new IllegalArgumentException("Invalid decision");
         var intended = new SpotModerationStore.StoredAction(action.name(), reportRef, reason,
-                fingerprint(action.name(), reportRef, reason));
+                fingerprint(action.name(), reportRef, reason + "|" + reportVersion), null);
         return accounts.withEnabledAccount(operator, () -> {
+            // Grant (held FOR SHARE to commit) and session first: no replay or existence answer without them.
+            grants.requireCurrent(operator, action == Action.DISMISS ? "spots_review" : "spots_hide");
+            sessionRecheck.run();
+            // Identical double-taps serialize on the operator's account lock, so the second one replays.
             Optional<SpotModerationStore.StoredAction> stored = store.action(operator, requestId);
             if (stored.isPresent()) {
                 if (!stored.get().fingerprint().equals(intended.fingerprint())) throw new SpotContributionConflict();
@@ -181,14 +203,18 @@ public final class SpotModerationService {
             }
             Instant now = clock.instant();
             SpotModerationStore.Group peek = store.group(reportRef).orElseThrow(SpotContributionNotFound::new);
-            // Lock order: item, then report group, then grant.
+            // Clears lock every current signal of a Spot and category: serialize them per Spot first.
+            if (action == Action.CLEAR_SIGNALS) store.lockSpotSignals(peek.spotId());
+            // Lock order: item, then report group.
             SpotModerationStore.PostItem post = null;
             SpotModerationStore.SummaryItem summary = null;
             if (peek.kind() == SpotModerationStore.Kind.POST) post = store.lockPost(peek.itemRef(), now).orElse(null);
             else summary = store.lockSummary(peek, now).orElse(null);
             SpotModerationStore.Group group = store.lockGroup(reportRef).orElseThrow(SpotContributionNotFound::new);
-            grants.requireCurrent(operator, action == Action.DISMISS ? "spots_review" : "spots_hide");
-            sessionRecheck.run();
+            // A report that arrived after the moderator looked (or after the incident was read) is not
+            // decided blind: the moderator refreshes and decides again.
+            if (group.latestSequence() != reportVersion || peek.latestSequence() != reportVersion)
+                throw new SpotContributionConflict();
             if (post == null && summary == null) throw new SpotContributionNotFound(); // Evidence gone.
             List<UUID> evidence = post != null ? List.of(group.itemRef()) : summary.signals();
             long ruled = group.latestSequence();
@@ -241,12 +267,12 @@ public final class SpotModerationService {
         reports.put("spam", counts.spam());
         SpotModerationStore.Votes votes = store.votes(group.itemRef());
         if (group.kind() == SpotModerationStore.Kind.POST) {
-            return store.post(group.itemRef(), now).map(post -> new QueueItem(group.ref(), "post",
+            return store.post(group.itemRef(), now).map(post -> new QueueItem(group.ref(), group.latestSequence(), "post",
                     counts.urgent(), name, nameTa, post.text(), post.type(), post.alias(), null, null,
                     post.captured(), post.expires(), postState(post, now), reports, votes.stillTrue(),
                     votes.noLongerTrue(), group.openSince()));
         }
-        return store.summary(group, now).map(summary -> new QueueItem(group.ref(), "summary",
+        return store.summary(group, now).map(summary -> new QueueItem(group.ref(), group.latestSequence(), "summary",
                 counts.urgent(), name, nameTa, null, null, null, summary.category(), summary.value(),
                 summary.captured(), summary.expires(),
                 summary.hidden() > 0 ? "hidden" : summary.active() > 0 ? "active" : "expired", reports,

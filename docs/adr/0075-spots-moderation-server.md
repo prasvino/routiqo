@@ -72,14 +72,20 @@ For a small rota over a multi-day festival window it had four gaps (ADR 0069):
    - Groups whose evidence is gone close as `CLOSED_EVIDENCE_UNAVAILABLE`.
    - Each page read is audited (count only, 30 days).
 6. **Decisions:**
-   - The endpoint is `POST /spots/reports/{reportRef}/…` with `{requestId, reason}`.
-     It is addressed by the report group, not the spec's `items/{ref}`, because one
-     summary can have several incidents.
-   - An exact `requestId` replays; a changed retry is 409.
+   - The endpoint is `POST /spots/reports/{reportRef}/…` with
+     `{requestId, reason, reportVersion}`. It is addressed by the report group, not the
+     spec's `items/{ref}`, because one summary can have several incidents.
+   - `reportVersion` is the queue item's latest report sequence. If a newer report
+     has arrived, the decision is 409 and the moderator refreshes, so no report is
+     ever closed unseen.
+   - An exact `requestId` replays; a changed retry is 409. Identical double taps
+     serialise on the operator's account lock and replay.
    - Order inside the transaction:
      1. the operator's account lock;
-     2. item, then group, then the grant (`FOR SHARE`, held to commit);
-     3. the session recheck last.
+     2. the grant (`FOR SHARE`, held to commit) and the session recheck, before any
+        replay or existence answer;
+     3. item, then group. Clear-signals first takes a per-Spot advisory lock, so two
+        clears never deadlock.
    - 10 decisions per minute per operator, audited 30 days.
 
    | Action | Permission | Effect |
@@ -114,8 +120,11 @@ For a small rota over a multi-day festival window it had four gaps (ADR 0069):
        minutes and usable only by that operator;
      - account age, completed-journey count, restriction state and revision;
      - reports ruled not upheld in 30 days, flagged at 3.
-   - It is audited. An exact retry issues fresh references without a second audit
-     row.
+   - It is audited. An exact retry within 5 minutes (a lost response) issues fresh
+     references without a second audit row; after that it is 409, so one audit row
+     never covers a later reveal.
+   - A lookup of reporters is deferred. Leads see an author's own not-upheld
+     count, but can't yet look up a flagged reporter to restrict them.
 10. **Restrict and restore:**
     - The endpoint is `POST /spots/accounts/restrict|restore` (`spots_restrict`)
       with `{accountRef, requestId, expectedRevision, reason}`.
@@ -123,7 +132,10 @@ For a small rota over a multi-day festival window it had four gaps (ADR 0069):
       browser history.
     - It runs through the existing audited restriction owner (ADR 0039/0041:
       exact revision, 20 per hour, 30-day audit), which now accepts `spots_restrict`
-      for both actions. A refused change is 409.
+      for both actions.
+    - The admin session and the reference are rechecked inside the restriction's
+      own transaction.
+    - A refused change is 409.
 11. **Module boundaries:**
     - The spot module owns the queue, the decisions and their tables.
     - It checks grants through the `moderation.application.OperatorGrantAuthority`
@@ -146,8 +158,13 @@ For a small rota over a multi-day festival window it had four gaps (ADR 0069):
 - **V3 compatibility:** V3 admin paths now also need `ROUTIQO_ADMIN_ENABLED`.
   Archived behaviour is otherwise unchanged.
 - **The summary incident is approximate:** its evidence signals are those created
-  between its window and its latest report. That is exact for a single incident;
-  overlapping incidents on one summary can share signals.
+  between its window and its latest report, and received by then. That is exact for
+  a single incident; overlapping incidents on one summary can share signals.
+- **Authors of hidden signals:** a hidden signal disappears for its author too;
+  only posts carry `hidden`.
+- **Retention jobs:** moderation retention runs both with Spots moderation on and
+  in Spot maintenance.
+- **Queue index:** V32 replaces ADR 0072's queue index with the open-queue index.
 
 ## Verification
 
@@ -170,6 +187,15 @@ For a small rota over a multi-day festival window it had four gaps (ADR 0069):
   - `SpotReportPersistenceTest` covers highlight rulings.
   - The native Spot tests cover `hidden`.
   - The V3 admin tests pass with the new flag.
+- **Independent review:** no blockers. Fixed before merge:
+  - decisions blind to newer reports (now `reportVersion`);
+  - lookup replay re-identification (5-minute window);
+  - replays skipping the grant check;
+  - restriction session recheck in one transaction;
+  - a clear-signals deadlock;
+  - incident membership by receipt time;
+  - reports racing a hide (row locks);
+  - DST-safe grant-audit CHECKs.
 - **Not verified:**
   - real moderator accounts and Google sign-in;
   - the admin UI (4b);

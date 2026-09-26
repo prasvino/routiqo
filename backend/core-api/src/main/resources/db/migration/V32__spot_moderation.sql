@@ -35,6 +35,7 @@ ALTER TABLE spot_report_group ADD COLUMN not_upheld_through BIGINT;
 ALTER TABLE spot_report_group ADD CONSTRAINT spot_report_group_decision CHECK (
     (closed_through IS NULL) = (decision IS NULL) AND (decision IS NULL) = (decided_at IS NULL));
 -- Urgent first (unsafe, abuse or personal data), newest report first within a tier.
+DROP INDEX spot_report_group_queue;
 CREATE INDEX spot_report_group_open_queue ON spot_report_group
     ((((unsafe + abuse + personal_data) > 0)) DESC, latest_sequence DESC, ref)
     WHERE closed_through IS NULL OR latest_sequence > closed_through;
@@ -108,7 +109,7 @@ CREATE TABLE spot_grant_action_audit (
     CHECK (administrator_id <> target_id),
     CHECK ((action = 'ISSUE' AND duration_minutes IS NOT NULL AND grant_expires_at IS NOT NULL)
         OR (action = 'REVOKE' AND duration_minutes IS NULL AND grant_expires_at IS NULL)),
-    CHECK (expires_at = occurred_at + INTERVAL '30 days')
+    CHECK (expires_at = occurred_at + INTERVAL '720 hours')
 );
 CREATE INDEX spot_grant_action_audit_expiry ON spot_grant_action_audit (expires_at);
 
@@ -117,6 +118,6 @@ CREATE TABLE spot_grant_read_audit (
     administrator_id UUID NOT NULL REFERENCES routiqo_account(id) ON DELETE CASCADE,
     occurred_at TIMESTAMPTZ NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
-    CHECK (expires_at = occurred_at + INTERVAL '30 days')
+    CHECK (expires_at = occurred_at + INTERVAL '720 hours')
 );
 CREATE INDEX spot_grant_read_audit_expiry ON spot_grant_read_audit (expires_at);

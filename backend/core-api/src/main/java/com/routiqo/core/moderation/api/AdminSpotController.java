@@ -57,7 +57,7 @@ public final class AdminSpotController {
         this.policy = settings.policy(); this.rates = rates;
     }
 
-    record Input(UUID requestId, String reason) {}
+    record Input(UUID requestId, String reason, long reportVersion) {}
     record RestrictionInput(String accountRef, UUID requestId, long expectedRevision, String reason) {}
     public record RestrictionResponse(boolean restricted, long revision) {}
 
@@ -83,7 +83,7 @@ public final class AdminSpotController {
             HttpServletRequest request) {
         AdminHttp.noQuery(request);
         UUID operator = operator(request);
-        Input input = input(request);
+        Input input = input(request, false);
         AdminHttp.allow(rates, operator, "admin-spot-write", WRITES_PER_MINUTE);
         return moderation.lookup(operator, input.requestId(), AdminTrafficJson.id(ref), input.reason(),
                 recheck(operator, request));
@@ -102,9 +102,14 @@ public final class AdminSpotController {
         UUID operator = operator(request);
         RestrictionInput input = restrictionInput(request);
         AdminHttp.allow(rates, operator, "admin-spot-write", WRITES_PER_MINUTE);
-        UUID account = moderation.accountForRestriction(operator, input.accountRef(), recheck(operator, request));
+        Runnable session = recheck(operator, request);
+        UUID account = moderation.accountForRestriction(operator, input.accountRef(), session);
+        // The change runs in its own transaction: re-check the session and the reference inside it.
         var result = restrictions.apply(operator, input.requestId(), account, input.expectedRevision(), restrict,
-                input.reason());
+                input.reason(), () -> {
+                    session.run();
+                    moderation.requireAccountRef(operator, input.accountRef(), account);
+                });
         return new RestrictionResponse(result.restricted(), result.revision());
     }
 
@@ -129,20 +134,28 @@ public final class AdminSpotController {
             HttpServletRequest request) {
         AdminHttp.noQuery(request);
         UUID operator = operator(request);
-        Input input = input(request);
+        Input input = input(request, true);
         AdminHttp.allow(rates, operator, "admin-spot-write", WRITES_PER_MINUTE);
-        return moderation.decide(operator, input.requestId(), AdminTrafficJson.id(ref), action, input.reason(),
-                recheck(operator, request));
+        return moderation.decide(operator, input.requestId(), AdminTrafficJson.id(ref), input.reportVersion(),
+                action, input.reason(), recheck(operator, request));
     }
 
-    /** Exactly {"requestId": "<uuid>", "reason": "<code>"}, at most 512 bytes of UTF-8. */
-    static Input input(HttpServletRequest request) {
+    /**
+     * Exactly {"requestId", "reason"} plus, for decisions, the queue item's "reportVersion"; at most 512
+     * bytes of UTF-8.
+     */
+    static Input input(HttpServletRequest request, boolean decision) {
         try {
             JsonNode node = JSON.readTree(utf8(request));
-            if (node == null || !node.isObject() || !node.propertyNames().equals(Set.of("requestId", "reason"))
-                    || !node.get("requestId").isTextual() || !node.get("reason").isTextual())
+            Set<String> expected = decision ? Set.of("requestId", "reason", "reportVersion")
+                    : Set.of("requestId", "reason");
+            if (node == null || !node.isObject() || !node.propertyNames().equals(expected)
+                    || !node.get("requestId").isTextual() || !node.get("reason").isTextual()
+                    || decision && (!node.get("reportVersion").isIntegralNumber()
+                        || !node.get("reportVersion").canConvertToLong()))
                 throw new IllegalArgumentException();
-            return new Input(AdminTrafficJson.id(node.get("requestId").textValue()), node.get("reason").textValue());
+            return new Input(AdminTrafficJson.id(node.get("requestId").textValue()), node.get("reason").textValue(),
+                    decision ? node.get("reportVersion").longValue() : 0);
         } catch (IOException | RuntimeException malformed) {
             throw new IllegalArgumentException("Invalid decision request");
         }
