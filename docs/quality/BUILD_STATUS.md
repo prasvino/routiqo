@@ -1,4 +1,4 @@
-# Build status — 2026-09-25
+# Build status — 2026-09-26
 
 > **Direction change, 2026-09-25.** Routiqo was reset to Journey, Spots and Ask
 > Ahead; product direction is [`docs/PRODUCT.md`](../PRODUCT.md). The rows and
@@ -14,6 +14,86 @@
 Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend foundations; not production-ready. The September 23 audit reconciles the committed reliability batches with this status; release gates below remain open.
 
 _Archived 2026-09-25:_ the user had authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag; that work is now archived and is no longer authorized pilot work. The different production privacy contract is not accepted. Person-level research is archived with its code preserved. Traveller-derived public LIVE remains disabled in production.
+
+## September 26 Spots backend (flagged, server and transport only)
+
+The Spots catalog and activity read exist on the server behind
+`ROUTIQO_SPOTS_API_ENABLED` (exact `true`, default off), per
+[SPOTS_SPEC.md](../features/spots/SPOTS_SPEC.md) and
+[ADR 0070](../adr/0070-spot-module-and-catalog-delivery.md):
+
+- **Module.** New `spot` module (api/application/domain/infrastructure). An
+  architecture test keeps it independent of `routeupdate`, `publiclive`, `privacy`,
+  `verification` and other modules' infrastructure. `journey` gains a read-only
+  `ActiveJourneyReader`, which uses the existing one-active-journey partial index.
+  There is no migration.
+- **Catalog loader.**
+  - Reads `routiqo-spots/1` from `ROUTIQO_SPOT_CATALOG_PATH` at startup: strict
+    UTF-8 JSON, at most 256 KiB and 512 Spots, exact keys at every level.
+  - Requires English and Tamil names under the display-label rule, a fixed kind
+    list, a fixed district list (Diwali and Pongal corridors), declared corridors,
+    and categories from the posts spec.
+  - Requires provenance, a strict date, and coordinates inside the routing region.
+  - Any error, with the flag on, stops startup.
+- **`GET /api/v1/native/spots/catalog`.**
+  - Native bearer and matching account header.
+  - Serves a public projection without provenance, precomputed once, with the ETag
+    set to the quoted version. `If-None-Match` returns 304.
+  - Rate gate: 10 per account per minute.
+- **`POST /api/v1/native/spots/activity`.**
+  - The body is exactly 1–20 distinct, ascending, lowercase Spot IDs, parsed by
+    hand so framework logging never sees them.
+  - Requires an active journey (409 without one). Unknown IDs are ignored, and every
+    known Spot is `quiet` until posts exist.
+  - Response cap 128 KiB. Rate gate: 20 per account per minute.
+- **Contract and client.** OpenAPI paths and schemas were added and the client
+  regenerated. `alertIds` and `alerts` are `maxItems: 0` until official alerts exist.
+- **Native transport.** `safe-transport.ts` allows the two exact paths and methods.
+  A dedicated `spotCatalog()` validates the ETag and accepts 304 only after
+  `If-None-Match`. `RoutiqoSafeHttpModule.kt` mirrors the paths, methods, caps,
+  ETag and the narrow 304 rule. No app code calls these paths yet.
+
+Checks (cloud session, Linux, JDK 25 from apt, Docker 29):
+
+- **Java:** `./gradlew check bootJar` — **669 tests / 114 suites**, zero failures,
+  errors or skips. Untouched `main` gave 641 / 108 in the same environment.
+  - 28 new tests: loader acceptance and rejections (including contact details in
+    names, Tamil script and future review dates), the published projection and
+    its 256 KiB cap, the activity and catalog services, and HTTP on PostgreSQL
+    (auth, account header, ETag/304, no provenance, rate limits, active journey,
+    400/413/415 matrix).
+  - A log-capture test at DEBUG shows Spot IDs never reach logs.
+  - Flag tests: `TRUE`, `1`, padded, empty and unset values leave the leaves off.
+    With the flag on but no `routing` profile, the guard answers 403 rather than
+    passing requests to a missing handler. With the flag on, a missing or
+    out-of-region catalog stops startup.
+  - Architecture rule for the module boundary.
+- **TypeScript:** `pnpm check` passed (contracts in sync, formatting, all
+  typechecks, lint): **875 tests / 106 files**. That includes the Spots transport
+  tests, a test that the Android adapter always passes seven arguments (it fails
+  if `?? null` is removed), and a static Kotlin parity test. `pnpm --filter @routiqo/mobile build`
+  exported the Android bundle.
+- **Secrets:** the pinned GHCR gitleaks image is blocked here. Gitleaks v8.30.1
+  from Docker Hub, run with the repo's config, found no leaks.
+
+- **Independent review:** a fresh-subagent security review found no Critical or
+  High issues.
+  - Fixed after the review:
+    - the guard and controller conditions now match;
+    - the startup log records the catalog digest;
+    - the loader hardening above;
+    - the new tests listed above.
+  - The Medium finding is open and blocks staging activation. The peer rate gate
+    (120 per minute per peer address) aggregates traffic behind a load balancer
+    or mobile carrier NAT, so Spots polling could make every native path return
+    429. It is recorded in the native Android ledger.
+  - The two client-parser findings are requirements for the Android Spots work.
+
+Not verified: the Kotlin module was not compiled or run (no Android SDK in the
+cloud). Device checks are in
+[the native Android ledger](../validation/NATIVE_ANDROID_PENDING.md). No real
+catalog exists yet: the curator's file and its review are owner inputs. No
+staging deployment, and the flag stays off.
 
 ## September 25 Android Journey map (flagged, not device-verified)
 

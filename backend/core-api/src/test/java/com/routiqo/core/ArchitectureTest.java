@@ -15,6 +15,13 @@ class ArchitectureTest {
        .resideInAnyPackage("..infrastructure..", "org.springframework.jdbc..", "org.flywaydb..")
        .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("com.routiqo.core"));
  }
+ @Test void spotModuleDoesNotReachArchivedLiveCodeOrOtherModulesStorage() {
+   noClasses().that().resideInAPackage("com.routiqo.core.spot..").should().dependOnClassesThat()
+       .resideInAnyPackage("com.routiqo.core.routeupdate..", "com.routiqo.core.publiclive..",
+           "com.routiqo.core.privacy..", "com.routiqo.core.verification..",
+           "com.routiqo.core.journey.infrastructure..", "com.routiqo.core.identity.infrastructure..")
+       .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("com.routiqo.core"));
+ }
  @Test void domainsAreIndependentOfFrameworkAndInfrastructure() {
    noClasses().that().resideInAPackage("..domain..").should().dependOnClassesThat()
        .resideInAnyPackage("org.springframework..","jakarta.persistence..","..api..","..infrastructure..")

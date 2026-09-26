@@ -40,8 +40,17 @@ paths:
       description: Owner-scoped keyset history. Cursor fields must be supplied together. No route endpoints or presence are returned.
       parameters:
         - { $ref: '#/components/parameters/JourneyAccount' }
-        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
-        - { in: query, name: beforeStartedAt, schema: { type: string, format: date-time }, description: Microsecond precision; pair with beforeId. }
+        - {
+            in: query,
+            name: limit,
+            schema: { type: integer, minimum: 1, maximum: 50, default: 20 },
+          }
+        - {
+            in: query,
+            name: beforeStartedAt,
+            schema: { type: string, format: date-time },
+            description: Microsecond precision; pair with beforeId.,
+          }
         - { in: query, name: beforeId, schema: { type: string, format: uuid } }
       responses:
         '200':
@@ -52,7 +61,8 @@ paths:
                 type: object
                 required: [journeys, next]
                 properties:
-                  journeys: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Journey' } }
+                  journeys:
+                    { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Journey' } }
                   next: { $ref: '#/components/schemas/JourneyCursor' }
         '400': { description: Invalid page size or cursor }
         '401': { $ref: '#/components/responses/AuthRejected' }
@@ -82,7 +92,10 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '409': { description: Journey identity/kind conflict or another active journey }
-        '503': { description: Journey write temporarily unavailable; retry the same command without changing its identity. Empty response body. }
+        '503':
+          {
+            description: Journey write temporarily unavailable; retry the same command without changing its identity. Empty response body.,
+          }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
@@ -118,7 +131,10 @@ paths:
             schema: { type: object }
       responses:
         '200': { $ref: '#/components/responses/JourneyResult' }
-        '503': { description: Journey write temporarily unavailable; retry the same completion command. Empty response body. }
+        '503':
+          {
+            description: Journey write temporarily unavailable; retry the same completion command. Empty response body.,
+          }
         '400': { description: Invalid identifier }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
@@ -248,7 +264,12 @@ paths:
               required: [confirmation, accountId]
               properties:
                 confirmation: { type: string, enum: [DELETE] }
-                accountId: { type: string, format: uuid, description: Must match the session account shown when confirmation opened; rejects account switches in other tabs. }
+                accountId:
+                  {
+                    type: string,
+                    format: uuid,
+                    description: Must match the session account shown when confirmation opened; rejects account switches in other tabs.,
+                  }
       responses:
         '204': { description: Account deleted; session and binding cookies cleared }
         '400': { description: Explicit confirmation required or invalid JSON }
@@ -386,7 +407,10 @@ paths:
             schema: { $ref: '#/components/schemas/NativeDeleteAccountRequest' }
       responses:
         '204': { description: Account deleted and all session lineages revoked }
-        '400': { description: 'Explicit confirmation, canonical account identifier and exact fields are required' }
+        '400':
+          {
+            description: 'Explicit confirmation, canonical account identifier and exact fields are required',
+          }
         '401': { $ref: '#/components/responses/NativeAuthRejected' }
         '403': { $ref: '#/components/responses/NativeTransportRejected' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
@@ -410,7 +434,8 @@ paths:
                 additionalProperties: false
                 required: [journeys]
                 properties:
-                  journeys: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Journey' } }
+                  journeys:
+                    { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Journey' } }
         '401': { $ref: '#/components/responses/NativeAuthRejected' }
         '403': { $ref: '#/components/responses/NativeTransportRejected' }
         '429': { $ref: '#/components/responses/AuthLimited' }
@@ -467,7 +492,8 @@ paths:
                 additionalProperties: false
                 required: [journeys, next]
                 properties:
-                  journeys: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/Journey' } }
+                  journeys:
+                    { type: array, maxItems: 20, items: { $ref: '#/components/schemas/Journey' } }
                   next: { $ref: '#/components/schemas/JourneyCursor' }
         '400': { description: Invalid request or cursor }
         '401': { $ref: '#/components/responses/NativeAuthRejected' }
@@ -515,7 +541,17 @@ paths:
   /api/v1/native/journeys/{id}/journal:
     parameters:
       - { $ref: '#/components/parameters/JourneyAccount' }
-      - { in: path, name: id, required: true, schema: { type: string, format: uuid, pattern: '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' } }
+      - {
+          in: path,
+          name: id,
+          required: true,
+          schema:
+            {
+              type: string,
+              format: uuid,
+              pattern: '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$',
+            },
+        }
     get:
       operationId: getNativeTripJournal
       security: [{ nativeBearer: [] }]
@@ -558,7 +594,17 @@ paths:
   /api/v1/native/journeys/{id}/route-context:
     parameters:
       - { $ref: '#/components/parameters/JourneyAccount' }
-      - { in: path, name: id, required: true, schema: { type: string, format: uuid, pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } }
+      - {
+          in: path,
+          name: id,
+          required: true,
+          schema:
+            {
+              type: string,
+              format: uuid,
+              pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            },
+        }
     get:
       operationId: getNativePrivateJourneyRouteContext
       security: [{ nativeBearer: [] }]
@@ -574,7 +620,8 @@ paths:
         '403': { $ref: '#/components/responses/NativeTransportRejected' }
         '404': { description: Journey missing or not owned by this account }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Context, session or rate authority unavailable. Empty response body.' }
+        '503':
+          { description: 'Context, session or rate authority unavailable. Empty response body.' }
     post:
       operationId: bindNativePrivateJourneyRouteContext
       security: [{ nativeBearer: [] }]
@@ -594,15 +641,31 @@ paths:
         '401': { $ref: '#/components/responses/NativeAuthRejected' }
         '403': { $ref: '#/components/responses/NativeTransportRejected' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: 'Stale context expectation, inactive consent, completed journey or binding conflict' }
+        '409':
+          {
+            description: 'Stale context expectation, inactive consent, completed journey or binding conflict',
+          }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Provider, persistence, session or rate authority unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Provider, persistence, session or rate authority unavailable. Empty response body.',
+          }
   /api/v1/native/journeys/{id}/consent:
     parameters:
       - { $ref: '#/components/parameters/JourneyAccount' }
-      - { in: path, name: id, required: true, schema: { type: string, format: uuid, pattern: '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' } }
+      - {
+          in: path,
+          name: id,
+          required: true,
+          schema:
+            {
+              type: string,
+              format: uuid,
+              pattern: '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$',
+            },
+        }
     get:
       operationId: getNativePrivateJourneyConsent
       security: [{ nativeBearer: [] }]
@@ -705,7 +768,10 @@ paths:
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: Consent authority or rate store temporarily unavailable. Empty response body. }
+        '503':
+          {
+            description: Consent authority or rate store temporarily unavailable. Empty response body.,
+          }
     post:
       operationId: submitPrivateJourneyConsentIntent
       security: [{ browserSession: [] }]
@@ -732,7 +798,10 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: Consent authority or rate store temporarily unavailable. Empty response body. }
+        '503':
+          {
+            description: Consent authority or rate store temporarily unavailable. Empty response body.,
+          }
   /api/v1/journeys/{id}/route-context:
     parameters:
       - name: id
@@ -759,7 +828,10 @@ paths:
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Context authority, session store or rate store temporarily unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Context authority, session store or rate store temporarily unavailable. Empty response body.',
+          }
     post:
       operationId: bindPrivateJourneyRouteContext
       security: [{ browserSession: [] }]
@@ -782,11 +854,17 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: 'Stale context expectation, inactive consent, completed journey or binding conflict' }
+        '409':
+          {
+            description: 'Stale context expectation, inactive consent, completed journey or binding conflict',
+          }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Provider, persistence, session or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Provider, persistence, session or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/provider-alerts:
     parameters:
       - name: id
@@ -813,7 +891,10 @@ paths:
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: 'Journey missing, completed or not owned by this account' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Provider, session or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Provider, session or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/signal-commands:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -840,11 +921,17 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: 'Current journey, consent, context, anchor or catalog authority denied issuance' }
+        '409':
+          {
+            description: 'Current journey, consent, context, anchor or catalog authority denied issuance',
+          }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, authority or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/signal-choices:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -863,9 +950,15 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Journey missing or not owned by this account }
-        '409': { description: 'Current journey, consent, context, restriction, provenance or display metadata unavailable' }
+        '409':
+          {
+            description: 'Current journey, consent, context, restriction, provenance or display metadata unavailable',
+          }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, authority or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/signal-commands/expected-context:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -896,7 +989,10 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, authority or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/signal-commands/{commandId}/stop:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -928,7 +1024,10 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, authority or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/signals/{commandId}:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -960,7 +1059,10 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, authority or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/signals/{commandId}/withdraw:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -992,7 +1094,10 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, authority or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/signals/{commandId}/public-intent:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -1024,7 +1129,10 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, authority or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/public-intents:
     get:
       operationId: listOwnPublicSignalIntents
@@ -1047,7 +1155,10 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, account or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, account or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/journeys/{id}/signals/{commandId}/public-intent/stop:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -1078,7 +1189,10 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Session, authority or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Session, authority or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/native/routes/places:
     post:
       operationId: searchNativePrivateRoutePlaces
@@ -1125,7 +1239,72 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Place provider, session or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Place provider, session or rate infrastructure unavailable. Empty response body.',
+          }
+  /api/v1/native/spots/catalog:
+    get:
+      operationId: getNativeSpotCatalog
+      security: [{ nativeBearer: [] }]
+      description: 'Default-off (ROUTIQO_SPOTS_API_ENABLED, exact true) curated Spot catalog for on-device Spots-ahead matching. Public reference data without provenance. The ETag is the quoted catalog version; a matching If-None-Match returns 304 with an empty body. Ten reads per account per minute.'
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+        - in: header
+          name: If-None-Match
+          required: false
+          schema: { type: string, maxLength: 512 }
+          description: Quoted catalog version previously received as the ETag.
+      responses:
+        '200':
+          description: Current Spot catalog, at most 256 KiB
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Quoted lowercase catalog version UUID.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeSpotCatalog' }
+        '304':
+          description: The cached catalog version is current. Empty response body.
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Quoted lowercase catalog version UUID.
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Session or rate authority unavailable. Empty response body.' }
+  /api/v1/native/spots/activity:
+    post:
+      operationId: readNativeSpotActivity
+      security: [{ nativeBearer: [] }]
+      description: 'Default-off (ROUTIQO_SPOTS_API_ENABLED, exact true) activity read for the Spots ahead. Requires an active journey owned by the account. Spot IDs travel in the body, are not logged or stored, and unknown IDs are ignored. Until posts and signals exist every known Spot is quiet. Twenty reads per account per minute; response at most 128 KiB and never cached.'
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeSpotActivityRequest' }
+      responses:
+        '200':
+          description: Activity for the requested Spots that exist in the current catalog, in request order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeSpotActivity' }
+        '400':
+          {
+            description: 'Body is not exactly 1-20 distinct, ascending, lowercase Spot IDs. Empty response body.',
+          }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '409': { description: 'The account has no active journey. Empty response body.' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503':
+          { description: 'Journey, session or rate authority unavailable. Empty response body.' }
   /api/v1/native/routes:
     post:
       operationId: calculateNativePrivateRoute
@@ -1181,9 +1360,15 @@ paths:
         '403': { $ref: '#/components/responses/NativeTransportRejected' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
-        '422': { description: 'Route endpoints or returned geometry exceed configured coverage. Empty response body.' }
+        '422':
+          {
+            description: 'Route endpoints or returned geometry exceed configured coverage. Empty response body.',
+          }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: 'Routing provider, session or rate infrastructure unavailable. Empty response body.' }
+        '503':
+          {
+            description: 'Routing provider, session or rate infrastructure unavailable. Empty response body.',
+          }
   /api/v1/routes/places:
     post:
       operationId: searchPrivateRoutePlaces
@@ -1201,7 +1386,13 @@ paths:
               type: object
               required: [query]
               properties:
-                query: { type: string, minLength: 3, maxLength: 256, description: Trimmed text; no semicolon or control characters; at most20 letter/number groups. }
+                query:
+                  {
+                    type: string,
+                    minLength: 3,
+                    maxLength: 256,
+                    description: Trimmed text; no semicolon or control characters; at most20 letter/number groups.,
+                  }
       responses:
         '200':
           description: Temporary places and provider attribution; empty places means no matches
@@ -1262,11 +1453,20 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AccountPlanning' }
-        '400': { description: 'Invalid plans, saved places, version or mutation identifier. Empty response body.' }
+        '400':
+          {
+            description: 'Invalid plans, saved places, version or mutation identifier. Empty response body.',
+          }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
-        '409': { description: 'Stale expected version or conflicting mutation reuse. Empty response body.' }
-        '413': { description: 'Request body over 264 KiB or canonical document over 256 KiB. Empty response body.' }
+        '409':
+          {
+            description: 'Stale expected version or conflicting mutation reuse. Empty response body.',
+          }
+        '413':
+          {
+            description: 'Request body over 264 KiB or canonical document over 256 KiB. Empty response body.',
+          }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/planning/delete:
@@ -1293,7 +1493,8 @@ paths:
         '400': { description: 'Invalid expected version. Empty response body.' }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
-        '409': { description: 'The account copy changed since it was checked. Empty response body.' }
+        '409':
+          { description: 'The account copy changed since it was checked. Empty response body.' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '429': { $ref: '#/components/responses/AuthLimited' }
@@ -1348,7 +1549,10 @@ paths:
                           description: Normalized English turn instructions. Optional only for compatibility with route responses produced before instructions were added.
                           items: { $ref: '#/components/schemas/RouteStep' }
         '400': { description: Invalid mode or endpoints }
-        '422': { description: Route endpoints or returned geometry exceed configured routing coverage. Empty body; no region or coordinate details are returned. }
+        '422':
+          {
+            description: Route endpoints or returned geometry exceed configured routing coverage. Empty body; no region or coordinate details are returned.,
+          }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '413': { $ref: '#/components/responses/AuthTooLarge' }
@@ -1382,7 +1586,8 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Signal or journey unavailable to this owner }
-        '409': { description: 'Ineligible authority, account/window conflict or changed exact retry' }
+        '409':
+          { description: 'Ineligible authority, account/window conflict or changed exact retry' }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Authority or database unavailable; result may require owner recovery }
   /api/v1/journeys/{id}/signals/{commandId}/community-share/stop:
@@ -1429,7 +1634,8 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '429': { $ref: '#/components/responses/AuthLimited' }
-        '503': { description: Recovery unavailable; do not resubmit a different request automatically }
+        '503':
+          { description: Recovery unavailable; do not resubmit a different request automatically }
   /api/v1/journeys/{id}/community-traffic:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
@@ -1452,7 +1658,12 @@ paths:
   /api/v1/journeys/{id}/community-traffic/{ref}/reports:
     parameters:
       - $ref: '#/components/parameters/PrivateJourneyId'
-      - { name: ref, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
+      - {
+          name: ref,
+          in: path,
+          required: true,
+          schema: { $ref: '#/components/schemas/PrivateSignalUuid' },
+        }
       - { $ref: '#/components/parameters/JourneyAccount' }
     post:
       operationId: reportVisibleCommunityTrafficV3
@@ -1475,7 +1686,10 @@ paths:
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { $ref: '#/components/responses/AuthForbidden' }
         '404': { description: Moment not visible to this journey; no existence disclosure }
-        '409': { description: 'Changed retry of this request, or this account already reported the moment' }
+        '409':
+          {
+            description: 'Changed retry of this request, or this account already reported the moment',
+          }
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503': { description: Intake unavailable }
   /api/v1/admin/auth/csrf:
@@ -1483,13 +1697,22 @@ paths:
       operationId: adminCsrf
       description: Default-off staging moderator CSRF bootstrap; separate admin cookie namespace and exact admin origin.
       responses:
-        '200': { description: Admin CSRF token, content: { application/json: { schema: { $ref: '#/components/schemas/CsrfToken' } } } }
+        '200':
+          {
+            description: Admin CSRF token,
+            content: { application/json: { schema: { $ref: '#/components/schemas/CsrfToken' } } },
+          }
   /api/v1/admin/auth/google/challenge:
     post:
       operationId: beginAdminGoogleChallenge
       description: Separate one-time admin binding and nonce; requires exact admin Origin and CSRF.
       responses:
-        '200': { description: Google challenge, content: { application/json: { schema: { $ref: '#/components/schemas/GoogleChallenge' } } } }
+        '200':
+          {
+            description: Google challenge,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/GoogleChallenge' } } },
+          }
   /api/v1/admin/auth/google/exchange:
     post:
       operationId: exchangeAdminGoogleIdentity
@@ -1506,14 +1729,24 @@ paths:
                 challengeId: { type: string, format: uuid }
                 idToken: { type: string, maxLength: 16384 }
       responses:
-        '200': { description: Admin session, content: { application/json: { schema: { $ref: '#/components/schemas/BrowserSession' } } } }
+        '200':
+          {
+            description: Admin session,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/BrowserSession' } } },
+          }
         '401': { $ref: '#/components/responses/AuthRejected' }
   /api/v1/admin/auth/session:
     get:
       operationId: readAdminSession
       security: [{ adminSession: [] }]
       responses:
-        '200': { description: Current admin session, content: { application/json: { schema: { $ref: '#/components/schemas/BrowserSession' } } } }
+        '200':
+          {
+            description: Current admin session,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/BrowserSession' } } },
+          }
         '401': { $ref: '#/components/responses/AuthRejected' }
   /api/v1/admin/auth/logout:
     post:
@@ -1528,9 +1761,20 @@ paths:
       description: Bounded, cursor-paged canonical report groups; unavailable evidence has no value or area detail. Every read is audited. A page may have zero items and a non-null nextCursor when scanned groups closed or expired; continue paging until nextCursor is null.
       parameters:
         - { name: cursor, in: query, schema: { type: string, maxLength: 128 } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 50, default: 20 },
+          }
       responses:
-        '200': { description: Moderator queue, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficQueueV3' } } } }
+        '200':
+          {
+            description: Moderator queue,
+            content:
+              {
+                application/json: { schema: { $ref: '#/components/schemas/AdminTrafficQueueV3' } },
+              },
+          }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '404': { description: Current grant unavailable }
         '429': { $ref: '#/components/responses/AuthLimited' }
@@ -1539,10 +1783,30 @@ paths:
       operationId: dismissAdminTrafficReport
       security: [{ adminSession: [] }]
       parameters:
-        - { name: ref, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionV3' } } } }
+        - {
+            name: ref,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/PrivateSignalUuid' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionV3' } },
+            },
+        }
       responses:
-        '200': { description: Report group dismissed, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionResponseV3' } } } }
+        '200':
+          {
+            description: Report group dismissed,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminTrafficDecisionResponseV3' } },
+              },
+          }
         '404': { description: No current investigable open group or grant }
         '409': { description: Conflicting request identity replay }
   /api/v1/admin/community-traffic/reports/{ref}/suppress:
@@ -1550,10 +1814,30 @@ paths:
       operationId: suppressAdminTrafficSummary
       security: [{ adminSession: [] }]
       parameters:
-        - { name: ref, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionV3' } } } }
+        - {
+            name: ref,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/PrivateSignalUuid' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionV3' } },
+            },
+        }
       responses:
-        '200': { description: Canonical projection suppressed atomically with audit, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficDecisionResponseV3' } } } }
+        '200':
+          {
+            description: Canonical projection suppressed atomically with audit,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminTrafficDecisionResponseV3' } },
+              },
+          }
         '404': { description: No current investigable open group or grant }
         '409': { description: Conflicting request identity replay }
   /api/v1/admin/traffic-grants/me:
@@ -1562,7 +1846,15 @@ paths:
       description: Separate default-off V3 grant administration capability for the current admin session.
       security: [{ adminSession: [] }]
       responses:
-        '200': { description: Current finite grant-administrator authority, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantCapabilityV3' } } } }
+        '200':
+          {
+            description: Current finite grant-administrator authority,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminTrafficGrantCapabilityV3' } },
+              },
+          }
         '401': { $ref: '#/components/responses/AuthRejected' }
   /api/v1/admin/traffic-grants/{targetId}:
     get:
@@ -1570,9 +1862,22 @@ paths:
       description: Exact enabled target UUID only; no lookup or directory. Unknown, disabled and administrator targets are indistinguishable.
       security: [{ adminSession: [] }]
       parameters:
-        - { name: targetId, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
+        - {
+            name: targetId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/PrivateSignalUuid' },
+          }
       responses:
-        '200': { description: Current V3 grants, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantReviewV3' } } } }
+        '200':
+          {
+            description: Current V3 grants,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminTrafficGrantReviewV3' } },
+              },
+          }
         '401': { $ref: '#/components/responses/AuthRejected' }
         '403': { description: Current grant-administrator authority unavailable }
         '404': { description: Target unavailable }
@@ -1583,10 +1888,31 @@ paths:
       description: Issues a finite V3 moderator grant. An active grant must be explicitly revoked before issuing another.
       security: [{ adminSession: [] }]
       parameters:
-        - { name: targetId, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantIssueV3' } } } }
+        - {
+            name: targetId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/PrivateSignalUuid' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/AdminTrafficGrantIssueV3' } },
+            },
+        }
       responses:
-        '200': { description: Committed grant or exact retained replay, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantReceiptV3' } } } }
+        '200':
+          {
+            description: Committed grant or exact retained replay,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminTrafficGrantReceiptV3' } },
+              },
+          }
         '403': { description: Current grant-administrator authority unavailable }
         '404': { description: Target unavailable }
         '409': { description: Active grant or conflicting request UUID }
@@ -1597,10 +1923,31 @@ paths:
       description: Removes one current V3 moderator grant. The next permission check observes revocation.
       security: [{ adminSession: [] }]
       parameters:
-        - { name: targetId, in: path, required: true, schema: { $ref: '#/components/schemas/PrivateSignalUuid' } }
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantRevokeV3' } } } }
+        - {
+            name: targetId,
+            in: path,
+            required: true,
+            schema: { $ref: '#/components/schemas/PrivateSignalUuid' },
+          }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/AdminTrafficGrantRevokeV3' } },
+            },
+        }
       responses:
-        '200': { description: Committed revocation or exact retained replay, content: { application/json: { schema: { $ref: '#/components/schemas/AdminTrafficGrantReceiptV3' } } } }
+        '200':
+          {
+            description: Committed revocation or exact retained replay,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminTrafficGrantReceiptV3' } },
+              },
+          }
         '403': { description: Current grant-administrator authority unavailable }
         '404': { description: Target unavailable }
         '409': { description: No active grant or conflicting request UUID }
@@ -1683,6 +2030,100 @@ components:
     NativeTransportRejected:
       description: Cookie, Origin, Sec-Fetch-Site, query string, unknown native route or unsupported method was rejected.
   schemas:
+    NativeSpotId:
+      type: string
+      format: uuid
+      pattern: '^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    NativeSpotCorridor:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 40 }
+        name: { type: string, minLength: 1, maxLength: 80 }
+    NativeSpot:
+      type: object
+      additionalProperties: false
+      required: [id, name, nameTa, kind, longitude, latitude, district, corridors, categories]
+      properties:
+        id: { $ref: '#/components/schemas/NativeSpotId' }
+        name: { type: string, minLength: 1, maxLength: 80, description: English name. }
+        nameTa: { type: string, minLength: 1, maxLength: 80, description: Tamil name. }
+        kind:
+          {
+            type: string,
+            enum: [toll, eatery, fuel, restroom, bus_stand, temple, junction, rest_area],
+          }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        district: { type: string, pattern: '^[a-z]+(?:_[a-z]+)*$', maxLength: 40 }
+        corridors:
+          type: array
+          minItems: 1
+          maxItems: 16
+          uniqueItems: true
+          items: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 40 }
+        categories:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items: { type: string, enum: [traffic, queue, food, fuel, restroom] }
+    NativeSpotCatalog:
+      type: object
+      additionalProperties: false
+      required: [version, corridors, spots]
+      properties:
+        version: { $ref: '#/components/schemas/NativeSpotId' }
+        corridors:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items: { $ref: '#/components/schemas/NativeSpotCorridor' }
+        spots:
+          type: array
+          minItems: 1
+          maxItems: 512
+          items: { $ref: '#/components/schemas/NativeSpot' }
+    NativeSpotActivityRequest:
+      type: object
+      additionalProperties: false
+      required: [spotIds]
+      properties:
+        spotIds:
+          type: array
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+          description: Distinct lowercase Spot IDs in ascending order.
+          items: { $ref: '#/components/schemas/NativeSpotId' }
+    NativeSpotActivity:
+      type: object
+      additionalProperties: false
+      required: [serverTime, catalogVersion, spots, alerts]
+      properties:
+        serverTime: { type: string, format: date-time }
+        catalogVersion: { $ref: '#/components/schemas/NativeSpotId' }
+        spots:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, state, alertIds]
+            properties:
+              id: { $ref: '#/components/schemas/NativeSpotId' }
+              state: { type: string, enum: [live, fading, quiet] }
+              alertIds:
+                type: array
+                maxItems: 0
+                description: Official alert references; always empty until official alerts are added.
+                items: { type: string }
+        alerts:
+          type: array
+          maxItems: 0
+          description: Official alerts; always empty until official alerts are added.
+          items: { type: object }
     NativeEmptyRequest:
       type: object
       additionalProperties: false
@@ -1724,7 +2165,12 @@ components:
       required: [confirmation, accountId]
       properties:
         confirmation: { type: string, enum: [DELETE] }
-        accountId: { type: string, format: uuid, description: Must exactly match the authenticated native session account. }
+        accountId:
+          {
+            type: string,
+            format: uuid,
+            description: Must exactly match the authenticated native session account.,
+          }
     TripJournal:
       type: object
       required: [journey, annotation]
@@ -1904,7 +2350,8 @@ components:
       properties:
         candidateId: { $ref: '#/components/schemas/PrivateSignalUuid' }
         commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
-        status: { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing, expired] }
+        status:
+          { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing, expired] }
         acceptedAt: { type: string, format: date-time }
         windowEndsAt: { type: string, format: date-time }
     CommunityTrafficStopResponseV3:
@@ -1923,7 +2370,8 @@ components:
         journeyId: { $ref: '#/components/schemas/PrivateSignalUuid' }
         commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
         requestId: { $ref: '#/components/schemas/PrivateSignalUuid' }
-        status: { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing, expired] }
+        status:
+          { type: string, enum: [accepted_for_consideration, stopped_for_future_sharing, expired] }
         acceptedAt: { type: string, format: date-time }
         windowEndsAt: { type: string, format: date-time }
     CommunityTrafficShareRecoveryV3:
@@ -1936,7 +2384,12 @@ components:
       required: [schemaVersion, serverTime, moments]
       properties:
         schemaVersion: { type: integer, enum: [3] }
-        serverTime: { type: string, format: date-time, description: Server time captured after the reader query; clients use it for conservative expiry deadlines. }
+        serverTime:
+          {
+            type: string,
+            format: date-time,
+            description: Server time captured after the reader query; clients use it for conservative expiry deadlines.,
+          }
         moments:
           type: array
           maxItems: 100
@@ -1948,7 +2401,8 @@ components:
       properties:
         ref: { $ref: '#/components/schemas/PrivateSignalUuid' }
         areaLabel: { type: string, minLength: 1, maxLength: 80 }
-        trafficValue: { type: string, enum: [traffic_moving, traffic_slow, traffic_very_slow, traffic_stopped] }
+        trafficValue:
+          { type: string, enum: [traffic_moving, traffic_slow, traffic_very_slow, traffic_stopped] }
         observationPeriod: { type: string, minLength: 1, maxLength: 40 }
         expiresAt: { type: string, format: date-time }
         source: { type: string, enum: [community] }
@@ -2045,7 +2499,17 @@ components:
     BrowserSignalCommandGrant:
       type: object
       additionalProperties: false
-      required: [commandId, anchorId, contextId, routeRevision, consentGeneration, categories, issuedAt, expiresAt]
+      required:
+        [
+          commandId,
+          anchorId,
+          contextId,
+          routeRevision,
+          consentGeneration,
+          categories,
+          issuedAt,
+          expiresAt,
+        ]
       properties:
         commandId: { $ref: '#/components/schemas/PrivateSignalUuid' }
         anchorId: { $ref: '#/components/schemas/PrivateSignalUuid' }
@@ -2105,8 +2569,18 @@ components:
       type: object
       required: [title, notes, version, updatedAt]
       properties:
-        title: { type: string, maxLength: 120, description: Plain text; UTF-16 code-unit limit enforced by server }
-        notes: { type: string, maxLength: 4000, description: Plain text; UTF-16 code-unit limit enforced by server }
+        title:
+          {
+            type: string,
+            maxLength: 120,
+            description: Plain text; UTF-16 code-unit limit enforced by server,
+          }
+        notes:
+          {
+            type: string,
+            maxLength: 4000,
+            description: Plain text; UTF-16 code-unit limit enforced by server,
+          }
         version: { type: integer, minimum: 0, maximum: 9007199254740991 }
         updatedAt: { type: string, format: date-time, nullable: true }
     TripJournalWrite:
@@ -2128,8 +2602,20 @@ components:
       properties:
         id: { type: string, minLength: 1, maxLength: 100 }
         kind: { type: string, enum: [trip, commute] }
-        origin: { type: string, minLength: 1, maxLength: 100, description: Not blank after ECMAScript trim; no control characters }
-        destination: { type: string, minLength: 1, maxLength: 100, description: Not blank after ECMAScript trim; no control characters }
+        origin:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 100,
+            description: Not blank after ECMAScript trim; no control characters,
+          }
+        destination:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 100,
+            description: Not blank after ECMAScript trim; no control characters,
+          }
         date: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$', description: Real calendar date }
         time: { type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$' }
         days:
@@ -2138,14 +2624,30 @@ components:
           uniqueItems: true
           description: Weekdays 0 (Sunday) to 6. A commute needs at least one.
           items: { type: integer, minimum: 0, maximum: 6 }
-        notes: { type: string, maxLength: 500, description: Tab, newline and carriage return are the only permitted control characters }
+        notes:
+          {
+            type: string,
+            maxLength: 500,
+            description: Tab,
+            newline and carriage return are the only permitted control characters,
+          }
         createdAt: { type: string, minLength: 1, maxLength: 64 }
     AccountPlanning:
       type: object
       required: [present, version, updatedAt, plans, saved]
       properties:
-        present: { type: boolean, description: False when the account has no copy; plans and saved are then empty and updatedAt is null }
-        version: { type: integer, minimum: 0, maximum: 9007199254740991, description: 'Compare-and-swap version. Counts saves and removals, so it never repeats; 0 means never saved.' }
+        present:
+          {
+            type: boolean,
+            description: False when the account has no copy; plans and saved are then empty and updatedAt is null,
+          }
+        version:
+          {
+            type: integer,
+            minimum: 0,
+            maximum: 9007199254740991,
+            description: 'Compare-and-swap version. Counts saves and removals, so it never repeats; 0 means never saved.',
+          }
         updatedAt: { type: string, format: date-time, nullable: true }
         plans:
           type: array
@@ -2266,7 +2768,8 @@ components:
     AdminTrafficQueueItemV3:
       type: object
       additionalProperties: false
-      required: [ref, reasonCounts, evidenceStatus, areaLabel, trafficValue, observationPeriod, expiresAt]
+      required:
+        [ref, reasonCounts, evidenceStatus, areaLabel, trafficValue, observationPeriod, expiresAt]
       properties:
         ref: { type: string, format: uuid }
         reasonCounts:
@@ -2351,7 +2854,21 @@ components:
     Destination:
       type: object
       additionalProperties: false
-      required: [id, name, region, category, eyebrow, description, detail, highlights, image, imageAlt, travelLabel, accent]
+      required:
+        [
+          id,
+          name,
+          region,
+          category,
+          eyebrow,
+          description,
+          detail,
+          highlights,
+          image,
+          imageAlt,
+          travelLabel,
+          accent,
+        ]
       properties:
         id: { type: string }
         name: { type: string }

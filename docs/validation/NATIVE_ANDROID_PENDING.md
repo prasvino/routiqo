@@ -80,6 +80,38 @@ module needs a rebuild) and then on 3+ physical phones:
 - [ ] The merged manifest has no `ACCESS_BACKGROUND_LOCATION` or location
       foreground-service permission.
 
+## Spots native transport (server flag `ROUTIQO_SPOTS_API_ENABLED`)
+
+The TypeScript transport rules are unit-tested. The Kotlin rules in
+`RoutiqoSafeHttpModule.kt` were changed on 2026-09-26 but only checked
+statically (a Vitest parity test), because this cloud session has no Android
+SDK. No app code calls these paths yet: that arrives with the Android Spots
+work and its client flag `EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED`. To check on a
+rebuilt development client against a staging API with the server flag on:
+
+- [ ] The Kotlin module compiles with the seventh `ifNoneMatch` argument, and every
+      existing native call still works (the TypeScript adapter always passes
+      seven arguments).
+- [ ] `GET /api/v1/native/spots/catalog` returns 200 with a strict ETag. A repeat
+      with that `If-None-Match` returns 304 with an empty body. Any other 3xx is
+      still rejected as a redirect.
+- [ ] `POST /api/v1/native/spots/activity` returns 200 with an active journey and
+      409 after completion. Oversized responses (above 256 KiB / 128 KiB) are rejected.
+- [ ] **Before the flag goes on in staging: peer rate gate behind the load balancer.**
+      - The problem: `NativeAuthGuard` limits every native path to 120 requests per
+        minute per peer address (`native-other`), and `forward-headers-strategy` is
+        `none`. Behind an AWS load balancer the peer is the balancer node. With
+        mobile carrier NAT (CGNAT), many phones share one IP. About 40 travellers
+        polling activity every 20 s would get 429 on every native path, including
+        session renew. This is the proxy aggregation that ADR 0009 says must be
+        evaluated before deployment.
+      - The fix: trust client IPs only from the balancer's address range (for
+        example RemoteIpValve), or exempt account-gated paths from the peer gate by
+        decision.
+      - Then measure the activity read's database cost at festival peak. Each read
+        does three rate-bucket upserts, one session lookup and one journey
+        `EXISTS` query.
+
 ## Evidence
 
 Recovered Android build, 2026-09-24:

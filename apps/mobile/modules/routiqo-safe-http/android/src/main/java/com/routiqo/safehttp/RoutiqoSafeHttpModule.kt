@@ -34,7 +34,7 @@ class RoutiqoSafeHttpModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("RoutiqoSafeHttp")
     AsyncFunction("request") { origin: String, path: String, method: String,
-        credential: String?, account: String?, payload: String? ->
+        credential: String?, account: String?, payload: String?, ifNoneMatch: String? ->
       try {
         val base = URI(origin)
         require(base.scheme == "https" && base.host != null && base.rawUserInfo == null &&
@@ -49,15 +49,22 @@ class RoutiqoSafeHttpModule : Module() {
         val routePath = path == "/api/v1/native/routes"
         val placePath = path == "/api/v1/native/routes/places"
         val routingPath = routePath || placePath
-        require((authPath || journeyPath || routingPath) && !path.contains('?') && !path.contains('#')) { "Invalid path" }
+        val spotCatalogPath = path == "/api/v1/native/spots/catalog"
+        val spotActivityPath = path == "/api/v1/native/spots/activity"
+        val spotPath = spotCatalogPath || spotActivityPath
+        val etagPattern = Regex("\"$uuid\"")
+        require((authPath || journeyPath || routingPath || spotPath) && !path.contains('?') && !path.contains('#')) { "Invalid path" }
         require(method == "GET" || method == "POST") { "Invalid method" }
         require(path != "/api/v1/native/journeys/history" || method == "POST") { "Invalid history method" }
         require(!routingPath || method == "POST") { "Invalid routing method" }
+        require(!spotCatalogPath || method == "GET") { "Invalid Spot catalog method" }
+        require(!spotActivityPath || method == "POST") { "Invalid Spot activity method" }
+        require(ifNoneMatch == null || spotCatalogPath && ifNoneMatch.matches(etagPattern)) { "Invalid If-None-Match" }
         require((method == "POST") == (payload != null)) { "Invalid body" }
         require(payload == null || payload.toByteArray(StandardCharsets.UTF_8).size <= 20 * 1024) { "Body too large" }
         require(credential == null || credential.matches(Regex("[A-Za-z0-9_-]{43}"))) { "Invalid credential" }
         require(account == null || account.matches(Regex(uuid))) { "Invalid account" }
-        require(!(journeyPath || routingPath) || credential != null && account != null) { "Native resource requires identity" }
+        require(!(journeyPath || routingPath || spotPath) || credential != null && account != null) { "Native resource requires identity" }
         require(!authPath || account == null) { "Auth cannot send account" }
         if (authPath) {
           val anonymous = path.startsWith("/api/v1/native/auth/google/")
@@ -69,13 +76,15 @@ class RoutiqoSafeHttpModule : Module() {
           .header("Cache-Control", "no-store")
         if (credential != null) builder.header("Authorization", "Bearer $credential")
         if (account != null) builder.header("X-Routiqo-Account", account)
+        if (ifNoneMatch != null) builder.header("If-None-Match", ifNoneMatch)
         if (method == "POST") {
           builder.post(payload!!.toRequestBody("application/json".toMediaType()))
         } else builder.get()
         (if (routeContextPath && method == "POST") bindingClient else if (routingPath) routingClient else client)
           .newCall(builder.build()).execute().use { response ->
-          require(!response.isRedirect && response.code !in 300..399) { "Redirect denied" }
-          if ((journalPath || consentPath || routeContextPath || routingPath) && response.code == 200) {
+          val notModified = response.code == 304 && spotCatalogPath && ifNoneMatch != null
+          require(!response.isRedirect && (response.code !in 300..399 || notModified)) { "Redirect denied" }
+          if ((journalPath || consentPath || routeContextPath || routingPath || spotPath) && response.code == 200) {
             val contentType = response.header("Content-Type") ?: ""
             require(contentType.matches(Regex("(?i)application/(?:[a-z0-9!#$&^_.+-]+\\+)?json(?:\\s*;.*)?"))) { "Invalid JSON content type" }
           }
@@ -88,6 +97,8 @@ class RoutiqoSafeHttpModule : Module() {
               val limit = when {
                 routePath -> 1024 * 1024
                 placePath -> 256 * 1024
+                spotCatalogPath -> 256 * 1024
+                spotActivityPath -> 128 * 1024
                 journalPath -> 32 * 1024
                 else -> 64 * 1024
               }
@@ -96,11 +107,13 @@ class RoutiqoSafeHttpModule : Module() {
             }
             output.toByteArray()
           } ?: byteArrayOf()
-          val body = if (journalPath || consentPath || routeContextPath || routingPath) StandardCharsets.UTF_8.newDecoder()
+          require(!notModified || bytes.isEmpty()) { "Invalid not-modified body" }
+          val body = if (journalPath || consentPath || routeContextPath || routingPath || spotPath) StandardCharsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
             .decode(ByteBuffer.wrap(bytes)).toString() else String(bytes, StandardCharsets.UTF_8)
-          mapOf("status" to response.code, "body" to body)
+          val etag = if (spotCatalogPath) response.header("ETag")?.takeIf { it.matches(etagPattern) } else null
+          mapOf("status" to response.code, "body" to body, "etag" to etag)
         }
       } catch (_: Exception) {
         throw IllegalStateException("Native request unavailable.")

@@ -785,6 +785,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/native/spots/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Default-off (ROUTIQO_SPOTS_API_ENABLED, exact true) curated Spot catalog for on-device Spots-ahead matching. Public reference data without provenance. The ETag is the quoted catalog version; a matching If-None-Match returns 304 with an empty body. Ten reads per account per minute. */
+        get: operations["getNativeSpotCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/spots/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Default-off (ROUTIQO_SPOTS_API_ENABLED, exact true) activity read for the Spots ahead. Requires an active journey owned by the account. Spot IDs travel in the body, are not logged or stored, and unknown IDs are ignored. Until posts and signals exist every known Spot is quiet. Twenty reads per account per minute; response at most 128 KiB and never cached. */
+        post: operations["readNativeSpotActivity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/native/routes": {
         parameters: {
             query?: never;
@@ -1195,6 +1229,49 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Format: uuid */
+        NativeSpotId: string;
+        NativeSpotCorridor: {
+            id: string;
+            name: string;
+        };
+        NativeSpot: {
+            id: components["schemas"]["NativeSpotId"];
+            /** @description English name. */
+            name: string;
+            /** @description Tamil name. */
+            nameTa: string;
+            /** @enum {string} */
+            kind: "toll" | "eatery" | "fuel" | "restroom" | "bus_stand" | "temple" | "junction" | "rest_area";
+            longitude: number;
+            latitude: number;
+            district: string;
+            corridors: string[];
+            categories: ("traffic" | "queue" | "food" | "fuel" | "restroom")[];
+        };
+        NativeSpotCatalog: {
+            version: components["schemas"]["NativeSpotId"];
+            corridors: components["schemas"]["NativeSpotCorridor"][];
+            spots: components["schemas"]["NativeSpot"][];
+        };
+        NativeSpotActivityRequest: {
+            /** @description Distinct lowercase Spot IDs in ascending order. */
+            spotIds: components["schemas"]["NativeSpotId"][];
+        };
+        NativeSpotActivity: {
+            /** Format: date-time */
+            serverTime: string;
+            catalogVersion: components["schemas"]["NativeSpotId"];
+            spots: {
+                id: components["schemas"]["NativeSpotId"];
+                /** @enum {string} */
+                state: "live" | "fading" | "quiet";
+                /** @description Official alert references; always empty until official alerts are added. */
+                alertIds: string[];
+            }[];
+            /** @description Official alerts; always empty until official alerts are added. */
+            alerts: Record<string, never>[];
+        };
         NativeEmptyRequest: Record<string, never>;
         NativeGoogleChallenge: {
             /** Format: uuid */
@@ -3960,6 +4037,105 @@ export interface operations {
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
             /** @description Place provider, session or rate infrastructure unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getNativeSpotCatalog: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+                /** @description Quoted catalog version previously received as the ETag. */
+                "If-None-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current Spot catalog, at most 256 KiB */
+            200: {
+                headers: {
+                    /** @description Quoted lowercase catalog version UUID. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSpotCatalog"];
+                };
+            };
+            /** @description The cached catalog version is current. Empty response body. */
+            304: {
+                headers: {
+                    /** @description Quoted lowercase catalog version UUID. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Session or rate authority unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readNativeSpotActivity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeSpotActivityRequest"];
+            };
+        };
+        responses: {
+            /** @description Activity for the requested Spots that exist in the current catalog, in request order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSpotActivity"];
+                };
+            };
+            /** @description Body is not exactly 1-20 distinct, ascending, lowercase Spot IDs. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            /** @description The account has no active journey. Empty response body. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Journey, session or rate authority unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -1,6 +1,6 @@
 # Implementation resume: handoff for the next session
 
-Updated end of day 2026-09-25. Read this first, then `CLAUDE.md` / `AGENTS.md`,
+Updated 2026-09-26 (Spots backend). Read this first, then `CLAUDE.md` / `AGENTS.md`,
 [`PRODUCT.md`](../PRODUCT.md) and the spec for whatever you pick up. The
 previous private LIVE handoff is archived at
 [`../archive/validation/IMPLEMENTATION_RESUME.md`](../archive/validation/IMPLEMENTATION_RESUME.md).
@@ -73,21 +73,26 @@ The full list is the *Diwali dry-run critical path* in [`todo.md`](../../todo.md
 Build each piece default-off, with tests, and keep BUILD_STATUS and the ledgers
 honest.
 
-1. **Spots backend** ([SPOTS_SPEC.md](../features/spots/SPOTS_SPEC.md)):
-   - a `routiqo-spots/1` catalog loader, modelled on
-     `routeupdate/infrastructure/RouteAnchorCatalogLoader.java`: strict JSON, at
-     most 512 Spots and 256 KiB, English and Tamil names required, provenance
-     kept on the server;
-   - `GET /api/v1/native/spots/catalog` with ETag;
-   - `POST /api/v1/native/spots/activity`, which returns empty activity until
-     posts exist;
-   - flag `ROUTIQO_SPOTS_API_ENABLED`, OpenAPI plus `pnpm contracts:generate`, and
-     the native transport allowlist updated in **both** `safe-transport.ts` and
-     the Kotlin `RoutiqoSafeHttpModule.kt`.
+1. **Spots backend — done 2026-09-26, default-off**
+   ([ADR 0070](../adr/0070-spot-module-and-catalog-delivery.md), BUILD_STATUS
+   *September 26 Spots backend*):
+   - new `spot` module;
+   - the `routiqo-spots/1` loader;
+   - `GET /api/v1/native/spots/catalog` with ETag/304;
+   - `POST /api/v1/native/spots/activity`, quiet until posts exist and requiring an
+     active journey;
+   - the exact-`true` `ROUTIQO_SPOTS_API_ENABLED` flag, the contract and the
+     generated client;
+   - both native transport allowlists. The client reads the catalog with
+     `nativeTransport.spotCatalog({ credential, accountId, ifNoneMatch })`.
 
-   Decide first whether this is a new `spot` module or lives in `routeupdate`.
-   ENGINEERING_CONTEXT leaves that to an ADR; a new module is
-   the cleaner boundary.
+   Kotlin transport checks are pending on a device, and the peer rate gate behind
+   a load balancer must be resolved before the flag goes on in staging
+   (NATIVE_ANDROID_PENDING.md).
+   Requirements for the step-2 client parser, from the independent review:
+   - Store a catalog only when its `version` equals the ETag without the quotes.
+   - Do not enforce the contract's `maxItems: 0` on `alertIds` and `alerts`: those
+     become non-empty additively once official alerts exist.
 2. **Spots on Android:**
    - a catalog cache (`spot_catalog_v1`);
    - on-device matching (100 m from route segments, 1,000 m endpoint exclusion
@@ -134,7 +139,7 @@ honest.
   task (`git fetch origin main && git checkout -B <branch> origin/main`). Open a
   PR only when asked.
 - **ADR numbers:** check `docs/adr/` on the latest `main` before numbering a new
-  ADR; other work lands on `main` in parallel. The next free number is **0070**.
+  ADR; other work lands on `main` in parallel. The next free number is **0071**.
 - **Checks:** `pnpm install --frozen-lockfile`, then `pnpm check` (contracts,
   formatting, typecheck, lint, Vitest) and `pnpm --filter @routiqo/mobile build`.
   Backend: `(cd backend && ./gradlew check)`; PostgreSQL tests need Docker, so
@@ -148,6 +153,16 @@ honest.
   `tests/native-journey-route-storage.test.ts`.
 - **No Android SDK or emulator in cloud sessions:** record device checks as
   pending, never as passed.
+- **Cloud backend checks (found 2026-09-26):**
+  - The container ships JDK 21. Install JDK 25 with
+    `apt-get install -y openjdk-25-jdk-headless`; Adoptium downloads are blocked.
+  - Docker's CLI is present but its daemon is not running. Start `dockerd` as a
+    long-running background task (it dies with a short-lived shell). If a stale
+    `/var/run/docker/containerd/containerd.pid` blocks startup, remove it first.
+  - Maven Central can answer 429 on the first Gradle run; retrying with backoff
+    and `--max-workers=1` resolved it.
+  - The pinned GHCR gitleaks image cannot be pulled, so run gitleaks v8.30.1 from
+    Docker Hub with `.gitleaks.toml`.
 - **Docs:** `prettier` does not cover `docs/`, so check relative links by hand.
   The only known broken ones are the two external Wayfind references.
 

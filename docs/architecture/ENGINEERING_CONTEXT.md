@@ -150,14 +150,15 @@ Redis, map or AI vendors.
 
 | Module | Role |
 | --- | --- |
-| `spot` | Seeded Spot catalog (from the anchor catalog), Spot posts and signals, voice-note metadata, "Still true?", per-type expiry, highlights |
+| `spot` | Seeded Spot catalog (`routiqo-spots/1`, its own loader), Spot posts and signals, voice-note metadata, "Still true?", per-type expiry, highlights |
 | `askahead` | Questions on Spots, bounded non-deterministic recipient selection, answers and summaries |
 | `room` | Short temporary Spot chat and festival route rooms, per-room aliases, membership expiry |
 | `routeguide` | Publishing finished journeys as route guides with endpoint stripping |
 
-Whether `spot` is a rename of `routeupdate` or a new module reusing its
-application interfaces is an open decision for its ADR. Archived code keeps its
-identifiers and stays default-off.
+`spot` is a new module, not a rename of `routeupdate`
+([ADR 0070](../adr/0070-spot-module-and-catalog-delivery.md)). It uses intentional
+interfaces only and never depends on archived `routeupdate` code. Archived code
+keeps its identifiers and stays default-off.
 
 ## 6. API and contracts
 

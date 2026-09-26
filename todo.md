@@ -112,7 +112,8 @@ and failure boundaries):
 
 Spots:
 
-- [ ] Seed about 150–200 Spots on the trunk and branches (tolls, major eateries, fuel, restrooms, bus stands, Kilambakkam), weighted to the trunk, by reusing the curated anchor catalog format, loader and route-anchor matching; record curator and provenance. Add Coimbatore-trunk Spots before Pongal.
+- [x] Spots backend, default-off behind `ROUTIQO_SPOTS_API_ENABLED` ([ADR 0070](docs/adr/0070-spot-module-and-catalog-delivery.md)): new `spot` module, strict `routiqo-spots/1` catalog loader, `GET /api/v1/native/spots/catalog` with ETag/304, `POST /api/v1/native/spots/activity` (quiet until posts exist, active journey required), OpenAPI and generated client, native transport allowlist in `safe-transport.ts` and `RoutiqoSafeHttpModule.kt`. Kotlin transport rules are device-pending.
+- [ ] Seed about 150–200 Spots on the trunk and branches (tolls, major eateries, fuel, restrooms, bus stands, Kilambakkam), weighted to the trunk, as a `routiqo-spots/1` catalog file (SPOTS_SPEC); record curator and provenance. Add Coimbatore-trunk Spots before Pongal.
 - [ ] English and Tamil names for every Spot, checked by a Tamil speaker; rest areas with facilities seeded; temples only where they slow the highway (e.g. Samayapuram) for Diwali, revisited for Pongal.
 - [ ] Alias word list (about 100 adjectives × 100 nouns) approved by the product owner and reviewed by a Tamil speaker; excludes insults, caste, religion, gender, bodies, politics and politically or religiously loaded colours.
 - [ ] Show Spots ahead on the Android Journey map, ordered by distance along the route, appearing automatically on journey start.

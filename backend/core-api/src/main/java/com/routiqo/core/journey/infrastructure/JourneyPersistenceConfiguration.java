@@ -1,5 +1,6 @@
 package com.routiqo.core.journey.infrastructure;
 
+import com.routiqo.core.journey.application.ActiveJourneyReader;
 import com.routiqo.core.journey.application.JourneyCompletionParticipant;
 import com.routiqo.core.journey.application.JourneyService;
 import com.routiqo.core.journey.application.JourneyStore;
@@ -18,6 +19,10 @@ public class JourneyPersistenceConfiguration {
     @Bean
     JdbcJourneyStore journeyStore(JdbcTemplate jdbc, AccountWriteAuthority accounts) {
         return new JdbcJourneyStore(jdbc, accounts);
+    }
+    @Bean
+    ActiveJourneyReader activeJourneyReader(JdbcTemplate jdbc) {
+        return new JdbcActiveJourneyReader(jdbc);
     }
     @Bean
     JourneyService journeyService(JourneyStore store, JourneyWriteAuthority writes,

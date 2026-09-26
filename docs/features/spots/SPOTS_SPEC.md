@@ -1,9 +1,14 @@
 # Spots
 
-Status: proposed, 2026-09-25. Not implemented. Phase 2 of the pilot path; the
-catalog, Spots ahead and activity reads are needed for the Diwali 2026 dry run.
+Status: proposed, 2026-09-25. Phase 2 of the pilot path; the catalog, Spots
+ahead and activity reads are needed for the Diwali 2026 dry run.
+**Implemented 2026-09-26 (server and native transport only, default-off):** the
+catalog loader, *Catalog delivery* and the *Activity read* endpoint, which returns
+every known Spot as `quiet` until posts and signals exist. The Android cache,
+matching, panel, refresh and official alerts are not built yet.
 Decision records: [ADR 0066](../../adr/0066-bounded-http-refresh-for-spot-chat.md),
-[ADR 0067](../../adr/0067-on-device-journey-route-and-spots-ahead.md).
+[ADR 0067](../../adr/0067-on-device-journey-route-and-spots-ahead.md),
+[ADR 0070](../../adr/0070-spot-module-and-catalog-delivery.md).
 Product rules: [PRODUCT.md](../../PRODUCT.md).
 
 Scope: the seeded Spot catalog, how the Android app finds the Spots ahead on a
@@ -51,7 +56,9 @@ each dry run and the launch.
   `junction`, `rest_area`.
 - `district`: a lowercase key from a fixed list in the loader (corridor
   districts from Chennai to Tirunelveli, Tuticorin and Thanjavur for Diwali;
-  Vellore to Coimbatore added for Pongal).
+  Vellore to Coimbatore added for Pongal). The list is in `SpotDistrict.java`
+  and uses official district names (for example `thoothukudi`,
+  `tiruchirappalli`); the curator confirms it when seeding.
 - `corridors`: ids declared in the same file. Diwali: `gst-trunk`,
   `trichy-thanjavur`, `trichy-madurai-tirunelveli`, `madurai-tuticorin`;
   Pongal adds `chennai-coimbatore`.
@@ -64,7 +71,14 @@ each dry run and the launch.
   not choose or edit their Spot.
 
 A catalog change is a new file with a new `version` and a restart; there is no
-hot reload or merge. The existing anchor catalog loader (ADR 0031) is the model
+hot reload or merge. **Every edit, however small, needs a new `version`**:
+phones revalidate by version (ETag), so an edit that keeps the version never
+reaches them. The second reviewer checks the version changed. At startup the
+server logs the version, Spot count and a SHA-256 of the served catalog; a
+deploy check confirms every replica logs the same digest. The loader also
+rejects names containing phone numbers (7 or more digits), web or e-mail
+addresses, Tamil names without Tamil script, and review dates later than
+tomorrow. The existing anchor catalog loader (ADR 0031) is the model
 for strictness and bounds; the anchor catalog itself stays with the archived
 route-binding code.
 
@@ -121,7 +135,8 @@ cached catalog. The route, endpoints and position are never sent to the server.
 
 - `POST /api/v1/native/spots/activity` with body `{ "spotIds": [...] }`: 1–20
   distinct, sorted, lowercase UUIDs from the current catalog. POST keeps Spot IDs
-  out of URLs and access logs. Unknown IDs are ignored.
+  out of URLs and access logs. Unknown IDs are ignored. Without an active journey
+  owned by the account the response is 409.
 - Response (`Cache-Control: no-store`, cap 128 KiB): `serverTime`,
   `catalogVersion`, and per Spot: `state`, the signal summaries, posts and
   highlights defined in the posts spec, and `alertIds`; plus a top-level

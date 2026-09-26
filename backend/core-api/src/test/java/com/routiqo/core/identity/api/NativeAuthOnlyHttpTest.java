@@ -40,4 +40,8 @@ class NativeAuthOnlyHttpTest {
                 .GET().build();
         assertThat(HttpClient.newHttpClient().send(browser, HttpResponse.BodyHandlers.ofString()).statusCode()).isIn(401, 403);
     }
+
+    @Test void spotLeavesAreForbiddenWhenTheFlagIsUnset() throws Exception {
+        NativeSpotProfileHttpTest.assertSpotLeavesForbidden(port);
+    }
 }
