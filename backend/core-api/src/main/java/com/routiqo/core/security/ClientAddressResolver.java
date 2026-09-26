@@ -15,15 +15,22 @@ import java.util.List;
  * <p>With no trusted ranges configured the key is the socket peer, as before. With ranges configured,
  * {@code X-Forwarded-For} is read only when the socket peer is inside one of them, walking from the
  * right past trusted hops; everything left of the first untrusted entry is client-controlled and never
- * read. Anything unexpected falls back to the socket peer. Only literal addresses are parsed, so no DNS
- * lookup can happen. IPv6 keys are the /64 prefix. Addresses are never logged.
+ * read. An unusable chain from a trusted peer gets one shared key. Only literal addresses are parsed, so no
+ * DNS lookup can happen. IPv6 keys are the /64 prefix. Addresses are never logged. This relies on
+ * {@code server.forward-headers-strategy: none}, so that {@code getRemoteAddr()} is the real socket peer;
+ * {@link ClientAddressConfiguration} refuses to start otherwise.
  */
 public final class ClientAddressResolver {
     static final String FORWARDED_FOR = "X-Forwarded-For";
     static final int MAX_RANGES = 32;
-    static final int MAX_FORWARDED_ENTRIES = 32;
-    private static final int MIN_IPV4_PREFIX = 8;
-    private static final int MIN_IPV6_PREFIX = 16;
+    static final int MAX_TRUSTED_HOPS = 32;
+    /**
+     * One shared key for every unusable forwarded chain behind a trusted balancer. Real clients never land
+     * here, and sharing one bucket (not one per balancer node) keeps a malformed header from buying quota.
+     */
+    static final String UNUSABLE_FORWARDING = "forwarded-unusable";
+    private static final int MIN_IPV4_PREFIX = 16;
+    private static final int MIN_IPV6_PREFIX = 48;
     private static final int MAX_LITERAL_LENGTH = 45;
 
     private final List<Range> trusted;
@@ -39,19 +46,21 @@ public final class ClientAddressResolver {
         String peerKey = key(peerAddress);
         if (trusted.isEmpty() || !isTrusted(peerAddress)) return peerKey;
 
-        var entries = new ArrayList<String>();
-        for (String header : Collections.list(request.getHeaders(FORWARDED_FOR))) {
-            for (String entry : header.split(",", -1)) {
-                if (entries.size() == MAX_FORWARDED_ENTRIES) return peerKey;
-                entries.add(entry.trim());
-            }
-        }
-        for (int i = entries.size() - 1; i >= 0; i--) {
-            byte[] hop = literal(entries.get(i));
-            if (hop == null) return peerKey;
+        // Exactly one header line: with several, which line the balancer appended to is ambiguous.
+        List<String> lines = Collections.list(request.getHeaders(FORWARDED_FOR));
+        if (lines.size() != 1) return UNUSABLE_FORWARDING;
+        String chain = lines.getFirst();
+        // Walk from the right and stop at the first untrusted entry; nothing to its left is ever read.
+        int end = chain.length();
+        for (int skipped = 0; skipped <= MAX_TRUSTED_HOPS; skipped++) {
+            int start = chain.lastIndexOf(',', end - 1) + 1;
+            byte[] hop = literal(chain.substring(start, end).trim());
+            if (hop == null) return UNUSABLE_FORWARDING;
             if (!isTrusted(hop)) return key(hop);
+            if (start == 0) return UNUSABLE_FORWARDING;
+            end = start - 1;
         }
-        return peerKey;
+        return UNUSABLE_FORWARDING;
     }
 
     private boolean isTrusted(byte[] address) {
@@ -123,10 +132,14 @@ public final class ClientAddressResolver {
             int slash = text.indexOf('/');
             if (slash < 0 || slash != text.lastIndexOf('/'))
                 throw invalid("each trusted range needs exactly one /prefix");
-            byte[] network = literal(text.substring(0, slash));
+            String address = text.substring(0, slash);
+            byte[] network = literal(address);
             if (network == null) throw invalid("trusted ranges must be literal IPv4 or IPv6 addresses");
+            if (network.length == 4 && address.indexOf(':') >= 0)
+                throw invalid("write IPv4 ranges in dotted form, not IPv4-mapped IPv6");
             String digits = text.substring(slash + 1);
-            if (digits.isEmpty() || digits.length() > 3 || !digits.chars().allMatch(c -> c >= '0' && c <= '9'))
+            if (digits.isEmpty() || digits.length() > 3 || (digits.length() > 1 && digits.charAt(0) == '0')
+                    || !digits.chars().allMatch(c -> c >= '0' && c <= '9'))
                 throw invalid("invalid prefix length");
             int prefix = Integer.parseInt(digits);
             int bits = network.length * 8;

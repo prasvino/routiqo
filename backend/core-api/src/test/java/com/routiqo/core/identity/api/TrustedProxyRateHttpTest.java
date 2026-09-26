@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
     "ROUTIQO_GOOGLE_CLIENT_ID=test-client.apps.googleusercontent.com",
     "ROUTIQO_WEB_ORIGIN=http://localhost:3000", "ROUTIQO_AUTH_SECURE_COOKIES=false",
-    "ROUTIQO_TRUSTED_PROXY_CIDRS=127.0.0.0/8,::1/128"
+    "ROUTIQO_TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128"
 })
 @ActiveProfiles({"persistence", "google-auth", "web-auth", "native-auth"})
 @Import(NativeAuthHttpTest.TestIdentity.class)
@@ -80,7 +80,7 @@ class TrustedProxyRateHttpTest {
         assertThat(challenge(SECOND).statusCode()).isEqualTo(200);
         // Prepending a fresh address does not escape: only the balancer-appended entry is read.
         assertThat(challenge("192.0.2.44, " + FIRST).statusCode()).isEqualTo(429);
-        // No usable header falls back to the balancer's own bucket, not to a fresh one.
+        // No usable header shares one bucket, never a fresh one.
         for (int i = 0; i < 10; i++) assertThat(challenge(null).statusCode()).isEqualTo(200);
         assertThat(challenge("garbage").statusCode()).isEqualTo(429);
     }
@@ -93,6 +93,15 @@ class TrustedProxyRateHttpTest {
         assertThat(limited.statusCode()).isEqualTo(429);
         assertThat(limited.headers().firstValue("Retry-After")).contains("60");
         assertThat(nativeCall("GET", "session", "", credential, FIRST).statusCode()).isEqualTo(200);
+    }
+
+    @Test void eachAccountKeeps120PerMinuteUnderTheWiderAddressCeiling() throws Exception {
+        String credential = login(FIRST);
+        String account = JsonPath.read(nativeCall("GET", "session", "", credential, FIRST).body(), "$.accountId");
+        for (int i = 0; i < 119; i++) rates.allow(account, "native-account", 120);
+        var limited = nativeCall("GET", "session", "", credential, SECOND);
+        assertThat(limited.statusCode()).isEqualTo(429);
+        assertThat(limited.headers().firstValue("Retry-After")).contains("60");
     }
 
     @Test void browserGuardUsesTheSameClientAddress() throws Exception {

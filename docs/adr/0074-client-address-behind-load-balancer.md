@@ -38,23 +38,29 @@ address. IPv6 subscribers usually get their own /64.
    `ROUTIQO_TRUSTED_PROXY_CIDRS`: a comma-separated list of literal CIDRs.
    - **Unset or blank (the default):** the key is the socket peer, as before.
    - **Set:** `X-Forwarded-For` is read only when the socket peer is inside a
-     trusted range. All header lines are read in order and split on commas.
-     Entries are then walked from the **right**, skipping trusted hops, and the
-     first untrusted entry is the client. Everything to its left was written
-     by the client and is never read.
-   - **Fail safe to the peer** when the header is missing, all entries are
-     trusted, the chain has more than 32 entries, or the entry that would be
-     used is not a literal address (ports, brackets, zones, names, empty
-     entries or leading zeros). The peer is the balancer's shared bucket, so a
-     malformed header never earns a fresh bucket.
+     trusted range, and only when exactly one header line is present. The
+     line is walked from the **right**, skipping at most 32 trusted hops, and
+     the first untrusted entry is the client. Everything to its left was
+     written by the client and is never read, not even its length.
+   - **One shared "unusable" bucket** is used when the header is missing, there
+     are several header lines, all entries are trusted, more than 32 trusted
+     hops are found, or the entry that would be used is not a literal address
+     (ports, brackets, zones, names, empty entries, or leading zeros in dotted
+     IPv4). The key is a constant, not the balancer node's address, so a
+     malformed header never earns a fresh bucket, whether per client or per
+     balancer node.
+     Real clients never land there.
 2. **No name resolution.** IPv4 is parsed as a strict dotted quad. IPv6 must
    contain only hex digits, `:` and `.` before `Inet6Address.ofLiteral`, which
    never performs a lookup.
 3. **Startup validation**, failing fast:
    - every entry needs exactly one `/prefix`;
    - no host bits may be set;
-   - IPv4 ranges wider than /8 and IPv6 ranges wider than /16 are refused
-     (which excludes `0.0.0.0/0` and `::/0`);
+   - IPv4 ranges wider than /16 and IPv6 ranges wider than /48 are refused
+     (which excludes `0.0.0.0/0` and `::/0`). A VPC is at most /16 on IPv4,
+     and its IPv6 block is a /56;
+   - ranges written in IPv4-mapped IPv6 notation, and prefixes with leading
+     zeros, are refused;
    - at most 32 ranges.
 4. **Key normalisation** in both modes:
    - IPv4 is keyed as dotted form;
@@ -71,7 +77,10 @@ address. IPv6 subscribers usually get their own /64.
      the carrier-NAT range `100.64.0.0/10`.
 
    The resolver changes only the rate-limit key, has an explicit allowlist, and
-   is unit-tested without a container. `forward-headers-strategy` stays `none`.
+   is unit-tested without a container. `forward-headers-strategy` stays `none`,
+   and the application refuses to start if it is set to anything else. With
+   container forwarding on, `getRemoteAddr()` would already come from a
+   client-written header.
 6. **Signed-in native ceiling: 600 per minute per address** (owner decision,
    2026-09-26) for `native-other`. This applies with or without trusted ranges.
    - Challenge (10) and exchange (20) are unchanged; they are the
@@ -81,7 +90,10 @@ address. IPv6 subscribers usually get their own /64.
      budget.
    - On signed-in paths the per-address gate only protects the indexed session
      lookup, which already requires a well-formed 43-character bearer
-     credential.
+     credential. Requests with a well-formed but invalid bearer are therefore
+     also allowed 600 lookups per minute per address before they get a 401.
+     Guessing a credential is infeasible (256 bits), so the cost is database
+     load only.
    - Browser and admin limits are unchanged: in the pilot they are not phone
      traffic behind carrier NAT.
 
@@ -92,7 +104,10 @@ address. IPv6 subscribers usually get their own /64.
 - The API must be reachable only through the ALB (security group). Otherwise a
   host inside those subnets could forge the header.
 - The ALB appends the client address to `X-Forwarded-For` (its default
-  `append` mode). If CloudFront or another proxy is added in front later, its
+  `append` mode). **Before turning it on, verify through the real ALB** that
+  a request with one `X-Forwarded-For` line reaches the API as a single line
+  ending in the client address. Also check what the ALB does with a request
+  carrying two lines; the resolver treats several lines as unusable either way. If CloudFront or another proxy is added in front later, its
   ranges need a separate decision; this ADR does not trust them.
 
 ## Consequences
@@ -110,16 +125,26 @@ address. IPv6 subscribers usually get their own /64.
 
 ## Verification
 
-- `ClientAddressResolverTest`: off mode, spoofing from an untrusted peer,
-  right-to-left walk, left-side forgery, multiple headers, fallbacks, IPv6 /64,
-  mapped addresses, bitwise prefixes and startup rejection.
+- `ClientAddressResolverTest`:
+  - off mode and spoofing from an untrusted peer;
+  - the right-to-left walk, left-side forgery, and an arbitrarily long
+    client-written part;
+  - the 32-hop bound and several header lines;
+  - the shared unusable bucket;
+  - IPv6 /64, including behind IPv6 balancer hops, and mapped addresses;
+  - bitwise prefixes, startup rejection, and the forwarding-strategy guard.
 - `TrustedProxyRateHttpTest` (real PostgreSQL, trusted loopback):
   - separate buckets per forwarded client on the native challenge;
   - prepending does not escape;
   - a missing or garbage header uses the balancer's bucket;
-  - the 600 signed-in ceiling;
+  - the 600 signed-in ceiling, and the 120-per-account limit still applying
+    beneath it;
   - the browser guard uses the same key.
 - `NativeAuthHttpTest`: the header is ignored when no ranges are configured.
+- An independent review found no blockers. Its findings were fixed before
+  merge: the per-node fallback bucket escape, multi-line ambiguity, loose
+  range floors, mapped-notation ranges, prefix leading zeros, the
+  forwarding-strategy guard, and a misleading code comment.
 - Not verified: a real ALB in staging, and the admin guard over HTTP. The admin
   guard shares the resolver and the same one-line call, but has no dedicated
   HTTP test.

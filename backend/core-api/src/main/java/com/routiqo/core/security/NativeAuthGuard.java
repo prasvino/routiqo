@@ -117,8 +117,9 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
         }
 
         String category = challenge ? "native-challenge" : exchange ? "native-exchange" : "native-other";
-        // Signed-in calls get a wider per-address ceiling because carrier NAT shares IPv4 addresses;
-        // each account stays at 120 per minute below (ADR 0074).
+        // Bearer paths get a wider per-address ceiling because carrier NAT shares IPv4 addresses. It is
+        // checked before the session lookup, so it also bounds invalid-bearer probes; each authenticated
+        // account stays at 120 per minute below (ADR 0074).
         int limit = challenge ? 10 : exchange ? 20 : 600;
         final boolean peerAllowed;
         try { peerAllowed = rates.allow(clients.resolve(request), category, limit); }

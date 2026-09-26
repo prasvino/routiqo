@@ -12,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ClientAddressResolverTest {
     static final String BALANCER_RANGES = "10.20.0.0/16, 10.21.0.0/16";
     static final String BALANCER = "10.20.3.4";
+    static final String UNUSABLE = ClientAddressResolver.UNUSABLE_FORWARDING;
 
     static MockHttpServletRequest request(String peer, String... forwardedFor) {
         var request = new MockHttpServletRequest();
@@ -52,28 +53,42 @@ class ClientAddressResolverTest {
         assertThat(resolve(BALANCER_RANGES, BALANCER, "10.20.0.9, 198.51.100.7")).isEqualTo("198.51.100.7");
     }
 
-    @Test void multipleHeadersAreReadInOrder() {
-        assertThat(resolve(BALANCER_RANGES, BALANCER, "1.2.3.4", "198.51.100.7")).isEqualTo("198.51.100.7");
-        assertThat(resolve(BALANCER_RANGES, BALANCER, "198.51.100.7", "10.20.0.1")).isEqualTo("198.51.100.7");
+    @Test void severalHeaderLinesAreAmbiguousAndShareOneBucket() {
+        // Which line a balancer appends to is not assumed, so a client cannot pick its key this way.
+        assertThat(resolve(BALANCER_RANGES, BALANCER, "1.2.3.4", "198.51.100.7")).isEqualTo(UNUSABLE);
+        assertThat(resolve(BALANCER_RANGES, BALANCER, "198.51.100.7", "10.20.0.1")).isEqualTo(UNUSABLE);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"", " ", "10.20.0.1", "10.20.0.1, 10.21.0.1", "198.51.100.7:443", "[2001:db8::1]",
         "unknown", "example.com", "198.51.100.7,", "198.051.100.7", "198.51.100", "256.1.1.1", "fe80::1%eth0",
         "::ffff:10.20.0.1"})
-    void unusableRightmostEntryFallsBackToThePeer(String header) {
-        assertThat(resolve(BALANCER_RANGES, BALANCER, header)).isEqualTo(BALANCER);
+    void unusableRightmostEntrySharesOneBucket(String header) {
+        assertThat(resolve(BALANCER_RANGES, BALANCER, header)).isEqualTo(UNUSABLE);
+        // The same key whichever balancer node forwarded it, so junk never buys a bucket per node.
+        assertThat(resolve(BALANCER_RANGES, "10.21.0.8", header)).isEqualTo(UNUSABLE);
     }
 
-    @Test void missingHeaderFallsBackToThePeer() {
-        assertThat(resolve(BALANCER_RANGES, BALANCER)).isEqualTo(BALANCER);
+    @Test void missingHeaderSharesOneBucket() {
+        assertThat(resolve(BALANCER_RANGES, BALANCER)).isEqualTo(UNUSABLE);
     }
 
-    @Test void overlongChainsFallBackToThePeer() {
-        String entries = String.join(",", java.util.Collections.nCopies(32, "198.51.100.7"));
-        assertThat(resolve(BALANCER_RANGES, BALANCER, entries)).isEqualTo("198.51.100.7");
-        assertThat(resolve(BALANCER_RANGES, BALANCER, entries + ",198.51.100.8")).isEqualTo(BALANCER);
-        assertThat(resolve(BALANCER_RANGES, BALANCER, entries, "198.51.100.8")).isEqualTo(BALANCER);
+    @Test void theLengthOfTheClientWrittenPartIsNeverRead() {
+        String junk = String.join(",", java.util.Collections.nCopies(200, "1"));
+        assertThat(resolve(BALANCER_RANGES, BALANCER, junk + ",198.51.100.7")).isEqualTo("198.51.100.7");
+        assertThat(resolve(BALANCER_RANGES, BALANCER, junk + ",198.51.100.7,10.20.0.1")).isEqualTo("198.51.100.7");
+    }
+
+    @Test void trustedHopsAreBoundedAt32() {
+        String hops = String.join(",", java.util.Collections.nCopies(32, "10.20.0.1"));
+        assertThat(resolve(BALANCER_RANGES, BALANCER, "198.51.100.7," + hops)).isEqualTo("198.51.100.7");
+        assertThat(resolve(BALANCER_RANGES, BALANCER, "198.51.100.7,10.21.0.1," + hops)).isEqualTo(UNUSABLE);
+        assertThat(resolve(BALANCER_RANGES, BALANCER, hops)).isEqualTo(UNUSABLE);
+    }
+
+    @Test void ipv6ClientBehindIpv6BalancerHops() {
+        assertThat(resolve("2600:1f18:aa::/48", "2600:1f18:aa:1::5", "2001:db8:5:6::9, 2600:1f18:aa:2::1"))
+                .isEqualTo("2001:db8:5:6:0:0:0:0/64");
     }
 
     @Test void ipv6ClientsAreKeyedByTheirSlash64() {
@@ -99,19 +114,29 @@ class ClientAddressResolverTest {
     }
 
     @Test void oddPrefixesMatchBitwise() {
-        assertThat(resolve("10.20.0.0/15", "10.21.255.255", "198.51.100.7")).isEqualTo("198.51.100.7");
-        assertThat(resolve("10.20.0.0/15", "10.22.0.0", "198.51.100.7")).isEqualTo("10.22.0.0");
+        assertThat(resolve("10.20.0.0/17", "10.20.127.255", "198.51.100.7")).isEqualTo("198.51.100.7");
+        assertThat(resolve("10.20.0.0/17", "10.20.128.0", "198.51.100.7")).isEqualTo("10.20.128.0");
         assertThat(resolve("10.20.3.4/32", BALANCER, "198.51.100.7")).isEqualTo("198.51.100.7");
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"0.0.0.0/0", "::/0", "10.0.0.0/7", "2600::/15", "10.20.0.0", "10.20.0.0/33",
+    @ValueSource(strings = {"0.0.0.0/0", "::/0", "10.0.0.0/7", "10.0.0.0/15", "2600::/15",
+        "2600:1f18::/47", "::ffff:10.20.0.0/16", "::ffff:10.20.0.0/112", "10.20.0.0/016", "10.20.0.0", "10.20.0.0/33",
         "2600::/129", "10.20.0.0/-1", "10.20.0.0/+16", "10.20.0.0/016x", "10.20.0.0/16/16", "localhost/32",
         "balancer.internal/24", "10.20.0.1/16", "10.20.0.0/16,", ",10.20.0.0/16", "[::1]/128", "fe80::%1/64",
         "010.20.0.0/16", "10.20.0.0 /16"})
     void unsafeOrMalformedRangesAreRefusedAtStartup(String ranges) {
         assertThatThrownBy(() -> new ClientAddressResolver(ranges)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("ROUTIQO_TRUSTED_PROXY_CIDRS");
+    }
+
+    @Test void refusesToStartWithContainerForwardingOn() {
+        var configuration = new ClientAddressConfiguration();
+        assertThat(configuration.clientAddressResolver("", "none")).isNotNull();
+        assertThat(configuration.clientAddressResolver(BALANCER_RANGES, "NONE")).isNotNull();
+        for (String strategy : new String[] {"native", "framework", ""})
+            assertThatThrownBy(() -> configuration.clientAddressResolver("", strategy))
+                    .isInstanceOf(IllegalStateException.class);
     }
 
     @Test void atMost32Ranges() {
