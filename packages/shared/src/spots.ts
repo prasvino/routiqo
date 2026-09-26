@@ -42,10 +42,46 @@ export interface SpotCatalog {
   spots: Spot[];
 }
 
+export type SpotVote = 'still_true' | 'no_longer_true';
+export type SpotPostType = 'traffic' | 'place';
+
+/** An unattributed signal summary: counts per value, never who reported them. */
+export interface SpotSignalSummary {
+  ref: string;
+  category: SpotCategory;
+  value: string;
+  values: { value: string; reports: number }[];
+  latestAt: string;
+  stillTrue: number;
+  viewerVote: SpotVote | null;
+}
+
+export interface SpotPost {
+  ref: string;
+  alias: string;
+  text: string;
+  type: SpotPostType;
+  capturedAt: string;
+  expiresAt: string;
+  stillTrue: number;
+  viewerVote: SpotVote | null;
+  /** True only for the viewer's own posts, so they can delete them. */
+  mine: boolean;
+}
+
+export interface SpotHighlight {
+  text: string;
+  createdAt: string;
+}
+
 export interface SpotActivityEntry {
   id: string;
   state: SpotState;
   alertIds: string[];
+  signals: SpotSignalSummary[];
+  posts: SpotPost[];
+  postsTruncated: boolean;
+  highlights: SpotHighlight[];
 }
 
 export interface SpotActivity {
@@ -166,7 +202,82 @@ export function readSpotCatalog(input: unknown, etag: string): SpotCatalog {
   return { version, corridors, spots };
 }
 
-/** Validates an activity response; alerts are tolerated because they arrive additively later. */
+function time(input: unknown): string {
+  if (typeof input !== 'string' || !instant.test(input) || Number.isNaN(Date.parse(input)))
+    invalid();
+  return input;
+}
+
+function count(input: unknown): number {
+  if (typeof input !== 'number' || !Number.isSafeInteger(input) || input < 0) invalid();
+  return input;
+}
+
+function vote(input: unknown): SpotVote | null {
+  if (input === null) return null;
+  if (input !== 'still_true' && input !== 'no_longer_true') invalid();
+  return input;
+}
+
+/** Content text shown as received: 1-200 code points, one paragraph, no control characters. */
+function contentText(input: unknown): string {
+  if (typeof input !== 'string') invalid();
+  const length = [...input].length;
+  if (length < 1 || length > 200 || /\p{Cc}/u.test(input)) invalid();
+  return input;
+}
+
+const signalValue = /^[a-z0-9_]{1,16}$/;
+
+/** Summaries in a category this app does not know are skipped, so new categories stay additive. */
+function signalSummary(input: unknown): SpotSignalSummary | null {
+  const summary = record(input);
+  const ref = id(summary.ref);
+  if (typeof summary.value !== 'string' || !signalValue.test(summary.value)) invalid();
+  const values = list(summary.values, 4).map((value) => {
+    const entry = record(value);
+    if (typeof entry.value !== 'string' || !signalValue.test(entry.value)) invalid();
+    const reports = count(entry.reports);
+    if (reports < 1) invalid();
+    return { value: entry.value, reports };
+  });
+  if (values.length === 0) invalid();
+  const parsed = {
+    ref,
+    value: summary.value,
+    values,
+    latestAt: time(summary.latestAt),
+    stillTrue: count(summary.stillTrue),
+    viewerVote: vote(summary.viewerVote),
+  };
+  if (typeof summary.category !== 'string') invalid();
+  if (!spotCategories.has(summary.category)) return null;
+  return { ...parsed, category: summary.category as SpotCategory };
+}
+
+function post(input: unknown): SpotPost {
+  const entry = record(input);
+  if (typeof entry.alias !== 'string' || [...entry.alias].length > 40 || entry.alias.length === 0)
+    invalid();
+  if (entry.type !== 'traffic' && entry.type !== 'place') invalid();
+  if (typeof entry.mine !== 'boolean') invalid();
+  return {
+    ref: id(entry.ref),
+    alias: label(entry.alias),
+    text: contentText(entry.text),
+    type: entry.type,
+    capturedAt: time(entry.capturedAt),
+    expiresAt: time(entry.expiresAt),
+    stillTrue: count(entry.stillTrue),
+    viewerVote: vote(entry.viewerVote),
+    mine: entry.mine,
+  };
+}
+
+/**
+ * Validates an activity response. Alerts are tolerated because they arrive additively later;
+ * content lists missing from an older server read as empty.
+ */
 export function readSpotActivity(input: unknown): SpotActivity {
   const root = record(input);
   if (typeof root.serverTime !== 'string' || !instant.test(root.serverTime)) invalid();
@@ -178,7 +289,30 @@ export function readSpotActivity(input: unknown): SpotActivity {
     const alertIds = Array.isArray(entry.alertIds)
       ? entry.alertIds.filter((alert): alert is string => typeof alert === 'string')
       : [];
-    return { id: id(entry.id), state: state as SpotState, alertIds };
+    const signals =
+      entry.signals === undefined
+        ? []
+        : list(entry.signals, SPOT_CATEGORIES.length + 8)
+            .map(signalSummary)
+            .filter((summary): summary is SpotSignalSummary => summary !== null);
+    const posts = entry.posts === undefined ? [] : list(entry.posts, 10).map(post);
+    const highlights =
+      entry.highlights === undefined
+        ? []
+        : list(entry.highlights, 3).map((value) => {
+            const highlight = record(value);
+            return { text: contentText(highlight.text), createdAt: time(highlight.createdAt) };
+          });
+    if (entry.postsTruncated !== undefined && typeof entry.postsTruncated !== 'boolean') invalid();
+    return {
+      id: id(entry.id),
+      state: state as SpotState,
+      alertIds,
+      signals,
+      posts,
+      postsTruncated: entry.postsTruncated === true,
+      highlights,
+    };
   });
   if (root.alerts !== undefined && !Array.isArray(root.alerts)) invalid();
   return { serverTime: root.serverTime, catalogVersion, spots };

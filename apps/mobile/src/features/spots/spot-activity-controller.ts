@@ -4,6 +4,8 @@ import { NativeSpotsError, type SpotsFailure } from './native-spots';
 export const ACTIVITY_INTERVAL_MS = 60_000;
 export const DETAIL_INTERVAL_MS = 20_000;
 export const MAX_BACKOFF_MS = 300_000;
+/** After the traveller's own action, re-read within this delay; repeated actions share one read. */
+export const REFRESH_SOON_MS = 3_000;
 
 export type SpotActivityStatus = 'idle' | 'loading' | 'ready' | Exclude<SpotsFailure, 'invalid'>;
 
@@ -125,6 +127,12 @@ export function createSpotActivityController(
     setDetailOpen(open: boolean) {
       if (open === detailOpen) return;
       detailOpen = open;
+      plan();
+    },
+    /** Re-read shortly after the traveller's own action, unless backing off or already reading. */
+    refreshSoon() {
+      if (inFlight || failures > 0 || lastAttemptAt === null) return;
+      lastAttemptAt = Math.min(lastAttemptAt, ports.now() - interval() + REFRESH_SOON_MS);
       plan();
     },
     /** Call when focus, foreground, network, session or journey confirmation changes. */

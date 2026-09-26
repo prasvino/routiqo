@@ -23,9 +23,21 @@ const routePath = '/api/v1/native/routes';
 const placePath = '/api/v1/native/routes/places';
 const spotCatalogPath = '/api/v1/native/spots/catalog';
 const spotActivityPath = '/api/v1/native/spots/activity';
+const spotWritePath = new RegExp(`^/api/v1/native/spots/(?:signals|posts)$`);
+const spotItemPath = new RegExp(
+  `^/api/v1/native/spots/items/${journeyId}/(vote|delete|reports|block-author)$`,
+);
+/** The only success status each Spot write may answer with (ADR 0071, ADR 0072). */
+function spotWriteStatus(path: string): number | null {
+  if (spotWritePath.test(path)) return 200;
+  const action = spotItemPath.exec(path)?.[1];
+  if (action === 'reports') return 202;
+  if (action === 'block-author') return 204;
+  return action ? 200 : null;
+}
 const spotEtag = /^"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"$/;
 const nativePath = new RegExp(
-  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal|consent|route-context))?)?|routes(?:/places)?|spots/activity)$`,
+  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal|consent|route-context))?)?|routes(?:/places)?|spots/(?:activity|signals|posts|items/${journeyId}/(?:vote|delete|reports|block-author)))$`,
 );
 
 export function nativeApiOrigin(value: string | undefined): string | null {
@@ -69,8 +81,12 @@ export function createNativeTransport(
       throw new Error('Native request is invalid.');
     if (path === '/api/v1/native/journeys/history' && method !== 'POST')
       throw new Error('Native request is invalid.');
+    const spotWrite = spotWriteStatus(path);
     if (
-      (path === routePath || path === placePath || path === spotActivityPath) &&
+      (path === routePath ||
+        path === placePath ||
+        path === spotActivityPath ||
+        spotWrite !== null) &&
       method !== 'POST'
     )
       throw new Error('Native request is invalid.');
@@ -84,7 +100,8 @@ export function createNativeTransport(
       path.startsWith('/api/v1/native/journeys') ||
       path === routePath ||
       path === placePath ||
-      path === spotActivityPath
+      path === spotActivityPath ||
+      spotWrite !== null
     ) {
       if (!credential || !accountId) throw new Error('Native journey session is unavailable.');
     } else if (path.startsWith('/api/v1/native/auth/google/')) {
@@ -123,6 +140,13 @@ export function createNativeTransport(
       throw new Error('Native server response is invalid.');
     if (response.status < 200 || response.status >= 300)
       throw new NativeHttpStatus(response.status);
+    if (spotWrite !== null) {
+      if (response.status !== spotWrite) throw new Error('Native server response is invalid.');
+      if (spotWrite === 204) {
+        if (response.body !== '') throw new Error('Native server response is invalid.');
+        return null;
+      }
+    }
     if (
       (journalPath.test(path) ||
         consentPath.test(path) ||
@@ -138,7 +162,8 @@ export function createNativeTransport(
       routeContextPath.test(path) ||
       path === routePath ||
       path === placePath ||
-      path === spotActivityPath
+      path === spotActivityPath ||
+      spotWrite !== null
     ) {
       const encoded = new TextEncoder().encode(response.body);
       if (new TextDecoder('utf-8', { fatal: true }).decode(encoded) !== response.body)

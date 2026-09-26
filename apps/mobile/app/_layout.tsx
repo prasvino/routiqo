@@ -4,18 +4,21 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { MobilePlanningProvider, initializeStorage } from '../src/storage/planning';
 import { NativeAccountProvider } from '../src/auth/native-account-provider';
 import { SpotsProvider } from '../src/features/spots/spots-provider';
+import { SpotContributionsProvider } from '../src/features/spots/spot-contributions-provider';
 export default function RootLayout() {
   return (
     <SQLiteProvider databaseName="routiqo.db" onInit={initializeStorage}>
       <MobilePlanningProvider>
         <NativeAccountProvider>
           <SpotsProvider>
-            <StatusBar style="dark" />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-              {/* Full-screen Journey mode above the tabs, not a fifth tab. */}
-              <Stack.Screen name="journey" />
-            </Stack>
+            <SpotContributionsProvider>
+              <StatusBar style="dark" />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
+                {/* Full-screen Journey mode above the tabs, not a fifth tab. */}
+                <Stack.Screen name="journey" />
+              </Stack>
+            </SpotContributionsProvider>
           </SpotsProvider>
         </NativeAccountProvider>
       </MobilePlanningProvider>

@@ -143,6 +143,51 @@ development client, then on 3+ physical phones:
 - [ ] Staging serves the catalog with a strong ETag through every proxy (no `W/`
       prefix from gzip). Otherwise phones never accept a new list.
 
+## Spot contributions on Android (flag `EXPO_PUBLIC_ROUTIQO_SPOT_CONTRIBUTIONS_ENABLED`)
+
+Implemented and unit-tested 2026-09-26 (step 3c, ADR 0073), with no emulator or
+device run and the Kotlin changes checked only statically. Needs the Spots and
+Journey map flags, and a staging API with `ROUTIQO_SPOTS_API_ENABLED=true` and
+`ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED=true`. Check on a rebuilt development
+client, then on 3+ physical phones:
+
+- [ ] The Kotlin module compiles and the six write paths work:
+      - signals and posts answer 200;
+      - vote and delete answer 200;
+      - reports answer 202 with JSON;
+      - block answers 204 with an empty body.
+- [ ] One-tap signal and post while online: the item shows as "Waiting to send",
+      then appears in the Spot detail after the next read, with the right alias
+      and capture time.
+- [ ] Offline (airplane mode) signal and post:
+      - they stay "Waiting to send" across an app restart;
+      - they send in order on reconnect;
+      - a traffic post captured more than 90 minutes earlier is dropped with its
+        message instead of being sent.
+- [ ] Refusals show their message once:
+      - a post with a phone number is refused before queueing;
+      - a restricted account gets "You can't post right now…".
+- [ ] Ghost Mode:
+      - it stops sending immediately, including a send in progress on a slow
+        network;
+      - it clears the queue;
+      - it disables every control except Delete my post;
+      - it survives restart, sign-out and a different account.
+      - With Ghost Mode on, a request log shows no Spot write at all.
+- [ ] Still true / No longer true, Report (each reason; a repeat says "You already
+      reported this") and Block (confirmation; the author's posts at that Spot
+      disappear for the blocker only).
+- [ ] Delete my post, including while Ghost Mode is on.
+- [ ] Sign-out, account switch, account deletion and "Clear local data" each
+      remove waiting items.
+- [ ] Composer at 360 dp and 200% font:
+      - the keyboard doesn't cover Post or Cancel;
+      - Tamil input and emoji work;
+      - the counter is right.
+- [ ] TalkBack reads each post as one label (byline, text, Still true count),
+      and every action names its target.
+- [ ] Driver safety: nothing opens, sounds or prompts by itself while moving.
+
 ## Evidence
 
 Recovered Android build, 2026-09-24:

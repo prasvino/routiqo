@@ -4,6 +4,7 @@ import { emptyPlanningState, readPlanningState, type PlanningState } from '@rout
 import { initializeJourneyOutbox } from './journey-outbox';
 import { initializeNativeJournalStorage } from './journal-storage';
 import { initializeSpotCatalogStorage } from './spot-catalog';
+import { initializeSpotOutboxStorage } from './spot-outbox';
 export async function initializeStorage(db: SQLiteDatabase) {
   await db.execAsync(
     'PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS planning_state (id INTEGER PRIMARY KEY CHECK (id = 1), payload TEXT NOT NULL);',
@@ -11,6 +12,7 @@ export async function initializeStorage(db: SQLiteDatabase) {
   await initializeJourneyOutbox(db);
   await initializeNativeJournalStorage(db);
   await initializeSpotCatalogStorage(db);
+  await initializeSpotOutboxStorage(db);
 }
 interface Context {
   state: PlanningState;

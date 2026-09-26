@@ -14,8 +14,14 @@ Status: proposed, 2026-09-25. Phase 2 of the pilot path; the parts marked
 signal summaries (per incident), and Block from posts (hiding that alias in its
 room), with reported items kept 30 days as evidence.
 
-Not built yet: moderator hide (step 4), and the Android controls,
-`spot_outbox_v1` and Ghost Mode (3c). The alias word list is a draft
+**Step 3c implemented 2026-09-26 (Android, default-off,
+`EXPO_PUBLIC_ROUTIQO_SPOT_CONTRIBUTIONS_ENABLED`,
+[ADR 0073](../../adr/0073-android-spot-contributions-and-ghost-mode.md)):**
+Spot detail content, one-tap signals, the post composer, votes, Report, Block,
+Delete my post, the `spot_outbox_v1` offline queue and device-wide Ghost Mode.
+Device checks are pending in NATIVE_ANDROID_PENDING.md.
+
+Not built yet: moderator hide (step 4). The alias word list is a draft
 awaiting owner approval and Tamil review. Product
 rules: [PRODUCT.md](../../PRODUCT.md) (Spots, lifespan table, Offline rule,
 Guardrails, Decisions §3–4). Catalog, activity read and refresh:

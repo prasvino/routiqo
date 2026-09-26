@@ -18,6 +18,7 @@ import {
 } from './spot-activity-controller';
 import { spotsPanelModel, type SpotsPanelSize } from './spots-model';
 import { SpotsPanelView } from './spots-panel-view';
+import { useSpotContributionControls } from './spot-contribution-controls';
 
 export const SPOTS_RECOMPUTE_MS = 10_000;
 const idleStore = createSpotCatalogStore({
@@ -194,5 +195,16 @@ export function SpotsPanel(props: SpotsPanelProps) {
   // The 20 s cadence applies only while a detail is actually on screen.
   const detailVisible = model.rows.some((row) => row.selected);
   useEffect(() => controller?.setDetailOpen(detailVisible), [controller, detailVisible]);
-  return <SpotsPanelView {...model} onSelect={setSelectedId} onResize={setSize} />;
+  const selectedSpot = detailVisible
+    ? (props.spots.ahead.find((entry) => entry.spot.id === selectedId)?.spot ?? null)
+    : null;
+  const controls = useSpotContributionControls({
+    spot: selectedSpot,
+    entry: activity.activity?.spots.find((entry) => entry.id === selectedSpot?.id) ?? null,
+    journeyId: journeyId,
+    online: session.online,
+    now: props.now,
+    refreshSoon: () => controller?.refreshSoon(),
+  });
+  return <SpotsPanelView {...model} {...controls} onSelect={setSelectedId} onResize={setSize} />;
 }

@@ -230,7 +230,17 @@ describe('catalog and activity parsing', () => {
       spots: [{ id: spotId(1), state: 'quiet', alertIds: ['alert-1'] }],
       alerts: [{ id: 'alert-1' }],
     });
-    expect(activity.spots).toEqual([{ id: spotId(1), state: 'quiet', alertIds: ['alert-1'] }]);
+    expect(activity.spots).toEqual([
+      {
+        id: spotId(1),
+        state: 'quiet',
+        alertIds: ['alert-1'],
+        signals: [],
+        posts: [],
+        postsTruncated: false,
+        highlights: [],
+      },
+    ]);
     expect(() =>
       readSpotActivity({ serverTime: 'now', catalogVersion: version, spots: [], alerts: [] }),
     ).toThrow();
@@ -256,5 +266,64 @@ describe('catalog and activity parsing', () => {
         spots: [{ id: spotId(1), state: 'busy' }],
       }),
     ).toThrow();
+  });
+
+  it('parses Spot content strictly and skips unknown signal categories', () => {
+    const summary = {
+      ref: spotId(90),
+      category: 'traffic',
+      value: 'slow',
+      values: [
+        { value: 'slow', reports: 2 },
+        { value: 'moving', reports: 1 },
+      ],
+      latestAt: '2026-11-05T06:20:00Z',
+      stillTrue: 1,
+      viewerVote: null,
+    };
+    const post = {
+      ref: spotId(91),
+      alias: 'Calm Auto',
+      text: 'Lane 3 moving',
+      type: 'traffic',
+      capturedAt: '2026-11-05T06:25:00Z',
+      expiresAt: '2026-11-05T07:55:00Z',
+      stillTrue: 0,
+      viewerVote: 'still_true',
+      mine: false,
+    };
+    const base = {
+      id: spotId(1),
+      state: 'live',
+      alertIds: [],
+      signals: [summary, { ...summary, ref: spotId(92), category: 'parking' }],
+      posts: [post],
+      postsTruncated: true,
+      highlights: [{ text: 'Clean restrooms', createdAt: '2026-11-04T06:00:00Z' }],
+    };
+    const read = (entry: object) =>
+      readSpotActivity({
+        serverTime: '2026-11-05T06:30:00Z',
+        catalogVersion: version,
+        spots: [entry],
+        alerts: [],
+      }).spots[0]!;
+    const parsed = read(base);
+    expect(parsed.signals).toEqual([summary]);
+    expect(parsed.posts).toEqual([post]);
+    expect(parsed.postsTruncated).toBe(true);
+    expect(parsed.highlights).toHaveLength(1);
+    for (const broken of [
+      { ...base, posts: [{ ...post, mine: 'yes' }] },
+      { ...base, posts: [{ ...post, text: 'two\nlines' }] },
+      { ...base, posts: [{ ...post, text: 'x'.repeat(201) }] },
+      { ...base, posts: [{ ...post, viewerVote: 'maybe' }] },
+      { ...base, posts: Array.from({ length: 11 }, () => post) },
+      { ...base, signals: [{ ...summary, values: [] }] },
+      { ...base, signals: [{ ...summary, stillTrue: -1 }] },
+      { ...base, highlights: [{ text: '', createdAt: '2026-11-04T06:00:00Z' }] },
+      { ...base, postsTruncated: 'no' },
+    ])
+      expect(() => read(broken)).toThrow();
   });
 });
