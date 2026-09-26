@@ -7,6 +7,7 @@ import com.routiqo.core.identity.infrastructure.GoogleTokenVerifier;
 import com.routiqo.core.moderation.infrastructure.AdminSessionService;
 import com.routiqo.core.moderation.infrastructure.JdbcTrafficReview;
 import com.routiqo.core.security.BrowserAuthPolicy;
+import com.routiqo.core.security.ClientAddressResolver;
 import java.net.URI;
 import java.time.Clock;
 import org.springframework.beans.factory.annotation.Value;
@@ -65,7 +66,8 @@ public class AdminTrafficConfiguration {
         return uri.getPort() == -1 ? ("https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80) : uri.getPort();
     }
     @Bean @Order(0) SecurityFilterChain adminSecurity(HttpSecurity http, AdminTrafficSettings settings,
-            AuthRateGate rates, @Value("${ROUTIQO_V3_GRANT_ADMIN_ENABLED:false}") String grantAdminEnabledFlag) throws Exception {
+            AuthRateGate rates, ClientAddressResolver clients,
+            @Value("${ROUTIQO_V3_GRANT_ADMIN_ENABLED:false}") String grantAdminEnabledFlag) throws Exception {
         boolean grantAdminEnabled = FeatureFlags.enabled(grantAdminEnabledFlag);
         BrowserAuthPolicy adminBrowserAuthPolicy = settings.policy();
         var csrf = new CookieCsrfTokenRepository();
@@ -76,7 +78,7 @@ public class AdminTrafficConfiguration {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.csrfTokenRepository(csrf))
-                .addFilterBefore(new AdminTrafficGuard(adminBrowserAuthPolicy, rates), CsrfFilter.class)
+                .addFilterBefore(new AdminTrafficGuard(adminBrowserAuthPolicy, rates, clients), CsrfFilter.class)
                 .authorizeHttpRequests(a -> {
                     a.requestMatchers("/api/v1/admin/auth/**", "/api/v1/admin/community-traffic/reports",
                             "/api/v1/admin/community-traffic/reports/**").permitAll();

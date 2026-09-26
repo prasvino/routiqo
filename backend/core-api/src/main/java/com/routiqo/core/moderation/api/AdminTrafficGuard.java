@@ -2,6 +2,7 @@ package com.routiqo.core.moderation.api;
 
 import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.security.BrowserAuthPolicy;
+import com.routiqo.core.security.ClientAddressResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletInputStream;
@@ -19,7 +20,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 final class AdminTrafficGuard extends OncePerRequestFilter {
     private final BrowserAuthPolicy policy;
     private final AuthRateGate rates;
-    AdminTrafficGuard(BrowserAuthPolicy policy, AuthRateGate rates) { this.policy = policy; this.rates = rates; }
+    private final ClientAddressResolver clients;
+    AdminTrafficGuard(BrowserAuthPolicy policy, AuthRateGate rates, ClientAddressResolver clients) {
+        this.policy = policy; this.rates = rates; this.clients = clients;
+    }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         response.setHeader("Cache-Control", "no-store");
@@ -31,7 +35,7 @@ final class AdminTrafficGuard extends OncePerRequestFilter {
         String category = path.endsWith("/challenge") ? "admin-challenge"
                 : path.endsWith("/exchange") ? "admin-exchange" : "admin-transport";
         try {
-            if (!rates.allow(request.getRemoteAddr(), category, category.equals("admin-transport") ? 100 : 10)) {
+            if (!rates.allow(clients.resolve(request), category, category.equals("admin-transport") ? 100 : 10)) {
                 response.setHeader("Retry-After", "60"); response.setStatus(429); return;
             }
         } catch (RuntimeException unavailable) { response.setStatus(503); return; }

@@ -1,3 +1,4 @@
 server:
-  # Peer-address rate limiting must not trust client-supplied forwarding headers.
+  # Rate limits never trust client-supplied forwarding headers; only hops from
+  # ROUTIQO_TRUSTED_PROXY_CIDRS are read (ClientAddressResolver, ADR 0074). Scheme and host forwarding stay off.
   forward-headers-strategy: none
