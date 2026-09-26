@@ -27,6 +27,7 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
     private static final int MAX_BODY_BYTES = 20 * 1024;
     private static final Pattern BEARER = Pattern.compile("Bearer ([A-Za-z0-9_-]{43})");
     private final AuthRateGate rates;
+    private final ClientAddressResolver clients;
     private final GoogleSessionService sessions;
     private final boolean consentEnabled;
     private final boolean routingEnabled;
@@ -34,9 +35,11 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
     private final boolean spotsEnabled;
     private final boolean contributionsEnabled;
 
-    public NativeAuthGuard(AuthRateGate rates, GoogleSessionService sessions, boolean consentEnabled,
+    public NativeAuthGuard(AuthRateGate rates, ClientAddressResolver clients, GoogleSessionService sessions,
+            boolean consentEnabled,
             boolean routingEnabled, boolean bindingEnabled, boolean spotsEnabled, boolean contributionsEnabled) {
         this.rates = rates;
+        this.clients = clients;
         this.sessions = sessions;
         this.consentEnabled = consentEnabled;
         this.routingEnabled = routingEnabled;
@@ -114,9 +117,12 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
         }
 
         String category = challenge ? "native-challenge" : exchange ? "native-exchange" : "native-other";
-        int limit = challenge ? 10 : exchange ? 20 : 120;
+        // Bearer paths get a wider per-address ceiling because carrier NAT shares IPv4 addresses. It is
+        // checked before the session lookup, so it also bounds invalid-bearer probes; each authenticated
+        // account stays at 120 per minute below (ADR 0074).
+        int limit = challenge ? 10 : exchange ? 20 : 600;
         final boolean peerAllowed;
-        try { peerAllowed = rates.allow(request.getRemoteAddr(), category, limit); }
+        try { peerAllowed = rates.allow(clients.resolve(request), category, limit); }
         catch (RuntimeException unavailable) {
             response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             return;

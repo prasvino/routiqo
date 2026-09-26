@@ -15,6 +15,50 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 _Archived 2026-09-25:_ the user had authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag; that work is now archived and is no longer authorized pilot work. The different production privacy contract is not accepted. Person-level research is archived with its code preserved. Traveller-derived public LIVE remains disabled in production.
 
+## September 26 Rate-limit client address behind a load balancer (step A, default-off)
+
+Resolves in code the open Medium finding from the Spots backend review below
+(per-address rate gates aggregate behind a load balancer). See
+[ADR 0074](../adr/0074-client-address-behind-load-balancer.md).
+
+- **`ClientAddressResolver`** keys the native, browser and admin per-address
+  rate gates:
+  - `ROUTIQO_TRUSTED_PROXY_CIDRS` is unset by default, which keeps the socket
+    peer as before;
+  - when it is set to the balancer's literal CIDRs, `X-Forwarded-For` is read
+    only from a trusted peer: one header line, walked from the right, past at
+    most 32 trusted hops;
+  - any unusable chain shares one constant bucket;
+  - no DNS lookups, and IPv6 is keyed by /64;
+  - ranges wider than IPv4 /16 or IPv6 /48 are refused at startup, and the app
+    refuses to start unless `server.forward-headers-strategy` is `none`.
+- **Signed-in native ceiling:** `native-other` is 600 per minute per address
+  (owner decision, for carrier NAT). Challenge (10), exchange (20) and the
+  per-account 120 are unchanged.
+- **Tests:**
+  - `ClientAddressResolverTest`, 56 cases;
+  - `TrustedProxyRateHttpTest`, 4 cases with real PostgreSQL: separate buckets
+    per forwarded client, no escape by prepending, the shared unusable bucket,
+    the 600 ceiling, per-account 120 under it, and the browser guard;
+  - a new `NativeAuthHttpTest` case: the header is ignored when no ranges are
+    set.
+- **Independent review:** no blockers. The fallback-bucket escape, multi-line
+  ambiguity, loose range floors, mapped-notation ranges, zero-padded prefixes,
+  the forwarding-strategy guard and a comment were fixed before commit.
+- **Checks on the final source:**
+  - `./gradlew clean check bootJar`: **768 tests / 121 suites**, all modules, zero
+    failures;
+  - `pnpm check`: **956 tests / 114 files**;
+  - `pnpm build` passed;
+  - gitleaks v8.30.1 found no leaks.
+  - A first `pnpm check` run concurrent with Gradle timed out
+    `journey-route.test.ts` at 5 s; the file takes about 3.8 s alone, and the
+    unloaded re-run passed.
+
+Not verified: behaviour through a real AWS ALB (single-line append,
+two-line handling), the admin guard over HTTP, and the activity read's database
+cost at festival peak. No staging deployment; the setting stays unset.
+
 ## September 26 Spot contributions on Android (step 3c, flagged, not device-verified)
 
 Android can now show and take Spot contributions behind

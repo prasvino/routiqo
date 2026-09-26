@@ -16,6 +16,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 @Profile("native-auth")
 public class NativeAuthConfiguration {
     @Bean @Order(0) SecurityFilterChain nativeAuthSecurity(HttpSecurity http, AuthRateGate rates,
+            ClientAddressResolver clients,
             GoogleSessionService sessions,
             @Value("${ROUTIQO_NATIVE_LIVE_CONSENT_API_ENABLED:false}") boolean consentEnabled,
             @Value("${ROUTIQO_NATIVE_ROUTING_API_ENABLED:false}") boolean routingEnabled,
@@ -32,7 +33,7 @@ public class NativeAuthConfiguration {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.disable())
-                .addFilterBefore(new NativeAuthGuard(rates, sessions, consentEnabled, routingEnabled,
+                .addFilterBefore(new NativeAuthGuard(rates, clients, sessions, consentEnabled, routingEnabled,
                         bindingEnabled, spotsEnabled, contributionsEnabled),
                         AuthorizationFilter.class)
                 .authorizeHttpRequests(a -> {

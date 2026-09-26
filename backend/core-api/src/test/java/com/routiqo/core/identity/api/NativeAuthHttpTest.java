@@ -530,6 +530,17 @@ class NativeAuthHttpTest {
         assertThat(post("logout", "{}", login.credential()).statusCode()).isEqualTo(429);
     }
 
+    @Test void forwardedForIsIgnoredWithoutTrustedBalancerRanges() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            var response = request("POST", "google/challenge", "{}", null,
+                    List.<String[]>of(new String[] {"X-Forwarded-For", "198.51.100." + i}));
+            assertThat(response.statusCode()).isEqualTo(200);
+        }
+        var spoofed = request("POST", "google/challenge", "{}", null,
+                List.<String[]>of(new String[] {"X-Forwarded-For", "203.0.113.200"}));
+        assertThat(spoofed.statusCode()).isEqualTo(429);
+    }
+
     @Test void unknownNativeRoutesAndMethodsAreDeniedAndWebCsrfStillApplies() throws Exception {
         assertThat(request("GET", "google/challenge", "", null, List.of()).statusCode()).isEqualTo(403);
         assertThat(request("DELETE", "session", "", null, List.of()).statusCode()).isEqualTo(403);

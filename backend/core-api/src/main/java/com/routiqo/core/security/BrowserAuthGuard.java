@@ -9,12 +9,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public final class BrowserAuthGuard extends OncePerRequestFilter {
     private final BrowserAuthPolicy policy;
     private final AuthRateGate rates;
+    private final ClientAddressResolver clients;
     /** Default browser POST limit. Only the explicit account planning copy (ADR 0062) may be larger. */
     static final int DEFAULT_BODY_LIMIT = 20 * 1024;
     static final int PLANNING_BODY_LIMIT = 264 * 1024;
     private final boolean planningBackupEnabled;
-    public BrowserAuthGuard(BrowserAuthPolicy policy, AuthRateGate rates, boolean planningBackupEnabled) {
-        this.policy = policy; this.rates = rates; this.planningBackupEnabled = planningBackupEnabled;
+    public BrowserAuthGuard(BrowserAuthPolicy policy, AuthRateGate rates, ClientAddressResolver clients,
+            boolean planningBackupEnabled) {
+        this.policy = policy; this.rates = rates; this.clients = clients; this.planningBackupEnabled = planningBackupEnabled;
     }
     int bodyLimit(String path) {
         return planningBackupEnabled && "/api/v1/planning".equals(path) ? PLANNING_BODY_LIMIT : DEFAULT_BODY_LIMIT;
@@ -30,7 +32,7 @@ public final class BrowserAuthGuard extends OncePerRequestFilter {
         String category = path.endsWith("/challenge") ? "challenge" : path.endsWith("/exchange") ? "exchange" : "other";
         int limit = category.equals("challenge") ? 10 : category.equals("exchange") ? 20 : 120;
         try {
-            if (!rates.allow(request.getRemoteAddr(), category, limit)) {
+            if (!rates.allow(clients.resolve(request), category, limit)) {
                 response.setHeader("Retry-After", "60"); response.setStatus(429); return;
             }
         } catch (RuntimeException unavailable) {

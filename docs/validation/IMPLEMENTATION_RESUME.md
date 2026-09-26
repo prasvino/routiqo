@@ -1,6 +1,6 @@
 # Implementation resume: handoff for the next session
 
-Updated 2026-09-26, end of day (steps 1–3 merged as PRs #21–#25). Work continues on the owner's laptop, where Android builds and device checks are possible. Read this first, then `CLAUDE.md` / `AGENTS.md`,
+Updated 2026-09-26, late (steps 1–3 merged as PRs #21–#25; step A done on branch `claude/resume-routiqo-mutuyg`, awaiting its PR). Work continues on the owner's laptop, where Android builds and device checks are possible. Read this first, then `CLAUDE.md` / `AGENTS.md`,
 [`PRODUCT.md`](../PRODUCT.md) and the spec for whatever you pick up. The
 previous private LIVE handoff is archived at
 [`../archive/validation/IMPLEMENTATION_RESUME.md`](../archive/validation/IMPLEMENTATION_RESUME.md).
@@ -143,16 +143,20 @@ honest.
    - Ghost Mode and the separate `spot_outbox_v1` offline queue on Android.
 **Next, in this order:**
 
-- **A. Staging blocker: per-address rate gate behind the load balancer.**
-  - The problem: `NativeAuthGuard` limits every native path to 120 requests per
-    minute per peer address (`native-other`), and `forward-headers-strategy` is
-    `none`.
-  - Behind a load balancer and mobile carrier NAT, many phones share one peer.
-    They would all get 429, including on session renew.
-  - Recommendation: trust client IPs only from the balancer's address range (for
-    example RemoteIpValve with configured trusted proxies), default-off. Record it
-    in an ADR.
-  - Details are in NATIVE_ANDROID_PENDING.md, "Spots native transport".
+- **A. Per-address rate gate behind the load balancer — done in code 2026-09-26,
+  default-off** ([ADR 0074](../adr/0074-client-address-behind-load-balancer.md),
+  BUILD_STATUS *September 26 Rate-limit client address*):
+  - `ClientAddressResolver` keys the native, browser and admin peer gates;
+  - `ROUTIQO_TRUSTED_PROXY_CIDRS` (unset by default) trusts `X-Forwarded-For`
+    only from the balancer's literal CIDRs, reading one line from the right;
+  - a custom resolver was chosen over `RemoteIpValve`, which would also rewrite
+    scheme and host and trust all private ranges by default;
+  - signed-in native calls allow 600 per minute per address (owner decision, for
+    carrier NAT), and per-account 120 is unchanged.
+  - Still open, in staging (NATIVE_ANDROID_PENDING.md, "Spots native transport"):
+    - set the ALB subnet CIDRs;
+    - confirm the ALB's `X-Forwarded-For` line handling;
+    - measure the activity read at peak.
 - **B. Android build and device verification, now possible on the laptop.**
   - Nothing Spot-related has run on Android yet. Rebuild the development client
     with `scripts/android-build.ps1` (JDK 17, API 36).
@@ -208,7 +212,6 @@ honest.
 - **Alias word list:** `alias-words-v1.txt` is a draft that needs owner
   approval and a Tamil review.
 - **District list:** confirm the catalog districts, which step 5 needs.
-- **Load-balancer rate gate:** approve the approach in step A.
 
 ## Waiting on the owner (outside the code)
 
@@ -227,19 +230,24 @@ honest.
 ## Working notes for agents
 
 - **Branch:** use the branch the session names (recently
-  `claude/spots-backend-impl-jmqihk`). The owner merges each PR and deletes the
+  `claude/resume-routiqo-mutuyg`). The owner merges each PR and deletes the
   branch, so recreate it from the latest `main` at the start of each task
   (`git fetch origin main && git checkout -B <branch> origin/main`). Open a PR
   only when asked ("yes, open the PR").
 - **Numbering:** check the latest `main` before numbering anything; other work
   lands there in parallel.
-  - The next free ADR number is **0074**.
+  - The next free ADR number is **0075**.
   - The next Flyway migration is **V32**. Never edit an applied migration.
-- **Baselines on `main` (`cb78e6b`, after PR #25):**
+- **Baselines on `main` (`2885b57`, after PR #26), confirmed 2026-09-26:**
   - `pnpm check`: **956 tests / 114 files**;
   - `./gradlew check bootJar`: **707 tests / 119 suites**, counted across all
     backend modules;
   - `pnpm build`: passes.
+  - With step A: backend **768 tests / 121 suites**; TypeScript unchanged.
+  - `packages/shared/src/journey-route.test.ts` ("tightens to the point budget")
+    takes about 3.8 s against the 5 s default timeout. It fails when `pnpm check`
+    runs alongside Gradle, so run the two one after the other, or raise that
+    test's timeout.
 - **Workflow the owner uses:**
   1. Plan mode for substantial steps; the owner approves before implementation.
   2. Build in phased commits, pushing each one.
@@ -261,7 +269,8 @@ honest.
   - The container ships JDK 21. Install JDK 25 with
     `apt-get install -y openjdk-25-jdk-headless`; Adoptium downloads are blocked.
   - Docker's CLI is present but its daemon is not running. Start `dockerd` as a
-    long-running background task (it dies with a short-lived shell). If a stale
+    long-running background task (`exec dockerd` in a background command); a
+    `nohup … &` launch dies with its shell. If a stale
     `/var/run/docker/containerd/containerd.pid` blocks startup, remove it first.
   - Maven Central can answer 429 on the first Gradle run; retrying with backoff
     and `--max-workers=1` resolved it.

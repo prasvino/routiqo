@@ -15,7 +15,7 @@ public class BrowserAuthConfiguration {
     @Bean BrowserAuthPolicy browserAuthPolicy(@Value("${ROUTIQO_WEB_ORIGIN}") String origin,
             @Value("${ROUTIQO_AUTH_SECURE_COOKIES:true}") boolean secure) { return new BrowserAuthPolicy(origin, secure); }
     @Bean @Order(1) SecurityFilterChain browserAuthSecurity(HttpSecurity http, BrowserAuthPolicy policy,
-            AuthRateGate rates,
+            AuthRateGate rates, ClientAddressResolver clients,
             @Value("${ROUTIQO_LIVE_CONSENT_API_ENABLED:false}") boolean consentEnabled,
             @Value("${ROUTIQO_LIVE_ROUTE_BINDING_API_ENABLED:false}") boolean routeBindingEnabled,
             @Value("${ROUTIQO_LIVE_SIGNAL_API_ENABLED:false}") boolean signalEnabled,
@@ -35,7 +35,7 @@ public class BrowserAuthConfiguration {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.csrfTokenRepository(csrf))
-                .addFilterBefore(new BrowserAuthGuard(policy, rates, planningBackupEnabled), CsrfFilter.class)
+                .addFilterBefore(new BrowserAuthGuard(policy, rates, clients, planningBackupEnabled), CsrfFilter.class)
                 .authorizeHttpRequests(a -> {
                     a.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/routes", "/api/v1/routes/places").permitAll();
                     a.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/auth/csrf", "/api/v1/auth/session").permitAll();
