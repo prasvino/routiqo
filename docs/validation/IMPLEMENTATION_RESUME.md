@@ -1,6 +1,6 @@
 # Implementation resume: handoff for the next session
 
-Updated 2026-09-26 (Spots backend). Read this first, then `CLAUDE.md` / `AGENTS.md`,
+Updated 2026-09-26 (Spots backend and Android Spots). Read this first, then `CLAUDE.md` / `AGENTS.md`,
 [`PRODUCT.md`](../PRODUCT.md) and the spec for whatever you pick up. The
 previous private LIVE handoff is archived at
 [`../archive/validation/IMPLEMENTATION_RESUME.md`](../archive/validation/IMPLEMENTATION_RESUME.md).
@@ -93,15 +93,13 @@ honest.
    - Store a catalog only when its `version` equals the ETag without the quotes.
    - Do not enforce the contract's `maxItems: 0` on `alertIds` and `alerts`: those
      become non-empty additively once official alerts exist.
-2. **Spots on Android:**
-   - a catalog cache (`spot_catalog_v1`);
-   - on-device matching (100 m from route segments, 1,000 m endpoint exclusion
-     except bus stands, ordering and the 200 m "Here" rule), reusing
-     `packages/shared/src/journey-route.ts`;
-   - the Spots-ahead panel in Journey mode (the slot is `spotsPanel={null}` in
-     `journey-mode-screen.tsx`), activity refresh every 60 s or 20 s, and markers
-     on the map;
-   - flag `EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED`.
+2. **Spots on Android — code done 2026-09-26, default-off, not device-verified.**
+   The flag is `EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED`.
+   - What's built: the catalog cache, Spots-ahead matching, the panel with an
+     in-place detail, activity refresh and map markers.
+   - Device checks are in NATIVE_ANDROID_PENDING.md.
+   - Spot detail has no posts, signals or actions yet; step 3 adds them.
+   - The activity parser already tolerates non-empty `alerts`.
 3. **Posts and signals** ([POSTS_AND_SIGNALS_SPEC.md](../features/spots/POSTS_AND_SIGNALS_SPEC.md)):
    - new tables (do not alter the archived V10 private-signal tables);
    - four queue bands, per-type lifetimes, "Still true?" and "No longer true";

@@ -20,12 +20,18 @@ import type {
   RouteRequest,
   RouteResult,
 } from '@routiqo/shared';
-import type { TripJournal, TripJournalWrite } from '@routiqo/shared';
+import type { SpotActivity, TripJournal, TripJournalWrite } from '@routiqo/shared';
 import { NativeHttpStatus } from './safe-transport';
 import { nativeTransport } from './android-transport';
 import { nativeGoogle } from './native-google';
 import { createNativeAccount, NativeSessionRequired } from './native-account';
 import { nativeSessionVault } from './secure-session';
+import {
+  NativeSpotsError,
+  fetchNativeSpotActivity,
+  fetchNativeSpotCatalog,
+  type SpotCatalogFetch,
+} from '../features/spots/native-spots';
 import { createNativeJourneys } from '../features/journey/native-journeys';
 import {
   readNativeJourneyPage,
@@ -114,6 +120,9 @@ interface NativeAccountContext {
   ): Promise<NativeLiveConsent>;
   searchPlaces(query: string, signal: AbortSignal): Promise<PlaceResults>;
   calculateRoute(request: RouteRequest, signal: AbortSignal): Promise<RouteResult>;
+  /** Spot catalog revalidation (ETag) and activity reads; only Spot IDs are ever sent. */
+  fetchSpotCatalog(ifNoneMatch: string | null, signal: AbortSignal): Promise<SpotCatalogFetch>;
+  fetchSpotActivity(spotIds: readonly string[], signal: AbortSignal): Promise<SpotActivity>;
   readRouteContext(journeyId: string, signal: AbortSignal): Promise<NativeRouteContextRead>;
   bindRouteContext(
     journeyId: string,
@@ -394,6 +403,43 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
       throw failure;
     }
   }
+  async function spotsRequest<T>(operation: (account: string) => Promise<T>): Promise<T> {
+    const account = identity.activeAccount();
+    if (!account || accountId !== account || deletionPendingRef.current)
+      throw new NativeSessionRequired();
+    if (!onlineRef.current || !foregroundRef.current || restoring)
+      throw new NativeSpotsError('unavailable');
+    const epoch = historyEpochRef.current;
+    const revision = identity.revision();
+    const current = () =>
+      epoch === historyEpochRef.current &&
+      revision === identity.revision() &&
+      identity.activeAccount() === account &&
+      accountId === account &&
+      !deletionPendingRef.current;
+    try {
+      const result = await operation(account);
+      if (!current()) throw new NativeSessionRequired();
+      return result;
+    } catch (failure) {
+      if (!current()) throw new NativeSessionRequired();
+      if (
+        failure instanceof NativeSessionRequired ||
+        (failure instanceof NativeSpotsError && failure.code === 'session')
+      ) {
+        invalidateHistory();
+        identity.invalidate();
+        setAccountId(null);
+        setPartition(null);
+        setError('Your session needs verification. Sign in from Profile to continue.');
+      }
+      throw failure;
+    }
+  }
+  const fetchSpotCatalog = (ifNoneMatch: string | null, signal: AbortSignal) =>
+    spotsRequest((account) => fetchNativeSpotCatalog(identity, account, ifNoneMatch, signal));
+  const fetchSpotActivity = (spotIds: readonly string[], signal: AbortSignal) =>
+    spotsRequest((account) => fetchNativeSpotActivity(identity, account, spotIds, signal));
   const searchPlaces = (query: string, signal: AbortSignal) =>
     routingRequest((account) => searchNativePlaces(identity, account, query, signal));
   const calculateRoute = (request: RouteRequest, signal: AbortSignal) =>
@@ -775,6 +821,8 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         submitLiveConsent,
         searchPlaces,
         calculateRoute,
+        fetchSpotCatalog,
+        fetchSpotActivity,
         readRouteContext,
         bindRouteContext,
         signIn,

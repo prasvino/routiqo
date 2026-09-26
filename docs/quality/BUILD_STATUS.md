@@ -15,6 +15,74 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 _Archived 2026-09-25:_ the user had authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag; that work is now archived and is no longer authorized pilot work. The different production privacy contract is not accepted. Person-level research is archived with its code preserved. Traveller-derived public LIVE remains disabled in production.
 
+## September 26 Spots on Android (flagged, not device-verified)
+
+Journey mode can show the Spots ahead behind `EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED`
+(exact `true`, default off; it also needs the Journey map flag), per
+[SPOTS_SPEC.md](../features/spots/SPOTS_SPEC.md), ADR 0066 and ADR 0067:
+
+- **Catalog cache.**
+  - `spot_catalog_v1` holds one row, not tied to an account. The payload is stored
+    as received with its ETag, re-validated on every read, and replaced whole by a
+    new version.
+  - The app revalidates by ETag after sign-in while online, and again on opening
+    Journey mode. It stores a catalog only when its `version` equals the ETag.
+  - A failed download keeps the cached copy. "Clear local data" removes it.
+- **Spots ahead** (`packages/shared/src/spots.ts`, computed on the phone):
+  - A Spot matches when it is within 100 m of the route line, measured to the
+    segments. Spots within 1,000 m of either stored endpoint are excluded, except
+    bus stands.
+  - Matches are ordered along the route. A Spot shows "Here" within 200 m either
+    side of the traveller and drops off 200 m behind. The list stops at 20.
+  - The traveller's position is applied at most every 10 s. Without a position,
+    the list is labelled "(from start)".
+  - The route and position never leave the phone. A source-scan test keeps route
+    and position terms out of the request module.
+- **Activity refresh** (ADR 0066):
+  - It runs only while Journey mode is focused, the app is in the foreground and
+    online, and the journey start has reached the server.
+  - It refreshes every 60 s, or every 20 s while a Spot detail is open, with one
+    request in flight.
+  - Requests are cancelled on blur, background, going offline, account or journey
+    change, and completion.
+  - It backs off exponentially on 429 and 503, up to 5 minutes.
+  - Only sorted Spot IDs are sent. Results stay in memory, per account and
+    journey.
+  - A newer `catalogVersion` in a response triggers a catalog refresh.
+- **Panel.**
+  - Rows show the English name with the Tamil name beneath, the kind, the
+    distance, and a state chip once activity has arrived. Each row reads as one
+    screen-reader label.
+  - The panel grows from the next Spot to five to all 20 with explicit 48 dp
+    buttons; there is no drag gesture. Tapping a row expands its detail.
+  - Every spec state has copy: loading, list not downloaded, no route, no Spots on
+    this route, all quiet ("does not mean the road is clear"), offline with the
+    last update time, not yet confirmed, updates paused, and unavailable.
+  - There are no sample Spots.
+- **Map.** Spot markers come from one GeoJSON source keyed on the Spots ahead and
+  their states, so the map does not rebuild them on every position fix.
+
+Checks (cloud session):
+
+- `pnpm check` passed (contracts, formatting, all typechecks, lint):
+  **909 TypeScript tests / 109 files**, 34 of them new. They cover:
+  - matching at 99/101 m;
+  - endpoint exclusion at 999/1,001 m and the bus-stand exception;
+  - ordering with and without a position, the 200 m rule at both edges, the
+    20-Spot limit and catalog replacement;
+  - parsers, including a version/ETag mismatch and unknown kinds;
+  - SQLite storage on file-backed `node:sqlite`, and the catalog store: ETag, 304,
+    failure keeps the cache, clear during refresh;
+  - the activity controller: cadence, one in flight, cancellation, backoff to
+    5 min, 409, dispose;
+  - the request mapping, panel states and copy, accessibility, and the flag
+    failing closed.
+- `pnpm --filter @routiqo/mobile build` exported the Android bundle.
+
+Not verified: there was no emulator or device run in this cloud session. The
+panel, markers, refresh against staging, large text, TalkBack and battery are
+pending in [the native Android ledger](../validation/NATIVE_ANDROID_PENDING.md).
+
 ## September 26 Spots backend (flagged, server and transport only)
 
 The Spots catalog and activity read exist on the server behind

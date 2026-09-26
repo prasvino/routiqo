@@ -208,6 +208,29 @@ export function createNativeAccount(
     current(attempt);
     return result;
   }
+  /** The Spot catalog read, with the same session checks as verifiedRequest plus ETag revalidation. */
+  async function verifiedSpotCatalog(options: {
+    accountId: string;
+    ifNoneMatch: string | null;
+    signal?: AbortSignal;
+  }) {
+    const attempt = generation;
+    const credential = await credentialFor(options.accountId);
+    current(attempt);
+    if (options.signal?.aborted) throw nativeAbortError('Native request cancelled.');
+    try {
+      const result = await transport.spotCatalog({
+        credential,
+        accountId: options.accountId,
+        ifNoneMatch: options.ifNoneMatch,
+      });
+      current(attempt);
+      return result;
+    } catch (error) {
+      current(attempt);
+      throw error;
+    }
+  }
   return {
     restore,
     signIn,
@@ -218,6 +241,7 @@ export function createNativeAccount(
     clearLocalSession,
     credentialFor,
     verifiedRequest,
+    verifiedSpotCatalog,
     activeAccount: () => accountId,
     revision: () => generation,
     invalidate: changed,

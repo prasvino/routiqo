@@ -32,6 +32,7 @@ import {
 import { tokens } from '@routiqo/design-tokens';
 import { useMobilePlanning } from '../../storage/planning';
 import { useNativeAccount } from '../../auth/native-account-provider';
+import { useSpotCatalogStore } from '../spots/spots-provider';
 import { NativePlanningBackup } from './planning-backup';
 import { NativeJourneyPanel } from '../journey/native-journey-panel';
 import { ActiveJourneyCardContainer, JourneyReturnBarContainer } from '../journey/journey-entry';
@@ -66,6 +67,7 @@ export function DiscoveryScreen({
   }, []);
   const { state, ready, error, update, clear } = useMobilePlanning();
   const account = useNativeAccount();
+  const spotCatalog = useSpotCatalogStore();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category>('All');
   const [detail, setDetail] = useState<Destination | null>(null);
@@ -308,7 +310,9 @@ export function DiscoveryScreen({
                   onPress={() =>
                     Alert.alert(
                       'Clear local data?',
-                      'All plans, saved places and the stored journey route on this device will be removed.',
+                      spotCatalog
+                        ? 'All plans, saved places, the stored journey route and the downloaded Spot list on this device will be removed.'
+                        : 'All plans, saved places and the stored journey route on this device will be removed.',
                       [
                         { text: 'Keep', style: 'cancel' },
                         {
@@ -317,6 +321,7 @@ export function DiscoveryScreen({
                           onPress: () => {
                             void clear();
                             void account.clearJourneyRoutes().catch(() => undefined);
+                            void spotCatalog?.clear().catch(() => undefined);
                           },
                         },
                       ],

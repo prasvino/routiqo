@@ -4,8 +4,13 @@ Status: proposed, 2026-09-25. Phase 2 of the pilot path; the catalog, Spots
 ahead and activity reads are needed for the Diwali 2026 dry run.
 **Implemented 2026-09-26 (server and native transport only, default-off):** the
 catalog loader, *Catalog delivery* and the *Activity read* endpoint, which returns
-every known Spot as `quiet` until posts and signals exist. The Android cache,
-matching, panel, refresh and official alerts are not built yet.
+every known Spot as `quiet` until posts and signals exist.
+**Implemented 2026-09-26 on Android (default-off, `EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED`,
+not device-verified):** the `spot_catalog_v1` cache and ETag revalidation,
+Spots-ahead matching and ordering, the panel with collapsed/half/full sizes
+(explicit buttons, no drag gesture), an in-place Spot detail, activity refresh
+and Spot markers. Spot detail shows no posts, signals or contribution actions
+yet (posts spec). Official alerts are not built yet.
 Decision records: [ADR 0066](../../adr/0066-bounded-http-refresh-for-spot-chat.md),
 [ADR 0067](../../adr/0067-on-device-journey-route-and-spots-ahead.md),
 [ADR 0070](../../adr/0070-spot-module-and-catalog-delivery.md).
