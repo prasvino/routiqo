@@ -100,7 +100,23 @@ honest.
    - Device checks are in NATIVE_ANDROID_PENDING.md.
    - Spot detail has no posts, signals or actions yet; step 3 adds them.
    - The activity parser already tolerates non-empty `alerts`.
-3. **Posts and signals** ([POSTS_AND_SIGNALS_SPEC.md](../features/spots/POSTS_AND_SIGNALS_SPEC.md)):
+3. **Posts and signals** ([POSTS_AND_SIGNALS_SPEC.md](../features/spots/POSTS_AND_SIGNALS_SPEC.md)).
+   The owner split this into three PRs.
+   - **3a — server writes, done 2026-09-26, default-off**
+     ([ADR 0071](../adr/0071-spot-contributions-storage-and-lifetimes.md)):
+     - signals, posts, votes, delete, aliases and lifetimes;
+     - rate limits and highlights;
+     - maintenance (`ROUTIQO_SPOTS_MAINTENANCE_ENABLED`);
+     - activity content.
+     Writes need `ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED`. The alias word list
+     `alias-words-v1.txt` is a **draft** that needs owner approval and a Tamil
+     review first.
+   - **3b — Report and Block (server), next.** Maintenance must keep rows that open
+     reports need, and highlights must exclude items with an upheld report.
+   - **3c — Android:** the transport allowlist for the new paths (TypeScript and
+     Kotlin), `spot_outbox_v1`, contribution controls and Ghost Mode.
+
+   Original scope list:
    - new tables (do not alter the archived V10 private-signal tables);
    - four queue bands, per-type lifetimes, "Still true?" and "No longer true";
    - aliases from the word list, delete my post, Report, Block;

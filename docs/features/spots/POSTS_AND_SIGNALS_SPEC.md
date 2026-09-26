@@ -1,7 +1,17 @@
 # Posts and signals on Spots
 
-Status: proposed, 2026-09-25. Not implemented. Phase 2 of the pilot path; the
-parts marked **Diwali** are needed for the 5–7 November 2026 dry run. Product
+Status: proposed, 2026-09-25. Phase 2 of the pilot path; the parts marked
+**Diwali** are needed for the 5–7 November 2026 dry run.
+**Step 3a implemented 2026-09-26 (server only, default-off,
+[ADR 0071](../../adr/0071-spot-contributions-storage-and-lifetimes.md)):**
+- signals, posts, votes, delete my post, per-room aliases, lifetimes and the
+  capture rules;
+- rate limits, highlights and expiry maintenance;
+- activity content.
+
+Not built yet: Report and Block (3b), moderator hide (step 4), and the Android
+controls, `spot_outbox_v1` and Ghost Mode (3c). The alias word list is a draft
+awaiting owner approval and Tamil review. Product
 rules: [PRODUCT.md](../../PRODUCT.md) (Spots, lifespan table, Offline rule,
 Guardrails, Decisions §3–4). Catalog, activity read and refresh:
 [SPOTS_SPEC.md](SPOTS_SPEC.md).

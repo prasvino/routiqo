@@ -122,10 +122,10 @@ Spots:
 
 Contribution:
 
-- [ ] Public one-tap signals on Spots, evolved from private Quick Signals (reuse signal storage, idempotent commands, abuse budgets, expiry maintenance; withdraw becomes "delete my post").
-- [ ] Short text posts on Spots.
+- [ ] Public one-tap signals on Spots, evolved from private Quick Signals (reuse signal storage, idempotent commands, abuse budgets, expiry maintenance; withdraw becomes "delete my post"). _Server done 2026-09-26 (step 3a, ADR 0071, default-off); Android controls in 3c._
+- [ ] Short text posts on Spots. _Server done 2026-09-26 (step 3a, ADR 0071, default-off); Android controls in 3c._
 - [ ] Voice notes via signed direct S3 uploads, recorded only by explicit action.
-- [ ] Per-type expiry on server time with the decided lifetimes, "Still true?" and "No longer true", and top tips becoming highlights after expiry.
+- [ ] Per-type expiry on server time with the decided lifetimes, "Still true?" and "No longer true", and top tips becoming highlights after expiry. _Server done 2026-09-26 (step 3a, ADR 0071, default-off); Android controls in 3c._
 - [ ] Report counts allowed ("3 reports in 20 min"); traveller counts not shown.
 - [ ] Offline rule: posts, signals and answers queue in the journey outbox with capture time and idempotency key; the server rejects items past their lifetime; cached Spot content is labelled stale and dropped at expiry.
 - [ ] Rate-limit posts, voice uploads, signals, "Still true?" and reports; stricter limits for new accounts.

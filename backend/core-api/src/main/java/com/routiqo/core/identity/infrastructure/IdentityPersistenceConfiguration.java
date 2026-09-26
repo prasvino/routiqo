@@ -1,6 +1,7 @@
 package com.routiqo.core.identity.infrastructure;
 
 import com.routiqo.core.identity.application.GoogleAccountStore;
+import com.routiqo.core.identity.application.AccountAgeReader;
 import com.routiqo.core.identity.application.AccountWriteAuthority;
 import com.routiqo.core.identity.application.EnabledAccountPairAuthority;
 import org.springframework.context.annotation.Bean;
@@ -23,5 +24,6 @@ public class IdentityPersistenceConfiguration {
     @Bean SessionStore sessionStore(JdbcTemplate jdbc, PlatformTransactionManager manager) {
         return new JdbcSessionStore(jdbc, manager);
     }
+    @Bean AccountAgeReader accountAgeReader(JdbcTemplate jdbc) { return new JdbcAccountAgeReader(jdbc); }
     @Bean GoogleAccountStore googleAccountStore(JdbcTemplate jdbc) { return new JdbcGoogleAccountStore(jdbc); }
 }

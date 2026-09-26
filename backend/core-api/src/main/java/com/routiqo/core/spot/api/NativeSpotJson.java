@@ -67,21 +67,78 @@ final class NativeSpotJson {
         }
     }
 
+    /**
+     * Serializes activity within the 128 KiB cap. If it would not fit, the oldest posts across the
+     * response are dropped and their Spots marked `postsTruncated`; signal summaries always stay.
+     */
     static byte[] activityResponse(SpotActivity activity) {
+        List<SpotActivity.Entry> entries = new ArrayList<>(activity.spots());
+        byte[] body = write(activity, entries);
+        while (body.length > MAX_RESPONSE_BYTES) {
+            int dropFrom = -1;
+            java.time.Instant oldest = null;
+            for (int index = 0; index < entries.size(); index++) {
+                List<SpotActivity.PostView> posts = entries.get(index).posts();
+                if (posts.isEmpty()) continue;
+                var last = posts.getLast().capturedAt();
+                if (oldest == null || last.isBefore(oldest)) {
+                    oldest = last;
+                    dropFrom = index;
+                }
+            }
+            if (dropFrom < 0) throw new ResponseTooLarge();
+            var entry = entries.get(dropFrom);
+            entries.set(dropFrom, entry.withPosts(entry.posts().subList(0, entry.posts().size() - 1), true));
+            body = write(activity, entries);
+        }
+        return body;
+    }
+
+    private static byte[] write(SpotActivity activity, List<SpotActivity.Entry> entries) {
         ObjectNode root = MAPPER.createObjectNode();
         root.put("serverTime", activity.serverTime().toString());
         root.put("catalogVersion", activity.catalogVersion().toString());
         ArrayNode spots = root.putArray("spots");
-        for (SpotActivity.Entry entry : activity.spots()) {
+        for (SpotActivity.Entry entry : entries) {
             ObjectNode spot = spots.addObject();
             spot.put("id", entry.id().toString());
             spot.put("state", entry.state().key());
             spot.putArray("alertIds");
+            ArrayNode signals = spot.putArray("signals");
+            for (var summary : entry.signals()) {
+                ObjectNode node = signals.addObject();
+                node.put("ref", summary.ref().toString());
+                node.put("category", summary.category());
+                node.put("value", summary.topValue());
+                ArrayNode values = node.putArray("values");
+                for (var count : summary.values())
+                    values.addObject().put("value", count.value()).put("reports", count.reports());
+                node.put("latestAt", summary.latestAt().toString());
+                node.put("stillTrue", summary.stillTrue());
+                if (summary.viewerVote() == null) node.putNull("viewerVote");
+                else node.put("viewerVote", summary.viewerVote());
+            }
+            ArrayNode posts = spot.putArray("posts");
+            for (var post : entry.posts()) {
+                ObjectNode node = posts.addObject();
+                node.put("ref", post.ref().toString());
+                node.put("alias", post.alias());
+                node.put("text", post.text());
+                node.put("type", post.type());
+                node.put("capturedAt", post.capturedAt().toString());
+                node.put("expiresAt", post.expiresAt().toString());
+                node.put("stillTrue", post.stillTrue());
+                if (post.viewerVote() == null) node.putNull("viewerVote");
+                else node.put("viewerVote", post.viewerVote());
+                node.put("mine", post.mine());
+            }
+            spot.put("postsTruncated", entry.postsTruncated());
+            ArrayNode highlights = spot.putArray("highlights");
+            for (var highlight : entry.highlights())
+                highlights.addObject().put("text", highlight.text()).put("createdAt", highlight.createdAt().toString());
         }
         root.putArray("alerts");
-        byte[] body = MAPPER.writeValueAsBytes(root);
-        if (body.length > MAX_RESPONSE_BYTES) throw new ResponseTooLarge();
-        return body;
+        return MAPPER.writeValueAsBytes(root);
     }
 
     static final class ResponseTooLarge extends RuntimeException {

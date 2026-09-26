@@ -89,6 +89,9 @@ class NativeSpotOffHttpTest {
                 .withBean(RoutingRegion.class, () -> region)
                 .withBean(AuthRateGate.class, () -> (key, category, limit) -> true)
                 .withBean(ActiveJourneyReader.class, () -> owner -> true)
+                .withBean(org.springframework.jdbc.core.JdbcTemplate.class,
+                        () -> new org.springframework.jdbc.core.JdbcTemplate(
+                                new org.springframework.jdbc.datasource.SimpleDriverDataSource()))
                 .withPropertyValues("spring.profiles.active=native-auth,routing,persistence",
                         "ROUTIQO_SPOTS_API_ENABLED=true", "ROUTIQO_SPOT_CATALOG_PATH=" + catalogPath);
     }

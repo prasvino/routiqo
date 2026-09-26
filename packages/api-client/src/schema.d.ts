@@ -819,6 +819,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/native/spots/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Default-off (ROUTIQO_SPOTS_API_ENABLED and ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED, exact true). A one-tap signal on a Spot, replacing the author's previous signal for that Spot and category. Idempotent by clientKey: an exact replay returns the original receipt. 20 per hour (10 for accounts under 24 h old) and one per Spot and category per minute. */
+        post: operations["submitNativeSpotSignal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/spots/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Default-off (both Spots flags, exact true). A short post on a Spot, shown under the author's per-room alias. Idempotent by clientKey. 5 per 10 minutes and 20 per day (2 and 5 for accounts under 24 h old). Text, Spot IDs and aliases are never logged. */
+        post: operations["submitNativeSpotPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/spots/items/{ref}/vote": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                ref: components["schemas"]["NativeSpotId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Default-off. "Still true" extends the item (or every signal in a summary) to half its base life from now, up to its maximum; "No longer true" from two different non-authors expires it at once, with no revival. One vote per account per item; repeating the same vote changes nothing. Requires an active journey. 60 per hour (30 for new accounts). */
+        post: operations["voteNativeSpotItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/spots/items/{ref}/delete": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                ref: components["schemas"]["NativeSpotId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Default-off. Delete my post: immediate and idempotent. Another account's post answers 404. */
+        post: operations["deleteNativeSpotPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/native/routes": {
         parameters: {
             query?: never;
@@ -1268,10 +1346,68 @@ export interface components {
                 state: "live" | "fading" | "quiet";
                 /** @description Official alert references; always empty until official alerts are added. */
                 alertIds: string[];
+                /** @description One unattributed summary per category with current signals. */
+                signals: components["schemas"]["NativeSpotSignalSummary"][];
+                /** @description Newest current posts first. */
+                posts: components["schemas"]["NativeSpotPost"][];
+                /** @description True when older posts were left out to keep the response within 128 KiB. */
+                postsTruncated: boolean;
+                highlights: {
+                    text: string;
+                    /** Format: date-time */
+                    createdAt: string;
+                }[];
             }[];
             /** @description Official alerts; always empty until official alerts are added. */
             alerts: Record<string, never>[];
         };
+        /** @enum {string|null} */
+        NativeSpotVote: "still_true" | "no_longer_true" | null;
+        NativeSpotSignalSummary: {
+            ref: components["schemas"]["NativeSpotId"];
+            /** @enum {string} */
+            category: "traffic" | "queue" | "food" | "fuel" | "restroom";
+            /** @description The most reported current value. */
+            value: string;
+            values: {
+                value: string;
+                reports: number;
+            }[];
+            /** Format: date-time */
+            latestAt: string;
+            stillTrue: number;
+            viewerVote: components["schemas"]["NativeSpotVote"];
+        };
+        NativeSpotPost: {
+            ref: components["schemas"]["NativeSpotId"];
+            /** @description Per-room alias; never an account identifier. */
+            alias: string;
+            text: string;
+            /** @enum {string} */
+            type: "traffic" | "place";
+            /** Format: date-time */
+            capturedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            stillTrue: number;
+            viewerVote: components["schemas"]["NativeSpotVote"];
+            /** @description True only for the viewer's own posts */
+            mine: boolean;
+        };
+        NativeSpotReceipt: {
+            ref: components["schemas"]["NativeSpotId"];
+            /** @enum {string} */
+            status: "active" | "replaced" | "deleted" | "expired";
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description Posts only. */
+            alias?: string;
+        };
+        /**
+         * Format: date-time
+         * @description Device capture time. The server uses the earlier of this and its own receipt time; more than 2 minutes in the future is rejected.
+         */
+        NativeSpotContributionTime: string;
         NativeEmptyRequest: Record<string, never>;
         NativeGoogleChallenge: {
             /** Format: uuid */
@@ -4136,6 +4272,309 @@ export interface operations {
             415: components["responses"]["AuthMediaType"];
             429: components["responses"]["AuthLimited"];
             /** @description Journey, session or rate authority unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    submitNativeSpotSignal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    clientKey: components["schemas"]["NativeSpotId"];
+                    spotId: components["schemas"]["NativeSpotId"];
+                    /** @enum {string} */
+                    category: "traffic" | "queue" | "food" | "fuel" | "restroom";
+                    /** @enum {string} */
+                    value: "moving" | "slow" | "stopped" | "under_5" | "5_to_15" | "15_to_30" | "over_30" | "good" | "avoid" | "available" | "long_queue" | "none" | "usable" | "busy";
+                    capturedAt: components["schemas"]["NativeSpotContributionTime"];
+                    journeyId: components["schemas"]["NativeSpotId"];
+                };
+            };
+        };
+        responses: {
+            /** @description Receipt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSpotReceipt"];
+                };
+            };
+            /** @description Malformed body, value not valid for the category, or a capture time in the future. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            /** @description Transport rejected or the account is restricted from contributing. Empty response body. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown Spot or journey, or a category this Spot does not allow. Empty response body. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The clientKey was used for different content, or the journey was not active at capture. Empty response body. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too old: its life had passed on arrival. Empty response body. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Storage, session or rate authority unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    submitNativeSpotPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    clientKey: components["schemas"]["NativeSpotId"];
+                    spotId: components["schemas"]["NativeSpotId"];
+                    /** @enum {string} */
+                    type: "traffic" | "place";
+                    /** @description 1-200 code points after trimming, one paragraph. */
+                    text: string;
+                    capturedAt: components["schemas"]["NativeSpotContributionTime"];
+                    journeyId: components["schemas"]["NativeSpotId"];
+                };
+            };
+        };
+        responses: {
+            /** @description Receipt with the author's alias for this room */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSpotReceipt"];
+                };
+            };
+            /** @description Malformed body, invalid text or a capture time in the future. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            /** @description Transport rejected or the account is restricted from contributing. Empty response body. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown Spot or journey. Empty response body. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The clientKey was used for different content, or the journey was not active at capture. Empty response body. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too old: its life had passed on arrival. Empty response body. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            /** @description Links, e-mail addresses and phone numbers are not allowed in posts. Empty response body. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+            /** @description Storage, session or rate authority unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    voteNativeSpotItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                ref: components["schemas"]["NativeSpotId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    vote: "still_true" | "no_longer_true";
+                };
+            };
+        };
+        responses: {
+            /** @description Current item state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ref: components["schemas"]["NativeSpotId"];
+                        /** @enum {string} */
+                        status: "active" | "expired";
+                        /** Format: date-time */
+                        expiresAt: string;
+                        stillTrue: number;
+                    };
+                };
+            };
+            /** @description Malformed body. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            /** @description Transport rejected, account restricted, or a vote on the voter's own content. Empty response body. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, expired or removed item. Empty response body. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No active journey. Empty response body. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Storage, session or rate authority unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteNativeSpotPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                ref: components["schemas"]["NativeSpotId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeEmptyRequest"];
+            };
+        };
+        responses: {
+            /** @description Deleted receipt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSpotReceipt"];
+                };
+            };
+            /** @description Malformed body. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            403: components["responses"]["NativeTransportRejected"];
+            /** @description Unknown post, or not the viewer's own. Empty response body. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            /** @description Storage or session unavailable. Empty response body. */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -1,6 +1,12 @@
 # Account deletion
 
 > **Direction brief (2026-09-25):** Kept, to finish before the pilot. When built, the deletion cascade must also remove the user's Spot posts, voice notes, one-tap signals, Ask Ahead questions and answers, Spot-passage records and route guides, and clear queued social items; remote erasure of copies already delivered to disconnected devices is still not claimed. See [PRODUCT.md](../../PRODUCT.md).
+>
+> **Spot contributions (V30, ADR 0071):** the account's signals, posts, votes,
+> aliases, idempotency keys, rate-ledger rows and highlights made from its posts
+> are removed by foreign-key cascade. This is tested in
+> `SpotContributionPersistenceTest`. Reports (3b) and the device queue (3c) are
+> added when they are built.
 
 An authenticated user may explicitly delete their Routiqo server account. Require exact confirmation DELETE and Google authentication within the previous five minutes. Renewal retains the original authentication timestamp and cannot satisfy this requirement. Older authentication returns 428; the user signs in again and explicitly reconfirms. Never automatically delete after a Google callback.
 

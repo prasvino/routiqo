@@ -1305,6 +1305,216 @@ paths:
         '429': { $ref: '#/components/responses/AuthLimited' }
         '503':
           { description: 'Journey, session or rate authority unavailable. Empty response body.' }
+  /api/v1/native/spots/signals:
+    post:
+      operationId: submitNativeSpotSignal
+      security: [{ nativeBearer: [] }]
+      description: "Default-off (ROUTIQO_SPOTS_API_ENABLED and ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED, exact true). A one-tap signal on a Spot, replacing the author's previous signal for that Spot and category. Idempotent by clientKey: an exact replay returns the original receipt. 20 per hour (10 for accounts under 24 h old) and one per Spot and category per minute."
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [clientKey, spotId, category, value, capturedAt, journeyId]
+              properties:
+                clientKey: { $ref: '#/components/schemas/NativeSpotId' }
+                spotId: { $ref: '#/components/schemas/NativeSpotId' }
+                category: { type: string, enum: [traffic, queue, food, fuel, restroom] }
+                value:
+                  {
+                    type: string,
+                    enum:
+                      [
+                        moving,
+                        slow,
+                        stopped,
+                        under_5,
+                        5_to_15,
+                        15_to_30,
+                        over_30,
+                        good,
+                        avoid,
+                        available,
+                        long_queue,
+                        none,
+                        usable,
+                        busy,
+                      ],
+                  }
+                capturedAt: { $ref: '#/components/schemas/NativeSpotContributionTime' }
+                journeyId: { $ref: '#/components/schemas/NativeSpotId' }
+      responses:
+        '200':
+          description: Receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeSpotReceipt' }
+        '400':
+          {
+            description: 'Malformed body, value not valid for the category, or a capture time in the future. Empty response body.',
+          }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403':
+          {
+            description: 'Transport rejected or the account is restricted from contributing. Empty response body.',
+          }
+        '404':
+          {
+            description: 'Unknown Spot or journey, or a category this Spot does not allow. Empty response body.',
+          }
+        '409':
+          {
+            description: 'The clientKey was used for different content, or the journey was not active at capture. Empty response body.',
+          }
+        '410': { description: 'Too old: its life had passed on arrival. Empty response body.' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503':
+          { description: 'Storage, session or rate authority unavailable. Empty response body.' }
+  /api/v1/native/spots/posts:
+    post:
+      operationId: submitNativeSpotPost
+      security: [{ nativeBearer: [] }]
+      description: "Default-off (both Spots flags, exact true). A short post on a Spot, shown under the author's per-room alias. Idempotent by clientKey. 5 per 10 minutes and 20 per day (2 and 5 for accounts under 24 h old). Text, Spot IDs and aliases are never logged."
+      parameters:
+        - { $ref: '#/components/parameters/JourneyAccount' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [clientKey, spotId, type, text, capturedAt, journeyId]
+              properties:
+                clientKey: { $ref: '#/components/schemas/NativeSpotId' }
+                spotId: { $ref: '#/components/schemas/NativeSpotId' }
+                type: { type: string, enum: [traffic, place] }
+                text:
+                  {
+                    type: string,
+                    minLength: 1,
+                    maxLength: 2000,
+                    description: '1-200 code points after trimming, one paragraph.',
+                  }
+                capturedAt: { $ref: '#/components/schemas/NativeSpotContributionTime' }
+                journeyId: { $ref: '#/components/schemas/NativeSpotId' }
+      responses:
+        '200':
+          description: Receipt with the author's alias for this room
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeSpotReceipt' }
+        '400':
+          {
+            description: 'Malformed body, invalid text or a capture time in the future. Empty response body.',
+          }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403':
+          {
+            description: 'Transport rejected or the account is restricted from contributing. Empty response body.',
+          }
+        '404': { description: 'Unknown Spot or journey. Empty response body.' }
+        '409':
+          {
+            description: 'The clientKey was used for different content, or the journey was not active at capture. Empty response body.',
+          }
+        '410': { description: 'Too old: its life had passed on arrival. Empty response body.' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '422':
+          {
+            description: 'Links, e-mail addresses and phone numbers are not allowed in posts. Empty response body.',
+          }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503':
+          { description: 'Storage, session or rate authority unavailable. Empty response body.' }
+  /api/v1/native/spots/items/{ref}/vote:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - {
+          in: path,
+          name: ref,
+          required: true,
+          schema: { $ref: '#/components/schemas/NativeSpotId' },
+        }
+    post:
+      operationId: voteNativeSpotItem
+      security: [{ nativeBearer: [] }]
+      description: 'Default-off. "Still true" extends the item (or every signal in a summary) to half its base life from now, up to its maximum; "No longer true" from two different non-authors expires it at once, with no revival. One vote per account per item; repeating the same vote changes nothing. Requires an active journey. 60 per hour (30 for new accounts).'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [vote]
+              properties:
+                vote: { type: string, enum: [still_true, no_longer_true] }
+      responses:
+        '200':
+          description: Current item state
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ref, status, expiresAt, stillTrue]
+                properties:
+                  ref: { $ref: '#/components/schemas/NativeSpotId' }
+                  status: { type: string, enum: [active, expired] }
+                  expiresAt: { type: string, format: date-time }
+                  stillTrue: { type: integer, minimum: 0 }
+        '400': { description: Malformed body. Empty response body. }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403':
+          {
+            description: "Transport rejected, account restricted, or a vote on the voter's own content. Empty response body.",
+          }
+        '404': { description: 'Unknown, expired or removed item. Empty response body.' }
+        '409': { description: No active journey. Empty response body. }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503':
+          { description: 'Storage, session or rate authority unavailable. Empty response body.' }
+  /api/v1/native/spots/items/{ref}/delete:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - {
+          in: path,
+          name: ref,
+          required: true,
+          schema: { $ref: '#/components/schemas/NativeSpotId' },
+        }
+    post:
+      operationId: deleteNativeSpotPost
+      security: [{ nativeBearer: [] }]
+      description: "Default-off. Delete my post: immediate and idempotent. Another account's post answers 404."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeEmptyRequest' }
+      responses:
+        '200':
+          description: Deleted receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeSpotReceipt' }
+        '400': { description: Malformed body. Empty response body. }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { $ref: '#/components/responses/NativeTransportRejected' }
+        '404': { description: "Unknown post, or not the viewer's own. Empty response body." }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '503': { description: 'Storage or session unavailable. Empty response body.' }
   /api/v1/native/routes:
     post:
       operationId: calculateNativePrivateRoute
@@ -2110,7 +2320,7 @@ components:
           items:
             type: object
             additionalProperties: false
-            required: [id, state, alertIds]
+            required: [id, state, alertIds, signals, posts, postsTruncated, highlights]
             properties:
               id: { $ref: '#/components/schemas/NativeSpotId' }
               state: { type: string, enum: [live, fading, quiet] }
@@ -2119,11 +2329,96 @@ components:
                 maxItems: 0
                 description: Official alert references; always empty until official alerts are added.
                 items: { type: string }
+              signals:
+                type: array
+                maxItems: 5
+                description: One unattributed summary per category with current signals.
+                items: { $ref: '#/components/schemas/NativeSpotSignalSummary' }
+              posts:
+                type: array
+                maxItems: 10
+                description: Newest current posts first.
+                items: { $ref: '#/components/schemas/NativeSpotPost' }
+              postsTruncated:
+                {
+                  type: boolean,
+                  description: 'True when older posts were left out to keep the response within 128 KiB.',
+                }
+              highlights:
+                type: array
+                maxItems: 3
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [text, createdAt]
+                  properties:
+                    text: { type: string, minLength: 1, maxLength: 200 }
+                    createdAt: { type: string, format: date-time }
         alerts:
           type: array
           maxItems: 0
           description: Official alerts; always empty until official alerts are added.
           items: { type: object }
+    NativeSpotVote:
+      type: string
+      nullable: true
+      enum: [still_true, no_longer_true, null]
+    NativeSpotSignalSummary:
+      type: object
+      additionalProperties: false
+      required: [ref, category, value, values, latestAt, stillTrue, viewerVote]
+      properties:
+        ref: { $ref: '#/components/schemas/NativeSpotId' }
+        category: { type: string, enum: [traffic, queue, food, fuel, restroom] }
+        value: { type: string, description: The most reported current value. }
+        values:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items:
+            type: object
+            additionalProperties: false
+            required: [value, reports]
+            properties:
+              value: { type: string }
+              reports: { type: integer, minimum: 1 }
+        latestAt: { type: string, format: date-time }
+        stillTrue: { type: integer, minimum: 0 }
+        viewerVote: { $ref: '#/components/schemas/NativeSpotVote' }
+    NativeSpotPost:
+      type: object
+      additionalProperties: false
+      required: [ref, alias, text, type, capturedAt, expiresAt, stillTrue, viewerVote, mine]
+      properties:
+        ref: { $ref: '#/components/schemas/NativeSpotId' }
+        alias:
+          { type: string, maxLength: 40, description: Per-room alias; never an account identifier. }
+        text: { type: string, minLength: 1, maxLength: 200 }
+        type: { type: string, enum: [traffic, place] }
+        capturedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        stillTrue: { type: integer, minimum: 0 }
+        viewerVote: { $ref: '#/components/schemas/NativeSpotVote' }
+        mine:
+          {
+            type: boolean,
+            description: True only for the viewer's own posts,
+            so they can delete them.,
+          }
+    NativeSpotReceipt:
+      type: object
+      additionalProperties: false
+      required: [ref, status, expiresAt]
+      properties:
+        ref: { $ref: '#/components/schemas/NativeSpotId' }
+        status: { type: string, enum: [active, replaced, deleted, expired] }
+        expiresAt: { type: string, format: date-time }
+        alias: { type: string, maxLength: 40, description: Posts only. }
+    NativeSpotContributionTime:
+      type: string
+      format: date-time
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$'
+      description: Device capture time. The server uses the earlier of this and its own receipt time; more than 2 minutes in the future is rejected.
     NativeEmptyRequest:
       type: object
       additionalProperties: false

@@ -21,19 +21,27 @@ public class NativeAuthConfiguration {
             @Value("${ROUTIQO_NATIVE_ROUTING_API_ENABLED:false}") boolean routingEnabled,
             @Value("${ROUTIQO_NATIVE_LIVE_ROUTE_BINDING_API_ENABLED:false}") boolean bindingEnabled,
             @Value("${ROUTIQO_SPOTS_API_ENABLED:}") String spotsEnabledFlag,
+            @Value("${ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED:}") String contributionsEnabledFlag,
             org.springframework.core.env.Environment environment)
             throws Exception {
         // Same condition as NativeSpotController, so the guard never admits a path without a handler.
         boolean spotsEnabled = FeatureFlags.enabled(spotsEnabledFlag)
                 && environment.matchesProfiles("routing & persistence");
+        boolean contributionsEnabled = spotsEnabled && FeatureFlags.enabled(contributionsEnabledFlag);
         return http.securityMatcher("/api/v1/native/**")
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())
                 .csrf(c -> c.disable())
                 .addFilterBefore(new NativeAuthGuard(rates, sessions, consentEnabled, routingEnabled,
-                        bindingEnabled, spotsEnabled),
+                        bindingEnabled, spotsEnabled, contributionsEnabled),
                         AuthorizationFilter.class)
                 .authorizeHttpRequests(a -> {
+                    if (contributionsEnabled) {
+                        a.requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/v1/native/spots/signals", "/api/v1/native/spots/posts",
+                                "/api/v1/native/spots/items/*/vote", "/api/v1/native/spots/items/*/delete")
+                                .permitAll();
+                    }
                     if (spotsEnabled) {
                         a.requestMatchers(org.springframework.http.HttpMethod.GET,
                                 "/api/v1/native/spots/catalog").permitAll();

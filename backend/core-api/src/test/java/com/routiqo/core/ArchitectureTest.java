@@ -19,7 +19,8 @@ class ArchitectureTest {
    noClasses().that().resideInAPackage("com.routiqo.core.spot..").should().dependOnClassesThat()
        .resideInAnyPackage("com.routiqo.core.routeupdate..", "com.routiqo.core.publiclive..",
            "com.routiqo.core.privacy..", "com.routiqo.core.verification..",
-           "com.routiqo.core.journey.infrastructure..", "com.routiqo.core.identity.infrastructure..")
+           "com.routiqo.core.journey.infrastructure..", "com.routiqo.core.identity.infrastructure..",
+           "com.routiqo.core.moderation.infrastructure..", "com.routiqo.core.moderation.api..")
        .check(new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("com.routiqo.core"));
  }
  @Test void domainsAreIndependentOfFrameworkAndInfrastructure() {
