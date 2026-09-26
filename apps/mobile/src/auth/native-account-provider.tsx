@@ -20,7 +20,16 @@ import type {
   RouteRequest,
   RouteResult,
 } from '@routiqo/shared';
-import type { SpotActivity, TripJournal, TripJournalWrite } from '@routiqo/shared';
+import type {
+  QueuedSpotContribution,
+  SpotActivity,
+  SpotContributionReceipt,
+  SpotReportReason,
+  SpotVote,
+  SpotVoteResult,
+  TripJournal,
+  TripJournalWrite,
+} from '@routiqo/shared';
 import { NativeHttpStatus } from './safe-transport';
 import { nativeTransport } from './android-transport';
 import { nativeGoogle } from './native-google';
@@ -28,10 +37,16 @@ import { createNativeAccount, NativeSessionRequired } from './native-account';
 import { nativeSessionVault } from './secure-session';
 import {
   NativeSpotsError,
+  blockNativeSpotAuthor,
+  deleteNativeSpotPost,
   fetchNativeSpotActivity,
   fetchNativeSpotCatalog,
+  reportNativeSpotItem,
+  submitNativeSpotContribution,
+  voteNativeSpotItem,
   type SpotCatalogFetch,
 } from '../features/spots/native-spots';
+import { clearSpotOutbox } from '../storage/spot-outbox';
 import { createNativeJourneys } from '../features/journey/native-journeys';
 import {
   readNativeJourneyPage,
@@ -123,6 +138,20 @@ interface NativeAccountContext {
   /** Spot catalog revalidation (ETag) and activity reads; only Spot IDs are ever sent. */
   fetchSpotCatalog(ifNoneMatch: string | null, signal: AbortSignal): Promise<SpotCatalogFetch>;
   fetchSpotActivity(spotIds: readonly string[], signal: AbortSignal): Promise<SpotActivity>;
+  /** Spot writes (ADR 0071-0073); only the item, never the traveller's position, is sent. */
+  submitSpotContribution(
+    entry: QueuedSpotContribution,
+    signal: AbortSignal,
+  ): Promise<SpotContributionReceipt>;
+  voteSpotItem(ref: string, vote: SpotVote, signal: AbortSignal): Promise<SpotVoteResult>;
+  deleteSpotPost(ref: string, signal: AbortSignal): Promise<SpotContributionReceipt>;
+  reportSpotItem(
+    ref: string,
+    requestId: string,
+    reason: SpotReportReason,
+    signal: AbortSignal,
+  ): Promise<unknown>;
+  blockSpotAuthor(ref: string, signal: AbortSignal): Promise<void>;
   readRouteContext(journeyId: string, signal: AbortSignal): Promise<NativeRouteContextRead>;
   bindRouteContext(
     journeyId: string,
@@ -440,6 +469,23 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
     spotsRequest((account) => fetchNativeSpotCatalog(identity, account, ifNoneMatch, signal));
   const fetchSpotActivity = (spotIds: readonly string[], signal: AbortSignal) =>
     spotsRequest((account) => fetchNativeSpotActivity(identity, account, spotIds, signal));
+  const submitSpotContribution = (entry: QueuedSpotContribution, signal: AbortSignal) =>
+    spotsRequest((account) => submitNativeSpotContribution(identity, account, entry, signal));
+  const voteSpotItem = (ref: string, vote: SpotVote, signal: AbortSignal) =>
+    spotsRequest((account) => voteNativeSpotItem(identity, account, ref, vote, signal));
+  const deleteSpotPost = (ref: string, signal: AbortSignal) =>
+    spotsRequest((account) => deleteNativeSpotPost(identity, account, ref, signal));
+  const reportSpotItem = (
+    ref: string,
+    requestId: string,
+    reason: SpotReportReason,
+    signal: AbortSignal,
+  ) =>
+    spotsRequest((account) =>
+      reportNativeSpotItem(identity, account, ref, requestId, reason, signal),
+    );
+  const blockSpotAuthor = (ref: string, signal: AbortSignal) =>
+    spotsRequest((account) => blockNativeSpotAuthor(identity, account, ref, signal));
   const searchPlaces = (query: string, signal: AbortSignal) =>
     routingRequest((account) => searchNativePlaces(identity, account, query, signal));
   const calculateRoute = (request: RouteRequest, signal: AbortSignal) =>
@@ -554,6 +600,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
       setAccountId(account);
       if (account) {
         await clearMobileJourneyRoutes(db, { except: account });
+        await clearSpotOutbox(db, { except: account });
         await load(account);
         await journeys.resume(account);
       }
@@ -579,6 +626,7 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
       if (account) {
         setAccountId(account);
         await clearMobileJourneyRoutes(db, { except: account });
+        await clearSpotOutbox(db, { except: account });
         await load(account);
         await journeys.resume(account);
       }
@@ -601,7 +649,10 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
     setPartition(null);
     try {
       await identity.logout();
-      if (leaving) await clearMobileJourneyRoutes(db, { only: leaving }).catch(() => undefined);
+      if (leaving) {
+        await clearMobileJourneyRoutes(db, { only: leaving }).catch(() => undefined);
+        await clearSpotOutbox(db, { only: leaving }).catch(() => undefined);
+      }
     } catch {
       const current = identity.activeAccount();
       setAccountId(current);
@@ -823,6 +874,11 @@ export function NativeAccountProvider({ children }: { children: ReactNode }) {
         calculateRoute,
         fetchSpotCatalog,
         fetchSpotActivity,
+        submitSpotContribution,
+        voteSpotItem,
+        deleteSpotPost,
+        reportSpotItem,
+        blockSpotAuthor,
         readRouteContext,
         bindRouteContext,
         signIn,

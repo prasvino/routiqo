@@ -34,6 +34,8 @@ import { useMobilePlanning } from '../../storage/planning';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import { useSpotCatalogStore } from '../spots/spots-provider';
 import { clearCachedSpotCatalog } from '../../storage/spot-catalog';
+import { clearSpotOutbox } from '../../storage/spot-outbox';
+import { useSpotContributions } from '../spots/spot-contributions-provider';
 import { useSQLiteContext } from 'expo-sqlite';
 import { NativePlanningBackup } from './planning-backup';
 import { NativeJourneyPanel } from '../journey/native-journey-panel';
@@ -70,6 +72,7 @@ export function DiscoveryScreen({
   const { state, ready, error, update, clear } = useMobilePlanning();
   const account = useNativeAccount();
   const spotCatalog = useSpotCatalogStore();
+  const contributions = useSpotContributions();
   const db = useSQLiteContext();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category>('All');
@@ -327,6 +330,12 @@ export function DiscoveryScreen({
                             // Always clear the cached Spot list, even if cached while the flag was on.
                             void (
                               spotCatalog ? spotCatalog.clear() : clearCachedSpotCatalog(db)
+                            ).catch(() => undefined);
+                            // Queued Spot posts and signals too, even if queued while the flag was on.
+                            void (
+                              contributions
+                                ? contributions.clearQueue()
+                                : clearSpotOutbox(db, 'all')
                             ).catch(() => undefined);
                           },
                         },

@@ -11,6 +11,10 @@ import { ACTIVITY_INTERVAL_MS, type SpotActivityStatus } from './spot-activity-c
 /** Client flag: exact `true` only, default off. Journey mode must also be enabled. */
 export const spotsEnabled = (value = process.env.EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED) =>
   value === 'true';
+/** Contributions (ADR 0073) are a separate, exact-`true` build flag on top of the Spots flag. */
+export const spotContributionsEnabled = (
+  value = process.env.EXPO_PUBLIC_ROUTIQO_SPOT_CONTRIBUTIONS_ENABLED,
+) => value === 'true';
 
 export type SpotsPanelSize = 'collapsed' | 'half' | 'full';
 const visibleRows: Record<SpotsPanelSize, number> = { collapsed: 1, half: 5, full: 20 };
