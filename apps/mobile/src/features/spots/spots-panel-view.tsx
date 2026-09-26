@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { tokens } from '@routiqo/design-tokens';
 import type { SpotRowView, SpotsPanelSize, SpotsPanelViewModel } from './spots-model';
@@ -7,9 +8,21 @@ const c = tokens.colors;
 export interface SpotsPanelViewProps extends SpotsPanelViewModel {
   onSelect(id: string | null): void;
   onResize(size: SpotsPanelSize): void;
+  /** Contribution controls above the list (Ghost Mode, queue notices); absent when off. */
+  header?: ReactNode;
+  /** Content and actions for the open Spot; absent when contributions are off. */
+  content?: ReactNode;
 }
 
-function SpotRow({ row, onSelect }: { row: SpotRowView; onSelect(id: string | null): void }) {
+function SpotRow({
+  row,
+  onSelect,
+  content,
+}: {
+  row: SpotRowView;
+  onSelect(id: string | null): void;
+  content?: ReactNode;
+}) {
   return (
     <View style={[styles.row, row.selected && styles.rowSelected]}>
       <Pressable
@@ -40,6 +53,7 @@ function SpotRow({ row, onSelect }: { row: SpotRowView; onSelect(id: string | nu
               {line}
             </Text>
           ))}
+          {content}
         </View>
       ) : null}
     </View>
@@ -53,6 +67,7 @@ export function SpotsPanelView(props: SpotsPanelViewProps) {
       <Text style={styles.heading} accessibilityRole="header">
         Spots ahead
       </Text>
+      {props.header}
       {props.notice ? (
         <Text style={styles.notice} accessibilityLiveRegion="polite">
           {props.notice}
@@ -60,7 +75,12 @@ export function SpotsPanelView(props: SpotsPanelViewProps) {
       ) : null}
       {props.freshness ? <Text style={styles.freshness}>{props.freshness}</Text> : null}
       {props.rows.map((row) => (
-        <SpotRow key={row.id} row={row} onSelect={props.onSelect} />
+        <SpotRow
+          key={row.id}
+          row={row}
+          onSelect={props.onSelect}
+          {...(row.selected && props.content ? { content: props.content } : {})}
+        />
       ))}
       {props.sizeAction ? (
         <Pressable

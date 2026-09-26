@@ -36,6 +36,7 @@ import { useSpotCatalogStore } from '../spots/spots-provider';
 import { clearCachedSpotCatalog } from '../../storage/spot-catalog';
 import { clearSpotOutbox } from '../../storage/spot-outbox';
 import { useSpotContributions } from '../spots/spot-contributions-provider';
+import { GhostModeSwitch } from '../spots/spot-detail-view';
 import { useSQLiteContext } from 'expo-sqlite';
 import { NativePlanningBackup } from './planning-backup';
 import { NativeJourneyPanel } from '../journey/native-journey-panel';
@@ -310,6 +311,12 @@ export function DiscoveryScreen({
                   stays on this phone. Clear your plans, saved places and stored journey route at
                   any time.
                 </Text>
+                {contributions ? (
+                  <GhostModeSwitch
+                    ghost={contributions.ghost}
+                    onChange={(on) => void contributions.setGhost(on).catch(() => undefined)}
+                  />
+                ) : null}
                 <Pressable
                   style={s.secondary}
                   accessibilityRole="button"
