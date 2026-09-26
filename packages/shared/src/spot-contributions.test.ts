@@ -6,6 +6,7 @@ import {
   defaultSpotPostType,
   dropExpiredSpotContributions,
   enqueueSpotContribution,
+  nextSpotAttemptAt,
   nextSpotContribution,
   readSpotContributionReceipt,
   readSpotOutbox,
@@ -192,6 +193,13 @@ describe('spot outbox', () => {
       readSpotOutbox({ accountId: account, entries: [{ kind: 'post' }] }, account).entries,
     ).toEqual([]);
     expect(readSpotOutbox('garbage', account).entries).toEqual([]);
+    const stored = JSON.parse(
+      JSON.stringify(enqueueSpotContribution(outbox, post(21, 'Second'), NOW)),
+    );
+    stored.entries[0].text = 'call 9876543210';
+    expect(readSpotOutbox(stored, account).entries.map((entry) => entry.clientKey)).toEqual([
+      id(21),
+    ]);
   });
 
   it('drops entries past their base life on the device clock', () => {
@@ -209,7 +217,13 @@ describe('spot outbox', () => {
     expect(nextSpotContribution(outbox, NOW, () => true)?.clientKey).toBe(id(40));
     const retried = settleSpotContribution(outbox, id(40), { kind: 'retry' }, NOW, 1);
     expect(retried.entries[0]).toMatchObject({ attempts: 1, nextAttemptAt: NOW + 1000 });
-    expect(nextSpotContribution(retried, NOW + 999, () => true)).toBeNull();
+    // The post backs off; the signal behind it is a different kind and may go first.
+    expect(nextSpotContribution(retried, NOW + 999, () => true)?.clientKey).toBe(id(41));
+    expect(nextSpotAttemptAt(retried, () => true)).toBe(NOW);
+    expect(
+      nextSpotAttemptAt(settleSpotContribution(retried, id(41), { kind: 'sent' }, NOW), () => true),
+    ).toBe(NOW + 1000);
+    expect(nextSpotAttemptAt(retried, () => false)).toBeNull();
     const limited = settleSpotContribution(
       outbox,
       id(40),
@@ -218,6 +232,12 @@ describe('spot outbox', () => {
       0,
     );
     expect(limited.entries[0]!.nextAttemptAt).toBe(NOW + 120_000);
+    // A post backing off never holds up a signal, but never lets a later post overtake it.
+    let mixed = enqueueSpotContribution(outbox, post(42, 'Later post'), NOW);
+    mixed = settleSpotContribution(mixed, id(40), { kind: 'retry' }, NOW, 1);
+    expect(nextSpotContribution(mixed, NOW, () => true)?.clientKey).toBe(id(41));
+    mixed = settleSpotContribution(mixed, id(41), { kind: 'sent' }, NOW);
+    expect(nextSpotContribution(mixed, NOW, () => true)).toBeNull();
     const sent = settleSpotContribution(outbox, id(40), { kind: 'sent' }, NOW);
     expect(nextSpotContribution(sent, NOW, () => true)?.clientKey).toBe(id(41));
     expect(settleSpotContribution(sent, id(41), { kind: 'refused' }, NOW).entries).toEqual([]);

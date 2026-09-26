@@ -24,9 +24,18 @@ import {
 
 type Action = 'vote' | 'report' | 'block' | 'delete' | 'queue';
 
+/** No Spot or journey to attach a contribution to. */
+export class NoJourneyForSpot extends Error {
+  constructor() {
+    super('Posting needs an active journey.');
+    this.name = 'NoJourneyForSpot';
+  }
+}
+
 /** What the traveller is told after an action fails; never a raw status or server text. */
 export function contributionMessage(error: unknown, action: Action): string {
   if (error instanceof GhostModeOn) return 'Ghost Mode is on. Nothing was sent.';
+  if (error instanceof NoJourneyForSpot) return error.message;
   if (error instanceof SpotOutboxFull) return error.message;
   if (error instanceof SpotOutboxUnavailable) return 'This could not be saved on your phone.';
   if (error instanceof NativeSpotsError) {
@@ -43,12 +52,15 @@ export function contributionMessage(error: unknown, action: Action): string {
           : "You can't do that right now.";
       case 'not-found':
         return 'That is no longer here.';
+      // 409 means different things per action; for votes it is "no active journey".
       case 'conflict':
         return action === 'report'
           ? 'You already reported this.'
           : action === 'block'
             ? 'Your block list is full.'
-            : 'That was already done.';
+            : action === 'vote'
+              ? 'Voting needs an active journey.'
+              : "That couldn't be done now.";
       case 'session':
         return 'Sign in from Profile to continue.';
       default:
@@ -81,6 +93,7 @@ export function useSpotContributionControls(input: SpotContributionControlsInput
   const [message, setMessage] = useState<string | null>(null);
   const [reporting, setReporting] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
+  const [ghostNote, setGhostNote] = useState<string | null>(null);
   const spotId = input.spot?.id ?? null;
   const refreshSoon = useRef(input.refreshSoon);
   refreshSoon.current = input.refreshSoon;
@@ -88,7 +101,11 @@ export function useSpotContributionControls(input: SpotContributionControlsInput
   const previousQueued = useRef(queuedCount);
   useEffect(() => {
     // Something left the queue (sent or dropped): show the server's view soon.
-    if (queuedCount < previousQueued.current) refreshSoon.current();
+    // Something left the queue: stop saying "Sending…" (a refusal arrives as its own notice).
+    if (queuedCount < previousQueued.current) {
+      refreshSoon.current();
+      setMessage((current) => (current?.startsWith('Sending') ? null : current));
+    }
     previousQueued.current = queuedCount;
   }, [queuedCount]);
   useEffect(() => setMessage(null), [spotId]);
@@ -113,7 +130,7 @@ export function useSpotContributionControls(input: SpotContributionControlsInput
   const queue = (
     contribution: { category: SpotCategory; value: string } | { type: SpotPostType; text: string },
   ) => {
-    if (!input.spot || !input.journeyId) return Promise.reject(new GhostModeOn());
+    if (!input.spot || !input.journeyId) return Promise.reject(new NoJourneyForSpot());
     const common = {
       clientKey: randomUUID(),
       spotId: input.spot.id,
@@ -134,9 +151,25 @@ export function useSpotContributionControls(input: SpotContributionControlsInput
         onChange={(on) =>
           void contributions
             .setGhost(on)
-            .catch(() => setMessage('Ghost Mode could not be changed.'))
+            .then((note) => note && setGhostNote(note))
+            .catch(() => setGhostNote('Ghost Mode could not be changed.'))
         }
       />
+      {ghostNote ? (
+        <View style={styles.notice}>
+          <Text style={styles.noticeText} accessibilityRole="alert">
+            {ghostNote}
+          </Text>
+          <Pressable
+            style={styles.dismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss this message"
+            onPress={() => setGhostNote(null)}
+          >
+            <Text style={styles.dismissText}>OK</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {contributions.outbox.notices.map((notice) => (
         <View key={notice.id} style={styles.notice}>
           <Text style={styles.noticeText} accessibilityRole="alert">

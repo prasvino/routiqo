@@ -23,8 +23,15 @@ import {
   SpotDetailContent,
   SpotReportSheet,
 } from '../apps/mobile/src/features/spots/spot-detail-view';
-import { contributionMessage } from '../apps/mobile/src/features/spots/spot-contribution-controls';
-import { GhostModeOn } from '../apps/mobile/src/features/spots/spot-contributions-provider';
+import {
+  NoJourneyForSpot,
+  contributionMessage,
+} from '../apps/mobile/src/features/spots/spot-contribution-controls';
+import {
+  GhostModeOn,
+  switchGhostMode,
+  type GhostSwitchPorts,
+} from '../apps/mobile/src/features/spots/spot-contributions-provider';
 import { NativeSpotsError } from '../apps/mobile/src/features/spots/native-spots';
 import {
   SpotOutboxFull,
@@ -305,6 +312,12 @@ describe('contribution messages', () => {
       "You can't vote on your own post.",
     );
     expect(contributionMessage(new Error('boom'), 'delete')).not.toMatch(/\d{3}/);
+    expect(contributionMessage(new NativeSpotsError('conflict', 409), 'vote')).toBe(
+      'Voting needs an active journey.',
+    );
+    expect(contributionMessage(new NoJourneyForSpot(), 'queue')).toBe(
+      'Posting needs an active journey.',
+    );
   });
 
   it('keeps sources free of sample content, logging and position data', () => {
@@ -322,5 +335,71 @@ describe('contribution messages', () => {
     expect(readFileSync('apps/mobile/.env.example', 'utf8')).toContain(
       'EXPO_PUBLIC_ROUTIQO_SPOT_CONTRIBUTIONS_ENABLED=false',
     );
+  });
+});
+
+describe('Ghost Mode switch', () => {
+  const ports = (overrides: Partial<GhostSwitchPorts> = {}) => {
+    const calls: string[] = [];
+    const latch: boolean[] = [];
+    const base: GhostSwitchPorts = {
+      latch: (on) => {
+        latch.push(on);
+        calls.push(`latch:${on}`);
+      },
+      stopSending: () => {
+        calls.push('stop');
+        return false;
+      },
+      save: async (on) => {
+        calls.push(`save:${on}`);
+      },
+      clearQueue: async () => {
+        calls.push('clear');
+      },
+      reload: async () => {
+        calls.push('reload');
+      },
+    };
+    return { calls, latch, ports: { ...base, ...overrides } };
+  };
+
+  it('latches and stops sending before it touches storage', async () => {
+    const { calls, ports: p } = ports();
+    await expect(switchGhostMode(true, p)).resolves.toBeNull();
+    expect(calls).toEqual(['latch:true', 'stop', 'save:true', 'reload']);
+  });
+
+  it('says so when something was already on its way', async () => {
+    const { ports: p } = ports({ stopSending: () => true });
+    await expect(switchGhostMode(true, p)).resolves.toMatch(/may still arrive/);
+  });
+
+  it('stays on and clears the queue anyway when storing fails', async () => {
+    const {
+      calls,
+      latch,
+      ports: p,
+    } = ports({
+      save: async () => {
+        throw new Error('disk');
+      },
+    });
+    await expect(switchGhostMode(true, p)).resolves.toMatch(/couldn't be saved/);
+    expect(latch).toEqual([true]);
+    expect(calls).toContain('clear');
+  });
+
+  it('turns off only after storing succeeds', async () => {
+    const failing = ports({
+      save: async () => {
+        throw new Error('disk');
+      },
+    });
+    await expect(switchGhostMode(false, failing.ports)).resolves.toMatch(/stays on/);
+    expect(failing.latch).toEqual([]);
+    const { latch, ports: p } = ports();
+    await expect(switchGhostMode(false, p)).resolves.toBeNull();
+    expect(latch).toEqual([false]);
   });
 });

@@ -15,6 +15,97 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 _Archived 2026-09-25:_ the user had authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag; that work is now archived and is no longer authorized pilot work. The different production privacy contract is not accepted. Person-level research is archived with its code preserved. Traveller-derived public LIVE remains disabled in production.
 
+## September 26 Spot contributions on Android (step 3c, flagged, not device-verified)
+
+Android can now show and take Spot contributions behind
+`EXPO_PUBLIC_ROUTIQO_SPOT_CONTRIBUTIONS_ENABLED`, which must be exactly `true`
+on top of the Spots and Journey map flags. Default off. See
+[ADR 0073](../adr/0073-android-spot-contributions-and-ghost-mode.md).
+
+- **Spot detail:**
+  - unattributed signal summaries ("Slow · 2 reports, Moving · 1 · latest
+    12 min ago");
+  - current posts, bylined with the alias or "You", capture time and the Still
+    true count; expired posts are never shown;
+  - highlights;
+  - "Waiting to send" items.
+- **Controls:**
+  - one-tap signal chips for the Spot's categories;
+  - an explicit post composer that applies the server's text rules before
+    queueing;
+  - Still true and No longer true;
+  - Report with a reason sheet;
+  - Block, posts only, with confirmation;
+  - Delete my post, with confirmation.
+  - Every control is at least 48 dp and has a named accessibility label.
+- **Offline queue (`spot_outbox_v1`):**
+  - one queue per account, at most 20 entries and 32 KiB;
+  - sent in order within each kind, and only once the journey is known on the
+    server;
+  - exact replays by `clientKey`;
+  - a refusal drops the entry with one message; a failure backs off (60 s on
+    429); a 401 pauses;
+  - an item past its life on the device clock is dropped unsent.
+  - It is cleared on sign-out, account switch, account deletion and "Clear local
+    data".
+- **Ghost Mode** (device-wide, in Profile and the Spots panel):
+  - it latches on in memory and aborts sending first;
+  - then it stores the flag and clears every queue in one transaction;
+  - it disables every sending control except Delete my post;
+  - an unreadable state counts as on;
+  - a failed save stays on in memory and says so;
+  - a request already on the wire may still arrive, and the traveller is told.
+- **Transport:** the TypeScript and Kotlin allowlists accept the six Spot write
+  paths, POST only, with identity:
+  - 200 for signals, posts, vote and delete;
+  - 202 JSON for reports;
+  - an empty 204 for block.
+- **Shared parser:** activity now carries summaries, posts, highlights and
+  `postsTruncated`. It is strict, but skips unknown categories.
+
+Checks (cloud session; no Android SDK):
+
+- **TypeScript:** `pnpm check` gave **956 tests / 114 files**, zero failures; the
+  baseline was 914 / 109. `pnpm build` passed: web, admin and the Android JS
+  export.
+  - New tests cover:
+    - the activity parser;
+    - post-text parity, using the server's vectors;
+    - the outbox model;
+    - SQLite storage with node:sqlite: partitions, the Ghost Mode clear, the
+      deletion clear, corrupt rows;
+    - the sender:
+      - order within each kind and waiting for the journey;
+      - backoff and the 429 wait;
+      - refusals and neutral 409 wording;
+      - an unreadable 2xx counted as sent;
+      - the 401 pause;
+      - aborting a send in flight;
+      - a stop during a store;
+      - expiry drops;
+    - the Ghost Mode switch, including a failed save;
+    - write calls and their error codes;
+    - transport paths and statuses, with Kotlin parity fragments;
+    - the view model and views.
+- **Secret scan:** no leaks.
+- **Independent review:** a fresh-subagent review found no High issues, five
+  Medium and ten Low. All are fixed in the follow-up commit, except the cases
+  below:
+  - A native call already on the wire cannot be cancelled. The app says it "may
+    still arrive" and points to Delete my post; making the Kotlin call
+    cancellable needs an Android build.
+  - `Retry-After` is not passed through the native driver, so there is a fixed
+    60 s wait.
+  - Whether Delete my post stays available in Ghost Mode is for the owner to
+    confirm.
+- **Device and visual QA:** not run. It is listed in NATIVE_ANDROID_PENDING.md:
+  - Kotlin compile;
+  - offline queue then reconnect;
+  - Ghost Mode with a request log;
+  - composer at 200% font;
+  - TalkBack;
+  - driver safety.
+
 ## September 26 Report and Block on Spot items, server (step 3b, flagged)
 
 Report and Block exist on the server behind the same write flags as 3a

@@ -290,8 +290,18 @@ export function readSpotOutbox(input: unknown, accountId: string): SpotOutbox {
   try {
     const root = object(input);
     if (root.accountId !== accountId || !Array.isArray(root.entries)) return empty;
-    const entries = root.entries.slice(0, SPOT_OUTBOX_MAX_ENTRIES).map(queued);
-    if (new Set(entries.map((entry) => entry.clientKey)).size !== entries.length) return empty;
+    // One unreadable entry (for example after a rule change) is dropped, not the whole queue.
+    const seen = new Set<string>();
+    const entries = root.entries.slice(0, SPOT_OUTBOX_MAX_ENTRIES).flatMap((value) => {
+      try {
+        const entry = queued(value);
+        if (seen.has(entry.clientKey)) return [];
+        seen.add(entry.clientKey);
+        return [entry];
+      } catch {
+        return [];
+      }
+    });
     return { accountId, entries };
   } catch {
     return empty;
@@ -348,15 +358,36 @@ export function dropExpiredSpotContributions(
   return { outbox: { accountId: outbox.accountId, entries }, dropped };
 }
 
-/** The first entry, strictly in order, once it is due and its journey is known on the server. */
+/**
+ * The next entry to send: in order within each kind, once due and once its journey is known on the
+ * server. A post waiting out a rate limit never holds up signals (and the reverse), but a later
+ * post never overtakes an earlier post.
+ */
 export function nextSpotContribution(
   outbox: SpotOutbox,
   now: number,
   journeyOnServer: (journeyId: string) => boolean,
 ): QueuedSpotContribution | null {
-  const first = outbox.entries[0];
-  if (!first || first.nextAttemptAt > now || !journeyOnServer(first.journeyId)) return null;
-  return first;
+  const waiting = new Set<QueuedSpotContribution['kind']>();
+  for (const entry of outbox.entries) {
+    if (waiting.has(entry.kind)) continue;
+    if (entry.nextAttemptAt <= now && journeyOnServer(entry.journeyId)) return entry;
+    waiting.add(entry.kind);
+  }
+  return null;
+}
+
+/** When the next entry could be sent: the earliest due time among the first entry of each kind. */
+export function nextSpotAttemptAt(
+  outbox: SpotOutbox,
+  journeyOnServer: (journeyId: string) => boolean,
+): number | null {
+  const heads = new Map<QueuedSpotContribution['kind'], QueuedSpotContribution>();
+  for (const entry of outbox.entries) if (!heads.has(entry.kind)) heads.set(entry.kind, entry);
+  const due = [...heads.values()]
+    .filter((entry) => journeyOnServer(entry.journeyId))
+    .map((entry) => entry.nextAttemptAt);
+  return due.length > 0 ? Math.min(...due) : null;
 }
 
 export type SpotSendOutcome =

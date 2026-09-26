@@ -314,7 +314,12 @@ export function DiscoveryScreen({
                 {contributions ? (
                   <GhostModeSwitch
                     ghost={contributions.ghost}
-                    onChange={(on) => void contributions.setGhost(on).catch(() => undefined)}
+                    onChange={(on) =>
+                      void contributions
+                        .setGhost(on)
+                        .then((note) => note && Alert.alert('Ghost Mode', note))
+                        .catch(() => Alert.alert('Ghost Mode', 'Ghost Mode could not be changed.'))
+                    }
                   />
                 ) : null}
                 <Pressable

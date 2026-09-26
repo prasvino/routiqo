@@ -166,7 +166,7 @@ describe('Spot outbox sender', () => {
     expect(h.last().notices).toEqual([]);
   });
 
-  it('pauses on a session refusal and resumes after a session check', async () => {
+  it('pauses on a session refusal and sends nothing more from this controller', async () => {
     const h = harness();
     h.replies.push(async () => {
       throw new NativeSpotsError('session', 401);
@@ -177,11 +177,71 @@ describe('Spot outbox sender', () => {
     expect(h.stored.entries).toHaveLength(1);
     await h.controller.kick();
     expect(h.sent).toEqual([id(1)]);
-    h.now = START + 5_000;
-    h.controller.resume();
+  });
+
+  it('treats an accepted request with an unreadable receipt as sent', async () => {
+    const h = harness();
+    h.replies.push(async () => {
+      throw new NativeSpotsError('invalid');
+    });
+    await h.controller.enqueue(post(1));
     await h.settle();
-    expect(h.sent).toEqual([id(1), id(1)]);
     expect(h.stored.entries).toEqual([]);
+    expect(h.last().notices).toEqual([]);
+  });
+
+  it('a 409 is worded neutrally, since it also means the journey was not active', async () => {
+    const h = harness();
+    h.replies.push(async () => {
+      throw new NativeSpotsError('conflict', 409);
+    });
+    await h.controller.enqueue(post(1));
+    await h.settle();
+    expect(h.last().notices.map((notice) => notice.message)).toEqual([
+      "Post: It couldn't be sent for this journey.",
+    ]);
+  });
+
+  it('a rate-limited post does not hold up signals, and posts keep their order', async () => {
+    const h = harness();
+    h.eligible = false;
+    await h.controller.enqueue(post(1));
+    await h.controller.enqueue(post(2));
+    await h.controller.enqueue({
+      kind: 'signal',
+      clientKey: id(3),
+      spotId: id(1),
+      journeyId: journey,
+      capturedAt: new Date(START).toISOString(),
+      category: 'traffic',
+      value: 'slow',
+    });
+    h.replies.push(async () => {
+      throw new NativeSpotsError('rate-limited', 429);
+    });
+    h.eligible = true;
+    await h.controller.kick();
+    await h.settle();
+    expect(h.sent).toEqual([id(1), id(3)]);
+    expect(h.stored.entries.map((entry) => entry.clientKey)).toEqual([id(1), id(2)]);
+    expect(h.timers.at(-1)!.at).toBe(START + RATE_LIMIT_WAIT_MS);
+  });
+
+  it('a stop while a result is being stored ends the pass without sending the next item', async () => {
+    const h = harness();
+    h.eligible = false;
+    await h.controller.enqueue(post(1));
+    await h.controller.enqueue(post(2));
+    let stopped = false;
+    h.replies.push(async () => {
+      stopped = h.controller.stop() === false; // nothing in flight any more once replied
+      return { ref: id(900), status: 'active', expiresAt: '2026-11-05T08:00:00Z' };
+    });
+    h.eligible = true;
+    await h.controller.kick();
+    await h.settle();
+    expect(stopped).toBe(false); // the first send was in flight when stop() ran
+    expect(h.sent).toEqual([id(1)]);
   });
 
   it('stop aborts the send in flight and leaves the entry untouched for a later replay', async () => {
@@ -200,7 +260,7 @@ describe('Spot outbox sender', () => {
     await h.controller.enqueue(post(1));
     await h.settle();
     expect(h.last().sending).toBe(true);
-    h.controller.stop();
+    expect(h.controller.stop()).toBe(true); // may still arrive: the caller says so
     expect(h.signals[0]!.aborted).toBe(true);
     release();
     await h.settle();

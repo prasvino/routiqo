@@ -42,7 +42,8 @@ export class GhostModeOn extends Error {
 export interface SpotContributions {
   /** Device-wide Ghost Mode (ADR 0073); null until read from storage. */
   ghost: boolean | null;
-  setGhost(on: boolean): Promise<void>;
+  /** Returns a message to show the traveller, or null when there is nothing to add. */
+  setGhost(on: boolean): Promise<string | null>;
   outbox: SpotOutboxState;
   /** Queues a signal or post (no network); throws while Ghost Mode is on or the queue is full. */
   queue(contribution: NewSpotContribution): Promise<void>;
@@ -56,6 +57,52 @@ export interface SpotContributions {
 }
 
 const Context = createContext<SpotContributions | null>(null);
+
+export interface GhostSwitchPorts {
+  /** Sets the in-memory latch that sending checks, and the visible state. */
+  latch(on: boolean): void;
+  /** Aborts sending; true when something was already on its way and may still arrive. */
+  stopSending(): boolean;
+  save(on: boolean): Promise<void>;
+  clearQueue(): Promise<void>;
+  reload(): Promise<void>;
+}
+
+/**
+ * Ghost Mode (ADR 0073). On: latch first and stop sending, then store the flag and clear the queue
+ * in one transaction; if storing fails, stay on in memory, clear the queue anyway and say so. Off:
+ * only after storing succeeds. Returns a message for the traveller, or null.
+ */
+export async function switchGhostMode(
+  on: boolean,
+  ports: GhostSwitchPorts,
+): Promise<string | null> {
+  if (on) {
+    ports.latch(true);
+    const onItsWay = ports.stopSending();
+    let saved = true;
+    try {
+      await ports.save(true);
+    } catch {
+      saved = false;
+      await ports.clearQueue().catch(() => undefined);
+    }
+    await ports.reload().catch(() => undefined);
+    if (!saved)
+      return "Ghost Mode is on until Routiqo closes, but it couldn't be saved. Turn it on again to keep it.";
+    // A request already on the wire cannot be recalled; say so rather than claim otherwise.
+    return onItsWay
+      ? 'Ghost Mode is on. Something was already on its way and may still arrive. You can delete your own post from its Spot.'
+      : null;
+  }
+  try {
+    await ports.save(false);
+  } catch {
+    return "Ghost Mode couldn't be turned off. It stays on.";
+  }
+  ports.latch(false);
+  return null;
+}
 
 /**
  * Spot contributions on the device: Ghost Mode, the `spot_outbox_v1` sender for signals and posts,
@@ -75,8 +122,9 @@ function EnabledProvider({ children }: { children: ReactNode }) {
   const [outbox, setOutbox] = useState<SpotOutboxState>(idle);
   const [controller, setController] = useState<SpotOutboxController | null>(null);
 
+  // The latch that sending checks. Written only by the storage read and by setGhost, never from a
+  // render, so a render that has not caught up cannot turn sending back on.
   const ghostRef = useRef<boolean | null>(null);
-  ghostRef.current = ghost;
   const onlineRef = useRef(session.online);
   onlineRef.current = session.online;
   const foregroundRef = useRef(AppState.currentState === 'active');
@@ -86,12 +134,18 @@ function EnabledProvider({ children }: { children: ReactNode }) {
   sessionRef.current = session;
   // A report's requestId is reused for the same item and reason until it is accepted or refused.
   const reportIds = useRef(new Map<string, string>());
+  // Online actions in progress, so Ghost Mode can abort them too.
+  const actions = useRef(new Set<AbortController>());
 
   useEffect(() => {
     let live = true;
     void readGhostMode(db)
-      .then((on) => live && setGhostState(on))
-      .catch(() => live && setGhostState(true)); // Unknown state fails closed.
+      .catch(() => true) // Unknown state fails closed.
+      .then((on) => {
+        if (!live || ghostRef.current === true) return;
+        ghostRef.current = on;
+        setGhostState(on);
+      });
     return () => {
       live = false;
     };
@@ -150,26 +204,40 @@ function EnabledProvider({ children }: { children: ReactNode }) {
   }, [controller]);
 
   const setGhost = useCallback(
-    async (on: boolean) => {
-      if (on) {
-        // Stop sending before anything else, so no queued item can leave after the switch.
-        ghostRef.current = true;
-        setGhostState(true);
-        controller?.stop();
-        await setGhostMode(db, true);
-        await controller?.kick(); // reloads the now-empty queue
-        return;
-      }
-      await setGhostMode(db, false);
-      setGhostState(false);
-    },
+    (on: boolean) =>
+      switchGhostMode(on, {
+        latch: (value) => {
+          ghostRef.current = value;
+          setGhostState(value);
+        },
+        stopSending: () => {
+          let onItsWay = controller?.stop() ?? false;
+          for (const action of actions.current) {
+            action.abort();
+            onItsWay = true;
+          }
+          actions.current.clear();
+          return onItsWay;
+        },
+        save: (value) => setGhostMode(db, value),
+        clearQueue: () => clearSpotOutbox(db, 'all'),
+        reload: async () => {
+          await controller?.kick();
+        },
+      }),
     [controller, db],
   );
 
   const online = useCallback(
     async <T,>(allowedInGhost: boolean, run: (signal: AbortSignal) => Promise<T>): Promise<T> => {
       if (!allowedInGhost && ghostRef.current !== false) throw new GhostModeOn();
-      return run(new AbortController().signal);
+      const abort = new AbortController();
+      if (!allowedInGhost) actions.current.add(abort);
+      try {
+        return await run(abort.signal);
+      } finally {
+        actions.current.delete(abort);
+      }
     },
     [],
   );

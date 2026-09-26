@@ -31,7 +31,9 @@ It also requires that sign-out and account deletion clear queued social items.
      outbox, so neither waits behind the other.
    - The queue holds at most 20 entries and 32 KiB. A new signal replaces a
      queued one for the same Spot and category.
-   - Entries are sent strictly in order, one at a time. Sending needs all of:
+   - Entries are sent one at a time, in order within each kind. A post waiting
+     out a rate limit never holds up signals, and a later post never overtakes an
+     earlier one. Sending needs all of:
      - online;
      - in the foreground;
      - signed in as the queue's account;
@@ -40,9 +42,14 @@ It also requires that sign-out and account deletion clear queued social items.
    - Retries reuse the `clientKey`, so they are exact replays.
    - Outcomes:
      - an accepted send removes the entry;
-     - a refusal removes it with one message;
+     - a refusal removes it with one message. A 409 is worded neutrally,
+       because it also means the journey was not active at capture;
+     - an accepted request whose receipt can't be read also counts as sent: the
+       `clientKey` makes it final;
      - a failure backs off (60 s on 429);
      - a 401 pauses the queue until the next sign-in.
+   - A stop (Ghost Mode, background, sign-out, "Clear local data") also ends the
+     current pass, so a stale copy of the queue is never sent from.
    - Entries past their base life on the device clock are dropped unsent.
    - Waiting items are shown as "Waiting to send".
    - Votes, delete, report and block are online-only single requests:
@@ -54,17 +61,25 @@ It also requires that sign-out and account deletion clear queued social items.
      safer default: a new account on the same phone does not start sending.
    - An unreadable state counts as on.
    - Turning it on:
-     1. marks it on in memory;
-     2. aborts the send in flight;
+     1. marks it on in memory, as a latch that only a successful save of "off"
+        releases;
+     2. aborts the queued send and any vote, report or block in flight;
      3. in one SQLite transaction, stores the flag and deletes every queued
         contribution.
+   - If storing fails, it stays on in memory, the queue is cleared anyway, and the
+     traveller is told it wasn't saved.
    - While it is on, storage refuses new queue entries, and every sending
      control is disabled.
    - "Delete my post" stays available, because it only removes the traveller's
-     own content.
+     own content. **Owner to confirm.** The spec lists signals, posts, votes and
+     reports as blocked, but AGENTS.md says "stops all sending".
    - Reading Spots and journey commands are unaffected.
-   - A request the server already accepted cannot be recalled. The switch's text
-     does not claim otherwise.
+   - A request already on the wire cannot be recalled: the native driver has no
+     cancellation, so an abort only stops the app waiting.
+     - When something was on its way, turning Ghost Mode on says it "may still
+       arrive" and points to Delete my post.
+     - Making the Kotlin call cancellable is follow-up work that needs an Android
+       build.
 4. **Clearing.**
    - Sign-out clears the leaving account's queue.
    - Sign-in and restore clear every other account's queue.

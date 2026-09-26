@@ -1,6 +1,7 @@
 import {
   dropExpiredSpotContributions,
   enqueueSpotContribution,
+  nextSpotAttemptAt,
   nextSpotContribution,
   settleSpotContribution,
   type NewSpotContribution,
@@ -38,7 +39,7 @@ export interface SpotOutboxState {
   entries: QueuedSpotContribution[];
   notices: SpotOutboxNotice[];
   sending: boolean;
-  /** The last send was refused for the session; sending resumes after the next sign-in check. */
+  /** The session was refused; this controller sends nothing more (sign-in creates a new one). */
   paused: boolean;
 }
 
@@ -50,12 +51,16 @@ const refusal: Partial<Record<NativeSpotsError['code'], string>> = {
   'contact-details': "Links and phone numbers aren't allowed in posts.",
   forbidden: "You can't post right now, so it wasn't sent.",
   'not-found': "That Spot or journey isn't available, so it wasn't sent.",
-  conflict: "That was already sent differently, so this copy wasn't sent.",
+  // 409 covers both a changed replay and a journey that was not active at capture.
+  conflict: "It couldn't be sent for this journey.",
   invalid: "It couldn't be sent.",
 };
 
 function outcomeOf(error: unknown): { outcome: SpotSendOutcome; notice?: string; pause?: boolean } {
   if (error instanceof NativeSpotsError) {
+    // A 2xx whose receipt could not be read was still accepted; the clientKey makes it final.
+    if (error.code === 'invalid' && error.status === undefined)
+      return { outcome: { kind: 'sent' } };
     if (error.code === 'session') return { outcome: { kind: 'retry' }, pause: true };
     if (error.code === 'rate-limited')
       return { outcome: { kind: 'retry', retryAfterMs: RATE_LIMIT_WAIT_MS } };
@@ -78,8 +83,15 @@ export function createSpotOutboxController(
   let inFlight: AbortController | null = null;
   let cancelTimer: (() => void) | null = null;
   let noticeId = 0;
+  /** Bumped by stop(): a pass that started earlier must not send from its now-stale copy. */
+  let epoch = 0;
 
   const publish = (next: Partial<SpotOutboxState>) => {
+    const same =
+      next.entries !== undefined &&
+      Object.keys(next).length === 1 &&
+      JSON.stringify(next.entries) === JSON.stringify(state.entries);
+    if (same) return; // Periodic checks re-render nothing when the queue did not change.
     state = { ...state, ...next };
     if (!disposed) onChange(state);
   };
@@ -94,7 +106,10 @@ export function createSpotOutboxController(
   async function pass(): Promise<void> {
     cancelTimer?.();
     cancelTimer = null;
+    const started = epoch;
+    const current = () => !disposed && epoch === started;
     let outbox = await ports.load();
+    if (!current()) return;
     publish({ entries: outbox.entries });
     const now = ports.now();
     if (dropExpiredSpotContributions(outbox, now).dropped.length > 0) {
@@ -106,15 +121,12 @@ export function createSpotOutboxController(
       });
       for (const entry of dropped) notify(`${what(entry)} waited too long and wasn't sent.`);
     }
-    while (!disposed && !state.paused && ports.eligible()) {
+    while (current() && !state.paused && ports.eligible()) {
       const entry = nextSpotContribution(outbox, ports.now(), ports.journeyOnServer);
       if (!entry) {
-        const first = outbox.entries[0];
-        if (first && ports.journeyOnServer(first.journeyId))
-          cancelTimer = ports.schedule(
-            () => void kick(),
-            Math.max(0, first.nextAttemptAt - ports.now()),
-          );
+        const at = nextSpotAttemptAt(outbox, ports.journeyOnServer);
+        if (at !== null)
+          cancelTimer = ports.schedule(() => void kick(), Math.max(0, at - ports.now()));
         return;
       }
       const abort = new AbortController();
@@ -134,10 +146,10 @@ export function createSpotOutboxController(
         if (inFlight === abort) inFlight = null;
       }
       publish({ sending: false });
-      if (disposed || abort.signal.aborted) return;
-      outbox = await commit((current) =>
+      if (!current() || abort.signal.aborted) return;
+      outbox = await commit((queue) =>
         settleSpotContribution(
-          current,
+          queue,
           entry.clientKey,
           settled.outcome,
           ports.now(),
@@ -150,6 +162,7 @@ export function createSpotOutboxController(
   }
 
   function stop() {
+    epoch += 1;
     cancelTimer?.();
     cancelTimer = null;
     inFlight?.abort();
@@ -185,13 +198,16 @@ export function createSpotOutboxController(
     },
     /** Something that affects sending changed: connectivity, foreground, session, journey. */
     kick,
-    /** A session check succeeded: resume after a 401 pause. */
-    resume() {
-      publish({ paused: false });
-      void kick();
+    /**
+     * Aborts the request in flight without settling it (Ghost Mode, background, sign-out) and
+     * ends the current pass. The native call cannot be cancelled once on the wire, so this
+     * returns whether a send may still reach the server.
+     */
+    stop(): boolean {
+      const sending = inFlight !== null;
+      stop();
+      return sending;
     },
-    /** Aborts the request in flight without settling it (Ghost Mode, background, sign-out). */
-    stop,
     dismiss(id: number) {
       publish({ notices: state.notices.filter((notice) => notice.id !== id) });
     },
