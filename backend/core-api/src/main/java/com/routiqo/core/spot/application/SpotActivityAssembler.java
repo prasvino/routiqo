@@ -66,10 +66,13 @@ final class SpotActivityAssembler {
         var postViews = new ArrayList<SpotActivity.PostView>();
         for (PostRow post : posts) {
             List<VoteRow> current = votes.getOrDefault(post.ref(), List.of());
-            live |= !post.effectiveCreated().isBefore(liveSince) || confirmedSince(current, liveSince);
+            boolean mine = post.actorId().equals(viewer);
+            boolean hidden = post.hidden() && mine;
+            if (post.hidden() && !mine) continue; // The reader already excludes these; never show them.
+            if (!hidden) live |= !post.effectiveCreated().isBefore(liveSince) || confirmedSince(current, liveSince);
             postViews.add(new SpotActivity.PostView(post.ref(), post.alias(), post.text(), post.type(),
                     post.effectiveCreated(), post.expiresAt(), stillTrue(current), viewerVote(current, viewer),
-                    post.actorId().equals(viewer)));
+                    mine, hidden));
         }
         var highlights = contents.highlights().stream().filter(row -> row.spotId().equals(spotId))
                 .limit(3).map(row -> new SpotActivity.Highlight(row.text(), row.createdAt())).toList();

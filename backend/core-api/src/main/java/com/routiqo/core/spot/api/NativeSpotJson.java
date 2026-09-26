@@ -111,7 +111,7 @@ final class NativeSpotJson {
         node.put("ref", post.ref().toString()).put("alias", post.alias()).put("text", post.text())
                 .put("type", post.type()).put("capturedAt", post.capturedAt().toString())
                 .put("expiresAt", post.expiresAt().toString()).put("stillTrue", post.stillTrue())
-                .put("viewerVote", post.viewerVote()).put("mine", post.mine());
+                .put("viewerVote", post.viewerVote()).put("mine", post.mine()).put("hidden", post.hidden());
         return MAPPER.writeValueAsBytes(node).length;
     }
 
@@ -152,6 +152,7 @@ final class NativeSpotJson {
                 if (post.viewerVote() == null) node.putNull("viewerVote");
                 else node.put("viewerVote", post.viewerVote());
                 node.put("mine", post.mine());
+                node.put("hidden", post.hidden());
             }
             spot.put("postsTruncated", entry.postsTruncated());
             ArrayNode highlights = spot.putArray("highlights");

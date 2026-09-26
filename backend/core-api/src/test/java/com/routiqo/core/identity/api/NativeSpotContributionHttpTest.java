@@ -168,7 +168,7 @@ class NativeSpotContributionHttpTest {
                 .containsExactlyInAnyOrder("ref", "category", "value", "values", "latestAt", "stillTrue", "viewerVote");
         assertThat(JsonPath.<Map<String, Object>>read(read.body(), "$.spots[0].posts[0]").keySet())
                 .containsExactlyInAnyOrder("ref", "alias", "text", "type", "capturedAt", "expiresAt", "stillTrue",
-                        "viewerVote", "mine");
+                        "viewerVote", "mine", "hidden");
         assertThat(JsonPath.<Boolean>read(read.body(), "$.spots[0].posts[0].mine")).isFalse();
         assertThat(JsonPath.<String>read(read.body(), "$.spots[0].posts[0].alias")).isEqualTo(alias);
         assertThat(read.body()).doesNotContain(author.account(), other.account(), journey, otherJourney);

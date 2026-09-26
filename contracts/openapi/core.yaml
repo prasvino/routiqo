@@ -1994,7 +1994,7 @@ paths:
   /api/v1/admin/auth/google/exchange:
     post:
       operationId: exchangeAdminGoogleIdentity
-      description: Separate Google audience; resolves an existing enabled account with a current finite traffic grant; never creates an account.
+      description: Separate Google audience; resolves an existing enabled account with a current finite traffic or Spots grant; never creates an account. Sessions last 15 minutes and renew up to 8 hours from sign-in (ADR 0075).
       requestBody:
         required: true
         content:
@@ -2011,7 +2011,7 @@ paths:
           {
             description: Admin session,
             content:
-              { application/json: { schema: { $ref: '#/components/schemas/BrowserSession' } } },
+              { application/json: { schema: { $ref: '#/components/schemas/AdminSession' } } },
           }
         '401': { $ref: '#/components/responses/AuthRejected' }
   /api/v1/admin/auth/session:
@@ -2023,7 +2023,20 @@ paths:
           {
             description: Current admin session,
             content:
-              { application/json: { schema: { $ref: '#/components/schemas/BrowserSession' } } },
+              { application/json: { schema: { $ref: '#/components/schemas/AdminSession' } } },
+          }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+  /api/v1/admin/auth/session/renew:
+    post:
+      operationId: renewAdminSession
+      security: [{ adminSession: [] }]
+      description: Extends an active session to 15 minutes from now, never past absoluteExpiresAt (8 hours from sign-in); requires a current admin grant. Empty body or {}.
+      responses:
+        '200':
+          {
+            description: Renewed admin session,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/AdminSession' } } },
           }
         '401': { $ref: '#/components/responses/AuthRejected' }
   /api/v1/admin/auth/logout:
@@ -2032,6 +2045,234 @@ paths:
       security: [{ adminSession: [] }]
       responses:
         '204': { description: Admin session cookie cleared }
+  /api/v1/admin/spots/reports:
+    get:
+      operationId: readAdminSpotReportQueue
+      security: [{ adminSession: [] }]
+      description: Open Spot report groups, 20 per page, urgent (unsafe, abuse or personal data) first, newest report first. Requires spots_review. No reporter, author or account identifier. Every read is audited for 30 days. Groups whose evidence is gone close as CLOSED_EVIDENCE_UNAVAILABLE, so a page may hold fewer than 20 items with a non-null nextCursor (ADR 0075).
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, maxLength: 96 } }
+      responses:
+        '200':
+          {
+            description: Moderator queue page,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/AdminSpotQueue' } } },
+          }
+        '400': { description: Invalid query or cursor }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current spots_review grant }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spots/reports/{ref}/dismiss:
+    post:
+      operationId: dismissAdminSpotReport
+      security: [{ adminSession: [] }]
+      description: 'Requires spots_review. Closes the group and rules its reports not upheld; the item is unchanged. Reason not_upheld. Exact requestId replays; a changed retry is 409. 10 decisions per minute per operator; audited 30 days.'
+      parameters:
+        - { name: ref, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/AdminSpotDecisionRequest' } },
+            },
+        }
+      responses:
+        '200':
+          {
+            description: Decision recorded or replayed,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/AdminSpotDecision' } } },
+          }
+        '400': { description: Invalid body or reason for this action }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current grant for this action }
+        '404': { description: 'Unknown report group, or its evidence is gone' }
+        '409':
+          { description: 'Changed retry, or the group or item is not in a state for this action' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spots/reports/{ref}/hide:
+    post:
+      operationId: hideAdminSpotItem
+      security: [{ adminSession: [] }]
+      description: "Requires spots_hide. Hides the post, or the incident's current signals, from every read at once; the author still sees their hidden post. Reasons abuse, spam, false_alarm, personal_data, unsafe. Exact requestId replays; a changed retry is 409. 10 decisions per minute per operator; audited 30 days."
+      parameters:
+        - { name: ref, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/AdminSpotDecisionRequest' } },
+            },
+        }
+      responses:
+        '200':
+          {
+            description: Decision recorded or replayed,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/AdminSpotDecision' } } },
+          }
+        '400': { description: Invalid body or reason for this action }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current grant for this action }
+        '404': { description: 'Unknown report group, or its evidence is gone' }
+        '409':
+          { description: 'Changed retry, or the group or item is not in a state for this action' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spots/reports/{ref}/restore:
+    post:
+      operationId: restoreAdminSpotItem
+      security: [{ adminSession: [] }]
+      description: 'Requires spots_hide. Undoes a hide (an expired item stays expired) and rules the reports not upheld. Reasons not_upheld, error_correction. Exact requestId replays; a changed retry is 409. 10 decisions per minute per operator; audited 30 days.'
+      parameters:
+        - { name: ref, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/AdminSpotDecisionRequest' } },
+            },
+        }
+      responses:
+        '200':
+          {
+            description: Decision recorded or replayed,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/AdminSpotDecision' } } },
+          }
+        '400': { description: Invalid body or reason for this action }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current grant for this action }
+        '404': { description: 'Unknown report group, or its evidence is gone' }
+        '409':
+          { description: 'Changed retry, or the group or item is not in a state for this action' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spots/reports/{ref}/clear-signals:
+    post:
+      operationId: clearAdminSpotSignals
+      security: [{ adminSession: [] }]
+      description: 'Requires spots_hide. Summary groups only: ends every current signal for that Spot and category. Reasons false_alarm, spam. Exact requestId replays; a changed retry is 409. 10 decisions per minute per operator; audited 30 days.'
+      parameters:
+        - { name: ref, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: '#/components/schemas/AdminSpotDecisionRequest' } },
+            },
+        }
+      responses:
+        '200':
+          {
+            description: Decision recorded or replayed,
+            content:
+              { application/json: { schema: { $ref: '#/components/schemas/AdminSpotDecision' } } },
+          }
+        '400': { description: Invalid body or reason for this action }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current grant for this action }
+        '404': { description: 'Unknown report group, or its evidence is gone' }
+        '409':
+          { description: 'Changed retry, or the group or item is not in a state for this action' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spot-grants/me:
+    get:
+      operationId: readAdminSpotGrantCapability
+      description: Whether the current admin session holds a current spots_grant_admin grant.
+      security: [{ adminSession: [] }]
+      responses:
+        '200':
+          {
+            description: Current Spots grant-administrator authority,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminTrafficGrantCapabilityV3' } },
+              },
+          }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+  /api/v1/admin/spot-grants/{targetId}:
+    get:
+      operationId: readAdminSpotGrants
+      security: [{ adminSession: [] }]
+      description: A target account's current Spots queue grants. Requires spots_grant_admin; audited 30 days.
+      parameters:
+        - { name: targetId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          {
+            description: Current Spots grants,
+            content:
+              {
+                application/json: { schema: { $ref: '#/components/schemas/AdminSpotGrantReview' } },
+              },
+          }
+        '401': { $ref: '#/components/responses/AuthRejected' }
+        '403': { description: No current spots_grant_admin grant }
+        '404': { description: 'Unknown, disabled or own account' }
+  /api/v1/admin/spot-grants/{targetId}/issue:
+    post:
+      operationId: issueAdminSpotGrant
+      security: [{ adminSession: [] }]
+      description: Issues a 60 to 720 minute shift grant. Never self; spots_grant_admin is never issued here. A live grant must be revoked first; an exact retry replays without extending.
+      parameters:
+        - { name: targetId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/AdminSpotGrantIssue' } } },
+        }
+      responses:
+        '200':
+          {
+            description: Grant issued or replayed,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminSpotGrantReceipt' } },
+              },
+          }
+        '400': { description: Invalid request }
+        '403': { description: No current spots_grant_admin grant }
+        '404': { description: 'Unknown, disabled or own account' }
+        '409': { description: Live grant or changed retry }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+  /api/v1/admin/spot-grants/{targetId}/revoke:
+    post:
+      operationId: revokeAdminSpotGrant
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: targetId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        {
+          required: true,
+          content:
+            { application/json: { schema: { $ref: '#/components/schemas/AdminSpotGrantRevoke' } } },
+        }
+      responses:
+        '200':
+          {
+            description: Grant revoked or replayed,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: '#/components/schemas/AdminSpotGrantReceipt' } },
+              },
+          }
+        '400': { description: Invalid request }
+        '403': { description: No current spots_grant_admin grant }
+        '404': { description: 'Unknown, disabled or own account' }
+        '409': { description: No live grant or changed retry }
+        '429': { $ref: '#/components/responses/AuthLimited' }
   /api/v1/admin/community-traffic/reports:
     get:
       operationId: readAdminTrafficReportQueue
@@ -2456,7 +2697,7 @@ components:
     NativeSpotPost:
       type: object
       additionalProperties: false
-      required: [ref, alias, text, type, capturedAt, expiresAt, stillTrue, viewerVote, mine]
+      required: [ref, alias, text, type, capturedAt, expiresAt, stillTrue, viewerVote, mine, hidden]
       properties:
         ref: { $ref: '#/components/schemas/NativeSpotId' }
         alias:
@@ -2470,6 +2711,9 @@ components:
         mine:
           type: boolean
           description: "True only for the viewer's own posts, so they can delete them."
+        hidden:
+          type: boolean
+          description: "True only on the viewer's own post that a moderator hid; hidden posts never reach anyone else (ADR 0075)."
     NativeSpotReportRequest:
       type: object
       additionalProperties: false
@@ -3172,6 +3416,143 @@ components:
       required: [status]
       properties:
         status: { type: string, enum: [dismissed, suppressed] }
+    AdminSession:
+      type: object
+      additionalProperties: false
+      required: [accountId, expiresAt, absoluteExpiresAt]
+      properties:
+        accountId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        absoluteExpiresAt:
+          type: string
+          format: date-time
+          description: 8 hours from sign-in; renewal never extends past it.
+    AdminSpotQueue:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/AdminSpotQueueItem' }
+        nextCursor: { type: string, nullable: true, maxLength: 96 }
+    AdminSpotQueueItem:
+      type: object
+      additionalProperties: false
+      description: One reported item. Post fields are null for summaries and summary fields null for posts. Never a reporter, author or account identifier.
+      required:
+        [
+          reportRef,
+          kind,
+          urgent,
+          spotName,
+          spotNameTa,
+          text,
+          postType,
+          alias,
+          category,
+          value,
+          capturedAt,
+          expiresAt,
+          state,
+          reports,
+          stillTrue,
+          noLongerTrue,
+          openSince,
+        ]
+      properties:
+        reportRef: { type: string, format: uuid }
+        kind: { type: string, enum: [post, summary] }
+        urgent: { type: boolean }
+        spotName: { type: string, nullable: true, maxLength: 80 }
+        spotNameTa: { type: string, nullable: true, maxLength: 80 }
+        text: { type: string, nullable: true, maxLength: 200 }
+        postType: { type: string, nullable: true, enum: [traffic, place] }
+        alias: { type: string, nullable: true, maxLength: 40 }
+        category: { type: string, nullable: true, enum: [traffic, queue, food, fuel, restroom] }
+        value: { type: string, nullable: true, maxLength: 16 }
+        capturedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        state: { type: string, enum: [active, hidden, expired, deleted] }
+        reports:
+          type: object
+          additionalProperties: false
+          required: [unsafe, abuse, personal_data, false_alarm, spam]
+          properties:
+            unsafe: { type: integer, minimum: 0 }
+            abuse: { type: integer, minimum: 0 }
+            personal_data: { type: integer, minimum: 0 }
+            false_alarm: { type: integer, minimum: 0 }
+            spam: { type: integer, minimum: 0 }
+        stillTrue: { type: integer, minimum: 0 }
+        noLongerTrue: { type: integer, minimum: 0 }
+        openSince: { type: string, format: date-time }
+    AdminSpotDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, reason]
+      properties:
+        requestId: { type: string, format: uuid }
+        reason:
+          type: string
+          enum: [abuse, spam, false_alarm, personal_data, unsafe, not_upheld, error_correction]
+    AdminSpotDecision:
+      type: object
+      additionalProperties: false
+      required: [status, replayed]
+      properties:
+        status: { type: string, enum: [dismissed, hidden, restored, cleared] }
+        replayed: { type: boolean }
+    AdminSpotGrantPermission:
+      type: string
+      enum: [spots_review, spots_hide, spots_restrict, spots_alias_lookup]
+    AdminSpotGrantReason:
+      type: string
+      enum: [shift_start, coverage_change, security_response, error_correction]
+    AdminSpotGrantReview:
+      type: object
+      additionalProperties: false
+      required: [targetId, grants]
+      properties:
+        targetId: { type: string, format: uuid }
+        grants:
+          type: array
+          maxItems: 4
+          items:
+            type: object
+            additionalProperties: false
+            required: [permission, expiresAt]
+            properties:
+              permission: { $ref: '#/components/schemas/AdminSpotGrantPermission' }
+              expiresAt: { type: string, format: date-time }
+    AdminSpotGrantIssue:
+      type: object
+      additionalProperties: false
+      required: [requestId, permission, reason, durationMinutes]
+      properties:
+        requestId: { type: string, format: uuid }
+        permission: { $ref: '#/components/schemas/AdminSpotGrantPermission' }
+        reason: { $ref: '#/components/schemas/AdminSpotGrantReason' }
+        durationMinutes: { type: integer, minimum: 60, maximum: 720 }
+    AdminSpotGrantRevoke:
+      type: object
+      additionalProperties: false
+      required: [requestId, permission, reason]
+      properties:
+        requestId: { type: string, format: uuid }
+        permission: { $ref: '#/components/schemas/AdminSpotGrantPermission' }
+        reason: { $ref: '#/components/schemas/AdminSpotGrantReason' }
+    AdminSpotGrantReceipt:
+      type: object
+      additionalProperties: false
+      required: [targetId, permission, expiresAt, requestId, replayed]
+      properties:
+        targetId: { type: string, format: uuid }
+        permission: { $ref: '#/components/schemas/AdminSpotGrantPermission' }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        requestId: { type: string, format: uuid }
+        replayed: { type: boolean }
     AdminTrafficGrantCapabilityV3:
       type: object
       additionalProperties: false

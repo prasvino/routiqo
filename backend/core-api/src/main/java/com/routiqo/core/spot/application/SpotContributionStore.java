@@ -27,8 +27,9 @@ public interface SpotContributionStore {
     }
     /** Stored item state as seen by its author: ACTIVE, SUPERSEDED, DELETED or EXPIRED_EARLY. */
     record ItemState(UUID ref, Kind kind, String state, Instant expiresAt, String alias) {}
+    /** {@code hidden}: a moderator hid it (ADR 0075); only its author can still act on it (delete). */
     record LockedPost(UUID ref, UUID actorId, String type, String state, Instant effectiveCreated,
-            Instant expiresAt, Instant maxExpiresAt) {}
+            Instant expiresAt, Instant maxExpiresAt, boolean hidden) {}
     record LockedSignal(UUID ref, UUID actorId, String category, Instant effectiveCreated,
             Instant expiresAt, Instant maxExpiresAt) {}
 

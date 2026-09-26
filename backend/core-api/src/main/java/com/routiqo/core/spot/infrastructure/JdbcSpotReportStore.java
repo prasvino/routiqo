@@ -61,7 +61,7 @@ final class JdbcSpotReportStore implements SpotReportStore {
         Timestamp at = Timestamp.from(now);
         Optional<Reportable> post = jdbc.query("""
                 SELECT spot_id, actor_id, effective_created_at FROM spot_post
-                WHERE ref = ? AND state = 'ACTIVE' AND expires_at > ?
+                WHERE ref = ? AND state = 'ACTIVE' AND expires_at > ? AND moderation_hidden_at IS NULL
                 """, (row, index) -> new Reportable(ref, ItemKind.POST, row.getObject("spot_id", UUID.class),
                         row.getTimestamp("effective_created_at").toInstant(),
                         List.of(row.getObject("actor_id", UUID.class)), List.of(ref)), ref, at).stream().findFirst();
@@ -69,7 +69,8 @@ final class JdbcSpotReportStore implements SpotReportStore {
         record Signal(UUID ref, UUID spotId, UUID actorId, Instant created) {}
         List<Signal> signals = jdbc.query("""
                 SELECT ref, spot_id, actor_id, effective_created_at FROM spot_signal
-                WHERE group_ref = ? AND state = 'ACTIVE' AND expires_at > ? ORDER BY ref LIMIT 500
+                WHERE group_ref = ? AND state = 'ACTIVE' AND expires_at > ? AND moderation_hidden_at IS NULL
+                ORDER BY ref LIMIT 500
                 """, (row, index) -> new Signal(row.getObject("ref", UUID.class), row.getObject("spot_id", UUID.class),
                         row.getObject("actor_id", UUID.class), row.getTimestamp("effective_created_at").toInstant()),
                 ref, at);
@@ -127,7 +128,7 @@ final class JdbcSpotReportStore implements SpotReportStore {
     @Override public Optional<BlockablePost> blockablePost(UUID ref, Instant now) {
         return jdbc.query("""
                 SELECT actor_id, spot_id, room_day, alias FROM spot_post
-                WHERE ref = ? AND state = 'ACTIVE' AND expires_at > ?
+                WHERE ref = ? AND state = 'ACTIVE' AND expires_at > ? AND moderation_hidden_at IS NULL
                 """, (row, index) -> new BlockablePost(row.getObject("actor_id", UUID.class),
                         row.getObject("spot_id", UUID.class), row.getDate("room_day").toLocalDate(),
                         row.getString("alias")), ref, Timestamp.from(now)).stream().findFirst();

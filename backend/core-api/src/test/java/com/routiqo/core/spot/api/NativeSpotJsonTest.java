@@ -20,7 +20,7 @@ class NativeSpotJsonTest {
             var posts = new ArrayList<SpotActivity.PostView>();
             for (int post = 0; post < 10; post++)
                 posts.add(new SpotActivity.PostView(UUID.randomUUID(), "Calm Auto", "த".repeat(200), "place",
-                        NOW.minusSeconds(60L * (post * 20 + spot)), NOW.plusSeconds(3600), 0, null, false));
+                        NOW.minusSeconds(60L * (post * 20 + spot)), NOW.plusSeconds(3600), 0, null, false, false));
             var signal = new SpotActivity.SignalSummary(UUID.randomUUID(), "traffic", "slow",
                     List.of(new SpotActivity.ValueCount("slow", 2)), NOW, 0, null);
             entries.add(new SpotActivity.Entry(new UUID(0x4000L, spot + 1L), SpotActivity.State.LIVE,

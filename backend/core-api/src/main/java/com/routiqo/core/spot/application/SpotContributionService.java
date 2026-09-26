@@ -191,7 +191,7 @@ public final class SpotContributionService {
     }
 
     private VoteResult votePost(UUID actor, SpotContributionStore.LockedPost post, VoteKind kind, Instant now) {
-        if (!"ACTIVE".equals(post.state()) || !post.expiresAt().isAfter(now))
+        if (!"ACTIVE".equals(post.state()) || !post.expiresAt().isAfter(now) || post.hidden())
             throw new SpotContributionNotFound();
         if (post.actorId().equals(actor)) throw new SpotContributionForbidden();
         Instant expires = post.expiresAt();

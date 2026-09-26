@@ -1190,7 +1190,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Separate Google audience; resolves an existing enabled account with a current finite traffic grant; never creates an account. */
+        /** @description Separate Google audience; resolves an existing enabled account with a current finite traffic or Spots grant; never creates an account. Sessions last 15 minutes and renew up to 8 hours from sign-in (ADR 0075). */
         post: operations["exchangeAdminGoogleIdentity"];
         delete?: never;
         options?: never;
@@ -1214,6 +1214,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/auth/session/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Extends an active session to 15 minutes from now, never past absoluteExpiresAt (8 hours from sign-in); requires a current admin grant. Empty body or {}. */
+        post: operations["renewAdminSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/auth/logout": {
         parameters: {
             query?: never;
@@ -1224,6 +1241,158 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["revokeAdminSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spots/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Open Spot report groups, 20 per page, urgent (unsafe, abuse or personal data) first, newest report first. Requires spots_review. No reporter, author or account identifier. Every read is audited for 30 days. Groups whose evidence is gone close as CLOSED_EVIDENCE_UNAVAILABLE, so a page may hold fewer than 20 items with a non-null nextCursor (ADR 0075). */
+        get: operations["readAdminSpotReportQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spots/reports/{ref}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Requires spots_review. Closes the group and rules its reports not upheld; the item is unchanged. Reason not_upheld. Exact requestId replays; a changed retry is 409. 10 decisions per minute per operator; audited 30 days. */
+        post: operations["dismissAdminSpotReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spots/reports/{ref}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Requires spots_hide. Hides the post, or the incident's current signals, from every read at once; the author still sees their hidden post. Reasons abuse, spam, false_alarm, personal_data, unsafe. Exact requestId replays; a changed retry is 409. 10 decisions per minute per operator; audited 30 days. */
+        post: operations["hideAdminSpotItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spots/reports/{ref}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Requires spots_hide. Undoes a hide (an expired item stays expired) and rules the reports not upheld. Reasons not_upheld, error_correction. Exact requestId replays; a changed retry is 409. 10 decisions per minute per operator; audited 30 days. */
+        post: operations["restoreAdminSpotItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spots/reports/{ref}/clear-signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Requires spots_hide. Summary groups only: ends every current signal for that Spot and category. Reasons false_alarm, spam. Exact requestId replays; a changed retry is 409. 10 decisions per minute per operator; audited 30 days. */
+        post: operations["clearAdminSpotSignals"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spot-grants/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Whether the current admin session holds a current spots_grant_admin grant. */
+        get: operations["readAdminSpotGrantCapability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spot-grants/{targetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A target account's current Spots queue grants. Requires spots_grant_admin; audited 30 days. */
+        get: operations["readAdminSpotGrants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spot-grants/{targetId}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Issues a 60 to 720 minute shift grant. Never self; spots_grant_admin is never issued here. A live grant must be revoked first; an exact retry replays without extending. */
+        post: operations["issueAdminSpotGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/spot-grants/{targetId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revokeAdminSpotGrant"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1437,6 +1606,8 @@ export interface components {
             viewerVote: components["schemas"]["NativeSpotVote"];
             /** @description True only for the viewer's own posts, so they can delete them. */
             mine: boolean;
+            /** @description True only on the viewer's own post that a moderator hid; hidden posts never reach anyone else (ADR 0075). */
+            hidden: boolean;
         };
         NativeSpotReportRequest: {
             requestId: components["schemas"]["NativeSpotId"];
@@ -1889,6 +2060,102 @@ export interface components {
         AdminTrafficDecisionResponseV3: {
             /** @enum {string} */
             status: "dismissed" | "suppressed";
+        };
+        AdminSession: {
+            /** Format: uuid */
+            accountId: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /**
+             * Format: date-time
+             * @description 8 hours from sign-in; renewal never extends past it.
+             */
+            absoluteExpiresAt: string;
+        };
+        AdminSpotQueue: {
+            items: components["schemas"]["AdminSpotQueueItem"][];
+            nextCursor: string | null;
+        };
+        /** @description One reported item. Post fields are null for summaries and summary fields null for posts. Never a reporter, author or account identifier. */
+        AdminSpotQueueItem: {
+            /** Format: uuid */
+            reportRef: string;
+            /** @enum {string} */
+            kind: "post" | "summary";
+            urgent: boolean;
+            spotName: string | null;
+            spotNameTa: string | null;
+            text: string | null;
+            /** @enum {string|null} */
+            postType: "traffic" | "place" | null;
+            alias: string | null;
+            /** @enum {string|null} */
+            category: "traffic" | "queue" | "food" | "fuel" | "restroom" | null;
+            value: string | null;
+            /** Format: date-time */
+            capturedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @enum {string} */
+            state: "active" | "hidden" | "expired" | "deleted";
+            reports: {
+                unsafe: number;
+                abuse: number;
+                personal_data: number;
+                false_alarm: number;
+                spam: number;
+            };
+            stillTrue: number;
+            noLongerTrue: number;
+            /** Format: date-time */
+            openSince: string;
+        };
+        AdminSpotDecisionRequest: {
+            /** Format: uuid */
+            requestId: string;
+            /** @enum {string} */
+            reason: "abuse" | "spam" | "false_alarm" | "personal_data" | "unsafe" | "not_upheld" | "error_correction";
+        };
+        AdminSpotDecision: {
+            /** @enum {string} */
+            status: "dismissed" | "hidden" | "restored" | "cleared";
+            replayed: boolean;
+        };
+        /** @enum {string} */
+        AdminSpotGrantPermission: "spots_review" | "spots_hide" | "spots_restrict" | "spots_alias_lookup";
+        /** @enum {string} */
+        AdminSpotGrantReason: "shift_start" | "coverage_change" | "security_response" | "error_correction";
+        AdminSpotGrantReview: {
+            /** Format: uuid */
+            targetId: string;
+            grants: {
+                permission: components["schemas"]["AdminSpotGrantPermission"];
+                /** Format: date-time */
+                expiresAt: string;
+            }[];
+        };
+        AdminSpotGrantIssue: {
+            /** Format: uuid */
+            requestId: string;
+            permission: components["schemas"]["AdminSpotGrantPermission"];
+            reason: components["schemas"]["AdminSpotGrantReason"];
+            durationMinutes: number;
+        };
+        AdminSpotGrantRevoke: {
+            /** Format: uuid */
+            requestId: string;
+            permission: components["schemas"]["AdminSpotGrantPermission"];
+            reason: components["schemas"]["AdminSpotGrantReason"];
+        };
+        AdminSpotGrantReceipt: {
+            /** Format: uuid */
+            targetId: string;
+            permission: components["schemas"]["AdminSpotGrantPermission"];
+            /** Format: date-time */
+            expiresAt: string | null;
+            /** Format: uuid */
+            requestId: string;
+            replayed: boolean;
         };
         AdminTrafficGrantCapabilityV3: {
             canManageGrants: boolean;
@@ -5425,7 +5692,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrowserSession"];
+                    "application/json": components["schemas"]["AdminSession"];
                 };
             };
             401: components["responses"]["AuthRejected"];
@@ -5446,7 +5713,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrowserSession"];
+                    "application/json": components["schemas"]["AdminSession"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+        };
+    };
+    renewAdminSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Renewed admin session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSession"];
                 };
             };
             401: components["responses"]["AuthRejected"];
@@ -5468,6 +5756,436 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    readAdminSpotReportQueue: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moderator queue page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotQueue"];
+                };
+            };
+            /** @description Invalid query or cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current spots_review grant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    dismissAdminSpotReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Decision recorded or replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotDecision"];
+                };
+            };
+            /** @description Invalid body or reason for this action */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current grant for this action */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown report group, or its evidence is gone */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Changed retry, or the group or item is not in a state for this action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    hideAdminSpotItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Decision recorded or replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotDecision"];
+                };
+            };
+            /** @description Invalid body or reason for this action */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current grant for this action */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown report group, or its evidence is gone */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Changed retry, or the group or item is not in a state for this action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    restoreAdminSpotItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Decision recorded or replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotDecision"];
+                };
+            };
+            /** @description Invalid body or reason for this action */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current grant for this action */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown report group, or its evidence is gone */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Changed retry, or the group or item is not in a state for this action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    clearAdminSpotSignals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Decision recorded or replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotDecision"];
+                };
+            };
+            /** @description Invalid body or reason for this action */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current grant for this action */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown report group, or its evidence is gone */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Changed retry, or the group or item is not in a state for this action */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    readAdminSpotGrantCapability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current Spots grant-administrator authority */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrafficGrantCapabilityV3"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+        };
+    };
+    readAdminSpotGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                targetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current Spots grants */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotGrantReview"];
+                };
+            };
+            401: components["responses"]["AuthRejected"];
+            /** @description No current spots_grant_admin grant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, disabled or own account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    issueAdminSpotGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                targetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotGrantIssue"];
+            };
+        };
+        responses: {
+            /** @description Grant issued or replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotGrantReceipt"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No current spots_grant_admin grant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, disabled or own account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Live grant or changed retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
+        };
+    };
+    revokeAdminSpotGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                targetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSpotGrantRevoke"];
+            };
+        };
+        responses: {
+            /** @description Grant revoked or replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSpotGrantReceipt"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No current spots_grant_admin grant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, disabled or own account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No live grant or changed retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["AuthLimited"];
         };
     };
     readAdminTrafficReportQueue: {

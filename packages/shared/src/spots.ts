@@ -67,6 +67,8 @@ export interface SpotPost {
   viewerVote: SpotVote | null;
   /** True only for the viewer's own posts, so they can delete them. */
   mine: boolean;
+  /** True only on the viewer's own post that a moderator hid; no one else receives it (ADR 0075). */
+  hidden: boolean;
 }
 
 export interface SpotHighlight {
@@ -261,6 +263,9 @@ function post(input: unknown): SpotPost {
     invalid();
   if (entry.type !== 'traffic' && entry.type !== 'place') invalid();
   if (typeof entry.mine !== 'boolean') invalid();
+  // An older server omits `hidden`; a hidden post that is not the viewer's own is never valid.
+  const hidden = entry.hidden === undefined ? false : entry.hidden;
+  if (typeof hidden !== 'boolean' || (hidden && !entry.mine)) invalid();
   return {
     ref: id(entry.ref),
     alias: label(entry.alias),
@@ -271,6 +276,7 @@ function post(input: unknown): SpotPost {
     stillTrue: count(entry.stillTrue),
     viewerVote: vote(entry.viewerVote),
     mine: entry.mine,
+    hidden,
   };
 }
 

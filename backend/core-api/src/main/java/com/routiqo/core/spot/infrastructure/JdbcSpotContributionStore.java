@@ -156,12 +156,13 @@ final class JdbcSpotContributionStore implements SpotContributionStore {
     @Override public Optional<LockedPost> lockPost(UUID ref) {
         requireTransaction();
         return jdbc.query("""
-                SELECT ref, actor_id, type, state, effective_created_at, expires_at, max_expires_at
+                SELECT ref, actor_id, type, state, effective_created_at, expires_at, max_expires_at,
+                    moderation_hidden_at IS NOT NULL AS hidden
                 FROM spot_post WHERE ref = ? FOR UPDATE
                 """, (row, index) -> new LockedPost(row.getObject("ref", UUID.class),
                         row.getObject("actor_id", UUID.class), row.getString("type"), row.getString("state"),
                         instant(row, "effective_created_at"), instant(row, "expires_at"),
-                        instant(row, "max_expires_at")), ref).stream().findFirst();
+                        instant(row, "max_expires_at"), row.getBoolean("hidden")), ref).stream().findFirst();
     }
 
     @Override public boolean lockGroup(UUID groupRef) {
@@ -176,6 +177,7 @@ final class JdbcSpotContributionStore implements SpotContributionStore {
         return jdbc.query("""
                 SELECT ref, actor_id, category, effective_created_at, expires_at, max_expires_at
                 FROM spot_signal WHERE group_ref = ? AND state = 'ACTIVE' AND expires_at > ?
+                  AND moderation_hidden_at IS NULL
                 ORDER BY ref FOR UPDATE
                 """, (row, index) -> new LockedSignal(row.getObject("ref", UUID.class),
                         row.getObject("actor_id", UUID.class), row.getString("category"),

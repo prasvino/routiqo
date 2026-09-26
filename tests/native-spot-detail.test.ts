@@ -94,6 +94,7 @@ const entry: SpotActivityEntry = {
       stillTrue: 0,
       viewerVote: null,
       mine: false,
+      hidden: false,
     },
     {
       ref: id(21),
@@ -105,6 +106,7 @@ const entry: SpotActivityEntry = {
       stillTrue: 2,
       viewerVote: null,
       mine: true,
+      hidden: false,
     },
     {
       ref: id(22),
@@ -116,6 +118,7 @@ const entry: SpotActivityEntry = {
       stillTrue: 0,
       viewerVote: null,
       mine: false,
+      hidden: false,
     },
   ],
   postsTruncated: false,

@@ -48,7 +48,8 @@ final class JdbcSpotContributionMaintenance {
     /**
      * Expired place posts with at least two "Still true" votes become highlights (at most 3 kept per
      * Spot, by votes then recency, for 30 days). Traffic posts and signals never become highlights, and
-     * neither does a reported post: until moderation (step 4) can judge a report, any report blocks it.
+     * neither does a hidden post or one with a report awaiting a decision. Dismissed or restored reports
+     * (ruled not upheld) no longer block it (ADR 0075).
      */
     int promoteHighlights(int limit) {
         limit(limit);
@@ -75,7 +76,10 @@ final class JdbcSpotContributionMaintenance {
                     CROSS JOIN LATERAL (SELECT count(*)::INTEGER AS still_true FROM spot_vote v
                         WHERE v.item_ref = p.ref AND v.kind = 'STILL_TRUE') votes
                     WHERE p.ref = ANY (?) AND votes.still_true >= 2
-                      AND NOT EXISTS (SELECT 1 FROM spot_report_evidence e WHERE e.ref = p.ref)
+                      AND p.moderation_hidden_at IS NULL
+                      -- Reported posts wait for a decision; dismissed or restored ones may qualify (ADR 0075).
+                      AND NOT EXISTS (SELECT 1 FROM spot_report_evidence e
+                          WHERE e.ref = p.ref AND e.not_upheld_at IS NULL)
                     ON CONFLICT (source_post_ref) DO NOTHING
                     RETURNING spot_id
                     """, UUID.class, (Object) considered.toArray(UUID[]::new));
@@ -177,6 +181,16 @@ final class JdbcSpotContributionMaintenance {
                         SELECT ref FROM spot_report_evidence WHERE expires_at <= ?
                         ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
                     """, Timestamp.from(now), limit);
+            // Moderation records (ADR 0075): 30-day decisions, read audit and reporter outcomes, and
+            // 30-minute account references.
+            for (String table : new String[] {"spot_moderation_action", "spot_moderation_read_audit",
+                    "spot_reporter_not_upheld", "spot_account_lookup_ref"}) {
+                removed += jdbc.update("""
+                        DELETE FROM %1$s WHERE ctid IN (
+                            SELECT ctid FROM %1$s WHERE expires_at <= ?
+                            ORDER BY expires_at LIMIT ? FOR UPDATE SKIP LOCKED)
+                        """.formatted(table), Timestamp.from(now), limit);
+            }
             LocalDate yesterday = LocalDate.ofInstant(now, ROOM_ZONE).minusDays(1);
             // A hidden alias only matters while its room's posts can still be read.
             removed += jdbc.update("""

@@ -29,6 +29,9 @@ ALTER TABLE spot_report_group ADD COLUMN closed_through BIGINT;
 ALTER TABLE spot_report_group ADD COLUMN decision VARCHAR(32) CHECK (decision IN
     ('DISMISSED', 'HIDDEN', 'RESTORED', 'CLEARED', 'CLOSED_EVIDENCE_UNAVAILABLE'));
 ALTER TABLE spot_report_group ADD COLUMN decided_at TIMESTAMPTZ;
+-- Reports up to this sequence were already ruled not upheld (dismiss or restore), so a later
+-- ruling never counts a reporter twice and never counts reports a hide upheld.
+ALTER TABLE spot_report_group ADD COLUMN not_upheld_through BIGINT;
 ALTER TABLE spot_report_group ADD CONSTRAINT spot_report_group_decision CHECK (
     (closed_through IS NULL) = (decision IS NULL) AND (decision IS NULL) = (decided_at IS NULL));
 -- Urgent first (unsafe, abuse or personal data), newest report first within a tier.

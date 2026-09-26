@@ -20,16 +20,18 @@ final class JdbcSpotActivityReader implements SpotActivityReader {
         Timestamp at = Timestamp.from(now);
         List<SignalRow> signals = jdbc.query("""
                 SELECT spot_id, group_ref, category, value, actor_id, effective_created_at FROM spot_signal
-                WHERE spot_id = ANY (?) AND state = 'ACTIVE' AND expires_at > ?
+                WHERE spot_id = ANY (?) AND state = 'ACTIVE' AND expires_at > ? AND moderation_hidden_at IS NULL
                 """, (row, index) -> new SignalRow(row.getObject("spot_id", UUID.class),
                         row.getObject("group_ref", UUID.class), row.getString("category"), row.getString("value"),
                         row.getObject("actor_id", UUID.class), row.getTimestamp("effective_created_at").toInstant()),
                 ids, at);
         List<PostRow> posts = jdbc.query("""
-                SELECT spot_id, ref, actor_id, type, text, alias, effective_created_at, expires_at FROM (
+                SELECT spot_id, ref, actor_id, type, text, alias, effective_created_at, expires_at,
+                    moderation_hidden_at IS NOT NULL AS hidden FROM (
                     SELECT p.*, row_number() OVER (PARTITION BY spot_id
                         ORDER BY effective_created_at DESC, ref) AS position
                     FROM spot_post p WHERE spot_id = ANY (?) AND state = 'ACTIVE' AND expires_at > ?
+                      AND (p.moderation_hidden_at IS NULL OR p.actor_id = ?)
                       AND NOT EXISTS (SELECT 1 FROM spot_hidden_alias h WHERE h.blocker_id = ?
                           AND h.spot_id = p.spot_id AND h.room_day = p.room_day AND h.alias = p.alias)) newest
                 WHERE position <= 10
@@ -37,7 +39,7 @@ final class JdbcSpotActivityReader implements SpotActivityReader {
                         row.getObject("ref", UUID.class), row.getObject("actor_id", UUID.class),
                         row.getString("type"), row.getString("text"), row.getString("alias"),
                         row.getTimestamp("effective_created_at").toInstant(),
-                        row.getTimestamp("expires_at").toInstant()), ids, at, viewer);
+                        row.getTimestamp("expires_at").toInstant(), row.getBoolean("hidden")), ids, at, viewer, viewer);
         var refs = new ArrayList<UUID>();
         signals.forEach(row -> refs.add(row.groupRef()));
         posts.forEach(row -> refs.add(row.ref()));

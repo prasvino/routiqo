@@ -312,6 +312,38 @@ class SpotReportPersistenceTest {
         assertThat(count("spot_signal")).isZero();
     }
 
+    @Test void moderatorRulingsDecideWhetherAReportedPostCanStillBecomeAHighlight() {
+        Traveller author = traveller();
+        Traveller a = traveller();
+        Traveller b = traveller();
+        Traveller reporter = traveller();
+        UUID dismissed = post(author, EATERY, "place", "Clean restrooms at the back");
+        UUID hidden = post(author, EATERY, "place", "Parking behind the hall");
+        UUID pending = post(author, EATERY, "place", "Water cooler near the gate");
+        for (UUID tip : List.of(dismissed, hidden, pending)) {
+            service.vote(a.account(), tip, VoteKind.STILL_TRUE);
+            service.vote(b.account(), tip, VoteKind.STILL_TRUE);
+            reports.report(reporter.account(), tip, report("spam"));
+        }
+        var store = new JdbcSpotModerationStore(jdbc);
+        new org.springframework.transaction.support.TransactionTemplate(manager).executeWithoutResult(status -> {
+            var dismissedGroup = store.group(jdbc.queryForObject(
+                    "SELECT ref FROM spot_report_group WHERE item_ref = ?", UUID.class, dismissed)).orElseThrow();
+            store.ruleNotUpheld(dismissedGroup, List.of(dismissed), 0, clock.instant());
+            store.close(dismissedGroup.ref(), dismissedGroup.latestSequence(), "DISMISSED", clock.instant());
+            store.hidePost(hidden, clock.instant());
+            store.ruleUpheld(List.of(hidden));
+        });
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM spot_reporter_not_upheld WHERE reporter_id = ?",
+                Integer.class, reporter.account())).isEqualTo(1);
+
+        clock.advance(Duration.ofHours(37));
+        maintenance.promoteHighlights(100);
+        // Only the dismissed report stops blocking: a hidden post and a report awaiting review never qualify.
+        assertThat(jdbc.queryForList("SELECT source_post_ref FROM spot_highlight", UUID.class))
+                .containsExactly(dismissed);
+    }
+
     @Test void eachIncidentOnASummaryIsSeparateAndLaterReportsNeverExtendOldEvidence() {
         Traveller author = traveller();
         Traveller reporter = traveller();

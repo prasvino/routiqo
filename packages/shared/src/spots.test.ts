@@ -291,6 +291,7 @@ describe('catalog and activity parsing', () => {
       stillTrue: 0,
       viewerVote: 'still_true',
       mine: false,
+      hidden: false,
     };
     const base = {
       id: spotId(1),
@@ -312,9 +313,17 @@ describe('catalog and activity parsing', () => {
     expect(parsed.signals).toEqual([summary]);
     expect(parsed.posts).toEqual([post]);
     expect(parsed.postsTruncated).toBe(true);
+    const olderServer: Record<string, unknown> = { ...post };
+    delete olderServer.hidden;
+    expect(read({ ...base, posts: [olderServer] }).posts[0]!.hidden).toBe(false);
+    expect(read({ ...base, posts: [{ ...post, mine: true, hidden: true }] }).posts[0]!.hidden).toBe(
+      true,
+    );
     expect(parsed.highlights).toHaveLength(1);
     for (const broken of [
       { ...base, posts: [{ ...post, mine: 'yes' }] },
+      { ...base, posts: [{ ...post, hidden: 'yes' }] },
+      { ...base, posts: [{ ...post, mine: false, hidden: true }] },
       { ...base, posts: [{ ...post, text: 'two\nlines' }] },
       { ...base, posts: [{ ...post, text: 'x'.repeat(201) }] },
       { ...base, posts: [{ ...post, viewerVote: 'maybe' }] },

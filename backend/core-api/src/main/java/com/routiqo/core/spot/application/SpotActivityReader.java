@@ -13,8 +13,9 @@ public interface SpotActivityReader {
             Instant effectiveCreated) {
         @Override public String toString() { return "SpotSignalRow[private]"; }
     }
+    /** {@code hidden} is a moderator hide; such rows come back only for their own author (ADR 0075). */
     record PostRow(UUID spotId, UUID ref, UUID actorId, String type, String text, String alias,
-            Instant effectiveCreated, Instant expiresAt) {
+            Instant effectiveCreated, Instant expiresAt, boolean hidden) {
         @Override public String toString() { return "SpotPostRow[private]"; }
     }
     record VoteRow(UUID itemRef, UUID actorId, String kind, Instant votedAt) {
@@ -29,6 +30,7 @@ public interface SpotActivityReader {
     /**
      * Unexpired, active content for these Spots: at most 10 newest posts and 3 highlights per Spot.
      * Posts under an alias the viewer blocked in that room are left out before the limit (ADR 0072).
+     * Moderator-hidden posts and signals are left out, except the viewer's own hidden posts (ADR 0075).
      */
     Contents read(List<UUID> spotIds, Instant now, UUID viewer);
 }

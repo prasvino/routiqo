@@ -26,8 +26,9 @@ public record SpotActivity(Instant serverTime, UUID catalogVersion, List<Entry> 
         public SignalSummary { values = List.copyOf(values); }
     }
 
+    /** {@code hidden} is true only on the viewer's own post that a moderator hid (ADR 0075). */
     public record PostView(UUID ref, String alias, String text, String type, Instant capturedAt,
-            Instant expiresAt, int stillTrue, String viewerVote, boolean mine) {
+            Instant expiresAt, int stillTrue, String viewerVote, boolean mine, boolean hidden) {
         @Override public String toString() { return "SpotPostView[private]"; }
     }
 

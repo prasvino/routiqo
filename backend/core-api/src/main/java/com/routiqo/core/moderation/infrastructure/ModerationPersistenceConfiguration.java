@@ -17,6 +17,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Profile("persistence")
 public class ModerationPersistenceConfiguration {
     @Bean
+    com.routiqo.core.moderation.application.OperatorGrantAuthority operatorGrantAuthority(JdbcTemplate jdbc) {
+        return new JdbcOperatorGrantAuthority(jdbc);
+    }
+
+    @Bean
     JdbcContributionRestrictionParticipant contributionRestrictionParticipant(JdbcTemplate jdbc) {
         return new JdbcContributionRestrictionParticipant(jdbc);
     }
