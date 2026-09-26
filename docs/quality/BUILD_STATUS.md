@@ -55,21 +55,39 @@ The Spots catalog and activity read exist on the server behind
 
 Checks (cloud session, Linux, JDK 25 from apt, Docker 29):
 
-- **Java:** `./gradlew check bootJar` — **664 tests / 112 suites**, zero failures,
+- **Java:** `./gradlew check bootJar` — **669 tests / 114 suites**, zero failures,
   errors or skips. Untouched `main` gave 641 / 108 in the same environment.
-  - 23 new tests: loader acceptance and rejections, the activity and catalog
-    services, and HTTP on PostgreSQL (auth, account header, ETag/304, no
-    provenance, rate limits, active journey, 400/413/415 matrix).
+  - 28 new tests: loader acceptance and rejections (including contact details in
+    names, Tamil script and future review dates), the published projection and
+    its 256 KiB cap, the activity and catalog services, and HTTP on PostgreSQL
+    (auth, account header, ETag/304, no provenance, rate limits, active journey,
+    400/413/415 matrix).
   - A log-capture test at DEBUG shows Spot IDs never reach logs.
-  - Flag tests: `TRUE`, `1`, padded and empty values leave the leaves off. With the
-    flag on, a missing or out-of-region catalog stops startup.
+  - Flag tests: `TRUE`, `1`, padded, empty and unset values leave the leaves off.
+    With the flag on but no `routing` profile, the guard answers 403 rather than
+    passing requests to a missing handler. With the flag on, a missing or
+    out-of-region catalog stops startup.
   - Architecture rule for the module boundary.
 - **TypeScript:** `pnpm check` passed (contracts in sync, formatting, all
-  typechecks, lint): **874 tests / 106 files**, including the Spots transport
-  tests and a static Kotlin parity test. `pnpm --filter @routiqo/mobile build`
+  typechecks, lint): **875 tests / 106 files**. That includes the Spots transport
+  tests, a test that the Android adapter always passes seven arguments (it fails
+  if `?? null` is removed), and a static Kotlin parity test. `pnpm --filter @routiqo/mobile build`
   exported the Android bundle.
 - **Secrets:** the pinned GHCR gitleaks image is blocked here. Gitleaks v8.30.1
   from Docker Hub, run with the repo's config, found no leaks.
+
+- **Independent review:** a fresh-subagent security review found no Critical or
+  High issues.
+  - Fixed after the review:
+    - the guard and controller conditions now match;
+    - the startup log records the catalog digest;
+    - the loader hardening above;
+    - the new tests listed above.
+  - The Medium finding is open and blocks staging activation. The peer rate gate
+    (120 per minute per peer address) aggregates traffic behind a load balancer
+    or mobile carrier NAT, so Spots polling could make every native path return
+    429. It is recorded in the native Android ledger.
+  - The two client-parser findings are requirements for the Android Spots work.
 
 Not verified: the Kotlin module was not compiled or run (no Android SDK in the
 cloud). Device checks are in

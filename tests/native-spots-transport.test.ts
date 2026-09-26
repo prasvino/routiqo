@@ -205,3 +205,43 @@ describe('Kotlin safe-HTTP parity (static; no Android SDK in CI)', () => {
       expect(kotlin).toContain(fragment);
   });
 });
+
+describe('Android adapter', () => {
+  it('always calls the native module with seven arguments, null If-None-Match for generic calls', async () => {
+    vi.resetModules();
+    const nativeRequest = vi.fn(async (..._arguments: unknown[]) => ({
+      status: 200,
+      body: '{"serverTime":"2026-10-01T00:00:00Z","spots":[],"alerts":[]}',
+      etag: null,
+    }));
+    vi.doMock('../apps/mobile/node_modules/expo', () => ({
+      requireNativeModule: () => ({ request: nativeRequest }),
+    }));
+    vi.stubEnv('EXPO_PUBLIC_ROUTIQO_API_ORIGIN', origin);
+    try {
+      const { nativeTransport } = await import('../apps/mobile/src/auth/android-transport');
+      await nativeTransport.request(activityPath, 'POST', {
+        credential,
+        accountId: account,
+        body: { spotIds: ['00000000-0000-4000-8000-000000000011'] },
+      });
+      expect(nativeRequest.mock.calls[0]).toHaveLength(7);
+      expect(nativeRequest.mock.calls[0]?.[6]).toBeNull();
+
+      nativeRequest.mockResolvedValueOnce({ status: 304, body: '', etag });
+      await nativeTransport.spotCatalog({ credential, accountId: account, ifNoneMatch: etag });
+      expect(nativeRequest.mock.calls[1]).toEqual([
+        origin,
+        catalogPath,
+        'GET',
+        credential,
+        account,
+        null,
+        etag,
+      ]);
+    } finally {
+      vi.doUnmock('../apps/mobile/node_modules/expo');
+      vi.unstubAllEnvs();
+    }
+  });
+});

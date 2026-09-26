@@ -71,7 +71,14 @@ each dry run and the launch.
   not choose or edit their Spot.
 
 A catalog change is a new file with a new `version` and a restart; there is no
-hot reload or merge. The existing anchor catalog loader (ADR 0031) is the model
+hot reload or merge. **Every edit, however small, needs a new `version`**:
+phones revalidate by version (ETag), so an edit that keeps the version never
+reaches them. The second reviewer checks the version changed. At startup the
+server logs the version, Spot count and a SHA-256 of the served catalog; a
+deploy check confirms every replica logs the same digest. The loader also
+rejects names containing phone numbers (7 or more digits), web or e-mail
+addresses, Tamil names without Tamil script, and review dates later than
+tomorrow. The existing anchor catalog loader (ADR 0031) is the model
 for strictness and bounds; the anchor catalog itself stays with the archived
 route-binding code.
 

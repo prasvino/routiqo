@@ -23,7 +23,8 @@ class SpotCatalogLoaderTest {
     private static final String SPOT_ID = "abcdefab-cdef-4abc-8def-abcdefabcdef";
     private static final String TAMIL = "செங்கல்பட்டு சுங்கச்சாவடி";
     @TempDir Path directory;
-    private final SpotCatalogLoader loader = new SpotCatalogLoader();
+    private final SpotCatalogLoader loader = new SpotCatalogLoader(
+            java.time.Clock.fixed(java.time.Instant.parse("2026-10-25T00:00:00Z"), java.time.ZoneOffset.UTC));
 
     private static ObjectNode spot(String id) {
         ObjectNode spot = MAPPER.createObjectNode();
@@ -147,8 +148,29 @@ class SpotCatalogLoaderTest {
         rejects("unknown-source", root -> ((ObjectNode) firstSpot(root).get("provenance")).put("source", "user"));
         rejects("bad-date", root -> ((ObjectNode) firstSpot(root).get("provenance")).put("reviewedAt", "2026-02-30"));
         rejects("loose-date", root -> ((ObjectNode) firstSpot(root).get("provenance")).put("reviewedAt", "2026-1-5"));
+        rejects("future-review", root -> ((ObjectNode) firstSpot(root).get("provenance")).put("reviewedAt", "2026-10-27"));
+        assertThat(loader.load(write("tomorrow.json", MAPPER.writeValueAsString(withReview("2026-10-26"))))
+                .spots()).hasSize(1);
         rejects("string-longitude", root -> firstSpot(root).put("longitude", "79.95"));
         rejects("out-of-range-latitude", root -> firstSpot(root).put("latitude", 91));
+    }
+
+    private static ObjectNode withReview(String date) {
+        ObjectNode root = catalog();
+        ((ObjectNode) firstSpot(root).get("provenance")).put("reviewedAt", date);
+        return root;
+    }
+
+    @Test void rejectsContactDetailsInNamesAndTamilNamesWithoutTamilScript() throws Exception {
+        for (String name : new String[] {"Hotel 9876543210", "Hotel 98765 43210", "Call 044-2345-678",
+                "Visit www.example", "Hotel example.com", "http://x", "HTTPS: Stop", "a@b"}) {
+            rejects("contact-en-" + name.hashCode(), root -> firstSpot(root).put("name", name));
+            rejects("contact-ta-" + name.hashCode(), root -> firstSpot(root).put("nameTa", TAMIL + " " + name));
+        }
+        rejects("latin-tamil", root -> firstSpot(root).put("nameTa", "Chengalpattu Toll"));
+        ObjectNode ok = catalog();
+        firstSpot(ok).put("name", "NH 32 Km 45 Toll, Gate 2");
+        assertThat(loader.load(write("digits-ok.json", MAPPER.writeValueAsString(ok))).spots()).hasSize(1);
     }
 
     @Test void rejectsEmptyTooManyOversizeMalformedAndMissingFiles() throws Exception {

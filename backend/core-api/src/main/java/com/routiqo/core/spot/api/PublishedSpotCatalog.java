@@ -47,7 +47,18 @@ final class PublishedSpotCatalog {
         this.etag = "\"" + catalog.version() + "\"";
     }
 
-    byte[] body() { return body.clone(); }
+    /** Shared immutable-by-convention bytes; callers only write them to the response. */
+    byte[] body() { return body; }
+
+    /** SHA-256 of the served bytes, so deploy checks can confirm every replica serves the same file. */
+    String digest() {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(body));
+        } catch (java.security.NoSuchAlgorithmException unavailable) {
+            throw new IllegalStateException(unavailable);
+        }
+    }
 
     String etag() { return etag; }
 

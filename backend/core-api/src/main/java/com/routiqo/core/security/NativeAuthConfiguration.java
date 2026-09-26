@@ -20,9 +20,12 @@ public class NativeAuthConfiguration {
             @Value("${ROUTIQO_NATIVE_LIVE_CONSENT_API_ENABLED:false}") boolean consentEnabled,
             @Value("${ROUTIQO_NATIVE_ROUTING_API_ENABLED:false}") boolean routingEnabled,
             @Value("${ROUTIQO_NATIVE_LIVE_ROUTE_BINDING_API_ENABLED:false}") boolean bindingEnabled,
-            @Value("${ROUTIQO_SPOTS_API_ENABLED:}") String spotsEnabledFlag)
+            @Value("${ROUTIQO_SPOTS_API_ENABLED:}") String spotsEnabledFlag,
+            org.springframework.core.env.Environment environment)
             throws Exception {
-        boolean spotsEnabled = FeatureFlags.enabled(spotsEnabledFlag);
+        // Same condition as NativeSpotController, so the guard never admits a path without a handler.
+        boolean spotsEnabled = FeatureFlags.enabled(spotsEnabledFlag)
+                && environment.matchesProfiles("routing & persistence");
         return http.securityMatcher("/api/v1/native/**")
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(c -> c.disable())

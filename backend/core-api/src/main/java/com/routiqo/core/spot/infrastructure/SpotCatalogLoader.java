@@ -47,6 +47,12 @@ public final class SpotCatalogLoader {
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .build();
 
+    private final java.time.Clock clock;
+
+    public SpotCatalogLoader() { this(java.time.Clock.systemUTC()); }
+
+    SpotCatalogLoader(java.time.Clock clock) { this.clock = clock; }
+
     public SpotCatalog load(Path path) {
         try {
             if (path == null || !Files.isRegularFile(path)) throw invalid();
@@ -66,7 +72,13 @@ public final class SpotCatalogLoader {
             }
             JsonNode spotNodes = array(root.get("spots"), SpotCatalog.MAX_SPOTS);
             var spots = new ArrayList<Spot>(spotNodes.size());
-            for (JsonNode node : spotNodes) spots.add(spot(node));
+            // A review date later than tomorrow (UTC, allowing for IST) is a curation error.
+            LocalDate latestReview = LocalDate.now(clock).plusDays(1);
+            for (JsonNode node : spotNodes) {
+                Spot spot = spot(node);
+                if (spot.provenance().reviewedAt().isAfter(latestReview)) throw invalid();
+                spots.add(spot);
+            }
             return new SpotCatalog(version, corridors, spots);
         } catch (RuntimeException | java.io.IOException invalid) {
             throw invalid();

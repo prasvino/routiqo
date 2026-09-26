@@ -68,11 +68,11 @@ class NativeSpotHttpTest {
                   {"id":"%s","name":"Synthetic Toll","nameTa":"செயற்கை சுங்கச்சாவடி","kind":"toll",
                    "longitude":0.1,"latitude":0.2,"district":"chengalpattu","corridors":["gst-trunk"],
                    "categories":["traffic","queue"],
-                   "provenance":{"curator":"Private Curator Marker","source":"field_visit","reviewedAt":"2026-10-20"}},
+                   "provenance":{"curator":"Private Curator Marker","source":"field_visit","reviewedAt":"2026-09-20"}},
                   {"id":"%s","name":"Synthetic Bus Stand","nameTa":"செயற்கை பேருந்து நிலையம்","kind":"bus_stand",
                    "longitude":-0.1,"latitude":-0.2,"district":"tiruchirappalli","corridors":["gst-trunk"],
                    "categories":["queue"],
-                   "provenance":{"curator":"Private Curator Marker","source":"osm","reviewedAt":"2026-10-21"}}]}
+                   "provenance":{"curator":"Private Curator Marker","source":"osm","reviewedAt":"2026-09-21"}}]}
                 """.formatted(VERSION, FIRST, SECOND);
     }
 
@@ -193,7 +193,7 @@ class NativeSpotHttpTest {
         assertThat(JsonPath.<List<String>>read(response.body(), "$.spots[0].categories"))
                 .containsExactly("traffic", "queue");
         assertThat(response.body()).doesNotContain("provenance", "Private Curator Marker", "field_visit",
-                "reviewedAt", "2026-10-20", owner.account());
+                "reviewedAt", "2026-09-20", owner.account());
 
         for (String tag : List.of(ETAG, "W/" + ETAG, "*", "\"other\", " + ETAG)) {
             var current = get("spots/catalog", owner, tag);

@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("native-auth & routing & persistence")
 @ConditionalOnExactlyTrue("ROUTIQO_SPOTS_API_ENABLED")
 public final class NativeSpotController {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(NativeSpotController.class);
     private final SpotCatalogService catalogs;
     private final SpotActivityService activity;
     private final PublishedSpotCatalog published;
@@ -37,6 +38,9 @@ public final class NativeSpotController {
         this.catalogs = catalogs;
         this.activity = activity;
         this.published = new PublishedSpotCatalog(catalog);
+        // Public reference data only: version, count and digest. A content change must bring a new version.
+        LOG.info("Spot catalog {} loaded: {} Spots, sha256 {}", catalog.version(), catalog.spots().size(),
+                published.digest());
     }
 
     @GetMapping("/catalog") ResponseEntity<byte[]> catalog(HttpServletRequest request) {

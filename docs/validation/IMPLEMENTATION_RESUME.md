@@ -86,7 +86,13 @@ honest.
    - both native transport allowlists. The client reads the catalog with
      `nativeTransport.spotCatalog({ credential, accountId, ifNoneMatch })`.
 
-   Kotlin transport checks are pending on a device (NATIVE_ANDROID_PENDING.md).
+   Kotlin transport checks are pending on a device, and the peer rate gate behind
+   a load balancer must be resolved before the flag goes on in staging
+   (NATIVE_ANDROID_PENDING.md).
+   Requirements for the step-2 client parser, from the independent review:
+   - Store a catalog only when its `version` equals the ETag without the quotes.
+   - Do not enforce the contract's `maxItems: 0` on `alertIds` and `alerts`: those
+     become non-empty additively once official alerts exist.
 2. **Spots on Android:**
    - a catalog cache (`spot_catalog_v1`);
    - on-device matching (100 m from route segments, 1,000 m endpoint exclusion

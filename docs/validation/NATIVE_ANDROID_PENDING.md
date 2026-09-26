@@ -97,6 +97,20 @@ rebuilt development client against a staging API with the server flag on:
       still rejected as a redirect.
 - [ ] `POST /api/v1/native/spots/activity` returns 200 with an active journey and
       409 after completion. Oversized responses (above 256 KiB / 128 KiB) are rejected.
+- [ ] **Before the flag goes on in staging: peer rate gate behind the load balancer.**
+      - The problem: `NativeAuthGuard` limits every native path to 120 requests per
+        minute per peer address (`native-other`), and `forward-headers-strategy` is
+        `none`. Behind an AWS load balancer the peer is the balancer node. With
+        mobile carrier NAT (CGNAT), many phones share one IP. About 40 travellers
+        polling activity every 20 s would get 429 on every native path, including
+        session renew. This is the proxy aggregation that ADR 0009 says must be
+        evaluated before deployment.
+      - The fix: trust client IPs only from the balancer's address range (for
+        example RemoteIpValve), or exempt account-gated paths from the peer gate by
+        decision.
+      - Then measure the activity read's database cost at festival peak. Each read
+        does three rate-bucket upserts, one session lookup and one journey
+        `EXISTS` query.
 
 ## Evidence
 
