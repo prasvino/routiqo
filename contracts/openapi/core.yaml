@@ -1515,6 +1515,74 @@ paths:
         '413': { $ref: '#/components/responses/AuthTooLarge' }
         '415': { $ref: '#/components/responses/AuthMediaType' }
         '503': { description: 'Storage or session unavailable. Empty response body.' }
+  /api/v1/native/spots/items/{ref}/reports:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - {
+          in: path,
+          name: ref,
+          required: true,
+          schema: { $ref: '#/components/schemas/NativeSpotId' },
+        }
+    post:
+      operationId: reportNativeSpotItem
+      security: [{ nativeBearer: [] }]
+      description: 'Default-off (ADR 0072). Report a current post (its ref) or signal summary (its summary ref). Receipt first: an exact requestId replay returns the original receipt. A summary is reported per incident (its current signals). Ten reports per account per rolling 24 hours, and at most twenty attempts a minute; Retry-After says when the quota frees. Nothing about the report is public.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeSpotReportRequest' }
+      responses:
+        '202':
+          description: Report received
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NativeSpotReportReceipt' }
+        '400': { description: Malformed body or unknown reason. Empty response body. }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { description: "The viewer's own item, or transport rejected. Empty response body." }
+        '404': { description: 'Unknown, expired or deleted item. Empty response body.' }
+        '409':
+          {
+            description: 'The requestId was used with a different item or reason, or the viewer already reported this post or this summary incident. Empty response body.',
+          }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Storage or session unavailable. Empty response body.' }
+  /api/v1/native/spots/items/{ref}/block-author:
+    parameters:
+      - { $ref: '#/components/parameters/JourneyAccount' }
+      - {
+          in: path,
+          name: ref,
+          required: true,
+          schema: { $ref: '#/components/schemas/NativeSpotId' },
+        }
+    post:
+      operationId: blockNativeSpotPostAuthor
+      security: [{ nativeBearer: [] }]
+      description: "Default-off (ADR 0072). Block the author of a current post; idempotent. The author is never named or told. The blocker no longer sees that alias's posts in that room (the Spot on that day); posts elsewhere, votes and signal summaries are unaffected so a block never links rooms. Also records an account-level block for later features. Ten blocks per account per minute."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NativeEmptyRequest' }
+      responses:
+        '204': { description: Blocked. }
+        '400': { description: Malformed body. Empty response body. }
+        '401': { $ref: '#/components/responses/NativeAuthRejected' }
+        '403': { description: "The viewer's own post, or transport rejected. Empty response body." }
+        '404':
+          {
+            description: 'Unknown, expired or deleted post (summary refs cannot be blocked). Empty response body.',
+          }
+        '409': { description: 'Block list is full. Empty response body.' }
+        '413': { $ref: '#/components/responses/AuthTooLarge' }
+        '415': { $ref: '#/components/responses/AuthMediaType' }
+        '429': { $ref: '#/components/responses/AuthLimited' }
+        '503': { description: 'Storage or session unavailable. Empty response body.' }
   /api/v1/native/routes:
     post:
       operationId: calculateNativePrivateRoute
@@ -2402,6 +2470,20 @@ components:
         mine:
           type: boolean
           description: "True only for the viewer's own posts, so they can delete them."
+    NativeSpotReportRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, reason]
+      properties:
+        requestId: { $ref: '#/components/schemas/NativeSpotId' }
+        reason: { type: string, enum: [false_alarm, abuse, spam, personal_data, unsafe] }
+    NativeSpotReportReceipt:
+      type: object
+      additionalProperties: false
+      required: [receivedAt, receiptExpiresAt]
+      properties:
+        receivedAt: { type: string, format: date-time }
+        receiptExpiresAt: { type: string, format: date-time }
     NativeSpotReceipt:
       type: object
       additionalProperties: false

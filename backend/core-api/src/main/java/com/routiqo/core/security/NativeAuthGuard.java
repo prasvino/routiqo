@@ -74,7 +74,7 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                     || ("POST".equals(request.getMethod()) && "/api/v1/native/spots/activity".equals(path)))
                 || contributionsEnabled && "POST".equals(request.getMethod())
                     && ("/api/v1/native/spots/signals".equals(path) || "/api/v1/native/spots/posts".equals(path)
-                        || path.matches("/api/v1/native/spots/items/[0-9a-f-]{36}/(?:vote|delete)"));
+                        || path.matches("/api/v1/native/spots/items/[0-9a-f-]{36}/(?:vote|delete|reports|block-author)"));
         boolean journey = ("GET".equals(request.getMethod()) &&
                     ("/api/v1/native/journeys".equals(path)
                         || path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}")

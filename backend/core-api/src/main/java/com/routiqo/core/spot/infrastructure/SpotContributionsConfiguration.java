@@ -2,12 +2,17 @@ package com.routiqo.core.spot.infrastructure;
 
 import com.routiqo.core.identity.application.AccountAgeReader;
 import com.routiqo.core.identity.application.AccountWriteAuthority;
+import com.routiqo.core.identity.application.AuthRateGate;
 import com.routiqo.core.journey.application.ActiveJourneyReader;
 import com.routiqo.core.journey.application.JourneyWriteAuthority;
 import com.routiqo.core.moderation.application.ContributionRestrictionReader;
+import com.routiqo.core.moderation.application.DurableBlockPolicyService;
 import com.routiqo.core.security.ConditionalOnExactlyTrue;
 import com.routiqo.core.spot.application.SpotContributionService;
+import com.routiqo.core.spot.application.SpotBlockService;
 import com.routiqo.core.spot.application.SpotContributionStore;
+import com.routiqo.core.spot.application.SpotReportService;
+import com.routiqo.core.spot.application.SpotReportStore;
 import com.routiqo.core.spot.domain.AliasWords;
 import com.routiqo.core.spot.domain.SpotCatalog;
 import java.io.InputStream;
@@ -31,6 +36,20 @@ public class SpotContributionsConfiguration {
 
     @Bean SpotContributionStore spotContributionStore(JdbcTemplate jdbc) {
         return new JdbcSpotContributionStore(jdbc);
+    }
+
+    @Bean SpotReportStore spotReportStore(JdbcTemplate jdbc) {
+        return new JdbcSpotReportStore(jdbc);
+    }
+
+    @Bean SpotReportService spotReportService(AuthRateGate rates, AccountWriteAuthority accounts,
+            SpotReportStore store) {
+        return new SpotReportService(rates, accounts, store, Clock.systemUTC());
+    }
+
+    @Bean SpotBlockService spotBlockService(AuthRateGate rates, SpotReportStore store,
+            DurableBlockPolicyService blocks) {
+        return new SpotBlockService(rates, store, blocks, Clock.systemUTC());
     }
 
     @Bean AliasWords spotAliasWords() {

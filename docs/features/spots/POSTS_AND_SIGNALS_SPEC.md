@@ -9,8 +9,13 @@ Status: proposed, 2026-09-25. Phase 2 of the pilot path; the parts marked
 - rate limits, highlights and expiry maintenance;
 - activity content.
 
-Not built yet: Report and Block (3b), moderator hide (step 4), and the Android
-controls, `spot_outbox_v1` and Ghost Mode (3c). The alias word list is a draft
+**Step 3b implemented 2026-09-26 (server only, default-off,
+[ADR 0072](../../adr/0072-spot-report-and-block.md)):** Report on posts and
+signal summaries (per incident), and Block from posts (hiding that alias in its
+room), with reported items kept 30 days as evidence.
+
+Not built yet: moderator hide (step 4), and the Android controls,
+`spot_outbox_v1` and Ghost Mode (3c). The alias word list is a draft
 awaiting owner approval and Tamil review. Product
 rules: [PRODUCT.md](../../PRODUCT.md) (Spots, lifespan table, Offline rule,
 Guardrails, Decisions §3–4). Catalog, activity read and refresh:
@@ -182,7 +187,9 @@ the proven patterns, not the archived tables:
   on-call rota handles reports.
 - **Block** from any post: the server maps the post to its author and records an
   account-level block edge (ADR 0040) without revealing the account. Activity
-  reads then omit that author's posts and votes for the blocker everywhere.
+  reads then omit that alias's posts in that room for the blocker. Hiding the
+  author everywhere, or their votes, was dropped because it would link aliases
+  across rooms ([ADR 0072](../../adr/0072-spot-report-and-block.md) §6).
   Blocked authors are not told.
 - **Moderator hide:** audited permission `spots_hide` on the admin app
   ([PILOT_MODERATION_SPEC.md](PILOT_MODERATION_SPEC.md), ADR 0069;
@@ -252,8 +259,9 @@ the proven patterns, not the archived tables:
 
 Deleting an account removes its signals, posts, votes, aliases, highlights made
 from its posts and pending device queue. Reports it made follow ADR 0064
-retention without the reporter identity. The deletion spec's cascade list is
-updated when this is built.
+retention without the reporter identity: the reporter rows cascade and the
+reporter-free group counts stay (ADR 0072). Block edges cascade with either
+account.
 
 ## Acceptance and evidence
 

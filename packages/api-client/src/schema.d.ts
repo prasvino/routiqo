@@ -897,6 +897,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/native/spots/items/{ref}/reports": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                ref: components["schemas"]["NativeSpotId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Default-off (ADR 0072). Report a current post (its ref) or signal summary (its summary ref). Receipt first: an exact requestId replay returns the original receipt. A summary is reported per incident (its current signals). Ten reports per account per rolling 24 hours, and at most twenty attempts a minute; Retry-After says when the quota frees. Nothing about the report is public. */
+        post: operations["reportNativeSpotItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/native/spots/items/{ref}/block-author": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                ref: components["schemas"]["NativeSpotId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Default-off (ADR 0072). Block the author of a current post; idempotent. The author is never named or told. The blocker no longer sees that alias's posts in that room (the Spot on that day); posts elsewhere, votes and signal summaries are unaffected so a block never links rooms. Also records an account-level block for later features. Ten blocks per account per minute. */
+        post: operations["blockNativeSpotPostAuthor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/native/routes": {
         parameters: {
             query?: never;
@@ -1393,6 +1437,17 @@ export interface components {
             viewerVote: components["schemas"]["NativeSpotVote"];
             /** @description True only for the viewer's own posts, so they can delete them. */
             mine: boolean;
+        };
+        NativeSpotReportRequest: {
+            requestId: components["schemas"]["NativeSpotId"];
+            /** @enum {string} */
+            reason: "false_alarm" | "abuse" | "spam" | "personal_data" | "unsafe";
+        };
+        NativeSpotReportReceipt: {
+            /** Format: date-time */
+            receivedAt: string;
+            /** Format: date-time */
+            receiptExpiresAt: string;
         };
         NativeSpotReceipt: {
             ref: components["schemas"]["NativeSpotId"];
@@ -4574,6 +4629,140 @@ export interface operations {
             };
             413: components["responses"]["AuthTooLarge"];
             415: components["responses"]["AuthMediaType"];
+            /** @description Storage or session unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reportNativeSpotItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                ref: components["schemas"]["NativeSpotId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeSpotReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Report received */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSpotReportReceipt"];
+                };
+            };
+            /** @description Malformed body or unknown reason. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            /** @description The viewer's own item, or transport rejected. Empty response body. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, expired or deleted item. Empty response body. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The requestId was used with a different item or reason, or the viewer already reported this post or this summary incident. Empty response body. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
+            /** @description Storage or session unavailable. Empty response body. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    blockNativeSpotPostAuthor: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Expected verified account partition. Must equal the session account; never selects or authenticates an owner. Mismatch/missing returns401 to stop stale queued work after account switching. */
+                "X-Routiqo-Account": components["parameters"]["JourneyAccount"];
+            };
+            path: {
+                ref: components["schemas"]["NativeSpotId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeEmptyRequest"];
+            };
+        };
+        responses: {
+            /** @description Blocked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed body. Empty response body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NativeAuthRejected"];
+            /** @description The viewer's own post, or transport rejected. Empty response body. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, expired or deleted post (summary refs cannot be blocked). Empty response body. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Block list is full. Empty response body. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            413: components["responses"]["AuthTooLarge"];
+            415: components["responses"]["AuthMediaType"];
+            429: components["responses"]["AuthLimited"];
             /** @description Storage or session unavailable. Empty response body. */
             503: {
                 headers: {

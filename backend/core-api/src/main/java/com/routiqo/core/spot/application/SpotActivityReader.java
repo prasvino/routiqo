@@ -26,6 +26,9 @@ public interface SpotActivityReader {
     record Contents(List<SignalRow> signals, List<PostRow> posts, List<VoteRow> votes,
             List<HighlightRow> highlights) {}
 
-    /** Unexpired, active content for these Spots: at most 10 newest posts and 3 highlights per Spot. */
-    Contents read(List<UUID> spotIds, Instant now);
+    /**
+     * Unexpired, active content for these Spots: at most 10 newest posts and 3 highlights per Spot.
+     * Posts under an alias the viewer blocked in that room are left out before the limit (ADR 0072).
+     */
+    Contents read(List<UUID> spotIds, Instant now, UUID viewer);
 }

@@ -2,6 +2,7 @@ package com.routiqo.core.spot.api;
 
 import com.routiqo.core.spot.application.SpotContributionService;
 import com.routiqo.core.spot.application.SpotContributionStore;
+import com.routiqo.core.spot.application.SpotReportService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.CodingErrorAction;
@@ -52,6 +53,18 @@ final class NativeSpotContributionJson {
             case "no_longer_true" -> SpotContributionStore.VoteKind.NO_LONGER_TRUE;
             default -> throw invalid();
         };
+    }
+
+    static SpotReportService.ReportCommand report(HttpServletRequest request) {
+        JsonNode node = object(request, Set.of("requestId", "reason"));
+        return new SpotReportService.ReportCommand(id(node.get("requestId")), text(node.get("reason"), 16));
+    }
+
+    static byte[] reportReceipt(SpotReportService.ReportReceipt receipt) {
+        ObjectNode root = MAPPER.createObjectNode();
+        root.put("receivedAt", receipt.receivedAt().toString());
+        root.put("receiptExpiresAt", receipt.receiptExpiresAt().toString());
+        return MAPPER.writeValueAsBytes(root);
     }
 
     static void empty(HttpServletRequest request) {

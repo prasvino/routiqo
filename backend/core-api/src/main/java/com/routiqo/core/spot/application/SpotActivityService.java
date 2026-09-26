@@ -15,7 +15,8 @@ import java.util.UUID;
  * Activity read for the Spots ahead (SPOTS_SPEC, ADR 0067). The requested Spot IDs are private journey
  * data: they are used only to shape this response and are never logged, stored or used as a rate key.
  * Content (signal summaries, posts, highlights) comes from {@link SpotActivityReader}; without any,
- * every known Spot is quiet.
+ * every known Spot is quiet. Posts under an alias the viewer blocked are hidden in that room only
+ * (ADR 0072); votes and signal summaries are unaffected, so a block never links rooms.
  */
 public final class SpotActivityService {
     static final String RATE_CATEGORY = "spot-activity-read-account";
@@ -31,7 +32,7 @@ public final class SpotActivityService {
     public SpotActivityService(AuthRateGate rates, ActiveJourneyReader journeys, SpotCatalog catalog,
             Clock clock) {
         this(rates, journeys, catalog, clock,
-                (ids, now) -> new SpotActivityReader.Contents(List.of(), List.of(), List.of(), List.of()));
+                (ids, now, viewer) -> new SpotActivityReader.Contents(List.of(), List.of(), List.of(), List.of()));
     }
 
     public SpotActivityService(AuthRateGate rates, ActiveJourneyReader journeys, SpotCatalog catalog,
@@ -67,7 +68,7 @@ public final class SpotActivityService {
         try {
             rows = known.isEmpty()
                     ? new SpotActivityReader.Contents(List.of(), List.of(), List.of(), List.of())
-                    : content.read(known, now);
+                    : content.read(known, now, actor);
         } catch (RuntimeException unavailable) {
             throw new SpotsUnavailable();
         }

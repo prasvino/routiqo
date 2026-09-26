@@ -14,7 +14,7 @@ final class JdbcSpotActivityReader implements SpotActivityReader {
 
     JdbcSpotActivityReader(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
-    @Override public Contents read(List<UUID> spotIds, Instant now) {
+    @Override public Contents read(List<UUID> spotIds, Instant now, UUID viewer) {
         if (spotIds.isEmpty() || spotIds.size() > 20) throw new IllegalArgumentException("Invalid Spot list");
         UUID[] ids = spotIds.toArray(UUID[]::new);
         Timestamp at = Timestamp.from(now);
@@ -29,13 +29,15 @@ final class JdbcSpotActivityReader implements SpotActivityReader {
                 SELECT spot_id, ref, actor_id, type, text, alias, effective_created_at, expires_at FROM (
                     SELECT p.*, row_number() OVER (PARTITION BY spot_id
                         ORDER BY effective_created_at DESC, ref) AS position
-                    FROM spot_post p WHERE spot_id = ANY (?) AND state = 'ACTIVE' AND expires_at > ?) newest
+                    FROM spot_post p WHERE spot_id = ANY (?) AND state = 'ACTIVE' AND expires_at > ?
+                      AND NOT EXISTS (SELECT 1 FROM spot_hidden_alias h WHERE h.blocker_id = ?
+                          AND h.spot_id = p.spot_id AND h.room_day = p.room_day AND h.alias = p.alias)) newest
                 WHERE position <= 10
                 """, (row, index) -> new PostRow(row.getObject("spot_id", UUID.class),
                         row.getObject("ref", UUID.class), row.getObject("actor_id", UUID.class),
                         row.getString("type"), row.getString("text"), row.getString("alias"),
                         row.getTimestamp("effective_created_at").toInstant(),
-                        row.getTimestamp("expires_at").toInstant()), ids, at);
+                        row.getTimestamp("expires_at").toInstant()), ids, at, viewer);
         var refs = new ArrayList<UUID>();
         signals.forEach(row -> refs.add(row.groupRef()));
         posts.forEach(row -> refs.add(row.ref()));

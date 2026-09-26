@@ -31,6 +31,21 @@ public final class DurableBlockPolicyService {
         });
     }
 
+    /**
+     * Blocks without the caller knowing the current revision; a no-op (no revision churn) when the
+     * edge is already blocked. Used where the target account is resolved server-side and never shown.
+     */
+    public DirectionalBlock ensureBlocked(UUID blockerId, UUID targetId) {
+        return accounts.withEnabledPair(blockerId, targetId, () -> {
+            DirectionalBlock prior = checkedRead(blockerId, targetId);
+            if (prior.blocked()) return prior;
+            DirectionalBlock updated = prior.block(prior.revision());
+            checkCapacityForNewEdge(prior);
+            edges.replace(prior, updated);
+            return updated;
+        });
+    }
+
     public DirectionalBlock unblock(UUID blockerId, UUID targetId, long expectedRevision) {
         return accounts.withEnabledPair(blockerId, targetId, () -> {
             DirectionalBlock prior = checkedRead(blockerId, targetId);

@@ -39,7 +39,8 @@ public class NativeAuthConfiguration {
                     if (contributionsEnabled) {
                         a.requestMatchers(org.springframework.http.HttpMethod.POST,
                                 "/api/v1/native/spots/signals", "/api/v1/native/spots/posts",
-                                "/api/v1/native/spots/items/*/vote", "/api/v1/native/spots/items/*/delete")
+                                "/api/v1/native/spots/items/*/vote", "/api/v1/native/spots/items/*/delete",
+                                "/api/v1/native/spots/items/*/reports", "/api/v1/native/spots/items/*/block-author")
                                 .permitAll();
                     }
                     if (spotsEnabled) {
