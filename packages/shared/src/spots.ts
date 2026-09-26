@@ -247,12 +247,18 @@ export interface SpotAhead {
 export function spotsAhead(
   matched: readonly MatchedSpot[],
   travellerAlongMetres: number,
+  /** Without a position the list runs from the route start and nothing is "Here". */
+  hasPosition = true,
 ): SpotAhead[] {
   const ahead: SpotAhead[] = [];
   for (const { spot, alongMetres } of matched) {
     const aheadMetres = alongMetres - travellerAlongMetres;
     if (aheadMetres < -SPOT_HERE_METRES) continue;
-    ahead.push({ spot, aheadMetres, here: Math.abs(aheadMetres) <= SPOT_HERE_METRES });
+    ahead.push({
+      spot,
+      aheadMetres,
+      here: hasPosition && Math.abs(aheadMetres) <= SPOT_HERE_METRES,
+    });
     if (ahead.length === SPOTS_AHEAD_LIMIT) break;
   }
   return ahead;
@@ -262,8 +268,9 @@ export function spotsAhead(
 export function spotDistanceLabel(ahead: Pick<SpotAhead, 'aheadMetres' | 'here'>): string {
   if (ahead.here) return 'Here';
   const metres = Math.max(0, ahead.aheadMetres);
-  if (metres < 1000) return `${Math.round(metres / 100) * 100} m ahead`;
-  if (metres < 10_000) return `${(metres / 1000).toFixed(1)} km ahead`;
+  // Thresholds sit where rounding changes units, so 960 m reads "1.0 km", never "1000 m".
+  if (metres < 950) return `${Math.round(metres / 100) * 100} m ahead`;
+  if (metres < 9_950) return `${(metres / 1000).toFixed(1)} km ahead`;
   return `${Math.round(metres / 1000)} km ahead`;
 }
 

@@ -72,6 +72,23 @@ export interface SpotsPanelInput {
   selectedId: string | null;
 }
 
+/**
+ * Activity is stale when offline, after a failed or pending refresh, or older than two intervals.
+ * Stale states are never shown as current: the panel labels them and the map mutes them.
+ */
+export function activityIsStale(
+  activity: { status: SpotActivityStatus; receivedAt: number | null },
+  online: boolean,
+  now: number,
+): boolean {
+  return (
+    activity.receivedAt === null ||
+    !online ||
+    activity.status !== 'ready' ||
+    now - activity.receivedAt > 2 * ACTIVITY_INTERVAL_MS
+  );
+}
+
 const districtLabel = (key: string) =>
   key
     .split('_')
@@ -147,14 +164,11 @@ export function spotsPanelModel(input: SpotsPanelInput): SpotsPanelViewModel {
   });
 
   const received = input.activity.receivedAt;
-  const stale =
-    received !== null &&
-    (!input.online ||
-      input.activity.status !== 'ready' ||
-      input.now - received > 2 * ACTIVITY_INTERVAL_MS);
+  const stale = received !== null && activityIsStale(input.activity, input.online, input.now);
+  // Only Spots the last response actually covered can be called quiet.
   const allQuiet =
     input.activity.status === 'ready' &&
-    input.ahead.every((entry) => (states.get(entry.spot.id) ?? 'quiet') === 'quiet');
+    input.ahead.every((entry) => states.get(entry.spot.id) === 'quiet');
   const total = input.ahead.length;
   const sizeAction: SpotsPanelViewModel['sizeAction'] =
     input.size === 'collapsed' && total > 1

@@ -140,6 +140,14 @@ describe('spotsAhead', () => {
     expect(ids.length).toBeLessThanOrEqual(20);
   });
 
+  it('never shows "Here" without a position, and rounds labels across unit boundaries', () => {
+    const first = matched[0]!;
+    expect(spotsAhead(matched, first.alongMetres - 50, false)[0]).toMatchObject({ here: false });
+    expect(spotDistanceLabel({ here: false, aheadMetres: 960 })).toBe('1.0 km ahead');
+    expect(spotDistanceLabel({ here: false, aheadMetres: 940 })).toBe('900 m ahead');
+    expect(spotDistanceLabel({ here: false, aheadMetres: 9_960 })).toBe('10 km ahead');
+  });
+
   it('labels freshness', () => {
     expect(updatedAgoLabel(0, 30_000)).toBe('Last updated just now');
     expect(updatedAgoLabel(0, 14 * 60_000)).toBe('Last updated 14 min ago');
@@ -225,6 +233,21 @@ describe('catalog and activity parsing', () => {
     expect(activity.spots).toEqual([{ id: spotId(1), state: 'quiet', alertIds: ['alert-1'] }]);
     expect(() =>
       readSpotActivity({ serverTime: 'now', catalogVersion: version, spots: [], alerts: [] }),
+    ).toThrow();
+    const entry = { id: spotId(1), state: 'quiet', alertIds: [] };
+    expect(() =>
+      readSpotActivity({
+        serverTime: '2026-11-05T06:30:00Z',
+        catalogVersion: version,
+        spots: Array.from({ length: 21 }, () => entry),
+      }),
+    ).toThrow();
+    expect(() =>
+      readSpotActivity({
+        serverTime: '2026-11-05T06:30:00Z',
+        catalogVersion: version,
+        spots: [{ ...entry, id: '0000000A-0000-4000-8000-000000000001' }],
+      }),
     ).toThrow();
     expect(() =>
       readSpotActivity({

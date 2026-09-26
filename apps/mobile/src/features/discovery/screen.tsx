@@ -33,6 +33,8 @@ import { tokens } from '@routiqo/design-tokens';
 import { useMobilePlanning } from '../../storage/planning';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import { useSpotCatalogStore } from '../spots/spots-provider';
+import { clearCachedSpotCatalog } from '../../storage/spot-catalog';
+import { useSQLiteContext } from 'expo-sqlite';
 import { NativePlanningBackup } from './planning-backup';
 import { NativeJourneyPanel } from '../journey/native-journey-panel';
 import { ActiveJourneyCardContainer, JourneyReturnBarContainer } from '../journey/journey-entry';
@@ -68,6 +70,7 @@ export function DiscoveryScreen({
   const { state, ready, error, update, clear } = useMobilePlanning();
   const account = useNativeAccount();
   const spotCatalog = useSpotCatalogStore();
+  const db = useSQLiteContext();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category>('All');
   const [detail, setDetail] = useState<Destination | null>(null);
@@ -321,7 +324,10 @@ export function DiscoveryScreen({
                           onPress: () => {
                             void clear();
                             void account.clearJourneyRoutes().catch(() => undefined);
-                            void spotCatalog?.clear().catch(() => undefined);
+                            // Always clear the cached Spot list, even if cached while the flag was on.
+                            void (
+                              spotCatalog ? spotCatalog.clear() : clearCachedSpotCatalog(db)
+                            ).catch(() => undefined);
                           },
                         },
                       ],

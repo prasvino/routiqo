@@ -203,6 +203,18 @@ describe('Spot catalog store', () => {
     expect(saved).toEqual([]);
   });
 
+  it('finishes loading with no catalog when the SQLite read fails', async () => {
+    const store = createSpotCatalogStore({
+      load: () => Promise.reject(new Error('disk')),
+      save: async () => undefined,
+      clear: async () => undefined,
+      fetch: () => new Promise<SpotCatalogFetch>(() => undefined),
+      now: () => 0,
+    });
+    await store.load();
+    expect(store.getState()).toMatchObject({ loaded: true, catalog: null });
+  });
+
   it('forgets the catalog on clear and ignores a refresh that finishes afterwards', async () => {
     const { store, resolve, saved } = harness(version);
     const pending = store.refresh();
@@ -306,6 +318,21 @@ describe('Spot activity controller', () => {
     h.controller.setDetailOpen(true);
     await h.advance(DETAIL_INTERVAL_MS);
     expect(h.calls).toHaveLength(3);
+  });
+
+  it('refreshes at once when the Spots ahead no longer overlap the last request (first fix)', async () => {
+    const h = harness();
+    h.controller.setSpotIds([spotId(1), spotId(2)]);
+    await h.advance(0);
+    h.calls[0]?.resolve(activity());
+    await h.flush();
+    h.controller.setSpotIds([spotId(2), spotId(3)]); // overlapping: waits for the interval
+    await h.advance(1_000);
+    expect(h.calls).toHaveLength(1);
+    h.controller.setSpotIds([spotId(8), spotId(9)]); // disjoint: due now
+    await h.advance(0);
+    expect(h.calls).toHaveLength(2);
+    expect(h.calls[1]?.ids).toEqual([spotId(8), spotId(9)]);
   });
 
   it('keeps one request in flight and never overlaps', async () => {

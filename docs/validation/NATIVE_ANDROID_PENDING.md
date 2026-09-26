@@ -140,6 +140,8 @@ development client, then on 3+ physical phones:
 - [ ] 360 dp width at 200% font scale: the rows, chips and Show more / Show fewer
       buttons stay readable, and TalkBack reads each row as one label.
 - [ ] One-hour battery and data reading with the panel open while travelling.
+- [ ] Staging serves the catalog with a strong ETag through every proxy (no `W/`
+      prefix from gzip). Otherwise phones never accept a new list.
 
 ## Evidence
 

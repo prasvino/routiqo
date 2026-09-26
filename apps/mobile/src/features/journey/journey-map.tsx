@@ -127,7 +127,10 @@ export function JourneyMap({
         : null,
     [position],
   );
-  const spotsKey = spots ? spots.map((spot) => `${spot.id}:${spot.state ?? ''}`).join('|') : '';
+  // Coordinates are part of the key so a corrected catalog position moves the marker.
+  const spotsKey = spots
+    ? spots.map((spot) => `${spot.id}:${spot.state ?? ''}:${spot.coordinate.join(',')}`).join('|')
+    : '';
   const spotsRef = useRef(spots);
   spotsRef.current = spots;
   const spotData = useMemo(

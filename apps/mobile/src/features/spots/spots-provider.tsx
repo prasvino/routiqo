@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import {
@@ -21,25 +21,24 @@ export function SpotsProvider({ children }: { children: ReactNode }) {
   const session = useNativeAccount();
   const fetchRef = useRef(session.fetchSpotCatalog);
   fetchRef.current = session.fetchSpotCatalog;
-  const store = useMemo(
-    () =>
-      enabled
-        ? createSpotCatalogStore({
-            load: () => readCachedSpotCatalog(db),
-            save: (etag, payload, fetchedAt) =>
-              replaceCachedSpotCatalog(db, etag, payload, fetchedAt),
-            clear: () => clearCachedSpotCatalog(db),
-            fetch: (ifNoneMatch, signal) => fetchRef.current(ifNoneMatch, signal),
-            now: Date.now,
-          })
-        : null,
-    [db],
-  );
+  // Created in an effect so a remount (or StrictMode's double effects) gets a live store.
+  const [store, setStore] = useState<SpotCatalogStore | null>(null);
   useEffect(() => {
-    if (!store) return;
-    void store.load();
-    return () => store.dispose();
-  }, [store]);
+    if (!enabled) return;
+    const created = createSpotCatalogStore({
+      load: () => readCachedSpotCatalog(db),
+      save: (etag, payload, fetchedAt) => replaceCachedSpotCatalog(db, etag, payload, fetchedAt),
+      clear: () => clearCachedSpotCatalog(db),
+      fetch: (ifNoneMatch, signal) => fetchRef.current(ifNoneMatch, signal),
+      now: Date.now,
+    });
+    setStore(created);
+    void created.load();
+    return () => {
+      created.dispose();
+      setStore(null);
+    };
+  }, [db]);
   useEffect(() => {
     if (store && session.accountId && session.online) void store.refresh();
   }, [store, session.accountId, session.online]);

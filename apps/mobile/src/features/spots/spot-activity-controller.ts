@@ -35,6 +35,8 @@ export function createSpotActivityController(
 ) {
   let state: SpotActivityState = { activity: null, receivedAt: null, status: 'idle' };
   let spotIds: string[] = [];
+  /** IDs of the last request; a disjoint new set (e.g. the first position fix) is due at once. */
+  let requested = new Set<string>();
   let detailOpen = false;
   let lastAttemptAt: number | null = null;
   /** Restored when a request is cancelled, so returning to Journey mode refreshes promptly. */
@@ -80,6 +82,7 @@ export function createSpotActivityController(
     cancelTimer = null;
     if (disposed || inFlight || !ports.eligible() || spotIds.length === 0) return;
     const controller = new AbortController();
+    requested = new Set(spotIds);
     inFlight = controller;
     attemptBefore = lastAttemptAt;
     lastAttemptAt = ports.now();
@@ -115,6 +118,8 @@ export function createSpotActivityController(
       if (sorted.length === spotIds.length && sorted.every((id, index) => id === spotIds[index]))
         return;
       spotIds = sorted;
+      const disjoint = requested.size > 0 && sorted.every((id) => !requested.has(id));
+      if (disjoint && failures === 0 && !inFlight) lastAttemptAt = null;
       plan();
     },
     setDetailOpen(open: boolean) {

@@ -12,6 +12,7 @@ vi.mock('../apps/mobile/node_modules/react-native', () => ({
 }));
 
 import {
+  activityIsStale,
   spotsEnabled,
   spotsPanelModel,
   type SpotsPanelInput,
@@ -61,7 +62,8 @@ const input = (overrides: Partial<SpotsPanelInput> = {}): SpotsPanelInput => ({
   matchedCount: 8,
   ahead: ahead(8),
   fromStart: false,
-  activity: { status: 'ready', activity: activity(['quiet']), receivedAt: 0 },
+  // The last response covered all eight Spots ahead.
+  activity: { status: 'ready', activity: activity(Array(8).fill('quiet')), receivedAt: 0 },
   online: true,
   confirmed: true,
   now: 30_000,
@@ -174,6 +176,33 @@ describe('Spots-ahead panel states', () => {
     expect(row?.props.accessibilityLabel).toBe('Toll 1, சுங்கம், Toll plaza, 400 m ahead, Live');
     expect(text(render({ fromStart: true }))).toContain('400 m ahead (from start)');
     expect(text(render({ ahead: ahead(2, 100) }))).toContain('Toll plaza · Here');
+  });
+
+  it('calls the Spots ahead quiet only when the last response covered every one of them', () => {
+    // Spot 2 entered the list after the last response: no "all quiet" claim for it.
+    const one = { status: 'ready' as const, activity: activity(['quiet']), receivedAt: 0 };
+    expect(text(render({ ahead: ahead(2), activity: one }))).not.toContain(
+      'No recent reports on the Spots ahead',
+    );
+    const both = {
+      status: 'ready' as const,
+      activity: activity(['quiet', 'quiet']),
+      receivedAt: 0,
+    };
+    expect(text(render({ ahead: ahead(2), activity: both }))).toContain(
+      'No recent reports on the Spots ahead',
+    );
+  });
+
+  it('shares one staleness rule with the map', () => {
+    const fresh = { status: 'ready' as const, receivedAt: 0 };
+    expect(activityIsStale(fresh, true, 60_000)).toBe(false);
+    expect(activityIsStale(fresh, true, 120_001)).toBe(true);
+    expect(activityIsStale(fresh, false, 1_000)).toBe(true);
+    expect(activityIsStale({ status: 'rate-limited', receivedAt: 0 }, true, 1_000)).toBe(true);
+    expect(activityIsStale({ status: 'ready', receivedAt: null }, true, 0)).toBe(true);
+    const screen = readFileSync('apps/mobile/src/features/journey/journey-mode-screen.tsx', 'utf8');
+    expect(screen).toContain('activityIsStale(spotActivity, session.online, now)');
   });
 
   it('shows no state chip before the first activity response, never inventing activity', () => {

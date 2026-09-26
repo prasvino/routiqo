@@ -65,7 +65,7 @@ Journey mode can show the Spots ahead behind `EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED`
 Checks (cloud session):
 
 - `pnpm check` passed (contracts, formatting, all typechecks, lint):
-  **909 TypeScript tests / 109 files**, 34 of them new. They cover:
+  **914 TypeScript tests / 109 files**, 39 of them new. They cover:
   - matching at 99/101 m;
   - endpoint exclusion at 999/1,001 m and the bus-stand exception;
   - ordering with and without a position, the 200 m rule at both edges, the
@@ -78,6 +78,23 @@ Checks (cloud session):
   - the request mapping, panel states and copy, accessibility, and the flag
     failing closed.
 - `pnpm --filter @routiqo/mobile build` exported the Android bundle.
+- **Independent review:** a fresh-subagent review found no Critical or High
+  issues. Fixed in a follow-up commit:
+  - The first position fix now applies at once, and a Spots-ahead set that
+    doesn't overlap the last request refreshes immediately.
+  - Stale activity no longer colours map markers.
+  - The 20 s cadence runs only while a detail is visible.
+  - "All quiet" requires every Spot ahead to be in the last response.
+  - Nothing shows "Here" without a position, and distance labels round cleanly.
+  - Marker keys include coordinates.
+  - "Clear local data" always clears the catalog.
+  - A catalog-version mismatch refreshes once per version.
+  - The controller and store are created in effects, so they survive a remount.
+  - Two limitations are documented in SPOTS_SPEC: routes that double back, and
+    the need for strong ETags.
+  - The `useSpotsAhead` throttle and the container wiring have no automated
+    test, because the repo has no React renderer in Vitest. They are covered
+    by the device checks.
 
 Not verified: there was no emulator or device run in this cloud session. The
 panel, markers, refresh against staging, large text, TalkBack and battery are

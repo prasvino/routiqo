@@ -11,7 +11,11 @@ import { useNativeAccount } from '../../auth/native-account-provider';
 import type { CurrentJourney, RouteProgress } from '../journey/journey-mode-model';
 import { useSpotCatalogStore } from './spots-provider';
 import { createSpotCatalogStore } from './spot-catalog-store';
-import { createSpotActivityController, type SpotActivityState } from './spot-activity-controller';
+import {
+  createSpotActivityController,
+  type SpotActivityController,
+  type SpotActivityState,
+} from './spot-activity-controller';
 import { spotsPanelModel, type SpotsPanelSize } from './spots-model';
 import { SpotsPanelView } from './spots-panel-view';
 
@@ -35,37 +39,46 @@ export function useSpotsAhead(route: JourneyRoute | null, progress: RouteProgres
     () => (route && catalog.catalog ? matchSpotsToRoute(catalog.catalog, route) : []),
     [route, catalog.catalog],
   );
-  const along = progress?.alongMetres ?? 0;
-  const [applied, setApplied] = useState(along);
+  const hasFix = progress !== null && !progress.fromStart;
+  const along = hasFix ? progress.alongMetres : 0;
+  const [applied, setApplied] = useState({ along, hasFix });
   const appliedAt = useRef(0);
+  const appliedFix = useRef(hasFix);
   useEffect(() => {
     appliedAt.current = 0; // a new route or catalog applies the position immediately
   }, [matched]);
   useEffect(() => {
-    const wait = appliedAt.current + SPOTS_RECOMPUTE_MS - Date.now();
-    if (wait <= 0) {
+    const apply = () => {
       appliedAt.current = Date.now();
-      setApplied(along);
+      appliedFix.current = hasFix;
+      setApplied({ along, hasFix });
+    };
+    // Gaining or losing a fix applies at once; movement is applied at most every 10 s.
+    const wait =
+      hasFix !== appliedFix.current ? 0 : appliedAt.current + SPOTS_RECOMPUTE_MS - Date.now();
+    if (wait <= 0) {
+      apply();
       return;
     }
-    const timer = setTimeout(() => {
-      appliedAt.current = Date.now();
-      setApplied(along);
-    }, wait);
+    const timer = setTimeout(apply, wait);
     return () => clearTimeout(timer);
-  }, [along, matched]);
-  const ahead = useMemo(() => spotsAhead(matched, applied), [matched, applied]);
-  return { store, catalog, matched, ahead };
+  }, [along, hasFix, matched]);
+  const ahead = useMemo(
+    () => spotsAhead(matched, applied.along, applied.hasFix),
+    [matched, applied],
+  );
+  // "(from start)" follows the same applied snapshot as the list, never the live position.
+  return { store, catalog, matched, ahead, fromStart: !applied.hasFix };
 }
 
 export interface SpotsPanelProps {
   accountId: string;
   journey: CurrentJourney;
   hasRoute: boolean;
-  fromStart: boolean;
   spots: ReturnType<typeof useSpotsAhead>;
   now: number;
-  onActivity(state: SpotActivityState): void;
+  /** Mirrors activity to the map; null when the panel's controller goes away. */
+  onActivity(state: SpotActivityState | null): void;
 }
 
 /** Container for the Spots-ahead panel: activity refresh and the panel's own UI state. */
@@ -94,64 +107,69 @@ export function SpotsPanel(props: SpotsPanelProps) {
   const onActivity = useRef(props.onActivity);
   onActivity.current = props.onActivity;
   const { store } = props.spots;
+  const refreshedFor = useRef<string | null>(null);
 
-  // One controller per account and journey: switching either drops all activity state.
-  const controller = useMemo(
-    () =>
-      createSpotActivityController(
-        {
-          eligible: () =>
-            focused.current &&
-            foreground.current &&
-            env.current.online &&
-            env.current.confirmed &&
-            env.current.account === accountId &&
-            env.current.journey === journeyId,
-          fetch: (ids, signal) => fetchRef.current(ids, signal),
-          now: Date.now,
-          schedule: (run, delay) => {
-            const timer = setTimeout(run, delay);
-            return () => clearTimeout(timer);
-          },
-          onCatalogVersion: (version) => {
-            if (store.version() !== version) void store.refresh();
-          },
-        },
-        (state) => {
-          setActivity(state);
-          onActivity.current(state);
-        },
-      ),
-    [accountId, journeyId, store],
-  );
-  useEffect(() => () => controller.dispose(), [controller]);
+  // One controller per account and journey: switching either drops all activity state. Created
+  // in an effect so a remount (or StrictMode's double effects) always gets a live controller.
+  const [controller, setController] = useState<SpotActivityController | null>(null);
   useEffect(() => {
-    setActivity(controller.getState());
+    const created = createSpotActivityController(
+      {
+        eligible: () =>
+          focused.current &&
+          foreground.current &&
+          env.current.online &&
+          env.current.confirmed &&
+          env.current.account === accountId &&
+          env.current.journey === journeyId,
+        fetch: (ids, signal) => fetchRef.current(ids, signal),
+        now: Date.now,
+        schedule: (run, delay) => {
+          const timer = setTimeout(run, delay);
+          return () => clearTimeout(timer);
+        },
+        onCatalogVersion: (version) => {
+          // One catalog refresh per announced version, so a mismatch cannot loop.
+          if (store.version() === version || refreshedFor.current === version) return;
+          refreshedFor.current = version;
+          void store.refresh();
+        },
+      },
+      (state) => {
+        setActivity(state);
+        onActivity.current(state);
+      },
+    );
+    setController(created);
+    setActivity(created.getState());
     setSelectedId(null);
-  }, [controller]);
+    return () => {
+      created.dispose();
+      onActivity.current(null);
+    };
+  }, [accountId, journeyId, store]);
   useEffect(
-    () => controller.environmentChanged(),
+    () => controller?.environmentChanged(),
     [controller, session.online, props.journey.confirmed, props.journey.blocked, session.accountId],
   );
   const ids = activityRequestIds(props.spots.ahead);
   const idsKey = ids.join(',');
-  useEffect(() => controller.setSpotIds(idsKey ? idsKey.split(',') : []), [controller, idsKey]);
-  useEffect(() => controller.setDetailOpen(selectedId !== null), [controller, selectedId]);
+  useEffect(() => controller?.setSpotIds(idsKey ? idsKey.split(',') : []), [controller, idsKey]);
 
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
       foreground.current = AppState.currentState === 'active';
       if (env.current.online) void store.refresh(); // SPOTS_SPEC: refresh on opening Journey mode
-      controller.environmentChanged();
+      controller?.environmentChanged();
       const change = AppState.addEventListener('change', (state) => {
         foreground.current = state === 'active';
-        controller.environmentChanged();
+        controller?.environmentChanged();
       });
       return () => {
         change.remove();
         focused.current = false;
-        controller.environmentChanged();
+        controller?.environmentChanged();
       };
     }, [controller, store]),
   );
@@ -165,7 +183,7 @@ export function SpotsPanel(props: SpotsPanelProps) {
     hasRoute: props.hasRoute,
     matchedCount: props.spots.matched.length,
     ahead: props.spots.ahead,
-    fromStart: props.fromStart,
+    fromStart: props.spots.fromStart,
     activity,
     online: session.online,
     confirmed: props.journey.confirmed && !props.journey.blocked,
@@ -173,5 +191,8 @@ export function SpotsPanel(props: SpotsPanelProps) {
     size,
     selectedId,
   });
+  // The 20 s cadence applies only while a detail is actually on screen.
+  const detailVisible = model.rows.some((row) => row.selected);
+  useEffect(() => controller?.setDetailOpen(detailVisible), [controller, detailVisible]);
   return <SpotsPanelView {...model} onSelect={setSelectedId} onResize={setSize} />;
 }

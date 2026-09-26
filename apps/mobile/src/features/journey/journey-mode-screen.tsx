@@ -7,7 +7,7 @@ import { tokens } from '@routiqo/design-tokens';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import { journeyLocation } from './journey-location-expo';
 import { JourneyMap, journeyMapStyle, type JourneyMapStatus } from './journey-map';
-import { spotsEnabled } from '../spots/spots-model';
+import { activityIsStale, spotsEnabled } from '../spots/spots-model';
 import { SpotsPanel, useSpotsAhead } from '../spots/spots-panel';
 import type { SpotActivityState } from '../spots/spot-activity-controller';
 import {
@@ -59,15 +59,19 @@ export function JourneyModeScreen() {
   const progress = routeProgress(route, location, measures);
   const spots = useSpotsAhead(spotsOn ? route : null, progress);
   const [spotActivity, setSpotActivity] = useState<SpotActivityState | null>(null);
+  const staleSpots = !spotActivity || activityIsStale(spotActivity, session.online, now);
   const mapSpots = useMemo(() => {
     if (!spotsOn) return null;
-    const states = new Map(spotActivity?.activity?.spots.map((entry) => [entry.id, entry.state]));
+    // Stale activity is never shown as current: markers fall back to the neutral style.
+    const states = new Map(
+      staleSpots ? [] : spotActivity?.activity?.spots.map((entry) => [entry.id, entry.state]),
+    );
     return spots.ahead.map((entry) => ({
       id: entry.spot.id,
       coordinate: entry.spot.coordinate,
       state: states.get(entry.spot.id) ?? null,
     }));
-  }, [spots.ahead, spotActivity]);
+  }, [spots.ahead, spotActivity, staleSpots]);
 
   // Updates run only while this screen is focused and the app is in the foreground.
   useFocusEffect(
@@ -143,7 +147,6 @@ export function JourneyModeScreen() {
                 accountId={session.accountId}
                 journey={journey}
                 hasRoute={route !== null}
-                fromStart={progress?.fromStart ?? true}
                 spots={spots}
                 now={now}
                 onActivity={setSpotActivity}
