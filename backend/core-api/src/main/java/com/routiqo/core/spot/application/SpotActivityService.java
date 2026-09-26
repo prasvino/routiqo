@@ -14,7 +14,8 @@ import java.util.UUID;
 /**
  * Activity read for the Spots ahead (SPOTS_SPEC, ADR 0067). The requested Spot IDs are private journey
  * data: they are used only to shape this response and are never logged, stored or used as a rate key.
- * Posts and signals do not exist yet, so every known Spot is quiet.
+ * Content (signal summaries, posts, highlights) comes from {@link SpotActivityReader}; without any,
+ * every known Spot is quiet.
  */
 public final class SpotActivityService {
     static final String RATE_CATEGORY = "spot-activity-read-account";
@@ -25,9 +26,17 @@ public final class SpotActivityService {
     private final SpotCatalog catalog;
     private final Map<UUID, Spot> spots;
     private final Clock clock;
+    private final SpotActivityReader content;
 
     public SpotActivityService(AuthRateGate rates, ActiveJourneyReader journeys, SpotCatalog catalog,
             Clock clock) {
+        this(rates, journeys, catalog, clock,
+                (ids, now) -> new SpotActivityReader.Contents(List.of(), List.of(), List.of(), List.of()));
+    }
+
+    public SpotActivityService(AuthRateGate rates, ActiveJourneyReader journeys, SpotCatalog catalog,
+            Clock clock, SpotActivityReader content) {
+        this.content = java.util.Objects.requireNonNull(content);
         this.rates = rates;
         this.journeys = journeys;
         this.catalog = catalog;
@@ -52,9 +61,18 @@ public final class SpotActivityService {
             throw new SpotsUnavailable();
         }
         if (!active) throw new SpotActivityNeedsActiveJourney();
-        var entries = new ArrayList<SpotActivity.Entry>(spotIds.size());
-        for (UUID id : spotIds)
-            if (spots.containsKey(id)) entries.add(new SpotActivity.Entry(id, SpotActivity.State.QUIET));
-        return new SpotActivity(clock.instant(), catalog.version(), entries);
+        List<UUID> known = spotIds.stream().filter(spots::containsKey).toList();
+        var now = clock.instant();
+        final SpotActivityReader.Contents rows;
+        try {
+            rows = known.isEmpty()
+                    ? new SpotActivityReader.Contents(List.of(), List.of(), List.of(), List.of())
+                    : content.read(known, now);
+        } catch (RuntimeException unavailable) {
+            throw new SpotsUnavailable();
+        }
+        var entries = new ArrayList<SpotActivity.Entry>(known.size());
+        for (UUID id : known) entries.add(SpotActivityAssembler.entry(id, actor, rows, now));
+        return new SpotActivity(now, catalog.version(), entries);
     }
 }

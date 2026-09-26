@@ -295,6 +295,14 @@ class NativeSpotHttpTest {
         assertThat(get("spots/catalog", login(true)).statusCode()).isEqualTo(200);
     }
 
+    @Test void contributionPathsStayForbiddenWithoutTheContributionFlag() throws Exception {
+        Login owner = login(false);
+        String journey = start(owner);
+        for (String path : List.of("spots/signals", "spots/posts", "spots/items/" + UUID.randomUUID() + "/vote",
+                "spots/items/" + UUID.randomUUID() + "/delete"))
+            empty(post(path, "{\"journeyId\":\"" + journey + "\"}", owner), 403);
+    }
+
     @Test void unavailableRateAuthorityFailsClosed() throws Exception {
         Login owner = login(false);
         start(owner);

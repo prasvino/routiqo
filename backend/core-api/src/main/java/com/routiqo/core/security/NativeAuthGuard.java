@@ -32,15 +32,17 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
     private final boolean routingEnabled;
     private final boolean bindingEnabled;
     private final boolean spotsEnabled;
+    private final boolean contributionsEnabled;
 
     public NativeAuthGuard(AuthRateGate rates, GoogleSessionService sessions, boolean consentEnabled,
-            boolean routingEnabled, boolean bindingEnabled, boolean spotsEnabled) {
+            boolean routingEnabled, boolean bindingEnabled, boolean spotsEnabled, boolean contributionsEnabled) {
         this.rates = rates;
         this.sessions = sessions;
         this.consentEnabled = consentEnabled;
         this.routingEnabled = routingEnabled;
         this.bindingEnabled = bindingEnabled;
         this.spotsEnabled = spotsEnabled;
+        this.contributionsEnabled = spotsEnabled && contributionsEnabled;
     }
 
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -69,7 +71,10 @@ public final class NativeAuthGuard extends OncePerRequestFilter {
                 && path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}/route-context");
         boolean spots = spotsEnabled
                 && (("GET".equals(request.getMethod()) && "/api/v1/native/spots/catalog".equals(path))
-                    || ("POST".equals(request.getMethod()) && "/api/v1/native/spots/activity".equals(path)));
+                    || ("POST".equals(request.getMethod()) && "/api/v1/native/spots/activity".equals(path)))
+                || contributionsEnabled && "POST".equals(request.getMethod())
+                    && ("/api/v1/native/spots/signals".equals(path) || "/api/v1/native/spots/posts".equals(path)
+                        || path.matches("/api/v1/native/spots/items/[0-9a-f-]{36}/(?:vote|delete)"));
         boolean journey = ("GET".equals(request.getMethod()) &&
                     ("/api/v1/native/journeys".equals(path)
                         || path.matches("/api/v1/native/journeys/[a-fA-F0-9-]{36}")

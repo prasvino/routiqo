@@ -15,6 +15,103 @@ Workspace: `D:\Pras\routiqo`. Working local-planning preview and tested backend 
 
 _Archived 2026-09-25:_ the user had authorized V3 community-summary implementation and staging evaluation under ADR 0055, behind a disabled production flag; that work is now archived and is no longer authorized pilot work. The different production privacy contract is not accepted. Person-level research is archived with its code preserved. Traveller-derived public LIVE remains disabled in production.
 
+## September 26 Spot posts and signals, server (step 3a, flagged)
+
+Public contributions on Spots exist on the server behind
+`ROUTIQO_SPOTS_CONTRIBUTIONS_ENABLED` together with `ROUTIQO_SPOTS_API_ENABLED`
+(both exact `true`, default off), per
+[POSTS_AND_SIGNALS_SPEC.md](../features/spots/POSTS_AND_SIGNALS_SPEC.md) and
+[ADR 0071](../adr/0071-spot-contributions-storage-and-lifetimes.md):
+
+- **Migration V30** adds eight `spot_*` tables. Every account-owned row cascades on
+  account deletion, and no coordinates are stored.
+- **Writes** run under the account row lock, then the journey row lock, in one
+  transaction.
+  - Exact-fingerprint `clientKey` idempotency: a replay returns the stored receipt,
+    a changed replay returns 409.
+  - Restriction check.
+  - Capture rules on server time: a future capture is refused, an early capture
+    only shortens life, and an item too old on arrival gets 410.
+  - The journey must be active at capture, allowing 30 minutes before an
+    offline-started journey's server start.
+  - Rolling budgets: signals 20 per hour plus a 60 s cooldown per Spot and
+    category; posts 5 per 10 minutes and 20 per day; votes 60 per hour. Accounts
+    under 24 h old get lower limits.
+- **Posts:**
+  - 1–200 code points in one paragraph; Tamil, emoji and ZWJ are allowed.
+  - Links, e-mail addresses and phone numbers are refused with 422.
+  - Each post gets a per-room alias (a Spot on one Kolkata day) from the draft word
+    list.
+  - "Delete my post" works for the author only.
+- **Votes:**
+  - "Still true" extends to half the base life from now, up to the maximum.
+  - "No longer true" from two non-authors expires the item for good.
+  - A summary vote applies to every current signal in that summary.
+  - Authors cannot vote on their own content.
+- **Activity** now carries:
+  - live, fading or quiet state per Spot;
+  - unattributed signal summaries per category;
+  - the newest 10 posts, with alias, the viewer's own vote and a `mine` flag;
+  - up to 3 highlights.
+  It never contains account IDs, and it stays within 128 KiB by dropping the oldest
+  posts and marking `postsTruncated`.
+- **Maintenance** (`ROUTIQO_SPOTS_MAINTENANCE_ENABLED`):
+  - promotes expired place tips with at least two "Still true" votes to
+    highlights, keeping at most 3 per Spot for 30 days;
+  - purges items 24 h after they expire or end, together with their votes and
+    idempotency keys;
+  - purges aliases of empty rooms, and old ledger and key rows.
+
+Checks (cloud session, JDK 25, Docker):
+
+- **Java:** `./gradlew check bootJar` gave **699 tests / 118 suites**, zero
+  failures, errors or skips; the baseline was 669.
+  - New domain tests cover lifetimes, capture rules, the Still-true formula, text
+    rules and aliases.
+  - New PostgreSQL tests cover:
+    - replay and conflict;
+    - one active signal per slot under concurrent writes;
+    - every rate limit tier;
+    - journey active at capture, and restriction;
+    - vote rules for posts and summaries;
+    - activity state and summaries;
+    - maintenance, including a late replay after purge;
+    - the deletion cascade.
+  - New HTTP tests cover:
+    - the contribute, vote, delete and read-back flow;
+    - activity field sets with no account IDs;
+    - the 400/401/403/404/409/410/422/429 matrix;
+    - DEBUG log capture with no post text, aliases or Spot IDs;
+    - contribution paths staying 403 without the write flag;
+    - response truncation.
+  - The architecture rule now also forbids `spot` from depending on moderation
+    infrastructure or API.
+- **Independent review:** a fresh-subagent review found two High and two Medium
+  issues. All are fixed and regression-tested in the follow-up commit:
+  - A same-kind vote cast before the current signals now counts again; it was
+    silently ignored before.
+  - Deleting a post now also removes a highlight made from it.
+  - Summary votes and concurrent re-reports no longer deadlock: the group row is
+    locked with `FOR NO KEY UPDATE`.
+  - Highlight promotion considers each expired post once, is serialized across
+    replicas, and uses a deterministic top-3 tie-break.
+  - Low fixes:
+    - First posts in a room are serialized by an advisory lock, so aliases can't
+      collide;
+    - the summary ref is deterministic;
+    - response truncation measures each post once;
+    - a contract description is quoted properly;
+    - an exhausted alias list returns 503.
+  - Open for a product decision: the phone-number rule ("7 or more digits") also
+    rejects dates such as 2026-11-05.
+- **TypeScript:** `pnpm check` passed with **914 tests / 109 files**, and the
+  contract is in sync.
+
+Not done in 3a: Report and Block (3b), moderator hide (step 4), and the Android
+controls, offline queue and Ghost Mode (3c). The alias word list is a draft
+pending owner approval and Tamil review. The write flag must stay off until those
+are done.
+
 ## September 26 Spots on Android (flagged, not device-verified)
 
 Journey mode can show the Spots ahead behind `EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED`
