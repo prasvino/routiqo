@@ -6,8 +6,12 @@ export interface NativeHttpDriver {
     credential: string | null,
     accountId: string | null,
     payload: string | null,
-  ): Promise<{ status: number; body: string }>;
+    ifNoneMatch?: string | null,
+  ): Promise<{ status: number; body: string; etag?: string | null }>;
 }
+
+export type NativeSpotCatalogResult =
+  { status: 'not-modified'; etag: string } | { status: 'catalog'; etag: string; catalog: unknown };
 
 const account = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
@@ -17,8 +21,11 @@ const consentPath = new RegExp(`^/api/v1/native/journeys/${journeyId}/consent$`)
 const routeContextPath = new RegExp(`^/api/v1/native/journeys/${journeyId}/route-context$`);
 const routePath = '/api/v1/native/routes';
 const placePath = '/api/v1/native/routes/places';
+const spotCatalogPath = '/api/v1/native/spots/catalog';
+const spotActivityPath = '/api/v1/native/spots/activity';
+const spotEtag = /^"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"$/;
 const nativePath = new RegExp(
-  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal|consent|route-context))?)?|routes(?:/places)?)$`,
+  `^/api/v1/native/(?:auth/(?:google/(?:challenge|exchange)|session(?:/renew)?|logout|account/delete)|journeys(?:/history|/${journeyId}(?:/(?:complete|journal|consent|route-context))?)?|routes(?:/places)?|spots/activity)$`,
 );
 
 export function nativeApiOrigin(value: string | undefined): string | null {
@@ -62,7 +69,10 @@ export function createNativeTransport(
       throw new Error('Native request is invalid.');
     if (path === '/api/v1/native/journeys/history' && method !== 'POST')
       throw new Error('Native request is invalid.');
-    if ((path === routePath || path === placePath) && method !== 'POST')
+    if (
+      (path === routePath || path === placePath || path === spotActivityPath) &&
+      method !== 'POST'
+    )
       throw new Error('Native request is invalid.');
     const credential = options.credential ?? null;
     const accountId = options.accountId ?? null;
@@ -70,7 +80,12 @@ export function createNativeTransport(
       throw new Error('Native request is invalid.');
     if (accountId !== null && !account.test(accountId))
       throw new Error('Native request is invalid.');
-    if (path.startsWith('/api/v1/native/journeys') || path === routePath || path === placePath) {
+    if (
+      path.startsWith('/api/v1/native/journeys') ||
+      path === routePath ||
+      path === placePath ||
+      path === spotActivityPath
+    ) {
       if (!credential || !accountId) throw new Error('Native journey session is unavailable.');
     } else if (path.startsWith('/api/v1/native/auth/google/')) {
       if (credential || accountId) throw new Error('Native request is invalid.');
@@ -94,7 +109,15 @@ export function createNativeTransport(
       response.status > 599 ||
       typeof response.body !== 'string' ||
       new TextEncoder().encode(response.body).length >
-        (journalPath.test(path) ? 32 : path === routePath ? 1024 : path === placePath ? 256 : 64) *
+        (journalPath.test(path)
+          ? 32
+          : path === routePath
+            ? 1024
+            : path === placePath
+              ? 256
+              : path === spotActivityPath
+                ? 128
+                : 64) *
           1024
     )
       throw new Error('Native server response is invalid.');
@@ -105,7 +128,8 @@ export function createNativeTransport(
         consentPath.test(path) ||
         routeContextPath.test(path) ||
         path === routePath ||
-        path === placePath) &&
+        path === placePath ||
+        path === spotActivityPath) &&
       response.status !== 200
     )
       throw new Error('Native server response is invalid.');
@@ -113,7 +137,8 @@ export function createNativeTransport(
       consentPath.test(path) ||
       routeContextPath.test(path) ||
       path === routePath ||
-      path === placePath
+      path === placePath ||
+      path === spotActivityPath
     ) {
       const encoded = new TextEncoder().encode(response.body);
       if (new TextDecoder('utf-8', { fatal: true }).decode(encoded) !== response.body)
@@ -126,5 +151,67 @@ export function createNativeTransport(
       throw new Error('Native server response is invalid.');
     }
   }
-  return { request, configured: origin !== null };
+  /** The only way to read the Spot catalog: validates the ETag and accepts 304 only for it. */
+  async function spotCatalog(options: {
+    credential: string;
+    accountId: string;
+    ifNoneMatch?: string | null;
+  }): Promise<NativeSpotCatalogResult> {
+    if (!origin) throw new Error('Secure server connection is not configured.');
+    const ifNoneMatch = options.ifNoneMatch ?? null;
+    if (
+      !credentialPattern.test(options.credential) ||
+      !account.test(options.accountId) ||
+      (ifNoneMatch !== null && !spotEtag.test(ifNoneMatch))
+    )
+      throw new Error('Native request is invalid.');
+    let response: { status: number; body: string; etag?: string | null };
+    try {
+      response = await driver.request(
+        origin,
+        spotCatalogPath,
+        'GET',
+        options.credential,
+        options.accountId,
+        null,
+        ifNoneMatch,
+      );
+    } catch {
+      throw new Error('Secure server connection failed. Try again.');
+    }
+    if (
+      !Number.isInteger(response.status) ||
+      response.status < 200 ||
+      response.status > 599 ||
+      typeof response.body !== 'string' ||
+      new TextEncoder().encode(response.body).length > 256 * 1024
+    )
+      throw new Error('Native server response is invalid.');
+    if (response.status === 304 && ifNoneMatch !== null) {
+      if (response.body !== '' || response.etag !== ifNoneMatch)
+        throw new Error('Native server response is invalid.');
+      return { status: 'not-modified', etag: ifNoneMatch };
+    }
+    if (response.status < 200 || response.status >= 300)
+      throw new NativeHttpStatus(response.status);
+    if (
+      response.status !== 200 ||
+      typeof response.etag !== 'string' ||
+      !spotEtag.test(response.etag)
+    )
+      throw new Error('Native server response is invalid.');
+    const encoded = new TextEncoder().encode(response.body);
+    if (new TextDecoder('utf-8', { fatal: true }).decode(encoded) !== response.body)
+      throw new Error('Native server response is invalid.');
+    try {
+      return {
+        status: 'catalog',
+        etag: response.etag,
+        catalog: JSON.parse(response.body) as unknown,
+      };
+    } catch {
+      throw new Error('Native server response is invalid.');
+    }
+  }
+  return { request, spotCatalog, configured: origin !== null };
 }
