@@ -29,8 +29,8 @@ phase.
 - [ ] ~150–200 seeded Spots on the trunk and branches, with a named curator.
 - [ ] Public one-tap signals and short text posts; per-type expiry; "Still true?" and "No longer true".
 - [ ] Bounded HTTP refresh for Spot content (ADR 0066); offline rule for queued signals and posts.
-- [ ] Ghost Mode stops all sending; delete my post; account deletion covers posts and signals.
-- [ ] Report/Block on every item; moderator hide; admin login and a named, time-boxed moderator rota for the dry run. _Report and Block server done 2026-09-26 (step 3b, ADR 0072, default-off); Android buttons in 3c; hide in step 4._
+- [ ] Ghost Mode stops all sending; delete my post; account deletion covers posts and signals. _Done in code 2026-09-26 (steps 3a–3c, default-off); device checks pending in NATIVE_ANDROID_PENDING.md._
+- [ ] Report/Block on every item; moderator hide; admin login and a named, time-boxed moderator rota for the dry run. _Report and Block done 2026-09-26 on the server (step 3b, ADR 0072) and Android (step 3c, ADR 0073), default-off; hide in step 4._
 - [ ] Rate limits, stricter for new accounts.
 - [ ] Official alerts shown on Spots and the Journey for the corridor districts (north-east monsoon season).
 - [ ] Minimal staging deployment, monitoring and rollback for the dry-run testers.
@@ -122,19 +122,19 @@ Spots:
 
 Contribution:
 
-- [ ] Public one-tap signals on Spots, evolved from private Quick Signals (reuse signal storage, idempotent commands, abuse budgets, expiry maintenance; withdraw becomes "delete my post"). _Server done 2026-09-26 (step 3a, ADR 0071, default-off); Android controls in 3c._
-- [ ] Short text posts on Spots. _Server done 2026-09-26 (step 3a, ADR 0071, default-off); Android controls in 3c._
+- [ ] Public one-tap signals on Spots, evolved from private Quick Signals (reuse signal storage, idempotent commands, abuse budgets, expiry maintenance; withdraw becomes "delete my post"). _Server done 2026-09-26 (step 3a, ADR 0071); Android controls done 2026-09-26 (step 3c, ADR 0073); all default-off; device checks pending in NATIVE_ANDROID_PENDING.md._
+- [ ] Short text posts on Spots. _Server done 2026-09-26 (step 3a, ADR 0071); Android controls done 2026-09-26 (step 3c, ADR 0073); all default-off; device checks pending in NATIVE_ANDROID_PENDING.md._
 - [ ] Voice notes via signed direct S3 uploads, recorded only by explicit action.
-- [ ] Per-type expiry on server time with the decided lifetimes, "Still true?" and "No longer true", and top tips becoming highlights after expiry. _Server done 2026-09-26 (step 3a, ADR 0071, default-off); Android controls in 3c._
-- [ ] Report counts allowed ("3 reports in 20 min"); traveller counts not shown.
-- [ ] Offline rule: posts, signals and answers queue in the journey outbox with capture time and idempotency key; the server rejects items past their lifetime; cached Spot content is labelled stale and dropped at expiry.
+- [ ] Per-type expiry on server time with the decided lifetimes, "Still true?" and "No longer true", and top tips becoming highlights after expiry. _Server done 2026-09-26 (step 3a, ADR 0071); Android controls done 2026-09-26 (step 3c, ADR 0073); all default-off; device checks pending in NATIVE_ANDROID_PENDING.md._
+- [ ] Report counts allowed ("3 reports in 20 min"); traveller counts not shown. _Android shows signal summaries as value counts with the latest time (step 3c, default-off); no traveller counts._
+- [ ] Offline rule: posts, signals and answers queue in the journey outbox with capture time and idempotency key; the server rejects items past their lifetime; cached Spot content is labelled stale and dropped at expiry. _Posts and signals: separate `spot_outbox_v1` queue done 2026-09-26 (step 3c, ADR 0073, default-off); answers with Ask Ahead._
 - [ ] Rate-limit posts, voice uploads, signals, "Still true?" and reports; stricter limits for new accounts.
 
 Privacy and identity:
 
 - [ ] Per-room aliases; no follower graph, no private DMs; aliases never embed account identifiers.
-- [ ] Ghost Mode stops **all** sending (posts, signals, Spot passage, queued outbox items) and takes priority over reconnect and replay.
-- [ ] Clear Spot state on Ghost Mode, account changes, sign-out and journey completion; reauthorize on reconnect.
+- [ ] Ghost Mode stops **all** sending (posts, signals, Spot passage, queued outbox items) and takes priority over reconnect and replay. _Spot contributions done 2026-09-26 (step 3c, ADR 0073, device-wide, default-off); Spot passage and Ask Ahead extend it later; device checks pending._
+- [ ] Clear Spot state on Ghost Mode, account changes, sign-out and journey completion; reauthorize on reconnect. _Queued contributions cleared on Ghost Mode, sign-out, account change, deletion and Clear local data (step 3c); activity state already drops on account or journey change._
 - [ ] Account deletion removes the user's posts, voice notes, signals, answers and route guides; users can delete their own posts.
 - [ ] Spot chat for each Spot and a festival route room per corridor for the event window, over bounded HTTP refresh (ADR 0066). Not needed for Diwali.
 

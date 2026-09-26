@@ -1,6 +1,6 @@
 # Implementation resume: handoff for the next session
 
-Updated 2026-09-26 (Spots backend, Android Spots, posts and signals 3a and Report and Block 3b). Read this first, then `CLAUDE.md` / `AGENTS.md`,
+Updated 2026-09-26 (Spots backend, Android Spots, and step 3: posts and signals 3a, Report and Block 3b, Android contributions 3c). Read this first, then `CLAUDE.md` / `AGENTS.md`,
 [`PRODUCT.md`](../PRODUCT.md) and the spec for whatever you pick up. The
 previous private LIVE handoff is archived at
 [`../archive/validation/IMPLEMENTATION_RESUME.md`](../archive/validation/IMPLEMENTATION_RESUME.md).
@@ -126,10 +126,15 @@ honest.
        become highlights.
      Step 4 must add hide/restore and an "upheld" state that lifts the highlight
      exclusion for restored posts.
-   - **3c — Android, next:** the transport allowlist for the new paths
-     (signals, posts, vote, delete, reports, block-author; TypeScript and Kotlin),
-     `spot_outbox_v1`, contribution controls with Report and Block, and Ghost
-     Mode.
+   - **3c — Android, done 2026-09-26, default-off, not device-verified**
+     ([ADR 0073](../adr/0073-android-spot-contributions-and-ghost-mode.md);
+     flag `EXPO_PUBLIC_ROUTIQO_SPOT_CONTRIBUTIONS_ENABLED`):
+     - Spot detail content;
+     - one-tap signals, the post composer, votes, Report, Block and Delete my post;
+     - the `spot_outbox_v1` offline queue;
+     - device-wide Ghost Mode, in Profile and the Spots panel;
+     - the TypeScript and Kotlin transport allowlists.
+     Device checks are in NATIVE_ANDROID_PENDING.md.
 
    Original scope list:
    - new tables (do not alter the archived V10 private-signal tables);
