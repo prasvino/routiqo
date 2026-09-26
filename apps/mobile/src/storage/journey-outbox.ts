@@ -38,6 +38,11 @@ export async function initializeJourneyOutbox(db: Pick<OutboxDatabase, 'execAsyn
     account_id TEXT PRIMARY KEY NOT NULL,
     payload TEXT NOT NULL
   );`);
+  // Deletion also clears queued Spot contributions (ADR 0073), so their table must exist here too.
+  await db.execAsync(`CREATE TABLE IF NOT EXISTS spot_outbox_v1 (
+    account_id TEXT PRIMARY KEY NOT NULL,
+    payload TEXT NOT NULL
+  );`);
   // Device-only route of the active journey (ADR 0067). Never sent, backed up or logged.
   await db.execAsync(`CREATE TABLE IF NOT EXISTS journey_route_v1 (
     account_id TEXT PRIMARY KEY NOT NULL,
@@ -188,6 +193,7 @@ export async function clearJourneyPartition(db: OutboxDatabase, accountId: strin
     await tx.runAsync('DELETE FROM journey_snapshots_v1 WHERE account_id = ?', accountId);
     await tx.runAsync('DELETE FROM journal_partitions_v1 WHERE account_id = ?', accountId);
     await tx.runAsync('DELETE FROM journey_route_v1 WHERE account_id = ?', accountId);
+    await tx.runAsync('DELETE FROM spot_outbox_v1 WHERE account_id = ?', accountId);
   });
 }
 

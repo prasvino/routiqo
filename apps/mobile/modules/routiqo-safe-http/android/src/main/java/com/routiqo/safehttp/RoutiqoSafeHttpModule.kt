@@ -51,7 +51,9 @@ class RoutiqoSafeHttpModule : Module() {
         val routingPath = routePath || placePath
         val spotCatalogPath = path == "/api/v1/native/spots/catalog"
         val spotActivityPath = path == "/api/v1/native/spots/activity"
-        val spotPath = spotCatalogPath || spotActivityPath
+        val spotWritePath = path.matches(Regex("/api/v1/native/spots/(?:signals|posts)"))
+        val spotItemPath = path.matches(Regex("/api/v1/native/spots/items/$uuid/(?:vote|delete|reports|block-author)"))
+        val spotPath = spotCatalogPath || spotActivityPath || spotWritePath || spotItemPath
         val etagPattern = Regex("\"$uuid\"")
         require((authPath || journeyPath || routingPath || spotPath) && !path.contains('?') && !path.contains('#')) { "Invalid path" }
         require(method == "GET" || method == "POST") { "Invalid method" }
@@ -59,6 +61,7 @@ class RoutiqoSafeHttpModule : Module() {
         require(!routingPath || method == "POST") { "Invalid routing method" }
         require(!spotCatalogPath || method == "GET") { "Invalid Spot catalog method" }
         require(!spotActivityPath || method == "POST") { "Invalid Spot activity method" }
+        require(!(spotWritePath || spotItemPath) || method == "POST") { "Invalid Spot write method" }
         require(ifNoneMatch == null || spotCatalogPath && ifNoneMatch.matches(etagPattern)) { "Invalid If-None-Match" }
         require((method == "POST") == (payload != null)) { "Invalid body" }
         require(payload == null || payload.toByteArray(StandardCharsets.UTF_8).size <= 20 * 1024) { "Body too large" }
@@ -84,7 +87,7 @@ class RoutiqoSafeHttpModule : Module() {
           .newCall(builder.build()).execute().use { response ->
           val notModified = response.code == 304 && spotCatalogPath && ifNoneMatch != null
           require(!response.isRedirect && (response.code !in 300..399 || notModified)) { "Redirect denied" }
-          if ((journalPath || consentPath || routeContextPath || routingPath || spotPath) && response.code == 200) {
+          if ((journalPath || consentPath || routeContextPath || routingPath || spotPath) && (response.code == 200 || response.code == 202)) {
             val contentType = response.header("Content-Type") ?: ""
             require(contentType.matches(Regex("(?i)application/(?:[a-z0-9!#$&^_.+-]+\\+)?json(?:\\s*;.*)?"))) { "Invalid JSON content type" }
           }

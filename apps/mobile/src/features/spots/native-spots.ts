@@ -1,15 +1,33 @@
 import {
   readSpotActivity,
   readSpotCatalog,
+  readSpotContributionReceipt,
+  readSpotReportReceipt,
+  readSpotVoteResult,
+  type QueuedSpotContribution,
   type SpotActivity,
   type SpotCatalog,
+  type SpotContributionReceipt,
+  type SpotReportReason,
+  type SpotVote,
+  type SpotVoteResult,
 } from '@routiqo/shared';
 import { NativeSessionRequired, type createNativeAccount } from '../../auth/native-account';
 import { NativeHttpStatus } from '../../auth/safe-transport';
 import { nativeAbortError } from '../../auth/abort-error';
 
 type Account = ReturnType<typeof createNativeAccount>;
-export type SpotsFailure = 'session' | 'no-journey' | 'rate-limited' | 'unavailable' | 'invalid';
+export type SpotsFailure =
+  | 'session'
+  | 'no-journey'
+  | 'rate-limited'
+  | 'unavailable'
+  | 'invalid'
+  | 'forbidden'
+  | 'not-found'
+  | 'conflict'
+  | 'too-old'
+  | 'contact-details';
 
 export class NativeSpotsError extends Error {
   constructor(
@@ -23,6 +41,11 @@ export class NativeSpotsError extends Error {
         'rate-limited': 'Updates paused briefly.',
         unavailable: 'Spot updates are unavailable right now.',
         invalid: 'Spot updates are unavailable right now.',
+        forbidden: "You can't do that right now.",
+        'not-found': 'That item is no longer here.',
+        conflict: 'That was already done.',
+        'too-old': "Too old to post; it wasn't sent.",
+        'contact-details': "Links and phone numbers aren't allowed in posts.",
       }[code],
     );
     this.name = 'NativeSpotsError';
@@ -31,6 +54,28 @@ export class NativeSpotsError extends Error {
 
 const deadlineMs = 12_000;
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+
+/** Writes map every refusal to a specific code; reads keep their coarser mapping. */
+function classifyWrite(error: unknown): Error {
+  if (error instanceof NativeHttpStatus) {
+    const code = (
+      {
+        401: 'session',
+        403: 'forbidden',
+        404: 'not-found',
+        409: 'conflict',
+        410: 'too-old',
+        422: 'contact-details',
+        429: 'rate-limited',
+        400: 'invalid',
+        413: 'invalid',
+        415: 'invalid',
+      } as Record<number, SpotsFailure>
+    )[error.status];
+    return new NativeSpotsError(code ?? 'unavailable', error.status);
+  }
+  return classify(error);
+}
 
 function classify(error: unknown): Error {
   if (error instanceof NativeSpotsError) return error;
@@ -58,6 +103,7 @@ async function guarded<T>(
   accountId: string,
   call: () => Promise<T>,
   signal?: AbortSignal,
+  classifyError: (error: unknown) => Error = classify,
 ): Promise<T> {
   if (!uuid.test(accountId) || identity.activeAccount() !== accountId)
     throw new NativeSpotsError('session');
@@ -83,7 +129,7 @@ async function guarded<T>(
     return result;
   } catch (error) {
     current();
-    throw classify(error);
+    throw classifyError(error);
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
@@ -152,6 +198,135 @@ export function fetchNativeSpotActivity(
       } catch {
         throw new NativeSpotsError('invalid');
       }
+    },
+    signal,
+  );
+}
+
+function write<T>(
+  identity: Account,
+  accountId: string,
+  path: string,
+  body: unknown,
+  read: (raw: unknown) => T,
+  signal?: AbortSignal,
+): Promise<T> {
+  return guarded(
+    identity,
+    accountId,
+    async () => {
+      const raw = await identity.verifiedRequest(path, 'POST', {
+        accountId,
+        body,
+        ...(signal ? { signal } : {}),
+      });
+      try {
+        return read(raw);
+      } catch {
+        throw new NativeSpotsError('invalid');
+      }
+    },
+    signal,
+    classifyWrite,
+  );
+}
+
+function itemPath(ref: string, action: 'vote' | 'delete' | 'reports' | 'block-author'): string {
+  if (!uuid.test(ref)) throw new NativeSpotsError('invalid');
+  return `/api/v1/native/spots/items/${ref}/${action}`;
+}
+
+/** Sends one queued signal or post exactly as queued; replays are safe by its clientKey. */
+export function submitNativeSpotContribution(
+  identity: Account,
+  accountId: string,
+  entry: QueuedSpotContribution,
+  signal?: AbortSignal,
+): Promise<SpotContributionReceipt> {
+  const common = {
+    clientKey: entry.clientKey,
+    spotId: entry.spotId,
+    capturedAt: entry.capturedAt,
+    journeyId: entry.journeyId,
+  };
+  return entry.kind === 'signal'
+    ? write(
+        identity,
+        accountId,
+        '/api/v1/native/spots/signals',
+        { ...common, category: entry.category, value: entry.value },
+        readSpotContributionReceipt,
+        signal,
+      )
+    : write(
+        identity,
+        accountId,
+        '/api/v1/native/spots/posts',
+        { ...common, type: entry.type, text: entry.text },
+        readSpotContributionReceipt,
+        signal,
+      );
+}
+
+export async function voteNativeSpotItem(
+  identity: Account,
+  accountId: string,
+  ref: string,
+  vote: SpotVote,
+  signal?: AbortSignal,
+): Promise<SpotVoteResult> {
+  return write(identity, accountId, itemPath(ref, 'vote'), { vote }, readSpotVoteResult, signal);
+}
+
+export async function deleteNativeSpotPost(
+  identity: Account,
+  accountId: string,
+  ref: string,
+  signal?: AbortSignal,
+): Promise<SpotContributionReceipt> {
+  return write(
+    identity,
+    accountId,
+    itemPath(ref, 'delete'),
+    {},
+    readSpotContributionReceipt,
+    signal,
+  );
+}
+
+/** `requestId` is kept by the caller for the same item and reason, so a retry replays safely. */
+export async function reportNativeSpotItem(
+  identity: Account,
+  accountId: string,
+  ref: string,
+  requestId: string,
+  reason: SpotReportReason,
+  signal?: AbortSignal,
+): Promise<{ receivedAt: string; receiptExpiresAt: string }> {
+  if (!uuid.test(requestId)) return Promise.reject(new NativeSpotsError('invalid'));
+  return write(
+    identity,
+    accountId,
+    itemPath(ref, 'reports'),
+    { requestId, reason },
+    readSpotReportReceipt,
+    signal,
+  );
+}
+
+export async function blockNativeSpotAuthor(
+  identity: Account,
+  accountId: string,
+  ref: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return write(
+    identity,
+    accountId,
+    itemPath(ref, 'block-author'),
+    {},
+    (raw) => {
+      if (raw !== null) throw new Error('Unexpected body.');
     },
     signal,
   );

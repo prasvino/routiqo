@@ -180,6 +180,74 @@ describe('Spot activity transport', () => {
   });
 });
 
+describe('Spot write transport', () => {
+  const item = '00000000-0000-4000-8000-0000000000c1';
+  const send = (
+    transport: ReturnType<typeof createNativeTransport>,
+    path: string,
+    method: 'GET' | 'POST' = 'POST',
+  ) =>
+    transport.request(path, method, {
+      credential,
+      accountId: account,
+      body: method === 'POST' ? {} : undefined,
+    });
+
+  it('allows only the Spot write paths, POST only, with identity', async () => {
+    const receipt = '{"ref":"' + item + '","status":"active","expiresAt":"2026-11-05T07:30:00Z"}';
+    for (const path of [
+      '/api/v1/native/spots/signals',
+      '/api/v1/native/spots/posts',
+      `/api/v1/native/spots/items/${item}/vote`,
+      `/api/v1/native/spots/items/${item}/delete`,
+    ]) {
+      const { request, transport } = transportFor({ status: 200, body: receipt });
+      await expect(send(transport, path)).resolves.toEqual(JSON.parse(receipt));
+      expect(request).toHaveBeenCalledWith(origin, path, 'POST', credential, account, '{}');
+      await expect(send(transport, path, 'GET')).rejects.toThrow('Native request is invalid.');
+      await expect(transport.request(path, 'POST', { credential, body: {} })).rejects.toThrow(
+        'Native journey session is unavailable.',
+      );
+    }
+    for (const path of [
+      `/api/v1/native/spots/items/${item}/hide`,
+      `/api/v1/native/spots/items/not-a-ref/vote`,
+      `/api/v1/native/spots/items/${item.toUpperCase()}/vote`,
+      '/api/v1/native/spots/signals/extra',
+    ]) {
+      const { transport } = transportFor({ status: 200, body: receipt });
+      await expect(send(transport, path)).rejects.toThrow('Native request is invalid.');
+    }
+  });
+
+  it('accepts exactly 202 JSON for reports and an empty 204 for block', async () => {
+    const reports = `/api/v1/native/spots/items/${item}/reports`;
+    const block = `/api/v1/native/spots/items/${item}/block-author`;
+    const report =
+      '{"receivedAt":"2026-11-05T06:30:00Z","receiptExpiresAt":"2026-11-12T06:30:00Z"}';
+    await expect(
+      send(transportFor({ status: 202, body: report }).transport, reports),
+    ).resolves.toEqual(JSON.parse(report));
+    await expect(
+      send(transportFor({ status: 200, body: report }).transport, reports),
+    ).rejects.toThrow('Native server response is invalid.');
+    await expect(
+      send(transportFor({ status: 204, body: '' }).transport, block),
+    ).resolves.toBeNull();
+    await expect(send(transportFor({ status: 204, body: '{}' }).transport, block)).rejects.toThrow(
+      'Native server response is invalid.',
+    );
+    await expect(send(transportFor({ status: 200, body: '{}' }).transport, block)).rejects.toThrow(
+      'Native server response is invalid.',
+    );
+    const refused = send(
+      transportFor({ status: 410, body: '' }).transport,
+      '/api/v1/native/spots/posts',
+    );
+    await expect(refused).rejects.toBeInstanceOf(NativeHttpStatus);
+  });
+});
+
 describe('Kotlin safe-HTTP parity (static; no Android SDK in CI)', () => {
   const kotlin = readFileSync(
     'apps/mobile/modules/routiqo-safe-http/android/src/main/java/com/routiqo/safehttp/RoutiqoSafeHttpModule.kt',
@@ -201,6 +269,11 @@ describe('Kotlin safe-HTTP parity (static; no Android SDK in CI)', () => {
       'spotCatalogPath -> 256 * 1024',
       'spotActivityPath -> 128 * 1024',
       '"etag" to etag',
+      'val spotWritePath = path.matches(Regex("/api/v1/native/spots/(?:signals|posts)"))',
+      'val spotItemPath = path.matches(Regex("/api/v1/native/spots/items/$uuid/(?:vote|delete|reports|block-author)"))',
+      'val spotPath = spotCatalogPath || spotActivityPath || spotWritePath || spotItemPath',
+      'require(!(spotWritePath || spotItemPath) || method == "POST")',
+      '(response.code == 200 || response.code == 202)',
     ])
       expect(kotlin).toContain(fragment);
   });
