@@ -7,6 +7,9 @@ import { tokens } from '@routiqo/design-tokens';
 import { useNativeAccount } from '../../auth/native-account-provider';
 import { journeyLocation } from './journey-location-expo';
 import { JourneyMap, journeyMapStyle, type JourneyMapStatus } from './journey-map';
+import { activityIsStale, spotsEnabled } from '../spots/spots-model';
+import { SpotsPanel, useSpotsAhead } from '../spots/spots-panel';
+import type { SpotActivityState } from '../spots/spot-activity-controller';
 import {
   currentJourney,
   elapsedLabel,
@@ -21,6 +24,7 @@ import { JourneyModeView } from './journey-mode-view';
 import { useMinuteClock } from './use-minute-clock';
 
 const enabled = journeyMapEnabled();
+const spotsOn = enabled && spotsEnabled();
 
 export function mapNotice(status: JourneyMapStatus): string | null {
   switch (status) {
@@ -53,6 +57,21 @@ export function JourneyModeScreen() {
     journey && session.journeyRoute?.journeyId === journey.id ? session.journeyRoute : null;
   const measures = useMemo(() => (route ? cumulativeRouteMetres(route.geometry) : null), [route]);
   const progress = routeProgress(route, location, measures);
+  const spots = useSpotsAhead(spotsOn ? route : null, progress);
+  const [spotActivity, setSpotActivity] = useState<SpotActivityState | null>(null);
+  const staleSpots = !spotActivity || activityIsStale(spotActivity, session.online, now);
+  const mapSpots = useMemo(() => {
+    if (!spotsOn) return null;
+    // Stale activity is never shown as current: markers fall back to the neutral style.
+    const states = new Map(
+      staleSpots ? [] : spotActivity?.activity?.spots.map((entry) => [entry.id, entry.state]),
+    );
+    return spots.ahead.map((entry) => ({
+      id: entry.spot.id,
+      coordinate: entry.spot.coordinate,
+      state: states.get(entry.spot.id) ?? null,
+    }));
+  }, [spots.ahead, spotActivity, staleSpots]);
 
   // Updates run only while this screen is focused and the app is in the foreground.
   useFocusEffect(
@@ -73,6 +92,8 @@ export function JourneyModeScreen() {
   );
   // Account change, sign-out or completion ends Journey mode and forgets the reading.
   const journeyId = journey?.id ?? null;
+  // Spot activity is per account and journey, in memory only.
+  useEffect(() => setSpotActivity(null), [session.accountId, journeyId]);
   useEffect(() => {
     if (enabled && session.accountId && journeyId) return;
     journeyLocation.stop();
@@ -111,6 +132,7 @@ export function JourneyModeScreen() {
             <JourneyMap
               route={route}
               position={fix}
+              spots={mapSpots}
               follow={follow}
               onUserPan={() => setFollow(false)}
               onStatus={setMapStatus}
@@ -118,7 +140,19 @@ export function JourneyModeScreen() {
           }
           mapNotice={mapNotice(mapStatus)}
           follow={fix && (mapStatus === 'ready' || mapStatus === 'tiles_failed') ? follow : null}
-          spotsPanel={null}
+          spotsPanel={
+            spotsOn ? (
+              <SpotsPanel
+                key={`${session.accountId}:${journey.id}`}
+                accountId={session.accountId}
+                journey={journey}
+                hasRoute={route !== null}
+                spots={spots}
+                now={now}
+                onActivity={setSpotActivity}
+              />
+            ) : null
+          }
           canComplete={journey.confirmed}
           confirmingComplete={confirming}
           busy={session.busy}

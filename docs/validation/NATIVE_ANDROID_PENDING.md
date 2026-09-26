@@ -112,6 +112,37 @@ rebuilt development client against a staging API with the server flag on:
         does three rate-bucket upserts, one session lookup and one journey
         `EXISTS` query.
 
+## Spots on Android (flag `EXPO_PUBLIC_ROUTIQO_SPOTS_ENABLED`)
+
+The code is implemented and unit-tested as of 2026-09-26, with no emulator or
+device run. It needs the Journey map flag and a staging API with
+`ROUTIQO_SPOTS_API_ENABLED=true` and a reviewed catalog. Check on a rebuilt
+development client, then on 3+ physical phones:
+
+- [ ] The Spot list downloads after sign-in and on opening Journey mode.
+      Reopening sends `If-None-Match` and gets a 304. A new catalog version
+      replaces the old one. "Clear local data" removes it, and the panel then
+      says the list will download.
+- [ ] Starting a trip with a calculated route shows the Spots ahead. The spot
+      list and map markers match, ordered by distance. Spots near home and the
+      destination are left out, except bus stands.
+- [ ] Driving past a Spot shows "Here", and the Spot drops off 200 m after it.
+      Without a position, the list reads "(from start)".
+- [ ] Refresh timing, confirmed with a request log on the staging API:
+      - requests go out about every 60 s, and every 20 s with a Spot detail open;
+      - they stop in the background, after leaving Journey mode, offline, and
+        after completion or an account switch;
+      - no requests go out before the journey start reaches the server.
+- [ ] Error states:
+      - a 429 or 503 from staging shows "Updates paused briefly" or
+        "unavailable", with backoff;
+      - offline shows "Last updated N min ago".
+- [ ] 360 dp width at 200% font scale: the rows, chips and Show more / Show fewer
+      buttons stay readable, and TalkBack reads each row as one label.
+- [ ] One-hour battery and data reading with the panel open while travelling.
+- [ ] Staging serves the catalog with a strong ETag through every proxy (no `W/`
+      prefix from gzip). Otherwise phones never accept a new list.
+
 ## Evidence
 
 Recovered Android build, 2026-09-24:

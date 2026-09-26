@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
-import type { JourneyRoute, RouteCoordinate } from '@routiqo/shared';
+import type { JourneyRoute, RouteCoordinate, SpotState } from '@routiqo/shared';
 import { tokens } from '@routiqo/design-tokens';
 import { nativeMapStyle } from './native-map-config';
 
@@ -30,19 +30,30 @@ export function routeBounds(
   return [west, south, east, north];
 }
 
+/** A Spot marker: the same Spots, in the same order, as the Spots-ahead panel. */
+export interface JourneyMapSpot {
+  id: string;
+  coordinate: RouteCoordinate;
+  state: SpotState | null;
+}
+
 /**
- * Journey map: the stored route, owner-only endpoints and the traveller's own dot.
- * The route source is created once; position updates change only the position source.
+ * Journey map: the stored route, owner-only endpoints, Spot markers and the traveller's own dot.
+ * The route source is created once; position updates change only the position source, and the
+ * Spot source changes only when the Spots ahead or their states change.
  */
 export function JourneyMap({
   route,
   position,
+  spots = null,
   follow,
   onUserPan,
   onStatus,
 }: {
   route: JourneyRoute | null;
   position: RouteCoordinate | null;
+  /** Spots ahead, or null when the Spots flag is off. */
+  spots?: readonly JourneyMapSpot[] | null;
   follow: boolean;
   onUserPan(): void;
   onStatus(status: JourneyMapStatus): void;
@@ -116,6 +127,26 @@ export function JourneyMap({
         : null,
     [position],
   );
+  // Coordinates are part of the key so a corrected catalog position moves the marker.
+  const spotsKey = spots
+    ? spots.map((spot) => `${spot.id}:${spot.state ?? ''}:${spot.coordinate.join(',')}`).join('|')
+    : '';
+  const spotsRef = useRef(spots);
+  spotsRef.current = spots;
+  const spotData = useMemo(
+    () =>
+      spotsKey
+        ? {
+            type: 'FeatureCollection' as const,
+            features: (spotsRef.current ?? []).map((spot) => ({
+              type: 'Feature' as const,
+              properties: { state: spot.state ?? 'unknown' },
+              geometry: { type: 'Point' as const, coordinates: spot.coordinate },
+            })),
+          }
+        : null,
+    [spotsKey],
+  );
   const initialBounds = useMemo(() => (route ? routeBounds(route.geometry) : null), [route]);
   useEffect(() => {
     if (!follow || !position || !camera.current) return;
@@ -168,6 +199,28 @@ export function JourneyMap({
               'circle-radius': 6,
               'circle-color': tokens.colors.surface,
               'circle-stroke-color': tokens.colors.ink,
+              'circle-stroke-width': 2,
+            }}
+          />
+        </GeoJSONSource>
+      ) : null}
+      {spotData ? (
+        <GeoJSONSource id="journey-spots" data={spotData}>
+          <Layer
+            id="journey-spots-dot"
+            type="circle"
+            paint={{
+              'circle-radius': 7,
+              'circle-color': [
+                'match',
+                ['get', 'state'],
+                'live',
+                tokens.colors.accent,
+                'fading',
+                tokens.colors.sand,
+                tokens.colors.surface,
+              ],
+              'circle-stroke-color': tokens.colors.accent,
               'circle-stroke-width': 2,
             }}
           />
